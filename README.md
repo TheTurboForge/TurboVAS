@@ -9,3 +9,18 @@ This repository is currently in an early private development phase. The initial 
 Imported upstream components live under `components/`.
 
 See `UPSTREAMS.md` for source provenance and imported commit IDs. See `LICENSE_AUDIT.md` for the initial license and provenance audit notes.
+
+## Development Commands
+
+TurboVAS provides a small root command surface for repository health checks:
+
+- `just status`: show repository branch, HEAD, upstream, and worktree state.
+- `just inventory`: list the expected monorepo components.
+- `just doctor`: run structural and environment readiness checks.
+- `just license-report`: check preserved license and provenance files.
+
+The commands delegate to `tools/forkctl`, which also supports JSON output for automation, for example:
+
+```sh
+tools/forkctl doctor --json
+```

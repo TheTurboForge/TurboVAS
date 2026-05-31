@@ -21,6 +21,10 @@
 /.cache/
 /ccache/
 
+# Python caches.
+__pycache__/
+*.py[cod]
+
 # Editor local config.
 /.vscode/*
 !/.vscode/extensions.json

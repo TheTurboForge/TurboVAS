@@ -1,0 +1,399 @@
+#!/usr/bin/env python3
+"""TurboVAS monorepo health command surface."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import shutil
+import subprocess
+import sys
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Iterable
+
+
+STATUSES = ("pass", "warn", "fail")
+EXPECTED_ROOT_DOCS = ("README.md", "AGENTS.md", "UPSTREAMS.md", "LICENSE_AUDIT.md")
+BASELINE_TOOLS = (
+    "git",
+    "rg",
+    "fd",
+    "jq",
+    "just",
+    "python3",
+    "docker",
+    "cmake",
+    "ninja",
+    "pkg-config",
+    "gcc",
+    "g++",
+    "clang",
+    "cargo",
+    "bear",
+)
+DEFERRED_SURFACES = (
+    ("just build", "Build command surface is deferred until component build baselines exist."),
+    ("just test", "Test command surface is deferred until component checks are mapped."),
+    ("just up", "Runtime orchestration is deferred until Docker design is implemented."),
+    ("just down", "Runtime orchestration is deferred until Docker design is implemented."),
+    ("just logs", "Runtime log command is deferred until service orchestration exists."),
+)
+
+
+@dataclass(frozen=True)
+class Component:
+    name: str
+    path: str
+    role: str
+    licenses: tuple[str, ...]
+    markers: tuple[str, ...]
+
+
+COMPONENTS: tuple[Component, ...] = (
+    Component(
+        "openvas-scanner",
+        "components/openvas-scanner",
+        "scanner engine and NASL runtime",
+        ("COPYING", "license-details.md"),
+        ("README.md", "CMakeLists.txt", "rust/Cargo.toml"),
+    ),
+    Component(
+        "gvm-libs",
+        "components/gvm-libs",
+        "shared Greenbone/OpenVAS libraries",
+        ("COPYING",),
+        ("README.md", "CMakeLists.txt"),
+    ),
+    Component(
+        "gvmd",
+        "components/gvmd",
+        "manager daemon and GMP API",
+        ("COPYING",),
+        ("README.md", "CMakeLists.txt"),
+    ),
+    Component(
+        "ospd-openvas",
+        "components/ospd-openvas",
+        "scanner adapter service",
+        ("COPYING",),
+        ("README.md", "pyproject.toml"),
+    ),
+    Component(
+        "gsad",
+        "components/gsad",
+        "web service daemon",
+        ("LICENSE",),
+        ("README.md", "CMakeLists.txt"),
+    ),
+    Component(
+        "gsa",
+        "components/gsa",
+        "web user interface",
+        ("LICENSE",),
+        ("README.md", "package.json"),
+    ),
+    Component(
+        "openvas-smb",
+        "components/openvas-smb",
+        "SMB support library",
+        ("COPYING",),
+        ("README.md", "CMakeLists.txt"),
+    ),
+    Component(
+        "notus-scanner",
+        "components/notus-scanner",
+        "Notus local security check scanner",
+        ("LICENSE",),
+        ("README.md", "pyproject.toml"),
+    ),
+    Component(
+        "greenbone-feed-sync",
+        "components/greenbone-feed-sync",
+        "feed synchronization tooling",
+        ("LICENSE",),
+        ("README.md", "pyproject.toml"),
+    ),
+    Component(
+        "python-gvm",
+        "components/python-gvm",
+        "Python GMP client library",
+        ("LICENSE",),
+        ("README.md", "pyproject.toml"),
+    ),
+    Component(
+        "gvm-tools",
+        "components/gvm-tools",
+        "command-line GMP tools",
+        ("LICENSE",),
+        ("README.md", "pyproject.toml"),
+    ),
+)
+
+
+def run_git(repo_root: Path, args: list[str]) -> str | None:
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=repo_root,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return result.stdout.strip()
+
+
+def find_repo_root(start: Path) -> Path:
+    git_root = run_git(start, ["rev-parse", "--show-toplevel"])
+    if git_root:
+        return Path(git_root)
+    return start.resolve()
+
+
+def metadata(repo_root: Path, command: str) -> dict[str, Any]:
+    return {
+        "command": command,
+        "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "repo_root": str(repo_root),
+        "head": run_git(repo_root, ["rev-parse", "--short", "HEAD"]),
+    }
+
+
+def status_rank(status: str) -> int:
+    return STATUSES.index(status)
+
+
+def aggregate_status(findings: Iterable[dict[str, Any]]) -> str:
+    final = "pass"
+    for finding in findings:
+        status = str(finding.get("status", "pass"))
+        if status not in STATUSES:
+            status = "fail"
+        if status_rank(status) > status_rank(final):
+            final = status
+    return final
+
+
+def make_result(command: str, repo_root: Path, summary: str, findings: list[dict[str, Any]], artifacts: list[str] | None = None) -> dict[str, Any]:
+    return {
+        "status": aggregate_status(findings),
+        "summary": summary,
+        "findings": findings,
+        "artifacts": artifacts or [],
+        "metadata": metadata(repo_root, command),
+    }
+
+
+def finding(status: str, check: str, message: str, path: str | None = None, details: dict[str, Any] | None = None) -> dict[str, Any]:
+    item: dict[str, Any] = {"status": status, "check": check, "message": message}
+    if path:
+        item["path"] = path
+    if details:
+        item["details"] = details
+    return item
+
+
+def component_inventory(repo_root: Path, scope: str | None = None) -> list[dict[str, Any]]:
+    scope_path = (repo_root / scope).resolve() if scope else None
+    rows: list[dict[str, Any]] = []
+    for component in COMPONENTS:
+        component_path = repo_root / component.path
+        if scope_path and not component_path.resolve().is_relative_to(scope_path):
+            continue
+        rows.append(
+            {
+                "name": component.name,
+                "path": component.path,
+                "role": component.role,
+                "exists": component_path.is_dir(),
+                "license_files": [
+                    {"path": f"{component.path}/{license_file}", "exists": (component_path / license_file).is_file()}
+                    for license_file in component.licenses
+                ],
+                "markers": [
+                    {"path": f"{component.path}/{marker}", "exists": (component_path / marker).exists()}
+                    for marker in component.markers
+                ],
+            }
+        )
+    return rows
+
+
+def nested_git_dirs(repo_root: Path) -> list[str]:
+    nested: list[str] = []
+    components = repo_root / "components"
+    if not components.is_dir():
+        return nested
+    for path in components.rglob(".git"):
+        nested.append(str(path.relative_to(repo_root)))
+    return sorted(nested)
+
+
+def command_status(repo_root: Path) -> dict[str, Any]:
+    findings: list[dict[str, Any]] = []
+    branch = run_git(repo_root, ["branch", "--show-current"]) or "(detached or unavailable)"
+    head = run_git(repo_root, ["rev-parse", "--short", "HEAD"]) or "unavailable"
+    porcelain = run_git(repo_root, ["status", "--short"]) or ""
+    upstream = run_git(repo_root, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"])
+    findings.append(finding("pass", "git.repository", f"Repository root: {repo_root}"))
+    findings.append(finding("pass", "git.head", f"Current branch {branch} at {head}"))
+    if upstream:
+        findings.append(finding("pass", "git.upstream", f"Tracking upstream: {upstream}"))
+    else:
+        findings.append(finding("warn", "git.upstream", "No upstream tracking branch is configured."))
+    if porcelain:
+        findings.append(
+            finding(
+                "warn",
+                "git.worktree",
+                "Worktree has uncommitted changes.",
+                details={"changed_files": porcelain.splitlines()},
+            )
+        )
+    else:
+        findings.append(finding("pass", "git.worktree", "Worktree is clean."))
+    return make_result("status", repo_root, "Repository status collected.", findings)
+
+
+def command_inventory(repo_root: Path, scope: str | None = None) -> dict[str, Any]:
+    rows = component_inventory(repo_root, scope)
+    findings: list[dict[str, Any]] = []
+    if scope and not rows:
+        findings.append(finding("warn", "inventory.scope", f"No expected components matched scope {scope}."))
+    for row in rows:
+        status = "pass" if row["exists"] else "fail"
+        findings.append(finding(status, "component.exists", f"{row['name']}: {row['role']}", row["path"]))
+    summary = f"Inventory contains {len(rows)} expected component(s)."
+    return make_result("inventory", repo_root, summary, findings, artifacts=[])
+
+
+def command_license_report(repo_root: Path) -> dict[str, Any]:
+    findings: list[dict[str, Any]] = []
+    for component in COMPONENTS:
+        component_path = repo_root / component.path
+        for license_file in component.licenses:
+            relative = f"{component.path}/{license_file}"
+            status = "pass" if (component_path / license_file).is_file() else "fail"
+            findings.append(finding(status, "license.file", f"{component.name}: expected {license_file}", relative))
+    findings.append(
+        finding(
+            "warn",
+            "license.scope",
+            "This report checks preserved license/provenance files only; it is not a legal conclusion.",
+        )
+    )
+    return make_result("license-report", repo_root, "License/provenance file presence checked.", findings)
+
+
+def command_doctor(repo_root: Path) -> dict[str, Any]:
+    findings: list[dict[str, Any]] = []
+    if (repo_root / ".git").exists():
+        findings.append(finding("pass", "repo.git", "Repository metadata is present.", ".git"))
+    else:
+        findings.append(finding("fail", "repo.git", "Repository metadata is missing.", ".git"))
+
+    porcelain = run_git(repo_root, ["status", "--short"]) or ""
+    if porcelain:
+        findings.append(finding("warn", "git.worktree", "Worktree has uncommitted changes."))
+    else:
+        findings.append(finding("pass", "git.worktree", "Worktree is clean."))
+
+    for doc in EXPECTED_ROOT_DOCS:
+        status = "pass" if (repo_root / doc).is_file() else "fail"
+        findings.append(finding(status, "root.doc", f"Expected root document {doc}", doc))
+
+    for row in component_inventory(repo_root):
+        findings.append(
+            finding(
+                "pass" if row["exists"] else "fail",
+                "component.exists",
+                f"Expected component {row['name']}",
+                row["path"],
+            )
+        )
+        for license_file in row["license_files"]:
+            findings.append(
+                finding(
+                    "pass" if license_file["exists"] else "fail",
+                    "component.license",
+                    f"Expected license/provenance file for {row['name']}",
+                    license_file["path"],
+                )
+            )
+
+    nested = nested_git_dirs(repo_root)
+    if nested:
+        findings.append(finding("fail", "component.nested_git", "Nested .git directories were found.", details={"paths": nested}))
+    else:
+        findings.append(finding("pass", "component.nested_git", "No nested .git directories found under components/."))
+
+    for tool in BASELINE_TOOLS:
+        if shutil.which(tool):
+            findings.append(finding("pass", "tool.available", f"{tool} is available."))
+        else:
+            findings.append(finding("warn", "tool.available", f"{tool} is not available on PATH."))
+
+    for command, message in DEFERRED_SURFACES:
+        findings.append(finding("warn", "surface.deferred", message, details={"command": command}))
+
+    return make_result("doctor", repo_root, "Monorepo health checks completed.", findings)
+
+
+def print_human(result: dict[str, Any]) -> None:
+    print(f"{result['status'].upper()}: {result['summary']}")
+    for item in result["findings"]:
+        line = f"[{item['status']}] {item['check']}: {item['message']}"
+        if "path" in item:
+            line += f" ({item['path']})"
+        print(line)
+
+
+def emit(result: dict[str, Any], as_json: bool) -> int:
+    if as_json:
+        print(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        print_human(result)
+    return 1 if result["status"] == "fail" else 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="TurboVAS monorepo health checks")
+    parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
+
+    subparsers.add_parser("status", parents=[common], help="show repository status")
+    inventory = subparsers.add_parser("inventory", parents=[common], help="show expected component inventory")
+    inventory.add_argument("--scope", help="limit inventory to a path under the repository")
+    subparsers.add_parser("doctor", parents=[common], help="run structural and environment health checks")
+    subparsers.add_parser("license-report", parents=[common], help="check preserved license/provenance files")
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    repo_root = find_repo_root(Path.cwd())
+
+    if args.command == "status":
+        result = command_status(repo_root)
+    elif args.command == "inventory":
+        result = command_inventory(repo_root, args.scope)
+    elif args.command == "doctor":
+        result = command_doctor(repo_root)
+    elif args.command == "license-report":
+        result = command_license_report(repo_root)
+    else:
+        parser.error(f"unknown command {args.command}")
+
+    return emit(result, args.json)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
