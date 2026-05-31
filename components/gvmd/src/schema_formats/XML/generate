@@ -1,0 +1,12 @@
+#!/bin/sh
+# Copyright (C) 2010-2022 Greenbone AG
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Schema generator script: GMP XML.
+#
+# This schema generator is the most trivial one as it simply passes on the
+# GMP XML schema as is.
+
+cat $1
+exit 0

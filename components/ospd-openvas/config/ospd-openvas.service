@@ -1,0 +1,20 @@
+[Unit]
+Description=OSPd Wrapper for the OpenVAS Scanner (ospd-openvas)
+Documentation=man:ospd-openvas(8) man:openvas(8)
+After=network.target networking.service redis-server@openvas.service mosquitto.service
+Wants=redis-server@openvas.service mosquitto.service notus-scanner.service
+ConditionKernelCommandLine=!recovery
+
+[Service]
+Type=forking
+User=gvm
+RuntimeDirectory=ospd
+RuntimeDirectoryMode=2775
+PIDFile=/run/ospd/ospd-openvas.pid
+ExecStart=/usr/bin/ospd-openvas --config /etc/gvm/ospd-openvas.conf --log-config /etc/gvm/ospd-logging.conf
+SuccessExitStatus=SIGKILL
+Restart=always
+RestartSec=60
+
+[Install]
+WantedBy=multi-user.target

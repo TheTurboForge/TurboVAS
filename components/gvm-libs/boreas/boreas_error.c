@@ -1,0 +1,58 @@
+/* SPDX-FileCopyrightText: 2020-2023 Greenbone AG
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ */
+
+#include "boreas_error.h"
+
+#include <glib.h>
+
+#undef G_LOG_DOMAIN
+/**
+ * @brief GLib log domain.
+ */
+#define G_LOG_DOMAIN "libgvm boreas"
+
+/**
+ * @brief Transform Boreas error code into human readable error message.
+ *
+ * @param  boreas_error  Boreas error code.
+ *
+ * @return String representation of supplied error code.
+ */
+const char *
+str_boreas_error (boreas_error_t boreas_error)
+{
+  const gchar *msg;
+
+  msg = NULL;
+  switch (boreas_error)
+    {
+    case BOREAS_OPENING_SOCKET_FAILED:
+      msg = "Boreas was not able to open a new socket";
+      break;
+    case BOREAS_SETTING_SOCKET_OPTION_FAILED:
+      msg = "Boreas was not able to set socket option for socket";
+      break;
+    case BOREAS_NO_VALID_ALIVE_TEST_SPECIFIED:
+      msg =
+        "No valid alive detection method was specified for Boreas by the user";
+      break;
+    case BOREAS_CLEANUP_ERROR:
+      msg = "Boreas encountered an error during clean up.";
+      break;
+    case BOREAS_NO_SRC_ADDR_FOUND:
+      msg = "Boreas was not able to determine a source address for the given "
+            "destination.";
+      break;
+    case BOREAS_INVALID_IPV6_NETWORK:
+      msg = "Invalid IPv6 Network. Not possible to run an Host Discovery";
+      break;
+    case NO_ERROR:
+      msg = "No error was encountered by Boreas";
+      break;
+    default:
+      break;
+    }
+  return msg;
+}

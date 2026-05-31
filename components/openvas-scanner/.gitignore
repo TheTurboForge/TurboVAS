@@ -1,0 +1,15 @@
+build/
+.docker/install
+nasl/nasl_grammar.output
+nasl/nasl_grammar.tab.c
+nasl/nasl_grammar.tab.h
+.cache/
+testsuiterun.nasl
+.vscode
+.venv/
+*.bak
+assets/
+target/
+*.rsa
+*.pem
+*.snap.new

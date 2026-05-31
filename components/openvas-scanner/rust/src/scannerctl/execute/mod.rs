@@ -1,0 +1,188 @@
+// SPDX-FileCopyrightText: 2024 Greenbone AG
+//
+// SPDX-License-Identifier: GPL-2.0-or-later WITH x11vnc-openssl-exception
+
+use std::fs::File;
+use std::io::stdin;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+
+use clap::Subcommand;
+use futures::StreamExt;
+use scannerlib::feed::{HashSumNameLoader, Update};
+use scannerlib::models;
+use scannerlib::nasl::nasl_std_functions;
+use scannerlib::nasl::syntax::Loader;
+use scannerlib::nasl::utils::scan_ctx::NotusCtx;
+use scannerlib::notus::{Notus, ProductLoader};
+use scannerlib::scanner::preferences::preference::ScanPrefs;
+use scannerlib::scanner::{Scan, ScanRunner};
+use scannerlib::scheduling::Scheduler;
+use scannerlib::storage::inmemory::InMemoryStorage;
+use tracing::{info, warn, warn_span};
+
+use crate::utils::{ArgOrStdin, NotusArgs};
+use crate::{CliError, CliErrorKind, Db, interpret};
+
+#[derive(clap::Parser)]
+pub struct ExecuteArgs {
+    #[command(subcommand)]
+    action: Action,
+}
+
+#[derive(Subcommand)]
+enum Action {
+    Script(ScriptArgs),
+    Scan(ScanArgs),
+}
+
+#[derive(clap::Parser)]
+struct ScriptArgs {
+    script: PathBuf,
+    /// The path to the feed.
+    #[clap(short, long)]
+    feed_path: Option<PathBuf>,
+    /// Target to scan.
+    #[clap(short, long)]
+    target: Option<String>,
+    /// KB key value.
+    #[clap(short, long = "kb")]
+    kb: Vec<String>,
+    /// TCP Ports to scan.
+    #[clap(short, long = "port")]
+    ports: Vec<u16>,
+    /// UDP Ports to scan.
+    #[clap(short, long = "udp-port")]
+    udp_ports: Vec<u16>,
+    #[clap(long = "timeout")]
+    timeout: Option<u32>,
+    #[clap(long = "vendor")]
+    vendor_version: Option<String>,
+    /// Notus configuration. Use "<IP:PORT>" to connect to a running Notus
+    /// instance or "<PATH>" to product files to use the internal
+    /// implementation. If not given Notus will be disabled.
+    #[clap(short, long = "notus")]
+    notus: Option<NotusArgs>,
+}
+
+#[derive(clap::Parser)]
+struct ScanArgs {
+    /// The path to the feed.
+    path: PathBuf,
+    /// Path to the scan config JSON. Use "-" to read from stdin.
+    json: ArgOrStdin<PathBuf>,
+    /// Print the schedule without executing the scan.
+    #[clap(short, long)]
+    schedule_only: bool,
+    /// Target to scan.
+    #[clap(short, long)]
+    target: Option<String>,
+    /// Notus configuration. Use "<IP:PORT>" to connect to a running Notus
+    /// instance or "<PATH>" to product files to use the internal
+    /// implementation. If not given Notus will be disabled.
+    #[clap(short, long = "notus")]
+    notus: Option<NotusArgs>,
+}
+
+pub async fn run(args: ExecuteArgs) -> Result<(), CliError> {
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+    match args.action {
+        Action::Script(args) => script(args).await,
+        Action::Scan(args) => scan(args).await,
+    }
+}
+
+async fn scan(args: ScanArgs) -> Result<(), CliError> {
+    let scan: models::Scan = match args.json {
+        ArgOrStdin::Arg(f) => serde_json::from_reader(File::open(f)?)
+            .map_err(|e| CliErrorKind::Corrupt(format!("{e:?}")))?,
+        ArgOrStdin::Stdin => {
+            serde_json::from_reader(stdin()).map_err(|e| CliErrorKind::Corrupt(format!("{e:?}")))?
+        }
+    };
+    let storage = Arc::new(InMemoryStorage::new());
+    info!("loading feed. This may take a while.");
+
+    let loader = Loader::from_feed_path(args.path);
+    let verifier = HashSumNameLoader::sha256(&loader)?;
+    let updater = Update::init("1", 5, loader.clone(), &storage, verifier);
+    updater.perform_update().await?;
+
+    let vts_cloned = scan.vts.clone();
+    let scheduler = Scheduler::new(storage.clone());
+    let schedule = scheduler
+        .execution_plan(&vts_cloned)
+        .await
+        .expect("expected to be schedulable");
+    info!("creating scheduling plan");
+    if args.schedule_only {
+        for (i, r) in schedule.enumerate() {
+            let (stage, vts) = r.expect("should be resolvable");
+            print!("{i} - {stage}:\t");
+            println!(
+                "{}",
+                vts.into_iter()
+                    .map(|(vt, _)| vt.oid)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+        }
+    } else {
+        let executor = nasl_std_functions();
+        let scan = Scan::default_to_localhost(scan);
+        let notus = args.notus.map(|x| match x {
+            NotusArgs::Address(addr) => NotusCtx::Address(addr),
+            NotusArgs::Internal(path) => NotusCtx::Direct(Arc::new(Mutex::new(Notus::new(
+                // we don't require a correctly setup feed for scannerctl
+                ProductLoader::new(false, Loader::from_feed_path(path)),
+            )))),
+        });
+        let runner: ScanRunner<Arc<InMemoryStorage>> =
+            ScanRunner::new(&storage, &loader, &executor, schedule, &scan, &notus).unwrap();
+        let mut results = Box::pin(runner.stream());
+        while let Some(x) = results.next().await {
+            match x {
+                Ok(x) => {
+                    let _span =
+                        warn_span!("script_result", filename=x.filename, oid=x.oid, stage=%x.stage)
+                            .entered();
+                    if x.has_succeeded() {
+                        info!("success")
+                    } else {
+                        warn!(kind=?x.kind, "failed")
+                    }
+                }
+                Err(e) => {
+                    warn!(error=?e, "failed to execute script.");
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+async fn script(args: ScriptArgs) -> Result<(), CliError> {
+    let notus = args.notus.map(|x| match x {
+        NotusArgs::Address(addr) => NotusCtx::Address(addr),
+        NotusArgs::Internal(path) => NotusCtx::Direct(Arc::new(Mutex::new(Notus::new(
+            // scannerctl doesn't require a proper feed
+            ProductLoader::new(false, Loader::from_feed_path(path)),
+        )))),
+    });
+    let scan_preferences = ScanPrefs::new()
+        .set_default_recv_timeout(args.timeout)
+        .set_vendor_version(args.vendor_version);
+    interpret::run(
+        &Db::InMemory,
+        args.feed_path,
+        &args.script,
+        args.target.clone(),
+        args.kb.clone(),
+        args.ports.clone(),
+        args.udp_ports.clone(),
+        scan_preferences,
+        notus,
+    )
+    .await
+}

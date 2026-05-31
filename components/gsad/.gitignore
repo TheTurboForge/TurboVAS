@@ -1,0 +1,10 @@
+build/
+/tags
+.env.local
+/gsa/public/config.js
+.vscode/
+.tern-project
+# directory files for image previews
+.directory
+coverage/
+/gsa/storybook-static/

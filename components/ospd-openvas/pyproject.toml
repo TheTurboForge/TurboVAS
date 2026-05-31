@@ -1,0 +1,91 @@
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "ospd-openvas"
+version = "22.10.1"
+description = "ospd based scanner for openvas"
+authors = ["Greenbone AG <info@greenbone.net>"]
+license = "AGPL-3.0-or-later"
+readme = "README.md"
+homepage = "https://github.com/greenbone/ospd-openvas"
+repository = "https://github.com/greenbone/ospd-openvas"
+# Full list: https://pypi.org/pypi?%3Aaction=list_classifiers
+classifiers=[
+  "Development Status :: 4 - Beta",
+  "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+  "Intended Audience :: Developers",
+  "Intended Audience :: System Administrators",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+]
+keywords = [
+  "openvas",
+  "Greenbone Vulnerability Management",
+  "Vulnerability Scanning",
+  "OSP",
+  "Open Scanner Protocol",
+]
+
+packages = [
+  { include = "ospd_openvas"},
+  { include = "ospd"},
+  { include = "docs/ospd-openvas.8", format = "sdist"},
+  { include = "config/ospd-openvas.service", format = "sdist"},
+  { include = "config/ospd-openvas.conf", format = "sdist"},
+  { include = "tests", format = "sdist" },
+  { include = "CHANGELOG.md", format = "sdist"},
+  { include = "COPYING", format = "sdist"},
+  { include = "poetry.lock", format = "sdist"},
+  { include = "poetry.toml", format = "sdist"},
+]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+redis = ">=4.5.0,<7.2.0"
+psutil = ">=5.5.1,<8.0.0"
+packaging = ">=20.4,<27.0"
+lxml = ">=4.5.2,<7.0.0"
+defusedxml = ">=0.6,<0.8"
+deprecated = "^1.2.10"
+paho-mqtt = ">=1.6,<3"
+python-gnupg = ">=0.4.8,<0.6.0"
+
+[tool.poetry.group.dev.dependencies]
+pylint = "^3.3.9"
+rope = "^1.14.0"
+autohooks-plugin-pylint = ">=21.6.0"
+autohooks-plugin-black = ">=22.7.0"
+pontos = ">=22.8.0"
+black = ">=22.6.0"
+
+[tool.poetry.scripts]
+ospd-openvas = "ospd_openvas.daemon:main"
+
+[tool.black]
+line-length = 80
+target-version = ['py39']
+skip-string-normalization = true
+exclude = '''
+/(
+    \.git
+  | \.hg
+  | \.venv
+  | \.circleci
+  | \.github
+  | \.vscode
+  | _build
+  | build
+  | dist
+  | docs
+)/
+'''
+
+[tool.autohooks]
+mode = "poetry"
+pre-commit = ['autohooks.plugins.black']
+
+[tool.pontos.version]
+version-module-file = "ospd_openvas/__version__.py"

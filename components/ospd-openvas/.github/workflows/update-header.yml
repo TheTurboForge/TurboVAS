@@ -1,0 +1,21 @@
+name: Update Headers
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 1 1 *' # At 00:00 on day-of-month 1 in January.
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-header:
+    name: Update headers
+    runs-on: 'ubuntu-latest'
+    steps:
+    - name: Run update header
+      uses: greenbone/actions/update-header@v3
+      with:
+        directories: ospd ospd_openvas tests
+        target: main

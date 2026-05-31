@@ -1,0 +1,87 @@
+name: Build and test C
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  c-format-check:
+    name: Check C Source Code Formatting
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check Source Format
+        run: |
+          clang-format -i -style=file src/*.{c,h}
+          git diff --exit-code
+
+  build-gsad:
+    name: Build gsad
+    runs-on: "ubuntu-latest"
+    strategy:
+      matrix:
+        container:
+          - stable
+          - oldstable
+          - testing
+    container: ghcr.io/greenbone/gvm-libs:${{ matrix.container }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install build dependencies
+        run: sh .github/install-dependencies.sh .github/build-dependencies.list
+      - name: Configure and compile gsad
+        run: |
+          rm -rf .git
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j $(nproc) -- install
+
+  unittests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    container: ghcr.io/greenbone/gvm-libs:stable
+    steps:
+      - name: Install git for codecov uploader and cgreen for unit tests
+        run: |
+          apt-get update
+          apt-get install --no-install-recommends -y ca-certificates git libcgreen1-dev
+      - uses: actions/checkout@v6
+      - name: Install build dependencies
+        run: sh .github/install-dependencies.sh .github/build-dependencies.list
+      - name: Configure and compile gsad
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=1 -DENABLE_COVERAGE=1 .
+      - name: Configure and run tests
+        run: CTEST_OUTPUT_ON_FAILURE=1 cmake --build build -- tests test
+      - name: Upload test coverage to Codecov
+        if: github.repository == 'greenbone/gsad'
+        uses: codecov/codecov-action@v6
+        with:
+          files: build/coverage/coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: unittests
+
+  cmake-format-check:
+    name: Check CMake Formatting
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: greenbone/actions/uv@v3
+        with:
+          install: gersemi
+      - name: Check CMake Format
+        id: check
+        run: |
+          gersemi --check . cmake
+      - name: Report Diff
+        if: ${{ failure() && steps.check.outcome == 'failure' }}
+        run: |
+          echo "## CMake Format Check" >> $GITHUB_STEP_SUMMARY
+          gersemi --check --no-warn-about-unknown-commands . cmake >> $GITHUB_STEP_SUMMARY 2>&1 || true
+          echo "## CMake Format Diff" >> $GITHUB_STEP_SUMMARY
+          echo '```diff' >> $GITHUB_STEP_SUMMARY
+          gersemi --diff . cmake >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

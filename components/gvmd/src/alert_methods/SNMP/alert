@@ -1,0 +1,20 @@
+#!/bin/sh
+# Copyright (C) 2016-2022 Greenbone AG
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Escalator method script: SNMP.
+
+COMMUNITY=$1
+AGENT=$2  # Host.
+MESSAGE=$3
+
+OUTPUT=$(snmptrap -v 2c -c $COMMUNITY $AGENT '' .1.3.6.1.6.3 0 s "$MESSAGE" 2>&1)
+
+EXIT_CODE=$?
+
+if [ "0" -ne "$EXIT_CODE" ]
+then
+  echo "snmptrap failed with code $EXIT_CODE:\n$OUTPUT" >&2
+  exit $EXIT_CODE
+fi

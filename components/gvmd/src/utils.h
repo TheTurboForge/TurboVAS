@@ -1,0 +1,112 @@
+/* Copyright (C) 2012-2022 Greenbone AG
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+/**
+ * @file
+ * @brief Headers for Greenbone Vulnerability Manager: General utilities.
+ */
+
+#ifndef _GVMD_UTILS_H
+#define _GVMD_UTILS_H
+
+#include <glib.h>
+#include <gvm/base/array.h>
+#include <gvm/util/xmlutils.h>
+#include <time.h>
+
+int
+gvm_usleep (unsigned int);
+
+int
+gvm_sleep (unsigned int);
+
+int
+parse_utc_ctime (const char *);
+
+int
+parse_feed_timestamp (const char *);
+
+time_t
+parse_iso_time_tz (const char *, const char *);
+
+char *
+iso_time (time_t *);
+
+char *
+iso_time_tz (time_t *, const char *, const char **);
+
+char *
+iso_if_time (time_t epoch_time);
+
+/**
+ * @brief Lockfile.
+ */
+typedef struct
+{
+  int fd;      ///< File descriptor.
+  gchar *name; ///< Name.
+} lockfile_t;
+
+int
+lockfile_lock (lockfile_t *, const gchar *);
+
+int
+lockfile_lock_nb (lockfile_t *, const gchar *);
+
+int
+lockfile_lock_path_nb (lockfile_t *, const gchar *);
+
+int
+lockfile_lock_shared_nb (lockfile_t *, const gchar *);
+
+int
+lockfile_unlock (lockfile_t *);
+
+int
+lockfile_locked (const gchar *);
+
+int
+lockfile_lock_with_retry (lockfile_t *, const gchar *, int, int);
+
+int
+is_uuid (const char *);
+
+gchar *
+strescape_check_utf8 (const char *, const char *);
+
+gchar *
+strescape_without_utf8 (const char *, const char *);
+
+int
+parse_xml_file (const gchar *, entity_t *);
+
+void
+setup_signal_handler (int, void (*) (int), int);
+
+void
+setup_signal_handler_info (int, void (*) (int, siginfo_t *, void *), int);
+
+int
+fork_with_handlers ();
+
+void
+wait_for_pid (pid_t, const char *);
+
+guint64
+phys_mem_available ();
+
+guint64
+phys_mem_total ();
+
+void
+array_add_new_string (array_t *, const gchar *);
+
+gboolean
+path_is_in_directory (const gchar *, const gchar *);
+
+gboolean
+str_blank (const gchar *);
+
+#endif /* not _GVMD_UTILS_H */

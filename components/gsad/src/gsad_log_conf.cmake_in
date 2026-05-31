@@ -1,0 +1,23 @@
+# GSA logging configuration
+#
+# WARNING: Setting the level of any of the library groups or the "*"
+#          group to include debug may reveal passwords in the logs.
+
+[gsad main]
+level=info
+
+[gsad gmp]
+level=info
+
+[gsad http]
+level=info
+
+[gsad http handler]
+level=info
+
+[*]
+prepend=%t %s %p
+separator=:
+prepend_time_format=%Y-%m-%d %Hh%M.%S %Z
+file=${GSAD_LOG_FILE}
+level=warning

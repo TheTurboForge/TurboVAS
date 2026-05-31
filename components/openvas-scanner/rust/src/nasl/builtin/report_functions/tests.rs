@@ -1,0 +1,114 @@
+// SPDX-FileCopyrightText: 2023 Greenbone AG
+//
+// SPDX-License-Identifier: GPL-2.0-or-later WITH x11vnc-openssl-exception
+
+use greenbone_scanner_framework::models::{self, Protocol, ResultType};
+
+use crate::nasl::test_prelude::*;
+
+async fn verify(function: &str, result_type: ResultType) {
+    let mut t = TestBuilder::default();
+    t.run_all(format!(
+        r###"
+        {function}(data: "test0", port: 12, proto: "udp", uri: "moep");
+        {function}(data: "test1", port: 12, proto: "tcp", uri: "moep");
+        {function}(data: "test2", port: 12, proto: "nonsense", uri: "moep");
+        {function}(data: "test3");
+        "###
+    ));
+    t.check_no_errors();
+    {
+        let (results, context) = t.results_and_context();
+
+        let get_result = async |index| {
+            context
+                .storage()
+                .retrieve(&(context.scan().clone(), index as usize))
+                .await
+                .unwrap()
+                .unwrap()
+        };
+        assert_eq!(
+            results.len(),
+            4,
+            "expected the same results as log_message calls"
+        );
+
+        let create_expected = |id, port, protocol| models::Result {
+            id,
+            r_type: result_type.clone(),
+            ip_address: Some(context.target().ip_addr().to_string()),
+            hostname: Some("".into()),
+            oid: Some(context.scan().0.clone()),
+            port,
+            protocol: Some(protocol),
+            message: Some(format!("test{id}")),
+            detail: None,
+        };
+
+        let udp = get_result(0).await;
+        let expected = create_expected(0, Some(12), Protocol::UDP);
+        assert_eq!(udp, expected);
+        let tcp = get_result(1).await;
+        let expected = create_expected(1, Some(12), Protocol::TCP);
+        assert_eq!(tcp, expected);
+        let defaults_to_tcp = get_result(2).await;
+        let expected = create_expected(2, Some(12), Protocol::TCP);
+        assert_eq!(defaults_to_tcp, expected);
+        let default = get_result(3).await;
+        let expected = create_expected(3, None, Protocol::TCP);
+        assert_eq!(default, expected);
+    }
+    t.async_verify().await;
+}
+
+#[tokio::test]
+async fn log_message() {
+    verify("log_message", ResultType::Log).await
+}
+
+#[tokio::test]
+async fn security_message() {
+    verify("security_message", ResultType::Alarm).await
+}
+
+#[tokio::test]
+async fn error_message() {
+    verify("error_message", ResultType::Error).await
+}
+
+#[tokio::test]
+async fn security_notus() {
+    let mut t = TestBuilder::default();
+    t.run_all(
+        r###"
+        result["oid"] = "1.2.3.4.5";
+        result["message"] = "test message";
+        security_notus(result: result);
+        "###,
+    );
+    t.check_no_errors();
+    {
+        let (results, context) = t.results_and_context();
+        assert_eq!(results.len(), 3);
+        let result = context
+            .storage()
+            .retrieve(&(context.scan().clone(), 0))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(result.id, 0);
+        assert_eq!(result.r_type, ResultType::Alarm);
+        assert_eq!(
+            result.ip_address,
+            Some(context.target().ip_addr().to_string())
+        );
+        assert_eq!(result.hostname, None);
+        assert_eq!(result.oid, Some("1.2.3.4.5".to_string()));
+        assert_eq!(result.port, None);
+        assert_eq!(result.protocol, None);
+        assert_eq!(result.message, Some("test message".into()));
+        assert_eq!(result.detail, None);
+    }
+    t.async_verify().await;
+}

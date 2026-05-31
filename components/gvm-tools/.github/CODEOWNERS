@@ -1,0 +1,5 @@
+# default reviewers
+*                 @greenbone/gea
+
+# dev ops
+.github/          @greenbone/devops @greenbone/gea

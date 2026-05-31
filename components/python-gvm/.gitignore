@@ -1,0 +1,18 @@
+__pycache__
+*.pyc
+*.log
+.egg
+*.egg-info
+dist
+build
+_build
+.idea
+.vscode
+htmlcov
+.coverage
+.venv
+.rej
+.DS_Store
+
+# ruff
+.ruff_cache/

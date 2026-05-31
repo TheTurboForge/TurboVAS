@@ -1,0 +1,96 @@
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "notus-scanner"
+version = "22.7.2"
+description = "A vulnerability scanner for creating results from local security checks (LSCs) "
+authors = ["Greenbone AG <info@greenbone.net>"]
+license = "AGPL-3.0-or-later"
+readme = "README.md"
+homepage = "https://github.com/greenbone/notus-scanner"
+repository = "https://github.com/greenbone/notus-scanner"
+# Full list: https://pypi.org/pypi?%3Aaction=list_classifiers
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+  "Intended Audience :: Developers",
+  "Intended Audience :: System Administrators",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+]
+keywords = [
+  "openvas",
+  "Greenbone Vulnerability Management",
+  "Vulnerability Scanning",
+  "Notus",
+  "Open Scanner Protocol",
+  "Local Security Checks",
+  "LSC",
+]
+
+packages = [
+  { include = "notus" },
+  { include = "tests", format = "sdist" },
+  { include = "poetry.lock", format = "sdist" },
+]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+paho-mqtt = ">=1.6,<3.0"
+psutil = "^7.0"
+python-gnupg = "^0.5.4"
+tomli = { version = "<3.0.0", python = "<3.11" }
+packaging = "<25.1"
+
+[tool.poetry.group.dev.dependencies]
+rope = "^1.14.0"
+coverage = ">=7.4.0"
+autohooks-plugin-black = ">=22.7.0"
+autohooks-plugin-isort = ">=22.8.0"
+autohooks-plugin-ruff = ">=24.1.0"
+pontos = ">=22.7.2"
+autohooks = "^25.4.1"
+
+[tool.poetry.scripts]
+notus-scanner = "notus.scanner.daemon:main"
+notus-scan-start = "notus.scanner.tools.scanstart:main"
+notus-subscriber = "notus.scanner.tools.subscriber:main"
+
+[tool.black]
+line-length = 80
+target-version = ['py39', 'py310', 'py311', 'py312']
+exclude = '''
+/(
+    \.git
+  | \.venv
+  | \.github
+  | \.vscode
+  | _build
+  | build
+  | dist
+  | docs
+)/
+'''
+
+[tool.autohooks]
+mode = "poetry"
+pre-commit = ["autohooks.plugins.black", "autohooks.plugins.ruff"]
+
+[tool.pontos.version]
+version-module-file = "notus/scanner/__version__.py"
+
+[tool.coverage.run]
+branch = true
+omit = ["tests/*", "*/__init__.py"]
+source = ["notus"]
+
+[tool.ruff]
+line-length = 80
+target-version = "py311"
+
+[tool.ruff.lint]
+extend-select = ["I", "PLE", "PLW"]

@@ -1,0 +1,683 @@
+/* SPDX-FileCopyrightText: 2024 Greenbone AG
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+import {useState} from 'react';
+import {TimePicker} from '@greenbone/ui-lib';
+import date, {
+  duration as createDuration,
+  type Date as DateType,
+  type Duration,
+} from 'gmp/models/date';
+import Event, {RecurrenceFrequency, WeekDays} from 'gmp/models/event';
+import {DEFAULT_TIMEZONE} from 'gmp/time-zones';
+import {isDefined} from 'gmp/utils/identity';
+import SaveDialog from 'web/components/dialog/SaveDialog';
+import CheckBox from 'web/components/form/Checkbox';
+import DatePicker from 'web/components/form/DatePicker';
+import FormGroup from 'web/components/form/FormGroup';
+import Radio from 'web/components/form/Radio';
+import Select from 'web/components/form/Select';
+import Spinner from 'web/components/form/Spinner';
+import TextField from 'web/components/form/TextField';
+import TimeZoneSelect from 'web/components/form/TimeZoneSelect';
+import Row from 'web/components/layout/Row';
+import useTranslation from 'web/hooks/useTranslation';
+import DaySelect from 'web/pages/schedules/DaySelect';
+import MonthDaysSelect from 'web/pages/schedules/MonthDaysSelect';
+import {renderDuration} from 'web/pages/schedules/Render';
+import SchedulingFormGroup from 'web/pages/schedules/SchedulingFormGroup';
+import TimeUnitSelect from 'web/pages/schedules/TimeUnitSelect';
+import WeekDaySelect from 'web/pages/schedules/WeekdaySelect';
+import {formatTimeForTimePicker} from 'web/utils/time-picker-helpers';
+
+type RecurrenceFrequencyValue =
+  (typeof RecurrenceFrequency)[keyof typeof RecurrenceFrequency];
+
+type RecurrenceType = 'once' | RecurrenceFrequencyValue | 'workweek' | 'custom';
+
+type RepeatMonthlyValue = 'nth' | 'days';
+
+type WeekDay =
+  | 'monday'
+  | 'tuesday'
+  | 'wednesday'
+  | 'thursday'
+  | 'friday'
+  | 'saturday'
+  | 'sunday';
+
+interface ResolvedRecurrence {
+  freq: RecurrenceFrequencyValue;
+  weekdays: WeekDays;
+}
+
+interface ScheduleDialogDefaultValues {
+  comment: string;
+  id?: string;
+  name: string;
+}
+
+interface ScheduleDialogValues {
+  endDate: DateType;
+  endOpen: boolean;
+  freq: RecurrenceFrequencyValue;
+  interval: number;
+  monthdays: number[];
+  monthly: RepeatMonthlyValue;
+  monthlyDay: WeekDay | undefined;
+  monthlyNth: string | undefined;
+  recurrenceType: RecurrenceType;
+  startDate: DateType;
+  timezone: string;
+  weekdays: WeekDays;
+}
+
+export interface ScheduleDialogSaveData {
+  id?: string;
+  name: string;
+  comment: string;
+  icalendar: string;
+  timezone: string;
+}
+
+interface ScheduleDialogProps {
+  comment?: string;
+  duration?: Duration;
+  freq?: RecurrenceFrequencyValue;
+  id?: string;
+  interval?: number;
+  monthdays?: number[];
+  name?: string;
+  startDate?: DateType;
+  timezone?: string;
+  title?: string;
+  weekdays?: WeekDays;
+  onClose: () => void;
+  onSave: (data: ScheduleDialogSaveData) => Promise<void> | void;
+}
+
+const RECURRENCE_ONCE = 'once' as const;
+const RECURRENCE_HOURLY = RecurrenceFrequency.HOURLY;
+const RECURRENCE_DAILY = RecurrenceFrequency.DAILY;
+const RECURRENCE_WEEKLY = RecurrenceFrequency.WEEKLY;
+const RECURRENCE_MONTHLY = RecurrenceFrequency.MONTHLY;
+const RECURRENCE_YEARLY = RecurrenceFrequency.YEARLY;
+const RECURRENCE_WORKWEEK = 'workweek' as const;
+const RECURRENCE_CUSTOM = 'custom' as const;
+
+const RepeatMonthly = {
+  nth: 'nth',
+  days: 'days',
+} as const;
+
+const getNthWeekday = (cdate: DateType) => Math.ceil(cdate.date() / 7);
+
+// Helper: Preserve time components when changing date
+const preserveTimeOnDateChange = (
+  newDate: DateType,
+  currentDate: DateType,
+  timezone: string,
+) => {
+  const dateInTimezone = newDate.tz(timezone, true);
+  return dateInTimezone
+    .hour(currentDate.hour())
+    .minute(currentDate.minute())
+    .second(currentDate.second())
+    .millisecond(currentDate.millisecond());
+};
+
+// Helper: Update date with new time
+const updateDateWithTime = (currentDate: DateType, timeString: string) => {
+  const parsedTime = date(timeString, 'HH:mm');
+  if (!parsedTime.isValid()) {
+    return null;
+  }
+  return currentDate
+    .clone()
+    .hour(parsedTime.hour())
+    .minute(parsedTime.minute());
+};
+
+const PRE_DEFINED_RECURRENCES: ReadonlySet<RecurrenceType> = new Set([
+  RecurrenceFrequency.HOURLY,
+  RecurrenceFrequency.DAILY,
+  RecurrenceFrequency.WEEKLY,
+  RecurrenceFrequency.MONTHLY,
+  RecurrenceFrequency.YEARLY,
+  RECURRENCE_WORKWEEK,
+]);
+
+const resolveRecurrence = (
+  recurrenceType: RecurrenceType,
+  freq: RecurrenceFrequencyValue,
+  monthly: RepeatMonthlyValue,
+  monthlyDay: WeekDay | undefined,
+  monthlyNth: string | undefined,
+  weekdays: WeekDays,
+): ResolvedRecurrence => {
+  if (recurrenceType === RECURRENCE_WORKWEEK) {
+    return {
+      freq: RecurrenceFrequency.WEEKLY,
+      weekdays: new WeekDays({
+        monday: true,
+        tuesday: true,
+        wednesday: true,
+        thursday: true,
+        friday: true,
+      }),
+    };
+  }
+
+  if (
+    recurrenceType === RECURRENCE_CUSTOM &&
+    freq === RecurrenceFrequency.MONTHLY &&
+    monthly === RepeatMonthly.nth &&
+    isDefined(monthlyDay)
+  ) {
+    return {
+      freq,
+      weekdays: new WeekDays({[monthlyDay]: monthlyNth}),
+    };
+  }
+
+  if (
+    recurrenceType !== RECURRENCE_CUSTOM &&
+    recurrenceType !== RECURRENCE_ONCE
+  ) {
+    return {freq: recurrenceType, weekdays};
+  }
+
+  return {freq, weekdays};
+};
+
+const shouldIncludeWeekdays = (
+  recurrenceType: RecurrenceType,
+  freq: RecurrenceFrequencyValue,
+  monthly: RepeatMonthlyValue,
+) =>
+  recurrenceType === RECURRENCE_WORKWEEK ||
+  (recurrenceType === RECURRENCE_CUSTOM &&
+    (freq === RecurrenceFrequency.WEEKLY ||
+      (freq === RecurrenceFrequency.MONTHLY && monthly === RepeatMonthly.nth)));
+
+const shouldIncludeMonthDays = (
+  recurrenceType: RecurrenceType,
+  freq: RecurrenceFrequencyValue,
+  monthly: RepeatMonthlyValue,
+) =>
+  recurrenceType === RECURRENCE_CUSTOM &&
+  freq === RecurrenceFrequency.MONTHLY &&
+  monthly === RepeatMonthly.days;
+
+const ScheduleDialog = ({
+  duration,
+  timezone: initialTimezone = DEFAULT_TIMEZONE,
+  startDate: initialStartDate = date()
+    .tz(initialTimezone, true)
+    .startOf('hour')
+    .add(1, 'hour'),
+  freq: initialFrequency,
+  interval: initialInterval = 1,
+  weekdays: initialWeekdays,
+  monthdays: initialMonthDays,
+  comment = '',
+  id,
+  name,
+  title,
+  onClose,
+  onSave,
+}: ScheduleDialogProps) => {
+  const [_] = useTranslation();
+
+  const [startDate, setStartDate] = useState(initialStartDate);
+
+  const [startTime, setStartTime] = useState(
+    formatTimeForTimePicker(startDate),
+  );
+
+  const [endOpen, setEndOpen] = useState(!isDefined(duration));
+  const [endDate, setEndDate] = useState(
+    isDefined(duration)
+      ? initialStartDate.clone().add(duration)
+      : initialStartDate.clone().add(1, 'hour'),
+  );
+
+  const [endTime, setEndTime] = useState(formatTimeForTimePicker(endDate));
+
+  const [timezone, setTimezone] = useState(initialTimezone);
+
+  const [freq, setFreq] = useState<RecurrenceFrequencyValue>(
+    isDefined(initialFrequency) ? initialFrequency : RecurrenceFrequency.WEEKLY,
+  );
+  const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>(() => {
+    if (isDefined(initialFrequency)) {
+      if (
+        !isDefined(initialWeekdays) &&
+        !isDefined(initialMonthDays) &&
+        initialInterval === 1
+      ) {
+        return initialFrequency;
+      }
+      return RECURRENCE_CUSTOM;
+    }
+    return RECURRENCE_ONCE;
+  });
+  const [interval, setInterval] = useState(initialInterval);
+  const [monthly, setMonthly] = useState<RepeatMonthlyValue>(
+    initialFrequency === RecurrenceFrequency.MONTHLY &&
+      !isDefined(initialWeekdays)
+      ? RepeatMonthly.days
+      : RepeatMonthly.nth,
+  );
+  const [weekdays, setWeekdays] = useState(() => {
+    if (isDefined(initialWeekdays)) {
+      return initialWeekdays;
+    }
+    return new WeekDays().setWeekDayFromDate(initialStartDate);
+  });
+  const [monthlyNth, setMonthlyNth] = useState(() => {
+    const currentWeekdays = isDefined(initialWeekdays)
+      ? initialWeekdays
+      : new WeekDays().setWeekDayFromDate(initialStartDate);
+    const currentMonthlyDay = currentWeekdays.getSelectedWeekDay() as
+      | WeekDay
+      | undefined;
+    const currentMonthlyNth = currentMonthlyDay
+      ? currentWeekdays.get(currentMonthlyDay)
+      : undefined;
+    return currentMonthlyNth === true
+      ? '' + getNthWeekday(initialStartDate)
+      : currentMonthlyDay;
+  });
+  const [monthdays, setMonthdays] = useState(
+    isDefined(initialMonthDays) ? initialMonthDays : [initialStartDate.date()],
+  );
+  const [monthlyDay, setMonthlyDay] = useState(() => {
+    const currentWeekdays = isDefined(initialWeekdays)
+      ? initialWeekdays
+      : new WeekDays().setWeekDayFromDate(initialStartDate);
+    return currentWeekdays.getSelectedWeekDay() as WeekDay | undefined;
+  });
+
+  name = name || _('Unnamed');
+  title = title || _('New Schedule');
+
+  const RECURRENCE_TYPE_ITEMS = [
+    {
+      label: _('Once'),
+      value: RECURRENCE_ONCE,
+    },
+    {
+      label: _('Hourly'),
+      value: RECURRENCE_HOURLY,
+    },
+    {
+      label: _('Daily'),
+      value: RECURRENCE_DAILY,
+    },
+    {
+      label: _('Weekly'),
+      value: RECURRENCE_WEEKLY,
+    },
+    {
+      label: _('Monthly'),
+      value: RECURRENCE_MONTHLY,
+    },
+    {
+      label: _('Yearly'),
+      value: RECURRENCE_YEARLY,
+    },
+    {
+      label: _('Workweek (Monday till Friday)'),
+      value: RECURRENCE_WORKWEEK,
+    },
+    {
+      label: _('Custom...'),
+      value: RECURRENCE_CUSTOM,
+    },
+  ];
+
+  const NTH_DAY_ITEMS = [
+    {
+      label: _('The First'),
+      value: '1',
+    },
+    {
+      label: _('The Second'),
+      value: '2',
+    },
+    {
+      label: _('The Third'),
+      value: '3',
+    },
+    {
+      label: _('The Fourth'),
+      value: '4',
+    },
+    {
+      label: _('The Last'),
+      value: '-1',
+    },
+  ];
+
+  if (endOpen || !isDefined(endDate)) {
+    duration = undefined;
+  } else {
+    duration = createDuration(endDate.diff(startDate));
+  }
+
+  const handleNowButtonClick = () => {
+    const now = date().tz(timezone);
+    setStartDate(now);
+    setStartTime(formatTimeForTimePicker(now));
+  };
+
+  const handleTimezoneChange = (value: string) => {
+    setEndDate(endDate => endDate.tz(value));
+    setStartDate(startDate => startDate.tz(value));
+    setStartTime(formatTimeForTimePicker(startDate));
+    setEndTime(formatTimeForTimePicker(endDate));
+    setTimezone(value);
+  };
+
+  const handleTimeChange = (selectedTime: string, type: string) => {
+    const updateState =
+      type === 'startTime'
+        ? {currentDate: startDate, setDate: setStartDate, setTime: setStartTime}
+        : {currentDate: endDate, setDate: setEndDate, setTime: setEndTime};
+
+    const newDate = updateDateWithTime(updateState.currentDate, selectedTime);
+    if (newDate) {
+      updateState.setDate(newDate);
+      updateState.setTime(selectedTime);
+    }
+  };
+
+  const handleSave = ({
+    comment,
+    endDate,
+    endOpen = false,
+    freq,
+    id,
+    interval,
+    monthdays,
+    monthly,
+    monthlyDay,
+    monthlyNth,
+    name,
+    recurrenceType,
+    startDate,
+    timezone,
+    weekdays,
+  }: ScheduleDialogDefaultValues & ScheduleDialogValues) => {
+    if (!isDefined(onSave)) {
+      return Promise.resolve();
+    }
+
+    startDate = date(startDate).set('seconds', 0);
+
+    if (!endOpen) {
+      endDate = date(endDate).set('seconds', 0);
+
+      if (endDate.isSameOrBefore(startDate)) {
+        return Promise.reject(
+          new Error(
+            _(
+              'End date is same or before start date. Please adjust you start ' +
+                'and/or end date.',
+            ),
+          ),
+        );
+      }
+    }
+
+    const resolved = resolveRecurrence(
+      recurrenceType,
+      freq,
+      monthly,
+      monthlyDay,
+      monthlyNth,
+      weekdays,
+    );
+    freq = resolved.freq;
+    weekdays = resolved.weekdays;
+
+    const event = Event.fromData(
+      {
+        duration: endOpen ? undefined : createDuration(endDate.diff(startDate)),
+        description: comment,
+        freq: recurrenceType === RECURRENCE_ONCE ? undefined : freq,
+        interval: PRE_DEFINED_RECURRENCES.has(recurrenceType) ? 1 : interval,
+        monthDays: shouldIncludeMonthDays(recurrenceType, freq, monthly)
+          ? monthdays
+          : undefined,
+        weekDays: shouldIncludeWeekdays(recurrenceType, freq, monthly)
+          ? weekdays
+          : undefined,
+        // convert name to string explicitly to not run into:
+        // `TypeError: e.replace is not a function`
+        // when name is just numbers.
+        summary: `${name}`,
+        startDate,
+      },
+      timezone,
+    );
+
+    return onSave({
+      id,
+      name,
+      comment,
+      icalendar: event.toIcalString(),
+      timezone,
+    });
+  };
+
+  const defaultValues: ScheduleDialogDefaultValues = {
+    comment,
+    id,
+    name,
+  };
+
+  const values: ScheduleDialogValues = {
+    endDate,
+    endOpen,
+    freq,
+    interval,
+    monthdays: monthdays,
+    monthly,
+    monthlyDay,
+    monthlyNth,
+    recurrenceType,
+    startDate,
+    timezone,
+    weekdays,
+  };
+
+  return (
+    <SaveDialog
+      defaultValues={defaultValues}
+      title={title}
+      values={values}
+      onClose={onClose}
+      onSave={handleSave}
+    >
+      {({values: state, onValueChange}) => {
+        // Date change handlers with timezone preservation
+        const handleStartDateChange = (newDate: DateType) => {
+          const updatedDate = preserveTimeOnDateChange(
+            newDate,
+            startDate,
+            timezone,
+          );
+          setStartDate(updatedDate);
+          setStartTime(formatTimeForTimePicker(updatedDate));
+          onValueChange(updatedDate, 'startDate');
+        };
+
+        const handleEndDateChange = (newDate: DateType) => {
+          const updatedDate = preserveTimeOnDateChange(
+            newDate,
+            endDate,
+            timezone,
+          );
+          setEndDate(updatedDate);
+          setEndTime(formatTimeForTimePicker(updatedDate));
+          onValueChange(updatedDate, 'endDate');
+        };
+
+        return (
+          <>
+            <FormGroup htmlFor="schedule-name" title={_('Name')}>
+              <TextField
+                id="schedule-name"
+                name="name"
+                value={state.name}
+                onChange={onValueChange}
+              />
+            </FormGroup>
+
+            <FormGroup htmlFor="schedule-comment" title={_('Comment')}>
+              <TextField
+                id="schedule-comment"
+                name="comment"
+                value={state.comment}
+                onChange={onValueChange}
+              />
+            </FormGroup>
+            <SchedulingFormGroup
+              handleNowButtonClick={handleNowButtonClick}
+              handleStartDateChange={handleStartDateChange}
+              handleTimeChange={handleTimeChange}
+              startDate={startDate}
+              startTime={startTime}
+            />
+
+            <FormGroup htmlFor="schedule-timezone" title={_('Timezone')}>
+              <TimeZoneSelect
+                id="schedule-timezone"
+                name="timezone"
+                value={timezone}
+                onChange={handleTimezoneChange}
+              />
+            </FormGroup>
+            <FormGroup title={_('Run Until')}>
+              <CheckBox
+                checked={state.endOpen}
+                name="endOpen"
+                title={_('Open End')}
+                onChange={setEndOpen}
+              />
+
+              <DatePicker
+                disabled={state.endOpen}
+                label={_('End Date')}
+                name="endDate"
+                value={state.endDate}
+                onChange={handleEndDateChange}
+              />
+
+              <TimePicker
+                disabled={state.endOpen}
+                label={_('End Time')}
+                name="endTime"
+                value={endTime}
+                onChange={(newEndTime: string) =>
+                  handleTimeChange(newEndTime, 'endTime')
+                }
+              />
+            </FormGroup>
+
+            <FormGroup title={_('Duration')}>
+              <span>{renderDuration(duration)}</span>
+            </FormGroup>
+
+            <FormGroup htmlFor="schedule-recurrence" title={_('Recurrence')}>
+              <Select
+                id="schedule-recurrence"
+                items={RECURRENCE_TYPE_ITEMS}
+                name="recurrenceType"
+                value={state.recurrenceType}
+                onChange={setRecurrenceType}
+              />
+            </FormGroup>
+
+            {state.recurrenceType === RECURRENCE_CUSTOM && (
+              <>
+                <FormGroup direction="row" title={_('Repeat')}>
+                  <span>{_('Every')}</span>
+                  <Spinner
+                    min={1}
+                    name="interval"
+                    type="int"
+                    value={state.interval}
+                    onChange={setInterval}
+                  />
+                  <TimeUnitSelect
+                    name="freq"
+                    value={state.freq}
+                    onChange={setFreq}
+                  />
+                </FormGroup>
+
+                {state.freq === RECURRENCE_WEEKLY && (
+                  <FormGroup title={_('Repeat at')}>
+                    <WeekDaySelect
+                      name="weekdays"
+                      value={weekdays}
+                      onChange={setWeekdays}
+                    />
+                  </FormGroup>
+                )}
+
+                {state.freq === RECURRENCE_MONTHLY && (
+                  <FormGroup title={_('Repeat at')}>
+                    <Row>
+                      <Radio
+                        checked={state.monthly === RepeatMonthly.nth}
+                        name="monthly"
+                        value={RepeatMonthly.nth}
+                        onChange={setMonthly}
+                      />
+                      <Select
+                        disabled={state.monthly !== RepeatMonthly.nth}
+                        items={NTH_DAY_ITEMS}
+                        name="monthlyNth"
+                        value={state.monthlyNth}
+                        onChange={setMonthlyNth}
+                      />
+                      <DaySelect
+                        disabled={state.monthly !== RepeatMonthly.nth}
+                        name="monthlyDay"
+                        value={state.monthlyDay}
+                        onChange={setMonthlyDay}
+                      />
+                    </Row>
+                    <Row>
+                      <Radio
+                        checked={state.monthly === RepeatMonthly.days}
+                        name="monthly"
+                        title={_('Recur on day(s)')}
+                        value={RepeatMonthly.days}
+                        onChange={setMonthly}
+                      />
+                      <MonthDaysSelect
+                        disabled={state.monthly !== RepeatMonthly.days}
+                        name="monthdays"
+                        value={state.monthdays}
+                        onChange={setMonthdays}
+                      />
+                    </Row>
+                  </FormGroup>
+                )}
+              </>
+            )}
+          </>
+        );
+      }}
+    </SaveDialog>
+  );
+};
+
+export default ScheduleDialog;

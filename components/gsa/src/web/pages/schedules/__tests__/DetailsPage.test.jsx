@@ -1,0 +1,203 @@
+/* SPDX-FileCopyrightText: 2024 Greenbone AG
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+import {describe, test, expect, testing} from '@gsa/testing';
+import {rendererWith, fireEvent, screen, within} from 'web/testing';
+import CollectionCounts from 'gmp/collection/collection-counts';
+import Filter from 'gmp/models/filter';
+import Schedule from 'gmp/models/schedule';
+import {createSession} from 'gmp/testing';
+import {currentSettingsDefaultResponse} from 'web/pages/__fixtures__/current-settings';
+import ScheduleDetailsPage from 'web/pages/schedules/DetailsPage';
+import {entityLoadingActions} from 'web/store/entities/schedules';
+
+const reloadInterval = -1;
+const manualUrl = 'test/';
+
+const schedule = Schedule.fromElement({
+  comment: 'hello world',
+  creation_time: '2020-12-23T14:14:11Z',
+  icalendar:
+    'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Greenbone.net//NONSGML Greenbone Security Manager \n 21.4.0~dev1~git-5f8b6cf-master//EN\nBEGIN:VEVENT\nDTSTART:20210104T115400Z\nDURATION:PT0S\nUID:foo\nDTSTAMP:20210111T134141Z\nEND:VEVENT\nEND:VCALENDAR',
+  in_use: 0,
+  modification_time: '2021-01-04T11:54:12Z',
+  name: 'schedule 1',
+  owner: {name: 'admin'},
+  permissions: {permission: {name: 'Everything'}},
+  timezone: 'UTC',
+  writable: 1,
+  _id: '12345',
+});
+
+const createGmp = ({
+  currentSettings = testing
+    .fn()
+    .mockResolvedValue(currentSettingsDefaultResponse),
+  getEntities = testing.fn().mockResolvedValue({
+    data: [],
+    meta: {
+      filter: Filter.fromString(),
+      counts: new CollectionCounts(),
+    },
+  }),
+  getSchedule = testing.fn().mockResolvedValue({
+    data: schedule,
+  }),
+  clone = testing.fn().mockResolvedValue({
+    data: {id: 'foo'},
+  }),
+  deleteFunc = testing.fn().mockResolvedValue({
+    foo: 'bar',
+  }),
+  exportFunc = testing.fn().mockResolvedValue({
+    foo: 'bar',
+  }),
+} = {}) => ({
+  schedule: {
+    get: getSchedule,
+    clone,
+    delete: deleteFunc,
+    export: exportFunc,
+  },
+  permissions: {
+    get: getEntities,
+  },
+  settings: {
+    manualUrl,
+    reloadInterval,
+  },
+  session: createSession({timezone: 'CET'}),
+  user: {
+    currentSettings,
+  },
+});
+
+describe('ScheduleDetailsPage tests', () => {
+  test('should render full DetailsPage', () => {
+    const gmp = createGmp();
+
+    const {render, store} = rendererWith({
+      gmp,
+      capabilities: true,
+      router: true,
+      store: true,
+    });
+
+    store.dispatch(entityLoadingActions.success('12345', schedule));
+
+    render(<ScheduleDetailsPage id="12345" />);
+
+    screen.getByRole('heading', {name: /schedule: schedule 1/i});
+
+    expect(screen.getByTestId('manual-link')).toHaveAttribute(
+      'href',
+      'test/en/scanning.html#managing-schedules',
+    );
+
+    screen.getByTitle('Help: Schedules');
+    screen.getByTitle('Schedules List');
+    expect(screen.getByTestId('list-link-icon')).toHaveAttribute(
+      'href',
+      '/schedules',
+    );
+
+    const entityInfo = within(screen.getByTestId('entity-info'));
+    const rows = entityInfo.getAllByRole('row');
+    expect(rows[0]).toHaveTextContent('ID:1234');
+    expect(rows[1]).toHaveTextContent(
+      'Created:Wed, Dec 23, 2020 3:14 PM Central European Standard',
+    );
+    expect(rows[2]).toHaveTextContent(
+      'Modified:Mon, Jan 4, 2021 12:54 PM Central European Standard',
+    );
+    expect(rows[3]).toHaveTextContent('Owner:admin');
+
+    const tablist = screen.getByRole('tablist');
+    within(tablist).getByRole('tab', {name: /information/i});
+    within(tablist).getByRole('tab', {name: /user tags/i});
+    within(tablist).getByRole('tab', {name: /permissions/i});
+
+    screen.getByText('Comment');
+    screen.getByText('hello world');
+    screen.getByText('First Run');
+    screen.getByText('Mon, Jan 4, 2021 11:54 AM Coordinated Universal Time');
+    screen.getByText('Next Run');
+    screen.getByText('-');
+    screen.getByText('Timezone');
+    screen.getByText('UTC');
+    screen.getByText('Recurrence');
+    screen.getByText('Once');
+    screen.getByText('Duration');
+    screen.getByText('Entire Operation');
+  });
+
+  test('should render user tags tab', () => {
+    const gmp = createGmp();
+
+    const {render, store} = rendererWith({
+      gmp,
+      capabilities: true,
+      router: true,
+      store: true,
+    });
+
+    store.dispatch(entityLoadingActions.success('12345', schedule));
+
+    const {container} = render(<ScheduleDetailsPage id="12345" />);
+
+    const tablist = screen.getByRole('tablist');
+    const userTagsTab = within(tablist).getByRole('tab', {name: /user tags/i});
+    fireEvent.click(userTagsTab);
+    expect(container).toHaveTextContent('No user tags available');
+  });
+
+  test('should render permissions tab', () => {
+    const gmp = createGmp();
+    const {render, store} = rendererWith({
+      gmp,
+      capabilities: true,
+      router: true,
+      store: true,
+    });
+
+    store.dispatch(entityLoadingActions.success('12345', schedule));
+
+    const {container} = render(<ScheduleDetailsPage id="12345" />);
+
+    const tablist = screen.getByRole('tablist');
+    const permissionsTab = within(tablist).getByRole('tab', {
+      name: /permissions/i,
+    });
+    fireEvent.click(permissionsTab);
+    expect(container).toHaveTextContent('No permissions available');
+  });
+
+  test('should call commands', async () => {
+    const gmp = createGmp();
+
+    const {render, store} = rendererWith({
+      gmp,
+      capabilities: true,
+      router: true,
+      store: true,
+    });
+
+    store.dispatch(entityLoadingActions.success('12345', schedule));
+
+    render(<ScheduleDetailsPage id="12345" />);
+
+    const cloneIcon = await screen.findByTitle('Clone Schedule');
+    fireEvent.click(cloneIcon);
+    expect(gmp.schedule.clone).toHaveBeenCalledWith(schedule);
+
+    const exportIcon = screen.getByTitle('Export Schedule as XML');
+    fireEvent.click(exportIcon);
+    expect(gmp.schedule.export).toHaveBeenCalledWith(schedule);
+
+    const deleteIcon = screen.getByTitle('Move Schedule to trashcan');
+    fireEvent.click(deleteIcon);
+    expect(gmp.schedule.delete).toHaveBeenCalledWith({id: schedule.id});
+  });
+});

@@ -1,0 +1,1222 @@
+/* Copyright (C) 2009-2021 Greenbone AG
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+/**
+ * @file gsad.c
+ * @brief Main module of Greenbone Security Assistant daemon
+ *
+ * This file contains the core of the GSA server process that
+ * handles HTTPS requests and communicates with Greenbone Vulnerability Manager
+ * via the GMP protocol.
+ */
+
+/**
+ * \mainpage
+ * \section Introduction
+ * \verbinclude README.md
+ *
+ * \section copying License
+ * \verbinclude LICENSE
+ */
+
+/**
+ * @brief The Glib fatal mask, redefined to leave out G_LOG_FLAG_RECURSION.
+ */
+
+#define _GNU_SOURCE /* for strcasecmp */
+
+#include <arpa/inet.h>
+#include <assert.h>
+#include <errno.h>
+#include <gcrypt.h>
+#include <glib.h>
+#include <gnutls/gnutls.h>
+#include <grp.h> /* for setgroups */
+#include <netinet/in.h>
+#include <pthread.h>
+#include <pwd.h> /* for getpwnam */
+#include <signal.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#if __linux
+#include <sys/prctl.h>
+#endif
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/un.h>
+#include <unistd.h>
+/* This must follow the system includes. */
+#include "gsad_args.h"
+#include "gsad_base.h"
+#include "gsad_credentials.h"
+#include "gsad_gmp.h"
+#include "gsad_gmp_auth.h"            /* for authenticate_gmp */
+#include "gsad_http_handle_request.h" /* for gsad_http_handle_request */
+#include "gsad_i18n.h"
+#include "gsad_logging.h" /* for gsad_logging_init and gsad_logging_cleanup */
+#include "gsad_manager.h" /* for gsad_manager_connect_with_credentials */
+#include "gsad_params.h"
+#include "gsad_session.h" /* for gsad_session_init */
+#include "gsad_settings.h"
+#include "gsad_user.h"
+#include "gsad_user_session.h"
+#include "gsad_utils.h"     /* for str_equal */
+#include "gsad_validator.h" /* for gsad_validator_* */
+
+#include <gvm/base/networking.h> /* for ipv6_is_enabled */
+#include <gvm/base/pidfile.h>
+#include <gvm/util/fileutils.h>
+#include <microhttpd.h>
+
+#undef G_LOG_DOMAIN
+/**
+ * @brief GLib log domain.
+ */
+#define G_LOG_DOMAIN "gsad main"
+
+#undef G_LOG_FATAL_MASK
+#define G_LOG_FATAL_MASK G_LOG_LEVEL_ERROR
+
+/*
+ * define MHD_USE_INTERNAL_POLLING_THREAD for libmicrohttp < 0.9.53
+ */
+#if MHD_VERSION < 0x00095300
+#define MHD_USE_INTERNAL_POLLING_THREAD 0
+#endif
+
+/**
+ * @brief Flag for signal handler.
+ */
+volatile int termination_signal = 0;
+
+/**
+ * @brief Libgcrypt thread callback definition for libgcrypt < 1.6.0.
+ */
+#if GCRYPT_VERSION_NUMBER < 0x010600
+GCRY_THREAD_OPTION_PTHREAD_IMPL;
+#endif
+
+/**
+ * @brief The handle on the embedded HTTP daemon.
+ */
+struct MHD_Daemon *gsad_daemon;
+
+/**
+ * @brief The IP addresses of this program, "the GSAD".
+ */
+GSList *address_list = NULL;
+
+/**
+ * @brief Location for redirection server.
+ */
+gchar *redirect_location = NULL;
+
+/**
+ * @brief PID of redirect child in parent, 0 in child.
+ */
+pid_t redirect_pid = 0;
+
+/** @todo Ensure the accesses to these are thread safe. */
+
+/**
+ * @brief Whether chroot is used
+ */
+int chroot_state = 0;
+
+/**
+ * @brief Free resources.
+ *
+ * Used as free callback for HTTP daemon.
+ *
+ * @param[in]  cls         Dummy parameter.
+ * @param[in]  connection  Connection.
+ * @param[in]  con_cls     Connection information.
+ * @param[in]  toe         Dummy parameter.
+ */
+void
+free_resources (void *cls, struct MHD_Connection *connection, void **con_cls,
+                enum MHD_RequestTerminationCode toe)
+{
+  gsad_connection_info_t *con_info = (gsad_connection_info_t *) *con_cls;
+  gsad_connection_info_free (con_info);
+  *con_cls = NULL;
+}
+
+/**
+ * @brief HTTP request handler for GSAD.
+ *
+ * This routine is an MHD_AccessHandlerCallback, the request handler for
+ * microhttpd.
+ *
+ * @param[in]  cls              Not used for this callback.
+ * @param[in]  connection       Connection handle, e.g. used to send response.
+ * @param[in]  url              The URL requested.
+ * @param[in]  method           "GET" or "POST", others are disregarded.
+ * @param[in]  version          Not used for this callback.
+ * @param[in]  upload_data      Data used for POST requests.
+ * @param[in]  upload_data_size Size of upload_data.
+ * @param[out] con_cls          For exchange of connection-related data
+ *                              (here a struct gsad_connection_info).
+ *
+ * @return MHD_NO in case of problems. MHD_YES if all is OK.
+ */
+static gsad_http_result_t
+redirect_handler (void *cls, struct MHD_Connection *connection,
+                  const gchar *url, const gchar *method, const gchar *version,
+                  const gchar *upload_data, size_t *upload_data_size,
+                  void **con_cls)
+{
+  gchar *location;
+  const gchar *host;
+  gchar name[MAX_HOST_LEN + 1];
+
+  /* Never respond on first call of a GET. */
+  if (str_equal (method, "GET") && *con_cls == NULL)
+    {
+      gsad_connection_info_t *con_info;
+
+      /* Freed by MHD_OPTION_NOTIFY_COMPLETED callback, free_resources. */
+      con_info = gsad_connection_info_new (METHOD_TYPE_GET, url);
+      *con_cls = (void *) con_info;
+      return MHD_YES;
+    }
+
+  /* If called with undefined URL, abort request handler. */
+  if (&url[0] == NULL)
+    return MHD_NO;
+
+  /* Only accept GET and POST methods and send ERROR_PAGE in other cases. */
+  if (strcmp (method, "GET") && strcmp (method, "POST"))
+    {
+      gsad_http_send_response_for_content (
+        connection, ERROR_PAGE, MHD_HTTP_NOT_ACCEPTABLE, NULL,
+        GSAD_CONTENT_TYPE_TEXT_HTML, NULL, 0);
+      return MHD_YES;
+    }
+
+  /* Redirect every URL to the default file on the HTTPS port. */
+  host = MHD_lookup_connection_value (connection, MHD_HEADER_KIND, "Host");
+  if (host && g_utf8_validate (host, -1, NULL) == FALSE)
+    {
+      gsad_http_send_response_for_content (
+        connection, UTF8_ERROR_PAGE ("'Host' header"), MHD_HTTP_BAD_REQUEST,
+        NULL, GSAD_CONTENT_TYPE_TEXT_HTML, NULL, 0);
+      return MHD_YES;
+    }
+  else if (host == NULL)
+    return MHD_NO;
+
+  /* [IPv6 or IPv4-mapped IPv6]:port */
+  if (sscanf (host, "[%" G_STRINGIFY (MAX_HOST_LEN) "[0-9a-f:.]]:%*i", name)
+      == 1)
+    {
+      gchar *name6 = g_strdup_printf ("[%s]", name);
+      location = g_strdup_printf (redirect_location, name6);
+      g_free (name6);
+    }
+  /* IPv4:port */
+  else if (sscanf (host, "%" G_STRINGIFY (MAX_HOST_LEN) "[^:]:%*i", name) == 1)
+    location = g_strdup_printf (redirect_location, name);
+  else
+    location = g_strdup_printf (redirect_location, host);
+  if (gsad_http_send_redirect_to_uri (connection, location, NULL) == MHD_NO)
+    {
+      g_free (location);
+      return MHD_NO;
+    }
+  g_free (location);
+  return MHD_YES;
+}
+
+/**
+ * @brief Attempt to drop privileges (become another user).
+ *
+ * @param[in]  user_pw  User details of new user.
+ *
+ * @return TRUE if successful, FALSE if failed (will g_critical in fail case).
+ */
+static gboolean
+drop_privileges (struct passwd *user_pw)
+{
+  if (setgroups (0, NULL))
+    {
+      g_critical ("%s: failed to set groups: %s\n", __func__, strerror (errno));
+      return FALSE;
+    }
+  if (setgid (user_pw->pw_gid))
+    {
+      g_critical ("%s: failed to drop group privileges: %s\n", __func__,
+                  strerror (errno));
+      return FALSE;
+    }
+  if (setuid (user_pw->pw_uid))
+    {
+      g_critical ("%s: failed to drop user privileges: %s\n", __func__,
+                  strerror (errno));
+      return FALSE;
+    }
+
+  return TRUE;
+}
+
+/**
+ * @brief Chroot and drop privileges, if requested.
+ *
+ * @param[in]  do_chroot  Whether to chroot.
+ * @param[in]  drop       Username to drop privileges to.  Null for no dropping.
+ * @param[in]  dir        Directory to chroot or chdir to.
+ *
+ * @return 0 success, 1 failed (will g_critical in fail case).
+ */
+static int
+chroot_drop_privileges (gboolean do_chroot, const gchar *drop, const gchar *dir)
+{
+  struct passwd *user_pw = NULL;
+
+  if (drop)
+    {
+      user_pw = getpwnam (drop);
+      if (user_pw == NULL)
+        {
+          g_critical ("Failed to drop privileges. Could not determine UID and "
+                      "GID for user \"%s\".",
+                      drop);
+          return 1;
+        }
+    }
+
+  if (do_chroot)
+    {
+      /* Chroot into state dir. */
+
+      if (chroot (dir))
+        {
+          g_critical ("Failed to chroot to \"%s\": %s", dir, strerror (errno));
+          return 1;
+        }
+      set_chroot_state (1);
+
+      if (chdir ("/"))
+        {
+          g_critical ("failed to change to \"/\" after chroot: %s",
+                      strerror (errno));
+          return 1;
+        }
+
+      g_info ("Chrooted to \"%s\"", dir);
+    }
+  else
+    {
+      if (chdir (dir))
+        {
+          g_critical ("failed to change to \"%s\": %s", dir, strerror (errno));
+          return 1;
+        }
+      g_debug ("Working directory is %s", dir);
+    }
+
+  if (user_pw)
+    {
+      if (drop_privileges (user_pw) == FALSE)
+        {
+          g_critical ("Failed to drop privileges");
+          return 1;
+        }
+
+      g_debug ("Working directory is %s", dir);
+    }
+
+  return 0;
+}
+
+/**
+ * @brief Log function callback used for GNUTLS debugging
+ *
+ * This is used only for debugging, thus we write to stderr.
+ *
+ * Fixme: It would be nice if we could use the regular log functions
+ * but the order of initialization in gsad is a bit strange.
+ */
+static void
+my_gnutls_log_func (int level, const gchar *text)
+{
+  fprintf (stderr, "[%d] (%d) %s", getpid (), level, text);
+  if (*text && text[strlen (text) - 1] != '\n')
+    putc ('\n', stderr);
+}
+
+/**
+ * @brief Initialization routine for GSAD.
+ *
+ * This routine checks for required files and initializes the gcrypt
+ * library.
+ *
+ * @return MHD_NO in case of problems. MHD_YES if all is OK.
+ */
+int
+gsad_init (const gchar *static_content_directory)
+{
+  g_debug ("Initializing the Greenbone Security Assistant Deamon...\n");
+
+  /* Init user ssessions. */
+  gsad_session_init ();
+
+  /* Check for required files. */
+  if (!gvm_file_exists (static_content_directory)
+      || gvm_file_check_is_dir (static_content_directory) != 1)
+    {
+      g_critical ("Could not access static content directory %s",
+                  static_content_directory);
+      return MHD_NO;
+    }
+
+  /* Init GCRYPT. */
+  if (!gcry_control (GCRYCTL_ANY_INITIALIZATION_P))
+    {
+      /* Register thread callback structure for libgcrypt < 1.6.0. */
+#if GCRYPT_VERSION_NUMBER < 0x010600
+      gcry_control (GCRYCTL_SET_THREAD_CBS, &gcry_threads_pthread);
+#endif
+
+      /* Version check should be the very first call because it makes sure that
+       * important subsystems are initialized.
+       * We pass NULL to gcry_check_version to disable the internal version
+       * mismatch test. */
+      if (!gcry_check_version (NULL))
+        {
+          g_critical ("libgcrypt version check failed");
+          return MHD_NO;
+        }
+
+      /* We don't want to see any warnings, e.g. because we have not yet parsed
+       * program options which might be used to suppress such warnings. */
+      gcry_control (GCRYCTL_SUSPEND_SECMEM_WARN);
+
+      /* ... If required, other initialization goes here.  Note that the process
+       * might still be running with increased privileges and that the secure
+       * memory has not been initialized. */
+
+      /* Allocate a pool of 16k secure memory.  This make the secure memory
+       * available and also drops privileges where needed. */
+      gcry_control (GCRYCTL_INIT_SECMEM, 16384, 0);
+
+      /* It is now okay to let Libgcrypt complain when there was/is a problem
+       * with the secure memory. */
+      gcry_control (GCRYCTL_RESUME_SECMEM_WARN);
+
+      /* ... If required, other initialization goes here. */
+
+      /* Tell Libgcrypt that initialization has completed. */
+      gcry_control (GCRYCTL_INITIALIZATION_FINISHED, 0);
+    }
+
+  /* Init GNUTLS. */
+  int ret = gnutls_global_init ();
+  if (ret < 0)
+    {
+      g_critical ("Failed to initialize GNUTLS.");
+      return MHD_NO;
+    }
+
+  /* Init the validator. */
+  gsad_init_validator ();
+
+  g_debug ("Initialization of GSA successful.");
+  return MHD_YES;
+}
+
+/**
+ * @brief Cleanup routine for GSAD.
+ *
+ * This routine will stop the http server, free log resources
+ * and remove the pidfile.
+ */
+void
+gsad_cleanup (gsad_log_config_t *log_config)
+{
+  gsad_settings_t *gsad_global_settings = gsad_settings_get_global_settings ();
+
+  if (redirect_pid)
+    {
+      g_debug ("Stopping redirect daemon with PID %d", redirect_pid);
+      kill (redirect_pid, SIGTERM);
+    }
+
+  g_debug ("Stopping HTTP server...");
+  MHD_stop_daemon (gsad_daemon);
+
+  gsad_http_request_cleanup_handlers ();
+
+  g_debug ("Cleaning up base...");
+  gsad_base_cleanup ();
+
+  if (gsad_settings_get_pid_filename (gsad_global_settings))
+    {
+      g_debug ("Removing pidfile... %s",
+               gsad_settings_get_pid_filename (gsad_global_settings));
+      pidfile_remove (
+        (gchar *) gsad_settings_get_pid_filename (gsad_global_settings));
+    }
+
+  gsad_logging_cleanup (log_config);
+  gsad_settings_free (gsad_global_settings);
+}
+
+/**
+ * @brief Handle a SIGINT signal.
+ *
+ * @param[in]  signal  The signal that caused this function to run.
+ */
+void
+handle_signal_exit (int signal)
+{
+  termination_signal = signal;
+}
+
+/**
+ * @brief Register the signal handlers.
+ *
+ * @todo Use sigaction () instead of signal () to register signal handlers.
+ *
+ * @return 0 on success, -1 on failure.
+ */
+static int
+register_signal_handlers ()
+{
+  if (signal (SIGTERM, handle_signal_exit) == SIG_ERR
+      || signal (SIGINT, handle_signal_exit) == SIG_ERR
+      || signal (SIGHUP, SIG_IGN) == SIG_ERR
+      || signal (SIGPIPE, SIG_IGN) == SIG_ERR
+      || signal (SIGCHLD, SIG_IGN) == SIG_ERR)
+    return -1;
+  return 0;
+}
+
+static void
+mhd_logger (void *arg, const gchar *fmt, va_list ap)
+{
+  gchar buf[1024];
+
+  vsnprintf (buf, sizeof (buf), fmt, ap);
+  va_end (ap);
+  g_warning ("MHD: %s", buf);
+}
+
+static struct MHD_Daemon *
+start_unix_http_daemon (
+  const gchar *unix_socket_path, const gchar *unix_socket_owner,
+  const gchar *unix_socket_group, const gchar *unix_socket_mode,
+#if MHD_VERSION < 0x00097002
+  int handler (void *, struct MHD_Connection *, const gchar *, const gchar *,
+               const gchar *, const gchar *, size_t *, void **),
+#else
+  enum MHD_Result handler (void *, struct MHD_Connection *, const gchar *,
+                           const gchar *, const gchar *, const gchar *,
+                           size_t *, void **),
+#endif
+  gsad_http_handler_t *http_handlers)
+{
+  struct sockaddr_un addr;
+  struct stat ustat;
+  mode_t oldmask = 0;
+  mode_t omode = 0;
+  gsad_settings_t *gsad_global_settings = gsad_settings_get_global_settings ();
+
+  int unix_socket = socket (AF_UNIX, SOCK_STREAM, 0);
+
+  gsad_settings_set_http_unix_socket (gsad_global_settings, unix_socket);
+
+  if (unix_socket == -1)
+    {
+      g_warning ("%s: Couldn't create UNIX socket", __func__);
+      return NULL;
+    }
+
+  memset (&addr, 0, sizeof (struct sockaddr_un));
+
+  addr.sun_family = AF_UNIX;
+  strncpy (addr.sun_path, unix_socket_path, sizeof (addr.sun_path) - 1);
+  if (!stat (addr.sun_path, &ustat))
+    {
+      /* Remove socket so we can bind(). Keep same permissions when recreating
+       * it. */
+      unlink (addr.sun_path);
+      oldmask = umask (~ustat.st_mode);
+    }
+  if (bind (unix_socket, (struct sockaddr *) &addr, sizeof (struct sockaddr_un))
+      == -1)
+    {
+      g_warning ("%s: Error on bind(%s): %s", __func__, unix_socket_path,
+                 strerror (errno));
+      return NULL;
+    }
+  if (oldmask)
+    umask (oldmask);
+
+  if (unix_socket_owner)
+    {
+      struct passwd *passwd;
+
+      passwd = getpwnam (unix_socket_owner);
+      if (passwd == NULL)
+        {
+          g_warning ("%s: User %s not found.", __FUNCTION__, unix_socket_owner);
+          return NULL;
+        }
+      if (chown (unix_socket_path, passwd->pw_uid, -1) == -1)
+        {
+          g_warning ("%s: chown: %s", __FUNCTION__, strerror (errno));
+          return NULL;
+        }
+    }
+
+  if (unix_socket_group)
+    {
+      struct group *group;
+
+      group = getgrnam (unix_socket_group);
+      if (group == NULL)
+        {
+          g_warning ("%s: Group %s not found.", __FUNCTION__,
+                     unix_socket_group);
+          return NULL;
+        }
+      if (chown (unix_socket_path, -1, group->gr_gid) == -1)
+        {
+          g_warning ("%s: chown: %s", __FUNCTION__, strerror (errno));
+          return NULL;
+        }
+    }
+
+  if (!unix_socket_mode)
+    unix_socket_mode = "660";
+  omode = strtol (unix_socket_mode, 0, 8);
+  if (omode <= 0 || omode > 4095)
+    {
+      g_warning ("%s: Erroneous --unix-socket--mode value", __FUNCTION__);
+      return NULL;
+    }
+  if (chmod (unix_socket_path, omode) == -1)
+    {
+      g_warning ("%s: chmod: %s", __FUNCTION__, strerror (errno));
+      return NULL;
+    }
+
+  if (listen (unix_socket, 128) == -1)
+    {
+      g_warning ("%s: Error on listen(): %s", __func__, strerror (errno));
+      return NULL;
+    }
+
+  g_info ("Starting UNIX socket HTTP server on %s\n", unix_socket_path);
+
+  return MHD_start_daemon (
+    MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD
+      | MHD_USE_DEBUG,
+    0, NULL, NULL, handler, http_handlers, MHD_OPTION_EXTERNAL_LOGGER,
+    mhd_logger, NULL, MHD_OPTION_NOTIFY_COMPLETED, free_resources, NULL,
+    MHD_OPTION_LISTEN_SOCKET, unix_socket, MHD_OPTION_PER_IP_CONNECTION_LIMIT,
+    gsad_settings_get_per_ip_connection_limit (gsad_global_settings),
+    MHD_OPTION_END);
+}
+
+static struct MHD_Daemon *
+start_http_daemon (int port,
+#if MHD_VERSION < 0x00097002
+                   int handler (void *, struct MHD_Connection *, const gchar *,
+                                const gchar *, const gchar *, const gchar *,
+                                size_t *, void **),
+#else
+                   enum MHD_Result handler (void *, struct MHD_Connection *,
+                                            const gchar *, const gchar *,
+                                            const gchar *, const gchar *,
+                                            size_t *, void **),
+#endif
+                   gsad_http_handler_t *http_handlers,
+                   struct sockaddr_storage *address)
+{
+  unsigned int flags;
+  int ipv6_flag;
+  gchar *ip_address = NULL;
+  gsad_settings_t *gsad_global_settings = gsad_settings_get_global_settings ();
+
+  if (address->ss_family == AF_INET6)
+    {
+/* LibmicroHTTPD 0.9.28 and higher. */
+#if MHD_VERSION >= 0x00092800
+      ipv6_flag = MHD_USE_DUAL_STACK;
+#else
+      ipv6_flag = MHD_USE_IPv6;
+#endif
+      struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *) address;
+      ip_address = g_malloc (INET6_ADDRSTRLEN);
+      inet_ntop (AF_INET6, &addr6->sin6_addr, ip_address, INET6_ADDRSTRLEN);
+    }
+  else
+    {
+      ipv6_flag = MHD_NO_FLAG;
+      struct sockaddr_in *addr = (struct sockaddr_in *) address;
+      ip_address = g_malloc (INET_ADDRSTRLEN);
+      inet_ntop (AF_INET, &addr->sin_addr, ip_address, INET_ADDRSTRLEN);
+    }
+  flags =
+    MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | ipv6_flag;
+#ifndef NDEBUG
+  flags = flags | MHD_USE_DEBUG;
+#endif
+
+  g_info ("Starting HTTP server on %s and port %d\n", ip_address, port);
+  g_free (ip_address);
+
+  return MHD_start_daemon (
+    flags, port, NULL, NULL, handler, http_handlers, MHD_OPTION_EXTERNAL_LOGGER,
+    mhd_logger, NULL, MHD_OPTION_NOTIFY_COMPLETED, free_resources, NULL,
+    MHD_OPTION_SOCK_ADDR, address, MHD_OPTION_PER_IP_CONNECTION_LIMIT,
+    gsad_settings_get_per_ip_connection_limit (gsad_global_settings),
+    MHD_OPTION_END);
+}
+
+static struct MHD_Daemon *
+start_https_daemon (int port, const gchar *key, const gchar *cert,
+                    const gchar *priorities, const gchar *dh_params,
+                    gsad_http_handler_t *http_handlers,
+                    struct sockaddr_storage *address)
+{
+  unsigned int flags;
+  int ipv6_flag;
+  gchar *ip_address = NULL;
+  gsad_settings_t *gsad_global_settings = gsad_settings_get_global_settings ();
+
+  if (address->ss_family == AF_INET6)
+    {
+/* LibmicroHTTPD 0.9.28 and higher. */
+#if MHD_VERSION >= 0x00092800
+      ipv6_flag = MHD_USE_DUAL_STACK;
+#else
+      ipv6_flag = MHD_USE_IPv6;
+#endif
+      struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *) address;
+      ip_address = g_malloc (INET6_ADDRSTRLEN);
+      inet_ntop (AF_INET6, &addr6->sin6_addr, ip_address, INET6_ADDRSTRLEN);
+    }
+  else
+    {
+      ipv6_flag = MHD_NO_FLAG;
+      struct sockaddr_in *addr = (struct sockaddr_in *) address;
+      ip_address = g_malloc (INET_ADDRSTRLEN);
+      inet_ntop (AF_INET, &addr->sin_addr, ip_address, INET_ADDRSTRLEN);
+    }
+
+  flags = MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD
+          | MHD_USE_SSL | ipv6_flag;
+#ifndef NDEBUG
+  flags = flags | MHD_USE_DEBUG;
+#endif
+
+  g_info ("Starting HTTPS server on %s and port %d\n", ip_address, port);
+  g_free (ip_address);
+
+  return MHD_start_daemon (
+    flags, port, NULL, NULL, &gsad_http_handle_request, http_handlers,
+    MHD_OPTION_EXTERNAL_LOGGER, mhd_logger, NULL, MHD_OPTION_HTTPS_MEM_KEY, key,
+    MHD_OPTION_HTTPS_MEM_CERT, cert, MHD_OPTION_NOTIFY_COMPLETED,
+    free_resources, NULL, MHD_OPTION_SOCK_ADDR, address,
+    MHD_OPTION_PER_IP_CONNECTION_LIMIT,
+    gsad_settings_get_per_ip_connection_limit (gsad_global_settings),
+    MHD_OPTION_HTTPS_PRIORITIES, priorities,
+/* LibmicroHTTPD 0.9.35 and higher. */
+#if MHD_VERSION >= 0x00093500
+    dh_params ? MHD_OPTION_HTTPS_MEM_DHPARAMS : MHD_OPTION_END, dh_params,
+#endif
+    MHD_OPTION_END);
+}
+
+/**
+ * @brief Set port to listen on.
+ *
+ * @param[in]  address          Address struct for which to set the port.
+ * @param[in]  port             Port to listen on.
+ */
+static void
+gsad_address_set_port (struct sockaddr_storage *address, int port)
+{
+  struct sockaddr_in *gsad_address = (struct sockaddr_in *) address;
+  struct sockaddr_in6 *gsad_address6 = (struct sockaddr_in6 *) address;
+
+  gsad_address->sin_port = htons (port);
+  gsad_address6->sin6_port = htons (port);
+}
+
+/**
+ * @brief Initializes the address to listen on.
+ *
+ * @param[in]  address_str      Address to listen on.
+ * @param[in]  port             Port to listen on.
+ *
+ * @return 0 on success, 1 on failure.
+ */
+static int
+gsad_address_init (const gchar *address_str, int port)
+{
+  struct sockaddr_storage *address = g_malloc0 (sizeof (*address));
+  struct sockaddr_in *gsad_address = (struct sockaddr_in *) address;
+  struct sockaddr_in6 *gsad_address6 = (struct sockaddr_in6 *) address;
+
+  gsad_address_set_port (address, port);
+  if (address_str)
+    {
+      if (inet_pton (AF_INET6, address_str, &gsad_address6->sin6_addr) > 0)
+        address->ss_family = AF_INET6;
+      else if (inet_pton (AF_INET, address_str, &gsad_address->sin_addr) > 0)
+        address->ss_family = AF_INET;
+      else
+        {
+          g_warning ("Failed to create GSAD address %s", address_str);
+          g_free (address);
+          return 1;
+        }
+    }
+  else
+    {
+      gsad_address->sin_addr.s_addr = INADDR_ANY;
+      gsad_address6->sin6_addr = in6addr_any;
+      if (ipv6_is_enabled ())
+        address->ss_family = AF_INET6;
+      else
+        address->ss_family = AF_INET;
+    }
+  address_list = g_slist_append (address_list, address);
+  return 0;
+}
+
+/**
+ * @brief Main routine of Greenbone Security Assistant daemon.
+ *
+ * @param[in]  argc  Argument counter
+ * @param[in]  argv  Argument vector
+ *
+ * @return EXIT_SUCCESS on success, else EXIT_FAILURE.
+ */
+int
+main (int argc, char **argv)
+{
+  sigset_t sigmask_all, sigmask_current;
+
+  gsad_log_config_t *log_config = NULL;
+
+  /* Process command line options. */
+  gsad_args_t *gsad_args = gsad_args_new ();
+  gsad_settings_t *gsad_global_settings = gsad_settings_get_global_settings ();
+
+  if (gsad_args_parse (argc, argv, gsad_args) != 0)
+    {
+      goto error;
+    }
+
+  if (gsad_args_is_print_version_enabled (gsad_args))
+    {
+      printf ("Greenbone Security Assistant Deamon %s\n", GSAD_VERSION);
+      if (gsad_args_is_debug_tls_enabled (gsad_args))
+        {
+          printf ("gnutls %s\n", gnutls_check_version (NULL));
+          printf ("libmicrohttpd %s\n", MHD_get_version ());
+        }
+      goto success;
+    }
+
+  gsad_settings_set_log_config_filename (
+    gsad_global_settings, gsad_args_get_log_config_filename (gsad_args));
+
+  log_config = gsad_logging_init (gsad_global_settings);
+
+  /* Validate command line options. */
+  if (gsad_args_validate_session_timeout (gsad_args))
+
+    {
+      g_critical ("Invalid session timeout value: %d.",
+                  gsad_args_get_session_timeout (gsad_args));
+      goto error;
+    }
+  if (gsad_args_validate_port (gsad_args))
+    {
+      g_critical ("Invalid GSAD port value: %d.",
+                  gsad_args_get_port (gsad_args));
+      goto error;
+    }
+  if (gsad_args_validate_redirect_port (gsad_args))
+    {
+      g_critical ("Invalid redirect port value: %d.",
+                  gsad_args_get_redirect_port (gsad_args));
+      goto error;
+    }
+  if (gsad_args_is_https_enabled (gsad_args))
+    {
+      if (gsad_args_validate_tls_private_key (gsad_args))
+        {
+          g_critical ("Invalid TLS private key file: %s.",
+                      gsad_args_get_tls_private_key_filename (gsad_args));
+          goto error;
+        }
+      if (gsad_args_validate_tls_certificate (gsad_args))
+        {
+          g_critical ("Invalid TLS certificate file: %s.",
+                      gsad_args_get_tls_certificate_filename (gsad_args));
+          goto error;
+        }
+    }
+
+  /* Initialise. */
+
+  if (gsad_init (gsad_args_get_static_content_directory (gsad_args)) == MHD_NO)
+    {
+      g_critical ("Initialization failed! Exiting...");
+      goto error;
+    }
+
+  gsad_settings_set_http_x_frame_options (
+    gsad_global_settings, gsad_args_get_http_x_frame_options (gsad_args));
+  gsad_settings_set_http_content_security_policy (
+    gsad_global_settings,
+    gsad_args_get_http_content_security_policy (gsad_args));
+  gsad_settings_set_http_cors_origin (
+    gsad_global_settings, gsad_args_get_http_cors_origin (gsad_args));
+  gsad_settings_set_http_coep (gsad_global_settings,
+                               gsad_args_get_http_coep (gsad_args));
+  gsad_settings_set_http_coop (gsad_global_settings,
+                               gsad_args_get_http_coop (gsad_args));
+  gsad_settings_set_http_corp (gsad_global_settings,
+                               gsad_args_get_http_corp (gsad_args));
+
+  if (gsad_args_is_http_strict_transport_security_enabled (gsad_args))
+    {
+      gsad_settings_set_http_strict_transport_security (
+        gsad_global_settings,
+        g_strdup_printf (
+          "max-age=%d",
+          gsad_args_get_http_strict_transport_security_max_age (gsad_args)));
+    }
+  else
+    gsad_settings_set_http_strict_transport_security (gsad_global_settings,
+                                                      NULL);
+
+  gsad_settings_set_ignore_http_x_real_ip (
+    gsad_global_settings, gsad_args_is_ignore_x_real_ip_enabled (gsad_args));
+
+  gsad_settings_set_per_ip_connection_limit (
+    gsad_global_settings, gsad_args_get_per_ip_connection_limit (gsad_args));
+
+  if (register_signal_handlers ())
+    {
+      g_critical ("Failed to register signal handlers!");
+      goto error;
+    }
+
+  if (gsad_args_is_debug_tls_enabled (gsad_args))
+    {
+      gnutls_global_set_log_function (my_gnutls_log_func);
+      gnutls_global_set_log_level (gsad_args_get_tls_debug_level (gsad_args));
+    }
+
+  if (gsad_base_init ())
+    {
+      g_critical ("libxml must be compiled with thread support");
+      goto error;
+    }
+
+  /* Switch to UTC for scheduling. */
+
+  if (setenv ("TZ", "utc 0", 1) == -1)
+    {
+      g_critical ("Failed to set timezone.");
+      goto error;
+    }
+  tzset ();
+
+  g_info ("Starting GSAD version %s", GSAD_VERSION);
+
+  /* Finish processing the command line options. */
+
+  gsad_settings_set_use_secure_cookie (
+    gsad_global_settings, gsad_args_is_secure_cookie_enabled (gsad_args));
+
+  gsad_settings_set_session_timeout (gsad_global_settings,
+                                     gsad_args_get_session_timeout (gsad_args));
+  gsad_settings_set_pid_filename (gsad_global_settings,
+                                  gsad_args_get_pid_filename (gsad_args));
+  gsad_settings_set_api_only (gsad_global_settings,
+                              gsad_args_is_api_only_enabled (gsad_args));
+  gsad_settings_set_jwt_requested (gsad_global_settings,
+                                   gsad_args_is_jwt_requested (gsad_args));
+
+  gsad_settings_set_client_watch_interval (
+    gsad_global_settings, gsad_args_get_client_watch_interval (gsad_args));
+
+  gsad_settings_set_user_session_limit (
+    gsad_global_settings, gsad_args_get_user_session_limit (gsad_args));
+
+  const gchar *manager_address =
+    gsad_args_get_manager_unix_socket_path (gsad_args);
+  gsad_settings_set_manager_address (gsad_global_settings, manager_address);
+  if (!gsad_args_is_run_in_foreground_enabled (gsad_args))
+    {
+      /* Fork into the background. */
+      g_debug ("Forking...");
+      pid_t pid = fork ();
+      switch (pid)
+        {
+        case 0:
+          /* Child. */
+          break;
+        case -1:
+          /* Parent when error. */
+          g_critical ("Failed to fork!");
+          goto error;
+          break;
+        default:
+          /* Parent. */
+          goto success;
+          break;
+        }
+    }
+
+  gboolean should_redirect = gsad_args_is_redirect_enabled (gsad_args);
+  int redirect_port = gsad_args_get_redirect_port (gsad_args);
+  if (should_redirect)
+    {
+      /* Fork for the redirect server. */
+      g_debug ("Forking for redirect...");
+      pid_t pid = fork ();
+      switch (pid)
+        {
+        case 0:
+          /* Child. */
+#if __linux
+          if (prctl (PR_SET_PDEATHSIG, SIGKILL))
+            g_warning ("Failed to change parent death signal;"
+                       " redirect process will remain if parent is killed:"
+                       " %s\n",
+                       strerror (errno));
+#endif
+          redirect_location =
+            g_strdup_printf ("https://%%s:%i/", redirect_port);
+          break;
+        case -1:
+          /* Parent when error. */
+          g_critical ("Failed to fork for redirect!");
+          goto error;
+          break;
+        default:
+          /* Parent. */
+          redirect_pid = pid;
+          should_redirect = FALSE;
+          break;
+        }
+    }
+
+  /* Write pidfile. */
+  if (pidfile_create (
+        (gchar *) gsad_settings_get_pid_filename (gsad_global_settings)))
+    {
+      g_critical ("Could not write PID file at %s.",
+                  gsad_settings_get_pid_filename (gsad_global_settings));
+      goto error;
+    }
+
+  int gsad_port = gsad_args_get_port (gsad_args);
+
+  gchar **gsad_addresses = gsad_args_get_listen_addresses (gsad_args);
+  if (gsad_addresses)
+    while (*gsad_addresses)
+      {
+        if (gsad_address_init (*gsad_addresses, gsad_port))
+          goto error;
+        gsad_addresses++;
+      }
+  else if (gsad_address_init (NULL, gsad_port))
+    goto error;
+
+  gsad_http_handler_t *handlers =
+    gsad_http_request_init_handlers (gsad_global_settings);
+
+  if (should_redirect)
+    {
+      GSList *list = address_list;
+      /* Start the HTTP to HTTPS redirect server. */
+
+      g_debug ("Starting redirect server on port %d", redirect_port);
+      while (list)
+        {
+          gsad_address_set_port (list->data, redirect_port);
+          gsad_daemon = start_http_daemon (redirect_port, redirect_handler,
+                                           NULL, list->data);
+          list = list->next;
+        }
+
+      if (gsad_daemon == NULL)
+        {
+          g_critical ("Starting gsad redirect daemon failed!");
+          goto error;
+        }
+    }
+  else if (gsad_args_is_unix_socket_enabled (gsad_args))
+    {
+      /* Start the unix socket server. */
+
+      gsad_daemon =
+        start_unix_http_daemon (gsad_args_get_unix_socket_path (gsad_args),
+                                gsad_args_get_unix_socket_owner (gsad_args),
+                                gsad_args_get_unix_socket_group (gsad_args),
+                                gsad_args_get_unix_socket_mode (gsad_args),
+                                gsad_http_handle_request, handlers);
+
+      if (gsad_daemon == NULL)
+        {
+          g_critical ("Starting gsad unix daemon failed!");
+          goto error;
+        }
+    }
+  else
+    {
+      /* Start the real server. */
+
+      if (!gsad_args_is_https_enabled (gsad_args))
+        {
+          GSList *list = address_list;
+
+          while (list)
+            {
+              gsad_daemon = start_http_daemon (
+                gsad_port, gsad_http_handle_request, handlers, list->data);
+              if (gsad_daemon == NULL)
+                {
+                  g_critical ("Binding to port %d failed", gsad_port);
+                  goto error;
+                }
+              list = list->next;
+            }
+        }
+      else
+        {
+          gchar *ssl_private_key = NULL;
+          gchar *ssl_certificate = NULL;
+          gchar *dh_params = NULL;
+          GSList *list = address_list;
+          GError *error = NULL;
+
+          if (!g_file_get_contents (
+                gsad_args_get_tls_private_key_filename (gsad_args),
+                &ssl_private_key, NULL, &error))
+            {
+              g_critical ("Could not load private SSL key from %s: %s",
+                          gsad_args_get_tls_private_key_filename (gsad_args),
+                          error->message);
+              g_error_free (error);
+              goto error;
+            }
+
+          if (!g_file_get_contents (
+                gsad_args_get_tls_certificate_filename (gsad_args),
+                &ssl_certificate, NULL, &error))
+            {
+              g_critical ("Could not load SSL certificate from %s: %s",
+                          gsad_args_get_tls_certificate_filename (gsad_args),
+                          error->message);
+              g_error_free (error);
+              goto error;
+            }
+
+          if (gsad_args_get_dh_params_filename (gsad_args)
+              && !g_file_get_contents (
+                gsad_args_get_dh_params_filename (gsad_args), &dh_params, NULL,
+                &error))
+            {
+              g_critical ("Could not load SSL certificate from %s: %s",
+                          gsad_args_get_dh_params_filename (gsad_args),
+                          error->message);
+              g_error_free (error);
+              goto error;
+            }
+
+          while (list)
+            {
+              gsad_daemon =
+                start_https_daemon (gsad_port, ssl_private_key, ssl_certificate,
+                                    gsad_args_get_gnutls_priorities (gsad_args),
+                                    dh_params, handlers, list->data);
+              if (gsad_daemon == NULL)
+                {
+                  g_critical ("Binding to port %d failed.", gsad_port);
+                  goto error;
+                }
+              list = list->next;
+            }
+        }
+
+      if (gsad_daemon == NULL)
+        {
+          g_critical ("Starting gsad http(s) daemon failed!");
+          goto error;
+        }
+    }
+
+  /* Chroot and drop privileges, if requested. */
+
+  if (chroot_drop_privileges (
+        gsad_args_is_chroot_enabled (gsad_args),
+        gsad_args_get_drop_privileges (gsad_args),
+        gsad_args_get_static_content_directory (gsad_args)))
+    {
+      g_critical ("Cannot use drop privileges for directory \"%s\".",
+                  gsad_args_get_static_content_directory (gsad_args));
+      goto error;
+    }
+
+  g_info ("gsad started successfully");
+
+  /* Wait forever for input or interrupts. */
+
+  if (sigfillset (&sigmask_all))
+    {
+      g_critical ("Error filling signal set");
+      goto error;
+    }
+  if (pthread_sigmask (SIG_BLOCK, &sigmask_all, &sigmask_current))
+    {
+      g_critical ("Error setting signal mask");
+      goto error;
+    }
+  while (1)
+    {
+      if (termination_signal)
+        {
+          g_debug ("Received %s signal.", strsignal (termination_signal));
+          gsad_cleanup (log_config);
+          /* Raise signal again, to exit with the correct return value. */
+          signal (termination_signal, SIG_DFL);
+          raise (termination_signal);
+        }
+
+      if (pselect (0, NULL, NULL, NULL, NULL, &sigmask_current) == -1)
+        {
+          if (errno == EINTR)
+            continue;
+          g_critical ("%s: pselect: %s\n", __func__, strerror (errno));
+          goto error;
+        }
+    }
+success:
+  g_debug ("Exiting...");
+  gsad_cleanup (log_config);
+  gsad_args_free (gsad_args);
+  return EXIT_SUCCESS;
+error:
+  g_debug ("Exiting with failure...");
+  gsad_cleanup (log_config);
+  gsad_args_free (gsad_args);
+  return EXIT_FAILURE;
+}

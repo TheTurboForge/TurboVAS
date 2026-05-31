@@ -1,0 +1,3 @@
+scanner/__version__.py
+scanner/models/packages/deb.py
+scanner/models/packages/rpm.py

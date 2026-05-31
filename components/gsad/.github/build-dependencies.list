@@ -1,0 +1,13 @@
+build-essential
+ca-certificates
+cmake
+curl
+gcc
+git
+libgcrypt-dev
+libglib2.0-dev
+libgnutls28-dev
+libmicrohttpd-dev
+libssh-dev
+libxml2-dev
+pkg-config

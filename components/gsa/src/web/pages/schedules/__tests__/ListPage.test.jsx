@@ -1,0 +1,398 @@
+/* SPDX-FileCopyrightText: 2024 Greenbone AG
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+import {describe, test, expect, testing} from '@gsa/testing';
+import {
+  getSelectItemElementsForSelect,
+  screen,
+  testBulkTrashcanDialog,
+  within,
+  rendererWith,
+  fireEvent,
+} from 'web/testing';
+import Capabilities from 'gmp/capabilities/capabilities';
+import CollectionCounts from 'gmp/collection/collection-counts';
+import Filter from 'gmp/models/filter';
+import Schedule from 'gmp/models/schedule';
+import {createSession} from 'gmp/testing';
+import {currentSettingsDefaultResponse} from 'web/pages/__fixtures__/current-settings';
+import SchedulePage, {ToolBarIcons} from 'web/pages/schedules/ListPage';
+import {entitiesLoadingActions} from 'web/store/entities/schedules';
+import {defaultFilterLoadingActions} from 'web/store/usersettings/defaultfilters/actions';
+import {loadingActions} from 'web/store/usersettings/defaults/actions';
+
+const schedule = Schedule.fromElement({
+  comment: 'hello world',
+  creation_time: '2020-12-23T14:14:11Z',
+  icalendar:
+    'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Greenbone.net//NONSGML Greenbone Security Manager \n 21.4.0~dev1~git-5f8b6cf-master//EN\nBEGIN:VEVENT\nDTSTART:20210104T115400Z\nDURATION:PT0S\nUID:foo\nDTSTAMP:20210111T134141Z\nEND:VEVENT\nEND:VCALENDAR',
+  in_use: 0,
+  modification_time: '2021-01-04T11:54:12Z',
+  name: 'schedule 1',
+  owner: {name: 'admin'},
+  permissions: {permission: {name: 'Everything'}},
+  timezone: 'UTC',
+  writable: 1,
+  _id: '41fc25b4-fc21-4b81-ab30-35c95adc032a',
+});
+
+const caps = new Capabilities(['everything']);
+const wrongCaps = new Capabilities(['get_config']);
+
+const reloadInterval = -1;
+const manualUrl = 'test/';
+
+const createGmp = ({
+  currentSettings = testing
+    .fn()
+    .mockResolvedValue(currentSettingsDefaultResponse),
+  getSetting = testing.fn().mockResolvedValue({
+    filter: null,
+  }),
+  getFilters = testing.fn().mockResolvedValue({
+    data: [],
+    meta: {
+      filter: Filter.fromString(),
+      counts: new CollectionCounts(),
+    },
+  }),
+  getSchedules = testing.fn().mockResolvedValue({
+    data: [schedule],
+    meta: {
+      filter: Filter.fromString(),
+      counts: new CollectionCounts(),
+    },
+  }),
+  deleteByFilter = testing.fn().mockResolvedValue({
+    foo: 'bar',
+  }),
+  exportByFilter = testing.fn().mockResolvedValue({
+    foo: 'bar',
+  }),
+  deleteByIds = testing.fn().mockResolvedValue({
+    foo: 'bar',
+  }),
+  exportByIds = testing.fn().mockResolvedValue({
+    foo: 'bar',
+  }),
+} = {}) => ({
+  schedules: {
+    get: getSchedules,
+    deleteByFilter,
+    exportByFilter,
+    export: exportByIds,
+    delete: deleteByIds,
+  },
+  filters: {
+    get: getFilters,
+  },
+  settings: {
+    manualUrl,
+    reloadInterval,
+  },
+  session: createSession(),
+  user: {currentSettings, getSetting},
+});
+
+describe('SchedulePage tests', () => {
+  test('should render full SchedulePage', async () => {
+    const gmp = createGmp();
+
+    const {render, store} = rendererWith({
+      gmp,
+      capabilities: true,
+      store: true,
+      router: true,
+    });
+
+    const defaultSettingFilter = Filter.fromString('foo=bar');
+    store.dispatch(loadingActions.success({rowsperpage: {value: '2'}}));
+    store.dispatch(
+      defaultFilterLoadingActions.success('schedule', defaultSettingFilter),
+    );
+
+    const counts = new CollectionCounts({
+      first: 1,
+      all: 1,
+      filtered: 1,
+      length: 1,
+      rows: 10,
+    });
+    const filter = Filter.fromString('first=1 rows=10');
+    const loadedFilter = Filter.fromString('first=1 rows=10');
+    store.dispatch(
+      entitiesLoadingActions.success([schedule], filter, loadedFilter, counts),
+    );
+
+    const {baseElement} = render(<SchedulePage />);
+
+    await screen.findByTitle('New Schedule');
+
+    const powerFilter = within(screen.queryPowerFilter());
+    const select = powerFilter.getByTestId('powerfilter-select');
+    const inputs = powerFilter.queryTextInputs();
+
+    // Toolbar Icons
+    screen.getByTitle('Help: Schedules');
+    screen.getByTitle('New Schedule');
+
+    // Powerfilter
+    expect(inputs[0]).toHaveAttribute('name', 'userFilterString');
+    screen.getByTitle('Update Filter');
+    screen.getByTitle('Remove Filter');
+    screen.getByTitle('Reset to Default Filter');
+    screen.getByTitle('Help: Powerfilter');
+    screen.getByTitle('Edit Filter');
+    expect(select).toHaveAttribute('title', 'Loaded filter');
+    expect(select).toHaveValue('--');
+
+    // Table
+    const header = baseElement.querySelectorAll('th');
+
+    expect(header[0]).toHaveTextContent('Name');
+    expect(header[1]).toHaveTextContent('First Run');
+    expect(header[2]).toHaveTextContent('Next Run');
+    expect(header[3]).toHaveTextContent('Recurrence');
+    expect(header[4]).toHaveTextContent('Duration');
+    expect(header[5]).toHaveTextContent('Actions');
+
+    const row = baseElement.querySelectorAll('tr');
+
+    expect(row[1]).toHaveTextContent('schedule 1');
+    expect(row[1]).toHaveTextContent('(hello world)');
+    expect(row[1]).toHaveTextContent(
+      'Mon, Jan 4, 2021 11:54 AM Coordinated Universal Time',
+    );
+    expect(row[1]).toHaveTextContent('-');
+    expect(row[1]).toHaveTextContent('Entire Operation');
+
+    screen.getByTitle('Move Schedule to trashcan');
+    screen.getByTitle('Edit Schedule');
+    screen.getByTitle('Clone Schedule');
+    screen.getByTitle('Export Schedule');
+  });
+
+  test('should allow to bulk action on page contents', async () => {
+    const gmp = createGmp();
+
+    const {render, store} = rendererWith({
+      gmp,
+      capabilities: true,
+      store: true,
+      router: true,
+    });
+
+    const defaultSettingFilter = Filter.fromString('foo=bar');
+    store.dispatch(loadingActions.success({rowsperpage: {value: '2'}}));
+    store.dispatch(
+      defaultFilterLoadingActions.success('schedule', defaultSettingFilter),
+    );
+
+    const counts = new CollectionCounts({
+      first: 1,
+      all: 1,
+      filtered: 1,
+      length: 1,
+      rows: 10,
+    });
+    const filter = Filter.fromString('first=1 rows=10');
+    const loadedFilter = Filter.fromString('first=1 rows=10');
+    store.dispatch(
+      entitiesLoadingActions.success([schedule], filter, loadedFilter, counts),
+    );
+
+    render(<SchedulePage />);
+
+    await screen.findByTitle('Export page contents');
+
+    // export page contents
+    const exportIcon = screen.getByTitle('Export page contents');
+    fireEvent.click(exportIcon);
+    expect(gmp.schedules.exportByFilter).toHaveBeenCalled();
+
+    // move page contents to trashcan
+    const deleteIcon = screen.getByTitle('Move page contents to trashcan');
+    fireEvent.click(deleteIcon);
+    testBulkTrashcanDialog(screen, gmp.schedules.deleteByFilter);
+  });
+
+  test('should allow to bulk action on selected schedules', async () => {
+    const gmp = createGmp();
+
+    const {render, store} = rendererWith({
+      gmp,
+      capabilities: true,
+      store: true,
+      router: true,
+    });
+
+    const defaultSettingFilter = Filter.fromString('foo=bar');
+    store.dispatch(loadingActions.success({rowsperpage: {value: '2'}}));
+    store.dispatch(
+      defaultFilterLoadingActions.success('schedule', defaultSettingFilter),
+    );
+
+    const counts = new CollectionCounts({
+      first: 1,
+      all: 1,
+      filtered: 1,
+      length: 1,
+      rows: 10,
+    });
+    const filter = Filter.fromString('first=1 rows=10');
+    const loadedFilter = Filter.fromString('first=1 rows=10');
+    store.dispatch(
+      entitiesLoadingActions.success([schedule], filter, loadedFilter, counts),
+    );
+
+    render(<SchedulePage />);
+
+    await screen.findByText('schedule 1');
+
+    // change to apply to selection
+    const tableFooter = within(screen.queryTableFooter());
+    const select = tableFooter.getSelectElement();
+    const selectItems = await getSelectItemElementsForSelect(select);
+    fireEvent.click(selectItems[1]);
+    expect(select).toHaveValue('Apply to selection');
+
+    // select an schedule
+    const tableBody = within(screen.queryTableBody());
+    const inputs = tableBody.queryCheckBoxes();
+    fireEvent.click(inputs[0]);
+
+    // export selected schedule
+    const exportIcon = screen.getByTitle('Export selection');
+    fireEvent.click(exportIcon);
+    expect(gmp.schedules.export).toHaveBeenCalled();
+
+    // move selected schedule to trashcan
+    const deleteIcon = screen.getByTitle('Move selection to trashcan');
+    fireEvent.click(deleteIcon);
+    testBulkTrashcanDialog(screen, gmp.schedules.delete);
+  });
+
+  test('should allow to bulk action on filtered schedules', async () => {
+    const gmp = createGmp();
+
+    const {render, store} = rendererWith({
+      gmp,
+      capabilities: true,
+      store: true,
+      router: true,
+    });
+
+    const defaultSettingFilter = Filter.fromString('foo=bar');
+    store.dispatch(loadingActions.success({rowsperpage: {value: '2'}}));
+    store.dispatch(
+      defaultFilterLoadingActions.success('schedule', defaultSettingFilter),
+    );
+
+    const counts = new CollectionCounts({
+      first: 1,
+      all: 1,
+      filtered: 1,
+      length: 1,
+      rows: 10,
+    });
+    const filter = Filter.fromString('first=1 rows=10');
+    const loadedFilter = Filter.fromString('first=1 rows=10');
+    store.dispatch(
+      entitiesLoadingActions.success([schedule], filter, loadedFilter, counts),
+    );
+
+    render(<SchedulePage />);
+
+    await screen.findByText('schedule 1');
+
+    // change to all filtered
+    const tableFooter = within(screen.queryTableFooter());
+    const select = tableFooter.getSelectElement();
+    const selectItems = await getSelectItemElementsForSelect(select);
+    fireEvent.click(selectItems[2]);
+    expect(select).toHaveValue('Apply to all filtered');
+
+    // export all filtered schedules
+    const exportIcon = screen.getByTitle('Export all filtered');
+    fireEvent.click(exportIcon);
+    expect(gmp.schedules.exportByFilter).toHaveBeenCalled();
+
+    // move all filtered schedules to trashcan
+    const deleteIcon = screen.getByTitle('Move all filtered to trashcan');
+    fireEvent.click(deleteIcon);
+    testBulkTrashcanDialog(screen, gmp.schedules.deleteByFilter);
+  });
+});
+
+describe('SchedulePage ToolBarIcons test', () => {
+  test('should render', () => {
+    const handleScheduleCreateClick = testing.fn();
+
+    const gmp = {
+      settings: {manualUrl},
+    };
+
+    const {render} = rendererWith({
+      gmp,
+      capabilities: caps,
+      router: true,
+    });
+
+    const {element} = render(
+      <ToolBarIcons onScheduleCreateClick={handleScheduleCreateClick} />,
+    );
+
+    const links = element.querySelectorAll('a');
+
+    expect(screen.getByTestId('help-icon')).toHaveAttribute(
+      'title',
+      'Help: Schedules',
+    );
+    expect(links[0]).toHaveAttribute(
+      'href',
+      'test/en/scanning.html#managing-schedules',
+    );
+  });
+
+  test('should call click handlers', () => {
+    const handleScheduleCreateClick = testing.fn();
+
+    const gmp = {
+      settings: {manualUrl},
+    };
+
+    const {render} = rendererWith({
+      gmp,
+      capabilities: caps,
+      router: true,
+    });
+
+    render(<ToolBarIcons onScheduleCreateClick={handleScheduleCreateClick} />);
+
+    const newIcon = screen.getByTestId('new-icon');
+    expect(newIcon).toHaveAttribute('title', 'New Schedule');
+    fireEvent.click(newIcon);
+    expect(handleScheduleCreateClick).toHaveBeenCalled();
+  });
+
+  test('should not show icons if user does not have the right permissions', () => {
+    const handleScheduleCreateClick = testing.fn();
+
+    const gmp = {
+      settings: {manualUrl},
+    };
+
+    const {render} = rendererWith({
+      gmp,
+      capabilities: wrongCaps,
+      router: true,
+    });
+
+    render(<ToolBarIcons onScheduleCreateClick={handleScheduleCreateClick} />);
+
+    const newIcon = screen.queryByTestId('new-icon');
+    expect(newIcon).not.toBeInTheDocument();
+  });
+});

@@ -10,25 +10,25 @@
 *.gpg
 
 # Local/private work.
-private/
-scratch/
-notes/
-logs/
+/private/
+/scratch/
+/notes/
+/logs/
 
 # Build and tool outputs.
-build/
-cmake-build-*/
-.cache/
-ccache/
+/build/
+/cmake-build-*/
+/.cache/
+/ccache/
 
 # Editor local config.
-.vscode/*
-!.vscode/extensions.json
-!.vscode/settings.example.json
+/.vscode/*
+!/.vscode/extensions.json
+!/.vscode/settings.example.json
 
 # Common local/editor noise.
 .DS_Store
 Thumbs.db
 *.swp
 *.swo
-.idea/
+/.idea/

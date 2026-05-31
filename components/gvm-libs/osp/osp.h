@@ -1,0 +1,218 @@
+/* SPDX-FileCopyrightText: 2014-2023 Greenbone AG
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ */
+
+/**
+ * @file
+ * @brief API for Open Scanner Protocol communication.
+ */
+
+#ifndef _GVM_OSP_OSP_H
+#define _GVM_OSP_OSP_H
+
+#include "../util/credentialutils.h"
+#include "../util/xmlutils.h"
+
+#include <glib.h> /* for GHashTable, GSList */
+
+/* Type definitions */
+
+typedef struct osp_connection osp_connection_t;
+
+typedef struct osp_target osp_target_t;
+
+typedef struct osp_vt_group osp_vt_group_t;
+
+typedef struct osp_vt_single osp_vt_single_t;
+
+/**
+ * @brief OSP parameter types.
+ */
+typedef enum
+{
+  OSP_PARAM_TYPE_INT = 0,      /**< Integer type. */
+  OSP_PARAM_TYPE_STR,          /**< String type. */
+  OSP_PARAM_TYPE_PASSWORD,     /**< Password type. */
+  OSP_PARAM_TYPE_FILE,         /**< File type. */
+  OSP_PARAM_TYPE_BOOLEAN,      /**< Boolean type. */
+  OSP_PARAM_TYPE_OVALDEF_FILE, /**< Oval definition type. */
+  OSP_PARAM_TYPE_SELECTION,    /**< Selection type. */
+  OSP_PARAM_TYPE_CRD_UP,       /**< Credential user/pass type. */
+} osp_param_type_t;
+
+/**
+ * @brief OSP scan status.
+ */
+typedef enum
+{
+  OSP_SCAN_STATUS_ERROR = -1,  /**< Error status. */
+  OSP_SCAN_STATUS_INIT,        /**< Init status. */
+  OSP_SCAN_STATUS_RUNNING,     /**< Running status. */
+  OSP_SCAN_STATUS_STOPPED,     /**< Stopped status. */
+  OSP_SCAN_STATUS_FINISHED,    /**< Finished status. */
+  OSP_SCAN_STATUS_QUEUED,      /**< Queued status */
+  OSP_SCAN_STATUS_INTERRUPTED, /**< Interrupted status */
+} osp_scan_status_t;
+
+typedef struct
+{
+  const char *scan_id; ///< UUID of the scan which get the status from.
+} osp_get_scan_status_opts_t;
+
+typedef struct
+{
+  int start;    /**< Start interval. */
+  int end;      /**< End interval. */
+  char *titles; /**< Graph title. */
+} osp_get_performance_opts_t;
+
+typedef struct osp_param osp_param_t;
+
+/* OSP Connection handling */
+
+osp_connection_t *
+osp_connection_new (const char *, int, const char *, const char *,
+                    const char *);
+
+void
+osp_connection_close (osp_connection_t *);
+
+/* OSP commands */
+int
+osp_check_feed (osp_connection_t *, int *, int *, char **, char **);
+
+int
+osp_get_version (osp_connection_t *, char **, char **, char **, char **,
+                 char **, char **);
+
+int
+osp_get_vts_version (osp_connection_t *, char **, char **error);
+
+int
+osp_get_vts_feed_info (osp_connection_t *, char **, char **, char **, char **,
+                       char **);
+
+int
+osp_get_vts (osp_connection_t *, entity_t *);
+
+typedef struct
+{
+  char *filter;     ///< the filter to apply for a vt sub-selection.
+  int version_only; ///< if get only feed info or the vt collection
+} osp_get_vts_opts_t;
+
+/**
+ * @brief Sensible default values for osp_get_vts_opts_t
+ */
+static const osp_get_vts_opts_t osp_get_vts_opts_default = {NULL, 0};
+
+int
+osp_get_vts_ext (osp_connection_t *, osp_get_vts_opts_t, entity_t *);
+
+int
+osp_get_vts_ext_str (osp_connection_t *, osp_get_vts_opts_t, gchar **);
+
+int
+osp_start_scan (osp_connection_t *, const char *, const char *, GHashTable *,
+                const char *, char **);
+
+typedef struct
+{
+  GSList *targets;            ///< Target hosts to scan.
+  GSList *vt_groups;          ///< VT groups to use for the scan.
+  GSList *vts;                ///< Single VTs to use for the scan.
+  GHashTable *scanner_params; ///< Table of scanner parameters.
+  const char *scan_id;        ///< UUID to set for scan, null otherwise.
+} osp_start_scan_opts_t;
+
+int
+osp_start_scan_ext (osp_connection_t *, osp_start_scan_opts_t, char **);
+
+int
+osp_get_scan (osp_connection_t *, const char *, char **, int, char **);
+
+int
+osp_get_scan_pop (osp_connection_t *, const char *, char **, int, int, char **);
+
+osp_scan_status_t
+osp_get_scan_status_ext (osp_connection_t *, osp_get_scan_status_opts_t,
+                         char **);
+
+int
+osp_delete_scan (osp_connection_t *, const char *);
+
+int
+osp_stop_scan (osp_connection_t *, const char *, char **);
+
+int
+osp_get_scanner_details (osp_connection_t *, char **, GSList **);
+
+int
+osp_get_performance_ext (osp_connection_t *, osp_get_performance_opts_t,
+                         char **, char **);
+
+/* OSP scanner parameters handling */
+
+osp_param_t *
+osp_param_new (void);
+
+const char *
+osp_param_id (const osp_param_t *);
+
+const char *
+osp_param_name (const osp_param_t *);
+
+const char *
+osp_param_desc (const osp_param_t *);
+
+const char *
+osp_param_default (const osp_param_t *);
+
+const char *
+osp_param_type_str (const osp_param_t *);
+
+int
+osp_param_mandatory (const osp_param_t *);
+
+void
+osp_param_free (osp_param_t *);
+
+/* OSP targets handling */
+
+osp_target_t *
+osp_target_new (const char *, const char *, const char *, int, int, int);
+
+void
+osp_target_set_finished_hosts (osp_target_t *, const char *);
+
+void
+osp_target_free (osp_target_t *);
+
+void
+osp_target_add_alive_test_methods (osp_target_t *, gboolean, gboolean, gboolean,
+                                   gboolean, gboolean);
+
+void
+osp_target_add_credential (osp_target_t *, scan_credential_t *);
+
+/* OSP VT group handling */
+
+osp_vt_group_t *
+osp_vt_group_new (const char *);
+
+void
+osp_vt_group_free (osp_vt_group_t *);
+
+/* OSP single VT handling */
+
+osp_vt_single_t *
+osp_vt_single_new (const char *);
+
+void
+osp_vt_single_free (osp_vt_single_t *);
+
+void
+osp_vt_single_add_value (osp_vt_single_t *, const char *, const char *);
+
+#endif /* not _GVM_OSP_OSP_H */

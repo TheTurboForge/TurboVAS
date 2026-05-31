@@ -1,0 +1,73 @@
+/* Copyright (C) 2016-2021 Greenbone AG
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+/**
+ * @file gsad_cmd.h
+ * @brief Headers for Response Data struct
+ */
+
+#ifndef _GSAD_COMMAND_RESPONSE_DATA_H
+#define _GSAD_COMMAND_RESPONSE_DATA_H
+
+#include "gsad_content_type.h" /* for content_type_t */
+
+#include <glib.h>
+
+typedef struct gsad_command_response_data gsad_command_response_data_t;
+
+gsad_command_response_data_t *
+gsad_command_response_data_new ();
+
+void
+gsad_command_response_data_free (gsad_command_response_data_t *data);
+
+void
+gsad_command_response_data_set_allow_caching (
+  gsad_command_response_data_t *data, gboolean allow_caching);
+
+gboolean
+gsad_command_response_data_is_allow_caching (
+  gsad_command_response_data_t *data);
+
+void
+gsad_command_response_data_set_content_type (gsad_command_response_data_t *data,
+                                             content_type_t content_type);
+
+content_type_t
+gsad_command_response_data_get_content_type (
+  gsad_command_response_data_t *data);
+
+void
+gsad_command_response_data_set_status_code (gsad_command_response_data_t *data,
+                                            int http_status_code);
+
+int
+gsad_command_response_data_get_status_code (gsad_command_response_data_t *data);
+
+void
+gsad_command_response_data_set_content_length (
+  gsad_command_response_data_t *data, gsize content_length);
+
+gsize
+gsad_command_response_data_get_content_length (
+  gsad_command_response_data_t *data);
+
+void
+gsad_command_response_data_set_content_disposition (
+  gsad_command_response_data_t *data, gchar *content_disposition);
+
+const gchar *
+gsad_command_response_data_get_content_disposition (
+  gsad_command_response_data_t *data);
+
+void
+gsad_command_response_data_set_content_type_string (
+  gsad_command_response_data_t *data, gchar *content_type_string);
+
+const gchar *
+gsad_command_response_data_get_content_type_string (
+  gsad_command_response_data_t *data);
+
+#endif /* _GSAD_COMMAND_RESPONSE_DATA_H */

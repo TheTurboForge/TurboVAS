@@ -1,0 +1,39 @@
+ARG GVM_LIBS_VERSION=stable
+ARG DEBIAN_FRONTEND=noninteractive
+ARG FEATURE_TOGGLE=""
+
+FROM ghcr.io/greenbone/gvm-libs:${GVM_LIBS_VERSION} AS build
+
+ARG FEATURE_TOGGLE
+
+COPY . /source
+WORKDIR /source
+
+RUN sh /source/.github/install-dependencies.sh \
+    /source/.github/build-dependencies.list \
+    && rm -rf /var/lib/apt/lists/*
+RUN cmake -DCMAKE_BUILD_TYPE=Release ${FEATURE_TOGGLE} -B /build /source \
+    && DESTDIR=/install cmake --build /build -j$(nproc) -- install
+
+FROM ghcr.io/greenbone/gvm-libs:${GVM_LIBS_VERSION}
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN --mount=type=bind,source=.github,target=/source/ \
+    sh /source/install-dependencies.sh /source/runtime-dependencies.list \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /install/ /
+COPY .docker/gsad_log.conf /etc/gvm/
+COPY --chmod=755 .docker/start-gsad.sh /usr/local/bin/start-gsad
+COPY --chmod=755 .docker/entrypoint.sh /usr/local/bin/entrypoint
+
+# create web directory where GSA should be placed and runtime files directories
+RUN addgroup --gid 1001 --system gsad \
+    && adduser --no-create-home --shell /bin/false --disabled-password --uid 1001 --system --group gsad \
+    && mkdir -p /usr/local/share/gvm/gsad/web /run/gsad /var/log/gvm \
+    && chown -R gsad:gsad /run/gsad /var/log/gvm
+
+ENTRYPOINT [ "/usr/local/bin/entrypoint" ]
+
+CMD ["/usr/local/bin/start-gsad"]

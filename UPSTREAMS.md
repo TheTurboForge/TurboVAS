@@ -1,0 +1,22 @@
+# Upstream Sources
+
+This file records the upstream source snapshots imported into the TurboVAS monorepo.
+
+Import date: 2026-05-31
+Import method: source snapshot from local upstream cache, excluding only upstream `.git/` directories.
+
+| Component | Path | Upstream repository | Imported commit | Role |
+| --- | --- | --- | --- | --- |
+| OpenVAS Scanner | `components/openvas-scanner` | https://github.com/greenbone/openvas-scanner | `f039649` | Scanner engine and NASL/VT execution core; includes C scanner and Rust/openvasd-related code. |
+| gvm-libs | `components/gvm-libs` | https://github.com/greenbone/gvm-libs | `f67e8b8` | Shared libraries for Greenbone services, protocols, scanner helpers, and utilities. |
+| gvmd | `components/gvmd` | https://github.com/greenbone/gvmd | `39a51f6` | Central management daemon; stores configuration/results, exposes GMP, and controls scanners through OSP. |
+| ospd-openvas | `components/ospd-openvas` | https://github.com/greenbone/ospd-openvas | `874c524` | OSP server implementation for controlling OpenVAS Scanner and Notus Scanner. |
+| gsad | `components/gsad` | https://github.com/greenbone/gsad | `88ef642` | HTTP daemon connecting the browser UI to `gvmd`. |
+| gsa | `components/gsa` | https://github.com/greenbone/gsa | `f1e8cbe` | React web UI for Greenbone vulnerability management. |
+| openvas-smb | `components/openvas-smb` | https://github.com/greenbone/openvas-smb | `488c810` | SMB/WMI support module for authenticated Windows scanning. |
+| notus-scanner | `components/notus-scanner` | https://github.com/greenbone/notus-scanner | `80681c6` | Python scanner for local security checks based on collected system information and Notus feed data. |
+| greenbone-feed-sync | `components/greenbone-feed-sync` | https://github.com/greenbone/greenbone-feed-sync | `1be4adf` | Tool for downloading Greenbone Community Feed data. |
+| python-gvm | `components/python-gvm` | https://github.com/greenbone/python-gvm | `acf6ccf` | Python API library for GMP and OSP. |
+| gvm-tools | `components/gvm-tools` | https://github.com/greenbone/gvm-tools | `f68027a` | CLI and scripting tools for GMP/OSP remote control. |
+
+The archived standalone `greenbone/ospd` repository is not imported. Current `ospd-openvas` includes its own `ospd` package.

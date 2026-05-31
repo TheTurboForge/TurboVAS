@@ -1,0 +1,93 @@
+name: functional
+
+# github.event.pull_request.number
+
+on:
+  workflow_call:
+    inputs:
+      image:
+        description: "The image to test"
+        required: true
+        type: string
+
+
+# smoke test definition.
+# It depends on build.yml that is controlled via control.yml
+#
+jobs:
+  # Tests that gvm-libs, openvas-smb and openvas dependencies work together and
+  # that openvas is buildable and integrates openvas-smb when available
+  distributed-monolith-railguard:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        system:
+          - debian_stable
+          - debian_bookworm
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/copy-docker-binaries
+        with:
+          arch: amd64 
+      - run: docker build -t test -f .docker/railguards/${{matrix.system}}.Dockerfile .
+      - run: docker run --rm test ldd /usr/local/sbin/openvas
+      - run: docker run --rm test ldd /usr/local/sbin/openvas | grep libopenvas_wmiclient
+      - run: docker run --rm test /usr/local/bin/openvasd -h
+      - run: docker run --rm test /usr/local/bin/scannerctl -h
+      - run: docker rmi test || true
+  smokey:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        # TODO: make version robust
+      - run: curl -L https://github.com/Orange-OpenSource/hurl/releases/download/7.1.0/hurl_7.1.0_amd64.deb -o hurl.deb
+      - run: sudo apt-get install -y ./hurl.deb
+      - run: cd compose && OPENVAS_IMAGE="${{ inputs.image }}" make test-environment-running
+      - run: |
+          for attempt in 1 2; do
+            ( cd compose/tests/smoketest && make > /dev/null 2>&1) && exit 0 || \
+              echo "smokey failed on attempt $attempt, retrying..."
+          done
+          cd compose/tests/smoketest && make
+      - run: cd compose && make test-environment-logs
+        if: always()
+  tests:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    container:
+      image: ${{ inputs.image }}
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v6
+      - name: prepare setup
+        run: |
+          apt-get update && apt-get install --no-install-recommends --no-install-suggests -y \
+            docker.io docker-cli \
+            make
+          FEED_DIR="feed/" sh .github/prepare-feed.sh
+          echo "db_address = tcp://redis:6379" >> /etc/openvas/openvas.conf
+          mv ./feed/* "$(openvas -s | grep plugins_folder | sed 's/plugins_folder = //')/"
+      - run: openvas -s
+      - name: verify feed syntax
+        run: scannerctl syntax --quiet "$(openvas -s | grep plugins_folder | sed 's/plugins_folder = //')/"
+      - name: verify nasl tests
+        run: |
+          mkdir -p /etc/openvas
+          cd nasl/tests
+          make check
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '>=1.16.0'
+      - name: verify lint
+        run: |
+          make build
+          ./run -e openvas-nasl-lint
+        working-directory: smoketest_lint

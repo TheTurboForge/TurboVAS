@@ -1,0 +1,17 @@
+name: Deploy on PyPI
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  deploy:
+    permissions:
+      id-token: write
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/greenbone-feed-sync/
+    steps:
+      - name: Build and publish to PyPI
+        uses: greenbone/actions/pypi-upload@v3

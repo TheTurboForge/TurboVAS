@@ -1,0 +1,203 @@
+/* SPDX-FileCopyrightText: 2009-2023 Greenbone AG
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ */
+
+/**
+ * @file
+ * @brief Headers for simple XML reader.
+ */
+
+#ifndef _GVM_UTIL_XMLUTILS_H
+#define _GVM_UTIL_XMLUTILS_H
+
+#include "serverutils.h"
+
+#include <glib.h>
+#include <gnutls/gnutls.h>
+#include <stdio.h>
+
+/**
+ * @brief XML context.
+ *
+ * This structure is used to pass data between XML event handlers and the
+ * caller of the XML parser.
+ */
+typedef struct
+{
+  GSList *first;   ///< The very first entity.
+  GSList *current; ///< The element currently being parsed.
+  gboolean done;   ///< Flag which is true when the first element is closed.
+} context_data_t;
+
+void
+xml_handle_start_element (context_data_t *, const gchar *, const gchar **,
+                          const gchar **);
+
+void
+xml_handle_end_element (context_data_t *, const gchar *);
+
+void
+xml_handle_text (context_data_t *, const gchar *, gsize);
+
+/**
+ * @brief Entities.
+ */
+typedef GSList *entities_t;
+
+/**
+ * @brief XML element.
+ */
+struct entity_s
+{
+  char *name;             ///< Name.
+  char *text;             ///< Text.
+  GHashTable *attributes; ///< Attributes.
+  entities_t entities;    ///< Children.
+};
+typedef struct entity_s *entity_t;
+
+/**
+ * @brief Data for xml search functions.
+ */
+typedef struct
+{
+  int found;                   /**< Founded.*/
+  int done;                    /**< Done. */
+  gchar *find_element;         /**< Element to be find. */
+  GHashTable *find_attributes; /**< Attributes to find. */
+} xml_search_data_t;
+
+entities_t next_entities (entities_t);
+
+entity_t first_entity (entities_t);
+
+entity_t
+add_entity (entities_t *, const char *, const char *);
+
+int compare_entities (entity_t, entity_t);
+
+entity_t
+entity_child (entity_t, const char *);
+
+const char *
+entity_attribute (entity_t, const char *);
+
+char *
+entity_name (entity_t entity);
+
+char *
+entity_text (entity_t entity);
+
+void free_entity (entity_t);
+
+void
+print_entity (FILE *, entity_t);
+
+void
+print_entity_format (entity_t, gpointer indentation);
+
+int
+try_read_entity_and_string (gnutls_session_t *, int, entity_t *, GString **);
+
+int
+read_entity_and_string (gnutls_session_t *, entity_t *, GString **);
+
+int
+read_entity_and_string_c (gvm_connection_t *, entity_t *, GString **);
+
+int
+read_entity_and_text (gnutls_session_t *, entity_t *, char **);
+
+int
+read_entity_and_text_c (gvm_connection_t *, entity_t *, char **);
+
+int
+try_read_entity (gnutls_session_t *, int, entity_t *);
+
+int
+try_read_entity_c (gvm_connection_t *, int, entity_t *);
+
+int
+read_entity (gnutls_session_t *, entity_t *);
+
+int
+read_entity_s (int, entity_t *);
+
+int
+read_entity_c (gvm_connection_t *, entity_t *);
+
+int
+read_string (gnutls_session_t *, GString **);
+
+int
+read_string_c (gvm_connection_t *, GString **);
+
+int
+read_text_c (gvm_connection_t *, char **);
+
+int
+parse_entity (const char *, entity_t *);
+
+void
+print_entity_to_string (entity_t entity, GString *string);
+
+int xml_count_entities (entities_t);
+
+void
+xml_string_append (GString *, const char *, ...);
+
+/* XML file utilities */
+
+int
+find_element_in_xml_file (gchar *, gchar *, GHashTable *);
+
+/* The new faster parser that uses libxml2. */
+
+typedef struct _xmlNode *element_t;
+
+int
+parse_element (const gchar *, element_t *);
+
+void element_free (element_t);
+
+const gchar *element_name (element_t);
+
+gchar *
+element_attribute (element_t, const gchar *);
+
+gchar *element_text (element_t);
+
+element_t
+element_child (element_t, const gchar *);
+
+element_t element_first_child (element_t);
+
+element_t element_next (element_t);
+
+gchar *
+element_to_string (element_t element);
+
+void
+print_element_to_string (element_t element, GString *string);
+
+/* XML file iterator
+ * for reading subelements from large files without building the whole DOM
+ */
+
+typedef struct xml_file_iterator_struct *xml_file_iterator_t;
+
+xml_file_iterator_t
+xml_file_iterator_new (void);
+
+int
+xml_file_iterator_init_from_file_path (xml_file_iterator_t, const char *, int);
+
+void xml_file_iterator_free (xml_file_iterator_t);
+
+int xml_file_iterator_rewind (xml_file_iterator_t);
+
+element_t
+xml_file_iterator_next (xml_file_iterator_t, gchar **);
+
+#endif /* not _GVM_UTIL_XMLUTILS_H */
