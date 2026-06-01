@@ -60,11 +60,26 @@ logs service="":
 runtime-init:
     @tools/turbovasctl runtime-init
 
+runtime-certs-init:
+    @tools/turbovasctl runtime-certs-init
+
+runtime-manager-init:
+    @tools/turbovasctl runtime-manager-init
+
 runtime-status:
     @tools/turbovasctl runtime-status
 
 runtime-smoke:
     @tools/turbovasctl runtime-smoke
+
+runtime-app-up:
+    @tools/turbovasctl runtime-app-up
+
+runtime-app-down:
+    @tools/turbovasctl runtime-app-down
+
+runtime-app-smoke:
+    @tools/turbovasctl runtime-app-smoke
 
 gvmd-smoke:
     @tools/turbovasctl gvmd-smoke

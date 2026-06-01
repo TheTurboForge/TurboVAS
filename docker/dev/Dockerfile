@@ -1,4 +1,6 @@
 # syntax=docker/dockerfile:1.7
+# SPDX-FileCopyrightText: 2026 TurboVAS contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -14,7 +16,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
       python3 python3-venv python3-pip pipx \
       bison flex perl jq ripgrep fd-find tree \
       libcjson-dev libcrypt-dev libcurl4-gnutls-dev libgcrypt20-dev \
-      libglib2.0-dev libgnutls28-dev libgpgme-dev libhiredis-dev \
+      libglib2.0-dev libgnutls28-dev gnutls-bin libgpgme-dev libhiredis-dev \
       libnet1-dev libpaho-mqtt-dev libpcap-dev libssh-dev libxml2-dev \
       uuid-dev libjson-glib-dev libksba-dev libbsd-dev krb5-multidev \
       libmagic-dev libsnmp-dev gcc-mingw-w64 heimdal-dev libpopt-dev \

@@ -103,6 +103,24 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_runtime_services_are_infrastructure_only(self):
         self.assertEqual(turbovasctl.RUNTIME_SERVICES, ("postgres", "redis", "mosquitto"))
 
+    def test_app_services_are_experimental_profile_services(self):
+        self.assertEqual(turbovasctl.APP_SERVICES, ("gvmd", "ospd-openvas", "gsad"))
+
+    def test_runtime_dirs_include_application_state(self):
+        self.assertIn("certs/CA", turbovasctl.RUNTIME_DIRS)
+        self.assertIn("certs/private/CA", turbovasctl.RUNTIME_DIRS)
+        self.assertIn("secrets", turbovasctl.RUNTIME_DIRS)
+        self.assertIn("run/gvmd", turbovasctl.RUNTIME_DIRS)
+        self.assertIn("run/ospd", turbovasctl.RUNTIME_DIRS)
+
+    def test_cert_files_live_under_runtime_dir(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            root.mkdir()
+            files = turbovasctl.cert_files(root)
+            self.assertEqual(files["ca_cert"], Path(tmp) / "TurboVAS-runtime" / "certs" / "CA" / "cacert.pem")
+            self.assertEqual(files["client_key"], Path(tmp) / "TurboVAS-runtime" / "certs" / "private" / "CA" / "clientkey.pem")
+
     def test_compose_command_uses_dev_compose_file(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -66,22 +66,31 @@ The Python baseline uses `uv` with per-component virtual environments under `bui
 
 ## Runtime Groundwork
 
-The current Docker runtime baseline starts infrastructure services only:
+The current Docker runtime baseline starts infrastructure services and an
+experimental inherited application profile:
 
 ```sh
 just runtime-plan
 just up
+just runtime-certs-init
 just runtime-init
+just runtime-manager-init
 just runtime-status
 just runtime-smoke
-just logs postgres
+just runtime-app-up
+just runtime-app-smoke
+just runtime-app-down
 just down
 ```
 
 Runtime state is host-visible and persistent under the sibling
 `TurboVAS-runtime` directory by default when commands are run through
-`tools/turbovasctl`. `just runtime-init` initializes PostgreSQL prerequisites
-idempotently, including the `dba` role and `pg-gvm` extension, without deleting
-or recreating existing runtime data. Full inherited service orchestration, feed
-population, certificate generation, scanner registration, and scan execution are
-deferred.
+`tools/turbovasctl`. `runtime-certs-init`, `runtime-init`, and
+`runtime-manager-init` are designed to be idempotent and must not delete or
+recreate existing runtime data.
+
+The current app profile can start `gvmd` and `gsad` for first service-health
+checks. `ospd-openvas` is wired to the built scanner binary but still needs
+scanner KB/Redis runtime wiring before its OSP socket becomes ready. Feed
+population, scanner registration finalization, Notus bring-up, scan execution,
+and production packaging remain deferred.

@@ -8,9 +8,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
+import secrets
 import shutil
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -41,12 +44,31 @@ C_SERVICES_CHAIN = ("gvm-libs", "openvas-smb", "openvas-scanner", "pg-gvm", "gvm
 PYTHON_CHAIN = ("python-gvm", "gvm-tools", "greenbone-feed-sync", "ospd-openvas", "notus-scanner")
 BASELINE_CHAIN = (*C_SERVICES_CHAIN, "gsa", *PYTHON_CHAIN)
 RUNTIME_SERVICES = ("postgres", "redis", "mosquitto")
-RUNTIME_DIRS = ("postgres", "redis", "mosquitto", "feeds", "run", "logs", "artifacts")
+APP_SERVICES = ("gvmd", "ospd-openvas", "gsad")
+RUNTIME_DIRS = (
+    "postgres",
+    "redis",
+    "mosquitto",
+    "feeds",
+    "run",
+    "logs",
+    "artifacts",
+    "certs/CA",
+    "certs/private/CA",
+    "secrets",
+    "state",
+    "run/gvmd",
+    "run/ospd",
+    "logs/gvmd",
+    "logs/ospd",
+    "logs/gsad",
+)
 RUNTIME_PORTS = {
     "postgres": "127.0.0.1:15432:5432",
     "redis": "127.0.0.1:16379:6379",
     "mosquitto": "127.0.0.1:1883:1883",
 }
+APP_PORTS = {"gsad": "127.0.0.1:19392:9392"}
 POSTGRES_DEFAULTS = {
     "user": "turbovas",
     "password": "turbovas-dev",
@@ -55,6 +77,10 @@ POSTGRES_DEFAULTS = {
 PG_GVM_CONTROL = "pg-gvm.control"
 PG_GVM_LIBRARY = "libpg-gvm.so"
 PG_GVM_EXTENSION = "pg-gvm"
+DEV_ADMIN_USER = "admin"
+DEV_ADMIN_SECRET = "gvmd-admin-password"
+FEED_IMPORT_OWNER_SETTING = "78eceaec-3385-11ea-b237-28d24461215b"
+UUID_PATTERN = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 
 
 @dataclass(frozen=True)
@@ -214,8 +240,15 @@ def run_git(repo_root: Path, args: list[str]) -> str | None:
     return result.stdout.strip()
 
 
-def run_command(command: list[str], cwd: Path, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(command, cwd=cwd, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+def run_command(command: list[str], cwd: Path, env: dict[str, str] | None = None, timeout: int | None = None) -> subprocess.CompletedProcess[str]:
+    try:
+        return subprocess.run(command, cwd=cwd, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout)
+    except subprocess.TimeoutExpired as error:
+        stdout = error.stdout or ""
+        if isinstance(stdout, bytes):
+            stdout = stdout.decode(errors="replace")
+        stdout += f"\nTimed out after {timeout} seconds."
+        return subprocess.CompletedProcess(command, 124, stdout)
 
 
 def find_repo_root(start: Path) -> Path:
@@ -286,6 +319,141 @@ def runtime_dir(repo_root: Path) -> Path:
     return (repo_root.parent / "TurboVAS-runtime").resolve()
 
 
+def runtime_path(repo_root: Path, *parts: str) -> Path:
+    return runtime_dir(repo_root).joinpath(*parts)
+
+
+def cert_public_dir(repo_root: Path) -> Path:
+    return runtime_path(repo_root, "certs", "CA")
+
+
+def cert_private_dir(repo_root: Path) -> Path:
+    return runtime_path(repo_root, "certs", "private", "CA")
+
+
+def cert_files(repo_root: Path) -> dict[str, Path]:
+    public = cert_public_dir(repo_root)
+    private = cert_private_dir(repo_root)
+    return {
+        "ca_key": private / "cakey.pem",
+        "ca_cert": public / "cacert.pem",
+        "server_key": private / "serverkey.pem",
+        "server_cert": public / "servercert.pem",
+        "client_key": private / "clientkey.pem",
+        "client_cert": public / "clientcert.pem",
+    }
+
+
+def cert_file_findings(repo_root: Path) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
+    for name, path in cert_files(repo_root).items():
+        findings.append(finding("pass" if path.is_file() and path.stat().st_size > 0 else "warn", "runtime.cert", f"{name} {'exists' if path.is_file() else 'is missing'}.", str(path)))
+    return findings
+
+
+def certs_complete(repo_root: Path) -> bool:
+    return all(path.is_file() and path.stat().st_size > 0 for path in cert_files(repo_root).values())
+
+
+def certs_partial(repo_root: Path) -> bool:
+    existing = [path for path in cert_files(repo_root).values() if path.exists()]
+    return bool(existing) and not certs_complete(repo_root)
+
+
+def gvm_cert_env(repo_root: Path) -> dict[str, str]:
+    env = build_env(repo_root)
+    env.update(
+        {
+            "GVM_KEY_LOCATION": str(cert_private_dir(repo_root)),
+            "GVM_CERT_LOCATION": str(cert_public_dir(repo_root)),
+            "GVM_CERTIFICATE_HOSTNAME": "localhost",
+            "GVM_CERTIFICATE_SAN_DNS": "localhost",
+            "GVM_CERTIFICATE_SAN_IP_ADDRESS": "127.0.0.1",
+        }
+    )
+    return env
+
+
+def runtime_secret_path(repo_root: Path, name: str) -> Path:
+    return runtime_path(repo_root, "secrets", name)
+
+
+def read_or_create_runtime_secret(repo_root: Path, name: str) -> tuple[str, bool]:
+    path = runtime_secret_path(repo_root, name)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.is_file():
+        return path.read_text(encoding="utf-8").strip(), False
+    secret = secrets.token_urlsafe(24)
+    path.write_text(secret + "\n", encoding="utf-8")
+    path.chmod(0o600)
+    return secret, True
+
+
+def gvmd_db_args(repo_root: Path) -> list[str]:
+    return [
+        f"--database={postgres_database(repo_root)}",
+        "--db-host=postgres",
+        "--db-port=5432",
+        f"--db-user={postgres_user(repo_root)}",
+    ]
+
+
+def gvmd_runtime_args(repo_root: Path) -> list[str]:
+    return [
+        *gvmd_db_args(repo_root),
+        "--broker-address=mosquitto:1883",
+        "--feed-lock-path=/runtime/run/feed-update.lock",
+    ]
+
+
+def run_app_oneoff(repo_root: Path, service: str, command: list[str], no_deps: bool = True) -> subprocess.CompletedProcess[str]:
+    args = ["--profile", "app", "run", "--rm", "-T"]
+    if no_deps:
+        args.append("--no-deps")
+    args.extend([service, *command])
+    return run_command(compose_command(repo_root, *args), repo_root, env=runtime_env(repo_root), timeout=300)
+
+
+def run_gvmd_oneoff(repo_root: Path, args: list[str], no_deps: bool = True) -> subprocess.CompletedProcess[str]:
+    return run_app_oneoff(repo_root, "gvmd", ["gvmd", *gvmd_db_args(repo_root), *args], no_deps=no_deps)
+
+
+def parse_user_uuid(output: str, username: str) -> str | None:
+    for line in output.splitlines():
+        if username in line:
+            match = UUID_PATTERN.search(line)
+            if match:
+                return match.group(0).lower()
+    if username in output:
+        match = UUID_PATTERN.search(output)
+        if match:
+            return match.group(0).lower()
+    return None
+
+
+def service_log_tail(repo_root: Path, service: str, lines: int = 80) -> list[str]:
+    result = run_command(compose_command(repo_root, "logs", "--tail", str(lines), service), repo_root, env=runtime_env(repo_root))
+    return result.stdout.splitlines()[-lines:]
+
+
+def gvmd_socket_path(repo_root: Path) -> Path:
+    return runtime_path(repo_root, "run", "gvmd", "gvmd.sock")
+
+
+def ospd_socket_path(repo_root: Path) -> Path:
+    return runtime_path(repo_root, "run", "ospd", "ospd-openvas.sock")
+
+
+
+def wait_for_socket(path: Path, timeout_seconds: int = 20) -> bool:
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        if path.is_socket():
+            return True
+        time.sleep(1)
+    return path.is_socket()
+
+
 def runtime_env(repo_root: Path) -> dict[str, str]:
     env = build_env(repo_root)
     env.setdefault("COMPOSE_PROJECT_NAME", "turbovas")
@@ -325,6 +493,22 @@ def ensure_runtime_dirs(repo_root: Path) -> list[dict[str, Any]]:
     return findings
 
 
+
+def ensure_build_runtime_dirs(repo_root: Path) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
+    for dirname in ("build/var/lib/gvm", "build/run/gvmd", "build/run/gsad", "build/logs"):
+        path = repo_root / dirname
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+            probe = path / ".turbovas-write-test"
+            probe.write_text("ok\n", encoding="utf-8")
+            probe.unlink()
+            findings.append(finding("pass", "build-runtime.dir", f"Inherited build runtime directory is writable: {path}", str(path.relative_to(repo_root))))
+        except OSError as error:
+            findings.append(finding("fail", "build-runtime.dir", f"Inherited build runtime directory is not writable: {path}: {error}", str(path)))
+    return findings
+
+
 def container_id(repo_root: Path, service: str) -> str | None:
     result = run_command(compose_command(repo_root, "ps", "-q", service), repo_root, env=runtime_env(repo_root))
     if result.returncode == 0 and result.stdout.strip():
@@ -342,6 +526,18 @@ def container_running(repo_root: Path, service: str) -> bool:
 
 def exec_in_service(repo_root: Path, service: str, command: list[str]) -> subprocess.CompletedProcess[str]:
     return run_command(compose_command(repo_root, "exec", "-T", service, *command), repo_root, env=runtime_env(repo_root))
+
+
+def output_tail(output: str, lines: int = 80, secrets_to_redact: Iterable[str] = ()) -> list[str]:
+    tail = output.splitlines()[-lines:]
+    redacted: list[str] = []
+    for line in tail:
+        clean = line
+        for secret in secrets_to_redact:
+            if secret:
+                clean = clean.replace(secret, "[redacted]")
+        redacted.append(clean)
+    return redacted
 
 
 def postgres_user(repo_root: Path) -> str:
@@ -780,16 +976,19 @@ def command_runtime_plan(repo_root: Path) -> dict[str, Any]:
     findings = [
         finding("pass", "runtime.compose", "Development Compose file path is defined.", str(compose_file(repo_root).relative_to(repo_root))),
         finding("pass", "runtime.state", f"Persistent runtime state lives outside the repository at {root}.", str(root)),
-        finding("pass", "runtime.services", "Initial runtime services are infrastructure only: Postgres, Redis, and Mosquitto.", details={"services": list(RUNTIME_SERVICES)}),
-        finding("pass", "runtime.ports", "All initial host port bindings are loopback-only.", details=RUNTIME_PORTS),
+        finding("pass", "runtime.services", "Default runtime services are infrastructure: Postgres, Redis, and Mosquitto.", details={"services": list(RUNTIME_SERVICES)}),
+        finding("pass", "runtime.app-services", "Experimental application services are available behind the app profile.", details={"services": list(APP_SERVICES)}),
+        finding("pass", "runtime.ports", "All host port bindings are loopback-only.", details={**RUNTIME_PORTS, **APP_PORTS}),
         finding("pass", "runtime.pg-gvm", "Postgres pg-gvm extension initialization is handled by just runtime-init after pg-gvm is built."),
-        finding("warn", "runtime.deferred", "gsad, ospd-openvas, notus-scanner, feed population, and scanning are intentionally deferred."),
+        finding("pass", "runtime.certs", "Certificate initialization is handled by just runtime-certs-init and persists outside the repository."),
+        finding("warn", "runtime.deferred", "Feed population, scanner registration finalization, Notus bring-up, and scan execution remain intentionally deferred."),
     ]
     return make_result("runtime-plan", repo_root, "Persistent Docker runtime plan collected.", findings, [str(root), str(compose_file(repo_root).relative_to(repo_root))])
 
 
 def command_up(repo_root: Path) -> dict[str, Any]:
     findings = ensure_runtime_dirs(repo_root)
+    findings.extend(ensure_build_runtime_dirs(repo_root))
     config = run_command(compose_command(repo_root, "config", "--quiet"), repo_root, env=runtime_env(repo_root))
     findings.append(finding("pass" if config.returncode == 0 else "fail", "compose.config", f"Compose config validation exit code {config.returncode}.", str(compose_file(repo_root).relative_to(repo_root)), {"output_tail": config.stdout.splitlines()[-40:]}))
     if aggregate_status(findings) == "fail":
@@ -844,6 +1043,154 @@ def command_runtime_init(repo_root: Path) -> dict[str, Any]:
     return make_result("runtime-init", repo_root, "Runtime database initialization completed.", findings, [str(runtime_dir(repo_root)), "build/prefix"])
 
 
+def command_runtime_certs_init(repo_root: Path) -> dict[str, Any]:
+    findings = ensure_runtime_dirs(repo_root)
+    cert_private_dir(repo_root).mkdir(parents=True, exist_ok=True)
+    cert_public_dir(repo_root).mkdir(parents=True, exist_ok=True)
+    try:
+        cert_private_dir(repo_root).chmod(0o700)
+        cert_public_dir(repo_root).chmod(0o755)
+    except OSError as error:
+        findings.append(finding("warn", "runtime.cert.permissions", f"Could not adjust certificate directory permissions: {error}."))
+
+    script = repo_root / "build" / "prefix" / "bin" / "gvm-manage-certs"
+    findings.append(finding("pass" if shutil.which("certtool") else "fail", "certtool.available", "certtool is available." if shutil.which("certtool") else "certtool is missing; install gnutls-bin."))
+    findings.append(finding("pass" if script.is_file() else "fail", "gvm-manage-certs.available", "gvm-manage-certs is available in build/prefix." if script.is_file() else "gvm-manage-certs is missing; build/install gvmd first.", str(script)))
+    if aggregate_status(findings) == "fail":
+        return make_result("runtime-certs-init", repo_root, "Certificate initialization stopped before generation.", findings, [str(runtime_dir(repo_root))])
+
+    if certs_partial(repo_root):
+        findings.extend(cert_file_findings(repo_root))
+        findings.append(finding("fail", "runtime.cert.partial", "Partial certificate infrastructure exists; refusing to overwrite or rotate automatically."))
+        return make_result("runtime-certs-init", repo_root, "Certificate initialization stopped at partial existing state.", findings, [str(runtime_dir(repo_root))])
+
+    if not certs_complete(repo_root):
+        create = run_command([str(script), "-a"], repo_root, env=gvm_cert_env(repo_root))
+        findings.append(finding("pass" if create.returncode == 0 else "fail", "runtime.cert.create", f"gvm-manage-certs -a exit code {create.returncode}.", details={"output_tail": output_tail(create.stdout, 80)}))
+        if create.returncode != 0:
+            return make_result("runtime-certs-init", repo_root, "Certificate generation failed.", findings, [str(runtime_dir(repo_root))])
+    else:
+        findings.append(finding("pass", "runtime.cert.exists", "Complete certificate infrastructure already exists; not regenerating."))
+
+    verify = run_command([str(script), "-V"], repo_root, env=gvm_cert_env(repo_root))
+    findings.append(finding("pass" if verify.returncode == 0 else "fail", "runtime.cert.verify", f"gvm-manage-certs -V exit code {verify.returncode}.", details={"output_tail": output_tail(verify.stdout, 80)}))
+    findings.extend(cert_file_findings(repo_root))
+    return make_result("runtime-certs-init", repo_root, "Runtime certificate initialization completed.", findings, [str(cert_public_dir(repo_root)), str(cert_private_dir(repo_root))])
+
+
+def command_runtime_manager_init(repo_root: Path) -> dict[str, Any]:
+    findings = ensure_runtime_dirs(repo_root)
+    findings.extend(ensure_build_runtime_dirs(repo_root))
+    db_init = command_runtime_init(repo_root)
+    findings.append(finding(db_init["status"], "runtime.database-init", db_init["summary"], details={"status": db_init["status"]}))
+    if db_init["status"] == "fail":
+        return make_result("runtime-manager-init", repo_root, "Manager initialization stopped at database prerequisites.", findings, db_init["artifacts"])
+
+    password, created = read_or_create_runtime_secret(repo_root, DEV_ADMIN_SECRET)
+    secret_path = runtime_secret_path(repo_root, DEV_ADMIN_SECRET)
+    findings.append(finding("pass", "runtime.admin-secret", f"Development admin password {'created' if created else 'reused'} in persistent runtime secrets.", str(secret_path)))
+    findings.extend(cert_file_findings(repo_root))
+
+    app_build = run_command(compose_command(repo_root, "--profile", "app", "build", "gvmd"), repo_root, env=runtime_env(repo_root), timeout=900)
+    findings.append(finding("pass" if app_build.returncode == 0 else "fail", "compose.app-build", f"docker compose build gvmd exit code {app_build.returncode}.", details={"output_tail": output_tail(app_build.stdout, 120, [password])}))
+    if app_build.returncode != 0:
+        return make_result("runtime-manager-init", repo_root, "Manager initialization stopped while building the app image.", findings, [str(runtime_dir(repo_root))])
+
+    migrate = run_gvmd_oneoff(repo_root, ["--migrate"], no_deps=False)
+    findings.append(finding("pass" if migrate.returncode == 0 else "fail", "gvmd.migrate", f"gvmd --migrate exit code {migrate.returncode}.", details={"output_tail": output_tail(migrate.stdout, 100, [password])}))
+    if migrate.returncode != 0:
+        return make_result("runtime-manager-init", repo_root, "Manager initialization stopped at database migration.", findings, [str(runtime_dir(repo_root))])
+
+    users = run_gvmd_oneoff(repo_root, ["--get-users", "--verbose"], no_deps=False)
+    admin_uuid = parse_user_uuid(users.stdout, DEV_ADMIN_USER) if users.returncode == 0 else None
+    findings.append(finding("pass" if users.returncode == 0 else "warn", "gvmd.get-users", f"gvmd --get-users --verbose exit code {users.returncode}.", details={"admin_uuid_found": bool(admin_uuid), "output_tail": output_tail(users.stdout, 80, [password])}))
+
+    if not admin_uuid:
+        create = run_gvmd_oneoff(repo_root, [f"--create-user={DEV_ADMIN_USER}", f"--password={password}"], no_deps=False)
+        findings.append(finding("pass" if create.returncode == 0 else "fail", "gvmd.create-admin", f"Create/verify development admin user exit code {create.returncode}.", details={"output_tail": output_tail(create.stdout, 80, [password])}))
+        if create.returncode != 0:
+            return make_result("runtime-manager-init", repo_root, "Manager initialization stopped at admin user creation.", findings, [str(runtime_dir(repo_root))])
+        users = run_gvmd_oneoff(repo_root, ["--get-users", "--verbose"], no_deps=False)
+        admin_uuid = parse_user_uuid(users.stdout, DEV_ADMIN_USER) if users.returncode == 0 else None
+        findings.append(finding("pass" if admin_uuid else "warn", "gvmd.admin-uuid", f"Development admin UUID {'found' if admin_uuid else 'not found after creation'}.", details={"admin_uuid": admin_uuid, "output_tail": output_tail(users.stdout, 80, [password])}))
+
+    if admin_uuid:
+        owner = run_gvmd_oneoff(repo_root, [f"--modify-setting={FEED_IMPORT_OWNER_SETTING}", f"--value={admin_uuid}"], no_deps=False)
+        findings.append(finding("pass" if owner.returncode == 0 else "warn", "gvmd.feed-owner", f"Set feed import owner exit code {owner.returncode}.", details={"admin_uuid": admin_uuid, "output_tail": output_tail(owner.stdout, 80, [password])}))
+    else:
+        findings.append(finding("warn", "gvmd.feed-owner", "Feed import owner was not set because the admin UUID could not be determined."))
+
+    return make_result("runtime-manager-init", repo_root, "Runtime manager initialization completed.", findings, [str(runtime_dir(repo_root)), str(secret_path)])
+
+
+def command_runtime_app_up(repo_root: Path) -> dict[str, Any]:
+    findings = ensure_runtime_dirs(repo_root)
+    findings.extend(ensure_build_runtime_dirs(repo_root))
+    config = run_command(compose_command(repo_root, "config", "--quiet"), repo_root, env=runtime_env(repo_root))
+    findings.append(finding("pass" if config.returncode == 0 else "fail", "compose.config", f"Compose config validation exit code {config.returncode}.", str(compose_file(repo_root).relative_to(repo_root)), {"output_tail": output_tail(config.stdout, 40)}))
+    infra = command_up(repo_root)
+    findings.append(finding(infra["status"], "runtime.infrastructure", infra["summary"], details={"status": infra["status"]}))
+    db_init = command_runtime_init(repo_root)
+    findings.append(finding(db_init["status"], "runtime.database-init", db_init["summary"], details={"status": db_init["status"]}))
+    cert_findings = cert_file_findings(repo_root)
+    if not certs_complete(repo_root):
+        cert_findings = [dict(item, status="fail") for item in cert_findings]
+    findings.extend(cert_findings)
+    if aggregate_status(findings) == "fail":
+        return make_result("runtime-app-up", repo_root, "Application runtime startup stopped at prerequisites.", findings, [str(runtime_dir(repo_root))])
+
+    result = run_command(compose_command(repo_root, "--profile", "app", "up", "-d", "--no-deps", "--build", *APP_SERVICES), repo_root, env=runtime_env(repo_root))
+    findings.append(finding("pass" if result.returncode == 0 else "fail", "compose.app-up", f"docker compose app up exit code {result.returncode}.", details={"output_tail": output_tail(result.stdout, 120)}))
+    for service in APP_SERVICES:
+        running = container_running(repo_root, service)
+        findings.append(finding("pass" if running else "warn", "runtime.app.running", f"{service} container is {'running' if running else 'not running'}.", details={"service": service, "logs_tail": [] if running else service_log_tail(repo_root, service)}))
+    return make_result("runtime-app-up", repo_root, "Application runtime startup attempted.", findings, [str(runtime_dir(repo_root))])
+
+
+def command_runtime_app_down(repo_root: Path) -> dict[str, Any]:
+    stop = run_command(compose_command(repo_root, "--profile", "app", "stop", *APP_SERVICES), repo_root, env=runtime_env(repo_root))
+    remove = run_command(compose_command(repo_root, "--profile", "app", "rm", "-f", *APP_SERVICES), repo_root, env=runtime_env(repo_root))
+    findings = [
+        finding("pass" if stop.returncode == 0 else "fail", "compose.app-stop", f"docker compose app stop exit code {stop.returncode}.", details={"output_tail": output_tail(stop.stdout, 80)}),
+        finding("pass" if remove.returncode == 0 else "fail", "compose.app-rm", f"docker compose app rm exit code {remove.returncode}.", details={"output_tail": output_tail(remove.stdout, 80)}),
+    ]
+    return make_result("runtime-app-down", repo_root, "Application runtime shutdown attempted.", findings, [str(runtime_dir(repo_root))])
+
+
+def command_runtime_app_smoke(repo_root: Path) -> dict[str, Any]:
+    findings: list[dict[str, Any]] = []
+    findings.extend(cert_file_findings(repo_root))
+    if not certs_complete(repo_root):
+        findings.append(finding("fail", "runtime.cert.complete", "Runtime certificates are incomplete; run just runtime-certs-init."))
+    findings.append(pg_gvm_extension_status(repo_root))
+    secret_path = runtime_secret_path(repo_root, DEV_ADMIN_SECRET)
+    findings.append(finding("pass" if secret_path.is_file() else "warn", "runtime.admin-secret", "Development admin secret exists." if secret_path.is_file() else "Development admin secret is missing; run just runtime-manager-init.", str(secret_path)))
+
+    password = secret_path.read_text(encoding="utf-8").strip() if secret_path.is_file() else ""
+    for service in APP_SERVICES:
+        running = container_running(repo_root, service)
+        findings.append(finding("pass" if running else "warn", "runtime.app.running", f"{service} container is {'running' if running else 'not running'}.", details={"service": service, "logs_tail": [] if running else service_log_tail(repo_root, service)}))
+
+    gvmd_socket = gvmd_socket_path(repo_root)
+    gvmd_ready = wait_for_socket(gvmd_socket)
+    findings.append(finding("pass" if gvmd_ready else "warn", "gvmd.socket", f"gvmd socket {'is ready' if gvmd_ready else 'is not ready'}.", str(gvmd_socket)))
+    if gvmd_ready and password:
+        gvm_cli = repo_root / "build" / "venvs" / "gvm-tools" / "bin" / "gvm-cli"
+        gmp = run_command([str(gvm_cli), "--gmp-username", DEV_ADMIN_USER, "--gmp-password", password, "socket", "--socketpath", str(gvmd_socket), "--xml", "<get_version/>", "--raw"], repo_root, env=build_env(repo_root))
+        findings.append(finding("pass" if gmp.returncode == 0 and "get_version_response" in gmp.stdout else "warn", "gvmd.gmp", f"GMP get_version over gvmd socket exit code {gmp.returncode}.", details={"output_tail": output_tail(gmp.stdout, 80, [password])}))
+
+    ospd_socket = ospd_socket_path(repo_root)
+    ospd_ready = wait_for_socket(ospd_socket, timeout_seconds=5)
+    findings.append(finding("pass" if ospd_ready else "warn", "ospd.socket", f"ospd-openvas socket {'is ready' if ospd_ready else 'is not ready'}.", str(ospd_socket)))
+    if ospd_ready:
+        scanners = run_gvmd_oneoff(repo_root, ["--get-scanners"], no_deps=False)
+        findings.append(finding("pass" if scanners.returncode == 0 else "warn", "gvmd.scanners", f"gvmd --get-scanners exit code {scanners.returncode}; scanner registration remains under review.", details={"output_tail": output_tail(scanners.stdout, 80, [password])}))
+
+    gsad_http = run_command(["curl", "-kIsS", "--max-time", "10", "https://127.0.0.1:19392/"], repo_root, env=runtime_env(repo_root))
+    findings.append(finding("pass" if gsad_http.returncode == 0 else "warn", "gsad.https", f"Loopback HTTPS header probe exit code {gsad_http.returncode}.", details={"output_tail": output_tail(gsad_http.stdout, 80, [password])}))
+    return make_result("runtime-app-smoke", repo_root, "Application runtime smoke checks completed.", findings, [str(runtime_dir(repo_root))])
+
+
 def command_down(repo_root: Path) -> dict[str, Any]:
     result = run_command(compose_command(repo_root, "--profile", "app", "--profile", "tools", "down"), repo_root, env=runtime_env(repo_root))
     findings = [finding("pass" if result.returncode == 0 else "fail", "compose.down", f"docker compose down exit code {result.returncode}.", details={"output_tail": result.stdout.splitlines()[-80:]})]
@@ -886,6 +1233,13 @@ def command_runtime_status(repo_root: Path) -> dict[str, Any]:
         membership_value = psql_value(membership)
         findings.append(finding("pass" if membership.returncode == 0 and membership_value == "t" else "warn", "postgres.role.membership", f"{postgres_user(repo_root)} has dba role membership: {membership_value or 'unknown'}.", details={"output_tail": membership.stdout.splitlines()[-20:]}))
         findings.append(pg_gvm_extension_status(repo_root))
+    findings.extend(cert_file_findings(repo_root))
+    secret_path = runtime_secret_path(repo_root, DEV_ADMIN_SECRET)
+    findings.append(finding("pass" if secret_path.is_file() else "warn", "runtime.admin-secret", "Development admin secret exists." if secret_path.is_file() else "Development admin secret is not initialized yet.", str(secret_path)))
+    for service in APP_SERVICES:
+        findings.append(finding("pass" if container_running(repo_root, service) else "warn", "runtime.app.running", f"{service} container is {'running' if container_running(repo_root, service) else 'not running'}.", details={"service": service}))
+    findings.append(finding("pass" if gvmd_socket_path(repo_root).is_socket() else "warn", "gvmd.socket", f"gvmd socket {'is ready' if gvmd_socket_path(repo_root).is_socket() else 'is not ready'}.", str(gvmd_socket_path(repo_root))))
+    findings.append(finding("pass" if ospd_socket_path(repo_root).is_socket() else "warn", "ospd.socket", f"ospd-openvas socket {'is ready' if ospd_socket_path(repo_root).is_socket() else 'is not ready'}.", str(ospd_socket_path(repo_root))))
     return make_result("runtime-status", repo_root, "Runtime status collected.", findings, [str(runtime_dir(repo_root))])
 
 
@@ -962,9 +1316,9 @@ def command_doctor(repo_root: Path) -> dict[str, Any]:
     for tool in BASELINE_TOOLS:
         findings.append(finding("pass" if shutil.which(tool) else "warn", "tool.available", f"{tool} is available." if shutil.which(tool) else f"{tool} is not available on PATH."))
     findings.append(finding("pass", "surface.available", "Build readiness surface is available.", details={"commands": ["just deps", "just configure", "just build", "just build-core-c", "just build-c-services", "just build-ui", "just build-python", "just build-baseline"]}))
-    findings.append(finding("pass" if compose_file(repo_root).is_file() else "warn", "surface.available", "Runtime infrastructure command surface is available." if compose_file(repo_root).is_file() else "Runtime infrastructure command surface is not available.", details={"commands": ["just runtime-plan", "just up", "just down", "just logs", "just runtime-init", "just runtime-status", "just runtime-smoke", "just gvmd-smoke"]}))
+    findings.append(finding("pass" if compose_file(repo_root).is_file() else "warn", "surface.available", "Runtime infrastructure command surface is available." if compose_file(repo_root).is_file() else "Runtime infrastructure command surface is not available.", details={"commands": ["just runtime-plan", "just up", "just down", "just logs", "just runtime-init", "just runtime-certs-init", "just runtime-manager-init", "just runtime-status", "just runtime-smoke", "just runtime-app-up", "just runtime-app-smoke", "just runtime-app-down", "just gvmd-smoke"]}))
     findings.append(finding("warn", "surface.deferred", "Test command surface is deferred until component checks are mapped.", details={"command": "just test"}))
-    findings.append(finding("warn", "surface.deferred", "Full inherited service orchestration is deferred until database/feed/certificate/scanner registration work is implemented.", details={"commands": ["gvmd", "gsad", "ospd-openvas", "notus-scanner"]}))
+    findings.append(finding("warn", "surface.deferred", "Full inherited service orchestration remains experimental until feed, scanner registration, and first UI/API connectivity are stabilized.", details={"commands": ["gvmd", "gsad", "ospd-openvas", "notus-scanner"]}))
     return make_result("doctor", repo_root, "Monorepo health checks completed.", findings)
 
 
@@ -1014,8 +1368,13 @@ def build_parser() -> argparse.ArgumentParser:
     logs = subparsers.add_parser("logs", parents=[common], help="show runtime logs")
     logs.add_argument("service", nargs="?", help="optional Compose service name")
     subparsers.add_parser("runtime-init", parents=[common], help="initialize persistent runtime database prerequisites")
+    subparsers.add_parser("runtime-certs-init", parents=[common], help="initialize persistent runtime certificates")
+    subparsers.add_parser("runtime-manager-init", parents=[common], help="initialize persistent gvmd database/user prerequisites")
     subparsers.add_parser("runtime-status", parents=[common], help="show runtime infrastructure status")
     subparsers.add_parser("runtime-smoke", parents=[common], help="run runtime infrastructure smoke checks")
+    subparsers.add_parser("runtime-app-up", parents=[common], help="start experimental application services")
+    subparsers.add_parser("runtime-app-down", parents=[common], help="stop experimental application services")
+    subparsers.add_parser("runtime-app-smoke", parents=[common], help="run experimental application service smoke checks")
     subparsers.add_parser("gvmd-smoke", parents=[common], help="run a narrow gvmd runtime profile smoke")
     return parser
 
@@ -1058,10 +1417,20 @@ def main(argv: list[str] | None = None) -> int:
         result = command_logs(repo_root, args.service)
     elif args.command == "runtime-init":
         result = command_runtime_init(repo_root)
+    elif args.command == "runtime-certs-init":
+        result = command_runtime_certs_init(repo_root)
+    elif args.command == "runtime-manager-init":
+        result = command_runtime_manager_init(repo_root)
     elif args.command == "runtime-status":
         result = command_runtime_status(repo_root)
     elif args.command == "runtime-smoke":
         result = command_runtime_smoke(repo_root)
+    elif args.command == "runtime-app-up":
+        result = command_runtime_app_up(repo_root)
+    elif args.command == "runtime-app-down":
+        result = command_runtime_app_down(repo_root)
+    elif args.command == "runtime-app-smoke":
+        result = command_runtime_app_smoke(repo_root)
     elif args.command == "gvmd-smoke":
         result = command_gvmd_smoke(repo_root)
     else:

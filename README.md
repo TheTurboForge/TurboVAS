@@ -34,8 +34,13 @@ TurboVAS provides a small root command surface for repository health checks:
 - `just down`: stop the current Docker infrastructure services.
 - `just logs [service]`: show recent Docker runtime logs.
 - `just runtime-init`: idempotently initialize PostgreSQL runtime prerequisites.
+- `just runtime-certs-init`: create or verify persistent development certificates.
+- `just runtime-manager-init`: migrate/initialize `gvmd` development database state and admin user.
 - `just runtime-status`: show Docker runtime status.
 - `just runtime-smoke`: run infrastructure smoke checks.
+- `just runtime-app-up`: start experimental inherited application services.
+- `just runtime-app-smoke`: run experimental application service smoke checks.
+- `just runtime-app-down`: stop experimental inherited application services.
 - `just gvmd-smoke`: run a narrow experimental manager profile smoke.
 
 The commands delegate to `tools/turbovasctl`, which also supports JSON output for

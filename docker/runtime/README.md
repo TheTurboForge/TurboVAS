@@ -6,39 +6,68 @@
 This directory documents the development/runtime Docker scaffolding. It is not a
 production deployment definition yet.
 
-The current Compose stack starts infrastructure services by default:
+The default Compose stack starts infrastructure services:
 
 - Postgres, using a TurboVAS development image with pg-gvm runtime dependencies
 - Redis
 - Mosquitto
 - optional `dev-shell` profile for toolchain/container experiments
-- optional `gvmd` profile for narrow manager runtime smoke checks
+
+The experimental `app` profile adds inherited application services:
+
+- `gvmd`, using the persistent Postgres database and a runtime Unix socket
+- `ospd-openvas`, wired to the built OpenVAS scanner binary and runtime OSP socket path
+- `gsad`, exposed on `127.0.0.1:19392` for local HTTPS/API smoke checks
 
 Persistent state is stored outside the repository by default, normally in the
-sibling `TurboVAS-runtime` directory. Runtime commands create these host-visible
-directories before starting services:
+sibling `TurboVAS-runtime` directory. Runtime commands create host-visible
+storage for Postgres, Redis, Mosquitto, feeds, run sockets, logs, artifacts,
+certificates, secrets, and service state.
 
-- `postgres/`
-- `redis/`
-- `mosquitto/`
-- `feeds/`
-- `run/`
-- `logs/`
-- `artifacts/`
-
-The initial services bind host ports to `127.0.0.1` only. Source, `build/`, and
+The services bind host ports to `127.0.0.1` only. Source, `build/`, and
 `build/prefix` are bind-mounted for fast development feedback instead of forcing
-container rebuilds after small source changes.
+container rebuilds after small source changes. App containers also mount the
+checkout at `/home/turboforge/Projects/TurboVAS` because the current CMake build
+baseline embeds inherited development paths under that location.
 
-The Postgres development image currently uses `postgres:16-trixie` so the
-container runtime libraries are compatible with `gvm-libs` built on the Ubuntu
-24.04 development host.
+## Commands
 
-After `pg-gvm` is built into `build/prefix`, run `just runtime-init` to copy the
-extension files into the Postgres container and create or verify the `dba` role,
-role grant, and `pg-gvm` extension. The command is idempotent and must not delete
-or recreate existing runtime data.
+Use the root `justfile` command surface:
 
-Full `gvmd` daemon startup, `gsad`, `ospd-openvas`, `notus-scanner`, feed
-population, certificate generation, scanner registration, and scan execution are
-intentionally deferred.
+- `just runtime-plan`
+- `just up`
+- `just runtime-certs-init`
+- `just runtime-init`
+- `just runtime-manager-init`
+- `just runtime-status`
+- `just runtime-smoke`
+- `just runtime-app-up`
+- `just runtime-app-smoke`
+- `just runtime-app-down`
+- `just down`
+
+`runtime-certs-init` uses inherited `gvm-manage-certs` with persistent runtime
+certificate directories and does not rotate existing certificates.
+
+`runtime-init` copies `pg-gvm` extension files into the active Postgres container
+and creates or verifies the `dba` role, role grant, and `pg-gvm` extension. It
+must not delete or recreate existing runtime data.
+
+`runtime-manager-init` runs the `gvmd` database migration, creates or verifies a
+local development admin user, stores the generated development password under
+the runtime `secrets/` directory, and sets the feed import owner when possible.
+
+## Current App Runtime Status
+
+The current app profile can start `gvmd` and `gsad` far enough for service-health
+smoke checks:
+
+- `gvmd` starts and creates `/runtime/run/gvmd/gvmd.sock`.
+- `gsad` starts in API-only mode and responds on loopback HTTPS.
+- `ospd-openvas` is wired to the built `openvas` binary but currently exits
+  before creating its OSP socket because scanner KB Redis connectivity is not
+  configured for the container topology yet.
+
+Full feed population, scanner registration finalization, Notus bring-up, OSP
+socket readiness, authenticated GMP client checks, scan execution, and production
+packaging are intentionally deferred.

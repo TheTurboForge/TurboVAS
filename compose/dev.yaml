@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 TurboVAS contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 name: turbovas
 
 services:
@@ -87,6 +90,9 @@ services:
         source: ..
         target: /workspace
       - type: bind
+        source: ..
+        target: /home/turboforge/Projects/TurboVAS
+      - type: bind
         source: ${TURBOVAS_RUNTIME_DIR:-../../TurboVAS-runtime}
         target: /runtime
       - type: bind
@@ -121,12 +127,125 @@ services:
         source: ..
         target: /workspace
       - type: bind
+        source: ..
+        target: /home/turboforge/Projects/TurboVAS
+      - type: bind
         source: ${TURBOVAS_RUNTIME_DIR:-../../TurboVAS-runtime}
         target: /runtime
       - type: bind
         source: ../build
         target: /workspace/build
-    command: ["sleep", "infinity"]
+    command:
+      - sh
+      - -lc
+      - >
+        mkdir -p /runtime/run/gvmd /runtime/logs/gvmd &&
+        rm -f /runtime/run/gvmd/gvmd.sock &&
+        exec gvmd --foreground
+        --database="$${POSTGRES_DB:-turbovas}"
+        --db-host=postgres
+        --db-port=5432
+        --db-user="$${POSTGRES_USER:-turbovas}"
+        --broker-address=mosquitto:1883
+        --feed-lock-path=/runtime/run/feed-update.lock
+        --disable-scheduling
+        --unix-socket=/runtime/run/gvmd/gvmd.sock
+        --listen-mode=0660
+
+  ospd-openvas:
+    profiles: ["app"]
+    build:
+      context: ..
+      dockerfile: docker/dev/Dockerfile
+    working_dir: /workspace
+    user: "${TURBOVAS_UID:-1000}:${TURBOVAS_GID:-1000}"
+    depends_on:
+      redis:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+    environment:
+      HOME: /tmp
+      LD_LIBRARY_PATH: /workspace/build/prefix/lib:/workspace/build/prefix/lib64
+      PATH: /workspace/build/venvs/ospd-openvas/bin:/workspace/build/openvas-scanner/src:/workspace/build/prefix/sbin:/workspace/build/prefix/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      TURBOVAS_RUNTIME_DIR: /runtime
+    volumes:
+      - type: bind
+        source: ..
+        target: /workspace
+      - type: bind
+        source: ..
+        target: /home/turboforge/Projects/TurboVAS
+      - type: bind
+        source: ${TURBOVAS_RUNTIME_DIR:-../../TurboVAS-runtime}
+        target: /runtime
+      - type: bind
+        source: ../build
+        target: /workspace/build
+    command:
+      - sh
+      - -lc
+      - >
+        mkdir -p /runtime/run/ospd /runtime/logs/ospd /runtime/feeds/notus/advisories &&
+        rm -f /runtime/run/ospd/ospd-openvas.sock /runtime/run/ospd/ospd-openvas.pid &&
+        exec /workspace/build/venvs/ospd-openvas/bin/ospd-openvas --foreground
+        --unix-socket=/runtime/run/ospd/ospd-openvas.sock
+        --pid-file=/runtime/run/ospd/ospd-openvas.pid
+        --lock-file-dir=/runtime/run/ospd
+        --socket-mode=0o770
+        --key-file=/runtime/certs/private/CA/serverkey.pem
+        --cert-file=/runtime/certs/CA/servercert.pem
+        --ca-file=/runtime/certs/CA/cacert.pem
+        --log-file=/runtime/logs/ospd/ospd-openvas.log
+        --mqtt-broker-address=mosquitto
+        --mqtt-broker-port=1883
+        --max-scans=0
+        --notus-feed-dir=/runtime/feeds/notus/advisories
+
+  gsad:
+    profiles: ["app"]
+    build:
+      context: ..
+      dockerfile: docker/dev/Dockerfile
+    working_dir: /workspace
+    user: "${TURBOVAS_UID:-1000}:${TURBOVAS_GID:-1000}"
+    depends_on:
+      gvmd:
+        condition: service_started
+    environment:
+      HOME: /tmp
+      LD_LIBRARY_PATH: /workspace/build/prefix/lib:/workspace/build/prefix/lib64
+      PATH: /workspace/build/prefix/sbin:/workspace/build/prefix/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      TURBOVAS_RUNTIME_DIR: /runtime
+    ports:
+      - "127.0.0.1:19392:9392"
+    volumes:
+      - type: bind
+        source: ..
+        target: /workspace
+      - type: bind
+        source: ..
+        target: /home/turboforge/Projects/TurboVAS
+      - type: bind
+        source: ${TURBOVAS_RUNTIME_DIR:-../../TurboVAS-runtime}
+        target: /runtime
+      - type: bind
+        source: ../build
+        target: /workspace/build
+    command:
+      - sh
+      - -lc
+      - >
+        mkdir -p /runtime/logs/gsad /runtime/state/gsad-static &&
+        exec gsad --foreground
+        --listen=0.0.0.0
+        --port=9392
+        --munix-socket=/runtime/run/gvmd/gvmd.sock
+        --ssl-private-key=/runtime/certs/private/CA/serverkey.pem
+        --ssl-certificate=/runtime/certs/CA/servercert.pem
+        --no-redirect
+        --static-content=/runtime/state/gsad-static
+        --api-only
 
 networks:
   default:
