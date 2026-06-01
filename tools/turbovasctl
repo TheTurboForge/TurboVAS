@@ -845,7 +845,7 @@ def command_runtime_init(repo_root: Path) -> dict[str, Any]:
 
 
 def command_down(repo_root: Path) -> dict[str, Any]:
-    result = run_command(compose_command(repo_root, "down"), repo_root, env=runtime_env(repo_root))
+    result = run_command(compose_command(repo_root, "--profile", "app", "--profile", "tools", "down"), repo_root, env=runtime_env(repo_root))
     findings = [finding("pass" if result.returncode == 0 else "fail", "compose.down", f"docker compose down exit code {result.returncode}.", details={"output_tail": result.stdout.splitlines()[-80:]})]
     return make_result("down", repo_root, "Runtime infrastructure shutdown attempted.", findings)
 
