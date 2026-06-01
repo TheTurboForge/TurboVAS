@@ -16,7 +16,7 @@ from typing import Any, Iterable
 
 
 STATUSES = ("pass", "warn", "fail")
-EXPECTED_ROOT_DOCS = ("README.md", "AGENTS.md", "UPSTREAMS.md", "LICENSE_AUDIT.md")
+EXPECTED_ROOT_DOCS = ("README.md", "UPSTREAMS.md", "LICENSE_AUDIT.md")
 BASELINE_TOOLS = (
     "git",
     "rg",

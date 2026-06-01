@@ -10,6 +10,7 @@
 *.gpg
 
 # Local/private work.
+/AGENTS.md
 /private/
 /scratch/
 /notes/
