@@ -1,0 +1,72 @@
+name: Build and test C
+
+on:
+  push:
+    branches: [main, stable]
+  pull_request:
+    branches: [main, stable]
+
+jobs:
+  build_and_test_debug:
+    strategy:
+      matrix:
+        base:
+          - version: oldstable
+            postgresql: 15
+          - version: stable
+            postgresql: 17
+    name: Build and test
+    runs-on: ubuntu-latest
+    container: registry.community.greenbone.net/community/gvm-libs:${{ matrix.base.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Install build dependencies
+        run: sh .github/install-dependencies.sh .github/build-dependencies.list
+      - name: Set up database
+        run: |
+          su postgres -c " \
+          /etc/init.d/postgresql start && \
+          createuser -DRS root && \
+          createdb -O root gvmd && \
+          psql -d gvmd -c 'create role dba with superuser noinherit; grant dba to root;' && \
+          psql -d gvmd -c 'create extension \"uuid-ossp\"; create extension \"pgcrypto\"; create extension "pgtap";' && \
+          /etc/init.d/postgresql stop \
+          "
+      - name: Build and install extension
+        run: |
+          rm -rf .git
+          cmake -B build -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build -j $(nproc) -- install
+      - name: Start PostgreSQL server
+        run: su postgres -c "pg_ctlcluster ${{ matrix.base.postgresql }} main start"
+      - name: Add "/usr/local/lib" as ld directory
+        run: echo "/usr/local/lib" >> /etc/ld.so.conf.d/gvm.conf && ldconfig
+      - name: Add pg-gvm extension
+        run: psql -d gvmd -c 'SET ROLE dba; CREATE EXTENSION "pg-gvm";'
+      - name: Create gvmd tables
+        run: psql -d gvmd < gvmd-tables.sql
+      - name: Run tests
+        run: pg_prove -d gvmd tests/*.sql
+
+  cmake-format-check:
+    name: Check CMake Formatting
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: greenbone/actions/uv@v3
+        with:
+          install: gersemi
+      - name: Check CMake Format
+        id: check
+        run: |
+          gersemi --check . cmake
+      - name: Report Diff
+        if: ${{ failure() && steps.check.outcome == 'failure' }}
+        run: |
+          echo "## CMake Format Check" >> $GITHUB_STEP_SUMMARY
+          gersemi --check --no-warn-about-unknown-commands . cmake >> $GITHUB_STEP_SUMMARY 2>&1 || true
+          echo "## CMake Format Diff" >> $GITHUB_STEP_SUMMARY
+          echo '```diff' >> $GITHUB_STEP_SUMMARY
+          gersemi --diff . cmake >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

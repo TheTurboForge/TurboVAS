@@ -2,9 +2,13 @@ name: turbovas
 
 services:
   postgres:
-    image: postgres:16-bookworm
+    build:
+      context: ..
+      dockerfile: docker/runtime/postgres/Dockerfile
+    image: turbovas-postgres-dev
     restart: unless-stopped
     environment:
+      LD_LIBRARY_PATH: /turbovas-prefix/lib:/turbovas-prefix/lib64
       POSTGRES_USER: ${POSTGRES_USER:-turbovas}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-turbovas-dev}
       POSTGRES_DB: ${POSTGRES_DB:-turbovas}
@@ -18,6 +22,10 @@ services:
       - type: bind
         source: ${TURBOVAS_RUNTIME_DIR:-../../TurboVAS-runtime}/logs/postgres
         target: /var/log/postgresql
+      - type: bind
+        source: ../build/prefix
+        target: /turbovas-prefix
+        read_only: true
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -73,6 +81,40 @@ services:
       HOME: /tmp
       CCACHE_DIR: /workspace/build/ccache
       CMAKE_GENERATOR: Ninja
+      TURBOVAS_RUNTIME_DIR: /runtime
+    volumes:
+      - type: bind
+        source: ..
+        target: /workspace
+      - type: bind
+        source: ${TURBOVAS_RUNTIME_DIR:-../../TurboVAS-runtime}
+        target: /runtime
+      - type: bind
+        source: ../build
+        target: /workspace/build
+    command: ["sleep", "infinity"]
+
+  gvmd:
+    profiles: ["app"]
+    build:
+      context: ..
+      dockerfile: docker/dev/Dockerfile
+    working_dir: /workspace
+    user: "${TURBOVAS_UID:-1000}:${TURBOVAS_GID:-1000}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+    environment:
+      HOME: /tmp
+      LD_LIBRARY_PATH: /workspace/build/prefix/lib:/workspace/build/prefix/lib64
+      PATH: /workspace/build/prefix/sbin:/workspace/build/prefix/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      PGPASSWORD: ${POSTGRES_PASSWORD:-turbovas-dev}
+      POSTGRES_USER: ${POSTGRES_USER:-turbovas}
+      POSTGRES_DB: ${POSTGRES_DB:-turbovas}
       TURBOVAS_RUNTIME_DIR: /runtime
     volumes:
       - type: bind

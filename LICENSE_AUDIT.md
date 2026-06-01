@@ -1,8 +1,13 @@
+<!-- SPDX-FileCopyrightText: 2026 TurboVAS contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+
 # License Audit
 
 This is the initial TurboVAS engineering license and provenance audit for the imported upstream source snapshots. It is not legal advice.
 
 The import preserves upstream component boundaries under `components/`. Upstream license files, copyright notices, package manifests, documentation, tests, and source files are retained as imported source material.
+
+Original TurboVAS-created root tooling and public documentation use `GPL-3.0-or-later` as the provisional project default unless a more specific compatible license is selected for a component-local file.
 
 ## Component License Summary
 
@@ -10,6 +15,7 @@ The import preserves upstream component boundaries under `components/`. Upstream
 | --- | --- | --- | --- | --- |
 | OpenVAS Scanner | `components/openvas-scanner` | Main non-Rust module is GPL-2.0 only overall, with per-file GPL-2.0 and GPL-2.0-or-later details. Rust implementation is GPL-2.0-or-later with OpenSSL exception; some files are additionally MIT. | `COPYING`, `rust/COPYING`, `license-details.md`, `RELICENSE/` | Highest-complexity component. Do not rewrite or normalize headers. Preserve per-file license detail and relicensing material. |
 | gvm-libs | `components/gvm-libs` | GPL-2.0-or-later. | `COPYING` | Shared library dependency for multiple services. |
+| pg-gvm | `components/pg-gvm` | GPL-3.0-or-later. | `LICENSE` | PostgreSQL extension required by `gvmd`. Runtime packaging must preserve extension/source obligations. |
 | gvmd | `components/gvmd` | AGPL-3.0-or-later. | `COPYING` | Network/server component. AGPL obligations matter for deployment and public access scenarios. |
 | gsad | `components/gsad` | AGPL-3.0-or-later. | `LICENSE` | HTTP daemon. AGPL obligations matter for deployment and public access scenarios. |
 | gsa | `components/gsa` | AGPL-3.0-or-later. | `LICENSE`, `package.json` license declaration | Web UI served over a network. AGPL obligations matter for deployment and public access scenarios. |
@@ -53,14 +59,14 @@ New TurboVAS-created files should include an SPDX license identifier and copyrig
 notice. Prefer the license already governing the component or subdirectory where
 the file lives. If the governing license is unclear, especially in mixed-license
 areas such as `components/openvas-scanner`, stop and review before adding the file.
-Root-level TurboVAS-only tooling and documentation need an explicit project
-license decision before public release.
+Root-level TurboVAS-only tooling and public documentation currently use
+`GPL-3.0-or-later` as the provisional default.
 
 ## Review Items
 
 - Confirm whether TurboVAS should preserve upstream git history in a later archival/import refinement, or whether explicit source snapshots plus `UPSTREAMS.md` are sufficient.
 - Review `components/openvas-scanner/license-details.md` before changing scanner/NASL/Rust license-sensitive files.
-- Decide the default license and header template for root-level TurboVAS-only tooling and documentation before public release.
+- Revisit the provisional `GPL-3.0-or-later` root tooling/documentation default before public release and before adding substantial original application code.
 - Review `components/openvas-smb` Samba-derived provenance before public release or distribution.
 - Review Greenbone Community Feed terms before bundling, redistributing, mirroring, or packaging feed content.
 - Define release-time source publication and attribution procedures before making this repository public.

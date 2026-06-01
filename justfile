@@ -1,58 +1,70 @@
+# SPDX-FileCopyrightText: 2026 TurboVAS contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 set shell := ["bash", "-eo", "pipefail", "-c"]
+
+turbovasctl *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl "$@"
 
 forkctl *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/forkctl "$@"
 
 status:
-    @tools/forkctl status
+    @tools/turbovasctl status
 
 inventory:
-    @tools/forkctl inventory
+    @tools/turbovasctl inventory
 
 doctor:
-    @tools/forkctl doctor
+    @tools/turbovasctl doctor
 
 license-report:
-    @tools/forkctl license-report
+    @tools/turbovasctl license-report
 
 deps component="":
-    @if [ -n "{{component}}" ]; then tools/forkctl deps "{{component}}"; else tools/forkctl deps; fi
+    @if [ -n "{{component}}" ]; then tools/turbovasctl deps "{{component}}"; else tools/turbovasctl deps; fi
 
 configure component:
-    @tools/forkctl configure "{{component}}"
+    @tools/turbovasctl configure "{{component}}"
 
 build component:
-    @tools/forkctl build "{{component}}"
+    @tools/turbovasctl build "{{component}}"
 
 build-core-c:
-    @tools/forkctl build-core-c
+    @tools/turbovasctl build-core-c
 
 build-c-services:
-    @tools/forkctl build-c-services
+    @tools/turbovasctl build-c-services
 
 build-ui:
-    @tools/forkctl build-ui
+    @tools/turbovasctl build-ui
 
 build-python:
-    @tools/forkctl build-python
+    @tools/turbovasctl build-python
 
 build-baseline:
-    @tools/forkctl build-baseline
+    @tools/turbovasctl build-baseline
 
 runtime-plan:
-    @tools/forkctl runtime-plan
+    @tools/turbovasctl runtime-plan
 
 up:
-    @tools/forkctl up
+    @tools/turbovasctl up
 
 down:
-    @tools/forkctl down
+    @tools/turbovasctl down
 
 logs service="":
-    @if [ -n "{{service}}" ]; then tools/forkctl logs "{{service}}"; else tools/forkctl logs; fi
+    @if [ -n "{{service}}" ]; then tools/turbovasctl logs "{{service}}"; else tools/turbovasctl logs; fi
+
+runtime-init:
+    @tools/turbovasctl runtime-init
 
 runtime-status:
-    @tools/forkctl runtime-status
+    @tools/turbovasctl runtime-status
 
 runtime-smoke:
-    @tools/forkctl runtime-smoke
+    @tools/turbovasctl runtime-smoke
+
+gvmd-smoke:
+    @tools/turbovasctl gvmd-smoke

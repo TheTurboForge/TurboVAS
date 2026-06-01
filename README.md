@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: 2026 TurboVAS contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+
 # TurboVAS
 
 TurboVAS is an OpenVAS-derived monorepo for vulnerability scanner operators. It is intentionally organized around the components required to run OpenVAS Scan / TurboVAS as one coherent scanner system.
@@ -30,13 +33,19 @@ TurboVAS provides a small root command surface for repository health checks:
 - `just up`: start the current Docker infrastructure services.
 - `just down`: stop the current Docker infrastructure services.
 - `just logs [service]`: show recent Docker runtime logs.
+- `just runtime-init`: idempotently initialize PostgreSQL runtime prerequisites.
 - `just runtime-status`: show Docker runtime status.
 - `just runtime-smoke`: run infrastructure smoke checks.
+- `just gvmd-smoke`: run a narrow experimental manager profile smoke.
 
-The commands delegate to `tools/forkctl`, which also supports JSON output for automation, for example:
+The commands delegate to `tools/turbovasctl`, which also supports JSON output for
+automation, for example:
 
 ```sh
-tools/forkctl doctor --json
+tools/turbovasctl doctor --json
 ```
+
+`tools/forkctl` remains as a temporary compatibility wrapper during the command
+rename.
 
 See `BUILDING.md` for the current build baseline and `docker/runtime/README.md` for the current runtime groundwork.

@@ -1,8 +1,11 @@
+<!-- SPDX-FileCopyrightText: 2026 TurboVAS contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+
 # Building TurboVAS
 
 TurboVAS currently has a local inherited-stack build baseline for:
 
-- C services: `gvm-libs`, `openvas-smb`, `openvas-scanner`, `gvmd`, `gsad`
+- C services: `gvm-libs`, `openvas-smb`, `openvas-scanner`, `pg-gvm`, `gvmd`, `gsad`
 - Web UI: `gsa`
 - Python components: `python-gvm`, `gvm-tools`, `greenbone-feed-sync`, `ospd-openvas`, `notus-scanner`
 
@@ -23,6 +26,7 @@ Build one supported component:
 ```sh
 just build gvmd
 just build gsad
+just build pg-gvm
 just build gsa
 just build python-gvm
 ```
@@ -37,18 +41,24 @@ just build-python
 just build-baseline
 ```
 
-Machine-readable output is available through `tools/forkctl`, for example:
+Machine-readable output is available through `tools/turbovasctl`, for example:
 
 ```sh
-tools/forkctl deps --json
-tools/forkctl build-baseline --json
+tools/turbovasctl deps --json
+tools/turbovasctl build-baseline --json
 ```
+
+`tools/forkctl` remains as a temporary compatibility wrapper during the command
+rename.
 
 ## Notes
 
 The server baseline uses the Ubuntu `libcurl4-gnutls-dev` package because the scanner build expects the GnuTLS curl variant.
 
-The scanner build currently passes `-isystem /usr/include/mit-krb5` through `forkctl` because Ubuntu's `mit-krb5-gssapi` pkg-config metadata exposes the GSSAPI header path there. This keeps the Phase 2 baseline reproducible without modifying imported source code.
+The scanner build currently passes `-isystem /usr/include/mit-krb5` through
+`turbovasctl` because Ubuntu's `mit-krb5-gssapi` pkg-config metadata exposes the
+GSSAPI header path there. This keeps the Phase 2 baseline reproducible without
+modifying imported source code.
 
 The web UI baseline uses Node.js 22 with npm 11 from an official Node.js binary installation on the development server. The NodeSource apt repository was not used for the final install because its dry-run transaction would have removed unrelated distro Node tooling.
 
@@ -61,6 +71,7 @@ The current Docker runtime baseline starts infrastructure services only:
 ```sh
 just runtime-plan
 just up
+just runtime-init
 just runtime-status
 just runtime-smoke
 just logs postgres
@@ -69,5 +80,8 @@ just down
 
 Runtime state is host-visible and persistent under the sibling
 `TurboVAS-runtime` directory by default when commands are run through
-`tools/forkctl`. Full inherited service orchestration, feed population,
-certificate generation, scanner registration, and scan execution are deferred.
+`tools/turbovasctl`. `just runtime-init` initializes PostgreSQL prerequisites
+idempotently, including the `dba` role and `pg-gvm` extension, without deleting
+or recreating existing runtime data. Full inherited service orchestration, feed
+population, certificate generation, scanner registration, and scan execution are
+deferred.

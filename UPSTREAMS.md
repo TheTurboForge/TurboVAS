@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: 2026 TurboVAS contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+
 # Upstream Sources
 
 This file records the upstream source snapshots imported into the TurboVAS monorepo.
@@ -5,10 +8,13 @@ This file records the upstream source snapshots imported into the TurboVAS monor
 Import date: 2026-05-31
 Import method: source snapshot from local upstream cache, excluding only upstream `.git/` directories.
 
+`pg-gvm` was added on 2026-06-01 after identifying it as a required PostgreSQL extension for `gvmd` runtime work.
+
 | Component | Path | Upstream repository | Imported commit | Role |
 | --- | --- | --- | --- | --- |
 | OpenVAS Scanner | `components/openvas-scanner` | https://github.com/greenbone/openvas-scanner | `f039649` | Scanner engine and NASL/VT execution core; includes C scanner and Rust/openvasd-related code. |
 | gvm-libs | `components/gvm-libs` | https://github.com/greenbone/gvm-libs | `f67e8b8` | Shared libraries for Greenbone services, protocols, scanner helpers, and utilities. |
+| pg-gvm | `components/pg-gvm` | https://github.com/greenbone/pg-gvm | `878e125` | PostgreSQL extension used by `gvmd` for helper functions. |
 | gvmd | `components/gvmd` | https://github.com/greenbone/gvmd | `39a51f6` | Central management daemon; stores configuration/results, exposes GMP, and controls scanners through OSP. |
 | ospd-openvas | `components/ospd-openvas` | https://github.com/greenbone/ospd-openvas | `874c524` | OSP server implementation for controlling OpenVAS Scanner and Notus Scanner. |
 | gsad | `components/gsad` | https://github.com/greenbone/gsad | `88ef642` | HTTP daemon connecting the browser UI to `gvmd`. |
