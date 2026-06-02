@@ -145,6 +145,63 @@ class TurboVASCtlTests(unittest.TestCase):
             self.assertEqual(turbovasctl.scanner_redis_socket_path(root), Path(tmp) / "TurboVAS-runtime" / "run" / "redis-openvas" / "redis.sock")
             self.assertEqual(turbovasctl.openvas_runtime_config_path(root), root / "build" / "prefix" / "etc" / "openvas" / "openvas.conf")
 
+    def test_feed_paths_live_under_runtime_dir(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            root.mkdir()
+            self.assertEqual(turbovasctl.feed_cache_var_lib(root), Path(tmp) / "TurboVAS-runtime" / "feed-cache" / "community" / "22.04" / "var-lib")
+            self.assertEqual(turbovasctl.feed_runtime_root(root), Path(tmp) / "TurboVAS-runtime" / "feeds")
+            self.assertEqual(turbovasctl.feed_sync_log_dir(root), Path(tmp) / "TurboVAS-runtime" / "logs" / "feed-sync")
+
+    def test_feed_sync_command_uses_full_22_04_cache(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            root.mkdir()
+            command = turbovasctl.feed_sync_command(root)
+            self.assertIn("--type", command)
+            self.assertEqual(command[command.index("--type") + 1], "all")
+            self.assertEqual(command[command.index("--feed-release") + 1], "22.04")
+            self.assertEqual(command[command.index("--destination-prefix") + 1], str(turbovasctl.feed_cache_var_lib(root)))
+
+    def test_feed_copy_pairs_are_known_subtrees(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            root.mkdir()
+            pairs = [
+                (feed_class.key, source.relative_to(turbovasctl.feed_cache_var_lib(root)), destination.relative_to(turbovasctl.feed_runtime_root(root)))
+                for feed_class, source, destination in turbovasctl.feed_copy_pairs(root)
+            ]
+            self.assertEqual(
+                pairs,
+                [
+                    ("nasl", Path("openvas/plugins"), Path("openvas/plugins")),
+                    ("notus", Path("notus"), Path("notus")),
+                    ("scap", Path("gvm/scap-data"), Path("gvm/scap-data")),
+                    ("cert", Path("gvm/cert-data"), Path("gvm/cert-data")),
+                    ("gvmd", Path("gvm/data-objects/gvmd/22.04"), Path("gvm/data-objects/gvmd/22.04")),
+                ],
+            )
+
+    def test_feed_state_reports_missing_cache_and_runtime(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            root.mkdir()
+            result = turbovasctl.command_feed_state(root)
+            self.assertEqual(result["status"], "warn")
+            checks = {item["check"]: item["status"] for item in result["findings"]}
+            self.assertEqual(checks["feed.cache.nasl"], "warn")
+            self.assertEqual(checks["feed.runtime.nasl"], "warn")
+
+    def test_openvas_runtime_config_includes_feed_paths(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            root.mkdir()
+            path = turbovasctl.write_openvas_runtime_config(root)
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("db_address = /runtime/run/redis-openvas/redis.sock", text)
+            self.assertIn("plugins_folder = /runtime/feeds/openvas/plugins", text)
+            self.assertIn("include_folders = /runtime/feeds/openvas/plugins", text)
+
     def test_runtime_plan_json_shape(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -36,6 +36,12 @@ TurboVAS provides a small root command surface for repository health checks:
 - `just runtime-init`: idempotently initialize PostgreSQL runtime prerequisites.
 - `just runtime-certs-init`: create or verify persistent development certificates.
 - `just runtime-manager-init`: migrate/initialize `gvmd` development database state and admin user.
+- `just runtime-scanner-redis-init`: initialize scanner Redis and generated OpenVAS runtime configuration.
+- `just runtime-gmp-smoke`: run an authenticated GMP smoke check.
+- `just runtime-scanner-register`: create or verify the OpenVAS scanner registration.
+- `just feed-state`: show persistent feed cache and runtime-copy state.
+- `just feed-cache-sync`: start a full Community Feed cache sync in `tmux`.
+- `just feed-copy-to-runtime`: copy cached feed data into the runtime feed tree.
 - `just runtime-status`: show Docker runtime status.
 - `just runtime-smoke`: run infrastructure smoke checks.
 - `just runtime-app-up`: start experimental inherited application services.

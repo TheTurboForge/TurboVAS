@@ -75,6 +75,15 @@ runtime-gmp-smoke:
 runtime-scanner-register:
     @tools/turbovasctl runtime-scanner-register
 
+feed-state *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl feed-state "$@"
+
+feed-cache-sync *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl feed-cache-sync "$@"
+
+feed-copy-to-runtime *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl feed-copy-to-runtime "$@"
+
 runtime-status:
     @tools/turbovasctl runtime-status
 

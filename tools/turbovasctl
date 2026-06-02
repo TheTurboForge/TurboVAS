@@ -10,6 +10,7 @@ import json
 import os
 import re
 import secrets
+import shlex
 import shutil
 import subprocess
 import sys
@@ -65,6 +66,13 @@ RUNTIME_DIRS = (
     "logs/ospd",
     "logs/gsad",
     "logs/redis-openvas",
+    "logs/feed-sync",
+    "feed-cache/community/22.04/var-lib",
+    "feeds/openvas/plugins",
+    "feeds/notus/advisories",
+    "feeds/gvm/scap-data",
+    "feeds/gvm/cert-data",
+    "feeds/gvm/data-objects/gvmd/22.04",
 )
 RUNTIME_PORTS = {
     "postgres": "127.0.0.1:15432:5432",
@@ -84,6 +92,19 @@ DEV_ADMIN_USER = "admin"
 DEV_ADMIN_SECRET = "gvmd-admin-password"
 FEED_IMPORT_OWNER_SETTING = "78eceaec-3385-11ea-b237-28d24461215b"
 UUID_PATTERN = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+FEED_RELEASE = "22.04"
+FEED_SYNC_TYPE = "all"
+FEED_SYNC_SESSION = "turbovas-feed-sync"
+FEED_RSYNC_TIMEOUT_SECONDS = 900
+
+
+@dataclass(frozen=True)
+class FeedClass:
+    key: str
+    label: str
+    cache_rel: str
+    runtime_rel: str
+    markers: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -125,6 +146,13 @@ COMPONENTS: tuple[Component, ...] = (
     Component("gvm-tools", "components/gvm-tools", "command-line GMP tools", ("LICENSE",), ("README.md", "pyproject.toml")),
 )
 COMPONENT_BY_NAME = {component.name: component for component in COMPONENTS}
+FEED_CLASSES: tuple[FeedClass, ...] = (
+    FeedClass("nasl", "NASL vulnerability tests", "openvas/plugins", "openvas/plugins", ("plugin_feed_info.inc", "LICENSE")),
+    FeedClass("notus", "Notus advisories", "notus", "notus", ("advisories",)),
+    FeedClass("scap", "SCAP data", "gvm/scap-data", "gvm/scap-data", ("COPYING",)),
+    FeedClass("cert", "CERT data", "gvm/cert-data", "gvm/cert-data", ("COPYING",)),
+    FeedClass("gvmd", "GVMD data objects", f"gvm/data-objects/gvmd/{FEED_RELEASE}", f"gvm/data-objects/gvmd/{FEED_RELEASE}", ("LICENSE", "scan-configs", "report-formats", "port-lists")),
+)
 
 BUILD_META: dict[str, BuildMeta] = {
     "gvm-libs": BuildMeta(
@@ -324,6 +352,100 @@ def runtime_dir(repo_root: Path) -> Path:
 
 def runtime_path(repo_root: Path, *parts: str) -> Path:
     return runtime_dir(repo_root).joinpath(*parts)
+
+
+def feed_cache_root(repo_root: Path) -> Path:
+    return runtime_path(repo_root, "feed-cache", "community", FEED_RELEASE)
+
+
+def feed_cache_var_lib(repo_root: Path) -> Path:
+    return feed_cache_root(repo_root) / "var-lib"
+
+
+def feed_runtime_root(repo_root: Path) -> Path:
+    return runtime_path(repo_root, "feeds")
+
+
+def feed_sync_log_dir(repo_root: Path) -> Path:
+    return runtime_path(repo_root, "logs", "feed-sync")
+
+
+def feed_sync_binary(repo_root: Path) -> Path:
+    return repo_root / "build" / "venvs" / "greenbone-feed-sync" / "bin" / "greenbone-feed-sync"
+
+
+def feed_sync_command(repo_root: Path, selftest: bool = False) -> list[str]:
+    command = [str(feed_sync_binary(repo_root))]
+    if selftest:
+        command.append("--selftest")
+    return [
+        *command,
+        "--type",
+        FEED_SYNC_TYPE,
+        "--feed-release",
+        FEED_RELEASE,
+        "--destination-prefix",
+        str(feed_cache_var_lib(repo_root)),
+        "--fail-fast",
+        "--rsync-timeout",
+        str(FEED_RSYNC_TIMEOUT_SECONDS),
+    ]
+
+
+def feed_copy_pairs(repo_root: Path) -> list[tuple[FeedClass, Path, Path]]:
+    cache_root = feed_cache_var_lib(repo_root)
+    runtime_root = feed_runtime_root(repo_root)
+    return [(feed_class, cache_root / feed_class.cache_rel, runtime_root / feed_class.runtime_rel) for feed_class in FEED_CLASSES]
+
+
+def feed_path_summary(path: Path, markers: tuple[str, ...]) -> dict[str, Any]:
+    file_count = 0
+    byte_count = 0
+    latest_mtime: float | None = None
+    errors: list[str] = []
+    if path.is_dir():
+        for entry in path.rglob("*"):
+            try:
+                if entry.is_file():
+                    stat = entry.stat()
+                    file_count += 1
+                    byte_count += stat.st_size
+                    latest_mtime = stat.st_mtime if latest_mtime is None else max(latest_mtime, stat.st_mtime)
+            except OSError as error:
+                errors.append(f"{entry}: {error}")
+    marker_rows = [{"path": marker, "exists": (path / marker).exists()} for marker in markers]
+    latest = datetime.fromtimestamp(latest_mtime, timezone.utc).replace(microsecond=0).isoformat() if latest_mtime is not None else None
+    return {
+        "exists": path.is_dir(),
+        "file_count": file_count,
+        "byte_count": byte_count,
+        "latest_mtime": latest,
+        "markers": marker_rows,
+        "errors": errors[:20],
+    }
+
+
+def feed_location_findings(repo_root: Path, location: str, root: Path, rel_attr: str) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
+    findings.append(finding("pass" if root.is_dir() else "warn", f"feed.{location}.root", f"{location} feed root {'exists' if root.is_dir() else 'is missing'}.", str(root)))
+    for feed_class in FEED_CLASSES:
+        rel = getattr(feed_class, rel_attr)
+        path = root / rel
+        summary = feed_path_summary(path, feed_class.markers)
+        marker_missing = [row["path"] for row in summary["markers"] if not row["exists"]]
+        status = "pass" if summary["exists"] and summary["file_count"] > 0 and not marker_missing and not summary["errors"] else "warn"
+        if not summary["exists"]:
+            message = f"{feed_class.label} directory is missing."
+        elif summary["file_count"] == 0:
+            message = f"{feed_class.label} directory exists but contains no files."
+        elif marker_missing:
+            message = f"{feed_class.label} has files but expected markers are missing."
+        elif summary["errors"]:
+            message = f"{feed_class.label} state has filesystem inspection errors."
+        else:
+            message = f"{feed_class.label} is present."
+        findings.append(finding(status, f"feed.{location}.{feed_class.key}", message, str(path), {"summary": summary, "missing_markers": marker_missing}))
+    return findings
 
 
 def cert_public_dir(repo_root: Path) -> Path:
@@ -690,7 +812,9 @@ def write_openvas_runtime_config(repo_root: Path) -> Path:
         "# SPDX-FileCopyrightText: 2026 TurboVAS contributors\n"
         "# SPDX-License-Identifier: GPL-3.0-or-later\n"
         "# Generated development runtime configuration.\n"
-        "db_address = /runtime/run/redis-openvas/redis.sock\n",
+        "db_address = /runtime/run/redis-openvas/redis.sock\n"
+        "plugins_folder = /runtime/feeds/openvas/plugins\n"
+        "include_folders = /runtime/feeds/openvas/plugins\n",
         encoding="utf-8",
     )
     return path
@@ -1023,9 +1147,11 @@ def command_runtime_plan(repo_root: Path) -> dict[str, Any]:
         finding("pass", "runtime.app-services", "Experimental application services are available behind the app profile.", details={"services": list(APP_SERVICES)}),
         finding("pass", "runtime.ports", "All host port bindings are loopback-only.", details={**RUNTIME_PORTS, **APP_PORTS}),
         finding("pass", "runtime.scanner-redis", "OpenVAS scanner KB Redis uses a runtime Unix socket, not host TCP exposure.", str(scanner_redis_socket_path(repo_root))),
+        finding("pass", "runtime.feed-cache", "Community feed downloads use a persistent host-local cache outside the repository.", str(feed_cache_var_lib(repo_root))),
+        finding("pass", "runtime.feed-copy", "Runtime services consume physical copies of the cache under the runtime feed tree.", str(feed_runtime_root(repo_root))),
         finding("pass", "runtime.pg-gvm", "Postgres pg-gvm extension initialization is handled by just runtime-init after pg-gvm is built."),
         finding("pass", "runtime.certs", "Certificate initialization is handled by just runtime-certs-init and persists outside the repository."),
-        finding("warn", "runtime.deferred", "Feed population, scanner registration finalization, Notus bring-up, and scan execution remain intentionally deferred."),
+        finding("warn", "runtime.deferred", "Notus daemon bring-up and scan execution remain intentionally deferred."),
     ]
     return make_result("runtime-plan", repo_root, "Persistent Docker runtime plan collected.", findings, [str(root), str(compose_file(repo_root).relative_to(repo_root))])
 
@@ -1144,15 +1270,21 @@ def command_runtime_scanner_redis_init(repo_root: Path) -> dict[str, Any]:
     findings.append(finding("pass" if ping and ping.returncode == 0 and "PONG" in ping.stdout else "fail", "redis-openvas.ready", f"scanner Redis Unix socket ping exit code {ping.returncode if ping else 'unavailable'}.", str(scanner_redis_socket_path(repo_root)), {"output_tail": output_tail(ping.stdout if ping else "", 20)}))
 
     config_path = write_openvas_runtime_config(repo_root)
-    findings.append(finding("pass", "openvas.config", "OpenVAS runtime config points db_address to scanner Redis Unix socket.", str(config_path.relative_to(repo_root))))
+    findings.append(finding("pass", "openvas.config", "OpenVAS runtime config points db_address and feed plugin paths to runtime state.", str(config_path.relative_to(repo_root))))
     app_build = run_command(compose_command(repo_root, "--profile", "app", "build", "ospd-openvas"), repo_root, env=runtime_env(repo_root), timeout=900)
     findings.append(finding("pass" if app_build.returncode == 0 else "fail", "compose.ospd-build", f"docker compose build ospd-openvas exit code {app_build.returncode}.", details={"output_tail": output_tail(app_build.stdout, 120)}))
     if app_build.returncode != 0:
         return make_result("runtime-scanner-redis-init", repo_root, "Scanner Redis initialization stopped while building ospd-openvas image.", findings, [str(runtime_dir(repo_root))])
     openvas_settings = run_app_oneoff(repo_root, "ospd-openvas", ["openvas", "-s"], no_deps=False)
     db_lines = [line for line in openvas_settings.stdout.splitlines() if line.startswith("db_address")]
+    plugin_lines = [line for line in openvas_settings.stdout.splitlines() if line.startswith("plugins_folder")]
+    include_lines = [line for line in openvas_settings.stdout.splitlines() if line.startswith("include_folders")]
     db_ok = openvas_settings.returncode == 0 and any("/runtime/run/redis-openvas/redis.sock" in line for line in db_lines)
+    plugins_ok = openvas_settings.returncode == 0 and any("/runtime/feeds/openvas/plugins" in line for line in plugin_lines)
+    include_ok = openvas_settings.returncode == 0 and any("/runtime/feeds/openvas/plugins" in line for line in include_lines)
     findings.append(finding("pass" if db_ok else "fail", "openvas.db_address", f"openvas -s runtime db_address check exit code {openvas_settings.returncode}.", details={"db_address_lines": db_lines, "output_tail": output_tail(openvas_settings.stdout, 80)}))
+    findings.append(finding("pass" if plugins_ok else "fail", "openvas.plugins_folder", f"openvas -s runtime plugins_folder check exit code {openvas_settings.returncode}.", details={"plugins_folder_lines": plugin_lines, "output_tail": output_tail(openvas_settings.stdout, 80)}))
+    findings.append(finding("pass" if include_ok else "fail", "openvas.include_folders", f"openvas -s runtime include_folders check exit code {openvas_settings.returncode}.", details={"include_folders_lines": include_lines, "output_tail": output_tail(openvas_settings.stdout, 80)}))
     return make_result("runtime-scanner-redis-init", repo_root, "Scanner Redis initialization completed.", findings, [str(runtime_dir(repo_root)), str(config_path.relative_to(repo_root))])
 
 
@@ -1263,6 +1395,87 @@ def command_runtime_scanner_register(repo_root: Path) -> dict[str, Any]:
     return make_result("runtime-scanner-register", repo_root, "Runtime scanner registration completed.", findings, [str(runtime_dir(repo_root))])
 
 
+def command_feed_state(repo_root: Path) -> dict[str, Any]:
+    findings: list[dict[str, Any]] = []
+    findings.extend(feed_location_findings(repo_root, "cache", feed_cache_var_lib(repo_root), "cache_rel"))
+    findings.extend(feed_location_findings(repo_root, "runtime", feed_runtime_root(repo_root), "runtime_rel"))
+    return make_result(
+        "feed-state",
+        repo_root,
+        "Feed cache and runtime copy state collected.",
+        findings,
+        [str(feed_cache_var_lib(repo_root)), str(feed_runtime_root(repo_root))],
+    )
+
+
+def command_feed_cache_sync(repo_root: Path) -> dict[str, Any]:
+    findings = ensure_runtime_dirs(repo_root)
+    binary = feed_sync_binary(repo_root)
+    findings.append(finding("pass" if binary.is_file() else "fail", "feed-sync.available", "greenbone-feed-sync venv command is available." if binary.is_file() else "greenbone-feed-sync venv command is missing; run just build-python or just build-baseline.", str(binary)))
+    findings.append(finding("pass" if shutil.which("rsync") else "fail", "rsync.available", "rsync is available." if shutil.which("rsync") else "rsync is missing."))
+    findings.append(finding("pass" if shutil.which("tmux") else "fail", "tmux.available", "tmux is available." if shutil.which("tmux") else "tmux is missing."))
+    if aggregate_status(findings) == "fail":
+        return make_result("feed-cache-sync", repo_root, "Feed cache sync stopped at prerequisites.", findings, [str(feed_cache_var_lib(repo_root))])
+
+    selftest = run_command(feed_sync_command(repo_root, selftest=True), repo_root, env=build_env(repo_root), timeout=120)
+    findings.append(finding("pass" if selftest.returncode == 0 else "fail", "feed-sync.selftest", f"greenbone-feed-sync selftest exit code {selftest.returncode}.", details={"output_tail": output_tail(selftest.stdout, 80)}))
+    if selftest.returncode != 0:
+        return make_result("feed-cache-sync", repo_root, "Feed cache sync stopped at greenbone-feed-sync selftest.", findings, [str(feed_cache_var_lib(repo_root))])
+
+    session_check = run_command(["tmux", "has-session", "-t", FEED_SYNC_SESSION], repo_root)
+    if session_check.returncode == 0:
+        findings.append(finding("warn", "feed-sync.session", f"tmux session {FEED_SYNC_SESSION} is already running; not starting another sync.", details={"session": FEED_SYNC_SESSION}))
+        return make_result("feed-cache-sync", repo_root, "Feed cache sync is already running.", findings, [str(feed_cache_var_lib(repo_root))])
+
+    feed_sync_log_dir(repo_root).mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    log_path = feed_sync_log_dir(repo_root) / f"community-{FEED_RELEASE}-{timestamp}.log"
+    sync_command = feed_sync_command(repo_root)
+    sync_line = " ".join(shlex.quote(part) for part in sync_command)
+    inner_command = (
+        f"cd {shlex.quote(str(repo_root))} && "
+        "set -o pipefail && "
+        f"{{ printf '%s\\n' 'TurboVAS feed cache sync started at {timestamp}'; "
+        f"{sync_line}; "
+        "status=$?; "
+        "printf '%s\\n' \"TurboVAS feed cache sync exited with status $status\"; "
+        "exit $status; "
+        f"}} 2>&1 | tee -a {shlex.quote(str(log_path))}"
+    )
+    shell_command = f"bash -lc {shlex.quote(inner_command)}"
+    start = run_command(["tmux", "new-session", "-d", "-s", FEED_SYNC_SESSION, shell_command], repo_root)
+    findings.append(finding("pass" if start.returncode == 0 else "fail", "feed-sync.session-start", f"Start tmux feed sync session exit code {start.returncode}.", details={"session": FEED_SYNC_SESSION, "log_path": str(log_path), "output_tail": output_tail(start.stdout, 80)}))
+    return make_result("feed-cache-sync", repo_root, "Feed cache sync session start attempted.", findings, [str(feed_cache_var_lib(repo_root)), str(log_path)])
+
+
+def command_feed_copy_to_runtime(repo_root: Path) -> dict[str, Any]:
+    findings = ensure_runtime_dirs(repo_root)
+    findings.append(finding("pass" if shutil.which("rsync") else "fail", "rsync.available", "rsync is available." if shutil.which("rsync") else "rsync is missing."))
+    if aggregate_status(findings) == "fail":
+        return make_result("feed-copy-to-runtime", repo_root, "Feed copy stopped at prerequisites.", findings, [str(feed_runtime_root(repo_root))])
+
+    for feed_class, source, _destination in feed_copy_pairs(repo_root):
+        summary = feed_path_summary(source, feed_class.markers)
+        marker_missing = [row["path"] for row in summary["markers"] if not row["exists"]]
+        if not summary["exists"] or summary["file_count"] == 0:
+            findings.append(finding("fail", f"feed.cache.{feed_class.key}", f"{feed_class.label} cache is missing or empty; refusing to copy an incomplete feed cache.", str(source), {"summary": summary}))
+        elif marker_missing:
+            findings.append(finding("warn", f"feed.cache.{feed_class.key}", f"{feed_class.label} cache has files but expected markers are missing.", str(source), {"summary": summary, "missing_markers": marker_missing}))
+        else:
+            findings.append(finding("pass", f"feed.cache.{feed_class.key}", f"{feed_class.label} cache is ready to copy.", str(source), {"summary": summary}))
+    if aggregate_status(findings) == "fail":
+        return make_result("feed-copy-to-runtime", repo_root, "Feed copy stopped because the cache is incomplete.", findings, [str(feed_cache_var_lib(repo_root)), str(feed_runtime_root(repo_root))])
+
+    for feed_class, source, destination in feed_copy_pairs(repo_root):
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        copy = run_command(["rsync", "-a", "--delete", f"{source}/", f"{destination}/"], repo_root, timeout=3600)
+        findings.append(finding("pass" if copy.returncode == 0 else "fail", f"feed.copy.{feed_class.key}", f"Copy {feed_class.label} to runtime exit code {copy.returncode}.", details={"source": str(source), "destination": str(destination), "output_tail": output_tail(copy.stdout, 80)}))
+        if copy.returncode != 0:
+            break
+    findings.extend(feed_location_findings(repo_root, "runtime", feed_runtime_root(repo_root), "runtime_rel"))
+    return make_result("feed-copy-to-runtime", repo_root, "Feed cache copy to runtime attempted.", findings, [str(feed_cache_var_lib(repo_root)), str(feed_runtime_root(repo_root))])
+
+
 def command_runtime_app_up(repo_root: Path) -> dict[str, Any]:
     findings = ensure_runtime_dirs(repo_root)
     findings.extend(ensure_build_runtime_dirs(repo_root))
@@ -1301,6 +1514,7 @@ def command_runtime_app_down(repo_root: Path) -> dict[str, Any]:
 
 def command_runtime_app_smoke(repo_root: Path) -> dict[str, Any]:
     findings: list[dict[str, Any]] = []
+    findings.extend(command_feed_state(repo_root)["findings"])
     findings.extend(cert_file_findings(repo_root))
     if not certs_complete(repo_root):
         findings.append(finding("fail", "runtime.cert.complete", "Runtime certificates are incomplete; run just runtime-certs-init."))
@@ -1471,7 +1685,7 @@ def command_doctor(repo_root: Path) -> dict[str, Any]:
     for tool in BASELINE_TOOLS:
         findings.append(finding("pass" if shutil.which(tool) else "warn", "tool.available", f"{tool} is available." if shutil.which(tool) else f"{tool} is not available on PATH."))
     findings.append(finding("pass", "surface.available", "Build readiness surface is available.", details={"commands": ["just deps", "just configure", "just build", "just build-core-c", "just build-c-services", "just build-ui", "just build-python", "just build-baseline"]}))
-    findings.append(finding("pass" if compose_file(repo_root).is_file() else "warn", "surface.available", "Runtime infrastructure command surface is available." if compose_file(repo_root).is_file() else "Runtime infrastructure command surface is not available.", details={"commands": ["just runtime-plan", "just up", "just down", "just logs", "just runtime-init", "just runtime-certs-init", "just runtime-manager-init", "just runtime-scanner-redis-init", "just runtime-gmp-smoke", "just runtime-scanner-register", "just runtime-status", "just runtime-smoke", "just runtime-app-up", "just runtime-app-smoke", "just runtime-app-down", "just gvmd-smoke"]}))
+    findings.append(finding("pass" if compose_file(repo_root).is_file() else "warn", "surface.available", "Runtime infrastructure command surface is available." if compose_file(repo_root).is_file() else "Runtime infrastructure command surface is not available.", details={"commands": ["just runtime-plan", "just up", "just down", "just logs", "just runtime-init", "just runtime-certs-init", "just runtime-manager-init", "just runtime-scanner-redis-init", "just runtime-gmp-smoke", "just runtime-scanner-register", "just feed-state", "just feed-cache-sync", "just feed-copy-to-runtime", "just runtime-status", "just runtime-smoke", "just runtime-app-up", "just runtime-app-smoke", "just runtime-app-down", "just gvmd-smoke"]}))
     findings.append(finding("warn", "surface.deferred", "Test command surface is deferred until component checks are mapped.", details={"command": "just test"}))
     findings.append(finding("warn", "surface.deferred", "Full inherited service orchestration remains experimental until feed, scanner registration, and first UI/API connectivity are stabilized.", details={"commands": ["gvmd", "gsad", "ospd-openvas", "notus-scanner"]}))
     return make_result("doctor", repo_root, "Monorepo health checks completed.", findings)
@@ -1528,6 +1742,9 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("runtime-scanner-redis-init", parents=[common], help="initialize dedicated OpenVAS scanner Redis runtime")
     subparsers.add_parser("runtime-gmp-smoke", parents=[common], help="run authenticated GMP smoke over the runtime gvmd socket")
     subparsers.add_parser("runtime-scanner-register", parents=[common], help="create or verify the OpenVAS scanner registration")
+    subparsers.add_parser("feed-state", parents=[common], help="show Greenbone Community Feed cache and runtime-copy state")
+    subparsers.add_parser("feed-cache-sync", parents=[common], help="start full Greenbone Community Feed cache sync in tmux")
+    subparsers.add_parser("feed-copy-to-runtime", parents=[common], help="copy cached feed data into the runtime feed tree")
     subparsers.add_parser("runtime-status", parents=[common], help="show runtime infrastructure status")
     subparsers.add_parser("runtime-smoke", parents=[common], help="run runtime infrastructure smoke checks")
     subparsers.add_parser("runtime-app-up", parents=[common], help="start experimental application services")
@@ -1585,6 +1802,12 @@ def main(argv: list[str] | None = None) -> int:
         result = command_runtime_gmp_smoke(repo_root)
     elif args.command == "runtime-scanner-register":
         result = command_runtime_scanner_register(repo_root)
+    elif args.command == "feed-state":
+        result = command_feed_state(repo_root)
+    elif args.command == "feed-cache-sync":
+        result = command_feed_cache_sync(repo_root)
+    elif args.command == "feed-copy-to-runtime":
+        result = command_feed_copy_to_runtime(repo_root)
     elif args.command == "runtime-status":
         result = command_runtime_status(repo_root)
     elif args.command == "runtime-smoke":

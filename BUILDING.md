@@ -75,6 +75,12 @@ just up
 just runtime-certs-init
 just runtime-init
 just runtime-manager-init
+just runtime-scanner-redis-init
+just runtime-gmp-smoke
+just runtime-scanner-register
+just feed-state
+just feed-cache-sync
+just feed-copy-to-runtime
 just runtime-status
 just runtime-smoke
 just runtime-app-up
@@ -85,12 +91,13 @@ just down
 
 Runtime state is host-visible and persistent under the sibling
 `TurboVAS-runtime` directory by default when commands are run through
-`tools/turbovasctl`. `runtime-certs-init`, `runtime-init`, and
-`runtime-manager-init` are designed to be idempotent and must not delete or
-recreate existing runtime data.
+`tools/turbovasctl`. `runtime-certs-init`, `runtime-init`,
+`runtime-manager-init`, scanner Redis/config initialization, scanner
+registration, and feed copy commands are designed to be idempotent and must not
+delete or recreate unrelated runtime data.
 
-The current app profile can start `gvmd` and `gsad` for first service-health
-checks. `ospd-openvas` is wired to the built scanner binary but still needs
-scanner KB/Redis runtime wiring before its OSP socket becomes ready. Feed
-population, scanner registration finalization, Notus bring-up, scan execution,
-and production packaging remain deferred.
+The current app profile can start `gvmd`, `ospd-openvas`, and `gsad` for first
+service-health checks. Feed downloads use a persistent local Community Feed
+cache under `TurboVAS-runtime/feed-cache/`, then runtime services consume
+physical copies under `TurboVAS-runtime/feeds/`. Notus daemon bring-up, scan
+execution, and production packaging remain deferred.

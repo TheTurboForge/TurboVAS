@@ -36,6 +36,7 @@ Original TurboVAS-created root tooling and public documentation use `GPL-3.0-or-
 - Add TurboVAS modification notices to imported source files when they are changed.
 - Add explicit license information to new TurboVAS-created files.
 - Treat feed content terms separately from source code licensing.
+- Treat development feed caches and runtime feed copies as local, untracked runtime state; do not commit, bundle, package, or redistribute feed content without a separate feed-terms review.
 - Mark ambiguous cases for human/legal review before public release or distribution.
 
 ## Modification Notice Policy
