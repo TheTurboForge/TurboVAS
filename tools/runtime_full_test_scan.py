@@ -20,7 +20,6 @@ OPENVAS_SCANNER_NAME = "OpenVAS Default"
 FULL_TEST_TARGET_NAME = f"TurboVAS full test target {AUTHORIZED_TARGET_CIDR}"
 FULL_TEST_TASK_NAME = f"TurboVAS full test scan {AUTHORIZED_TARGET_CIDR}"
 ACTIVE_TASK_STATUSES = {
-    "New",
     "Requested",
     "Queued",
     "Running",

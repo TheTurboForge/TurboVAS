@@ -425,6 +425,7 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_full_test_scan_detects_active_duplicate_task(self):
         rows = [
             {"name": runtime_full_test_scan.FULL_TEST_TASK_NAME, "status": "Running", "id": "active"},
+            {"name": runtime_full_test_scan.FULL_TEST_TASK_NAME, "status": "New", "id": "created-not-started"},
             {"name": runtime_full_test_scan.FULL_TEST_TASK_NAME, "status": "Done", "id": "done"},
         ]
         active = runtime_full_test_scan.active_full_test_tasks(rows)
