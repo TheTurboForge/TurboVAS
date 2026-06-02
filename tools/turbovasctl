@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import sys
 import time
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -103,6 +104,9 @@ FEED_RSYNC_TIMEOUT_SECONDS = 900
 GREENBONE_COMMUNITY_KEY_URL = "https://www.greenbone.net/GBCommunitySigningKey.asc"
 GREENBONE_COMMUNITY_KEY_FPR = "8AE4BE429B60A59B311C2E739823FAA60ED1E580"
 NOTUS_SIGNATURE_SUBTREES = ("advisories", "products")
+FULL_AND_FAST_SCAN_CONFIG_ID = "daba56c8-73ec-11df-a475-002264764cea"
+IANA_TCP_UDP_PORT_LIST_ID = "4a4717fe-57d2-11e1-9a26-406186ea4fc5"
+GVMD_IMPORT_TIMEOUT_SECONDS = 7200
 
 
 @dataclass(frozen=True)
@@ -112,6 +116,14 @@ class FeedClass:
     cache_rel: str
     runtime_rel: str
     markers: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class RuntimeFeedMapping:
+    key: str
+    label: str
+    build_rel: str
+    container_target: str
 
 
 @dataclass(frozen=True)
@@ -159,6 +171,12 @@ FEED_CLASSES: tuple[FeedClass, ...] = (
     FeedClass("scap", "SCAP data", "gvm/scap-data", "gvm/scap-data", ("COPYING",)),
     FeedClass("cert", "CERT data", "gvm/cert-data", "gvm/cert-data", ("COPYING.CERT-BUND", "COPYING.DFN-CERT", "feed.xml")),
     FeedClass("gvmd", "GVMD data objects", f"gvm/data-objects/gvmd/{FEED_RELEASE}", f"gvm/data-objects/gvmd/{FEED_RELEASE}", ("LICENSE", "scan-configs", "report-formats", "port-lists")),
+)
+RUNTIME_FEED_MAPPINGS: tuple[RuntimeFeedMapping, ...] = (
+    RuntimeFeedMapping("nasl", "OpenVAS plugin feed", "build/var/lib/openvas/plugins", "/runtime/feeds/openvas/plugins"),
+    RuntimeFeedMapping("gvmd", "GVMD data objects feed", "build/var/lib/gvm/data-objects/gvmd", f"/runtime/feeds/gvm/data-objects/gvmd/{FEED_RELEASE}"),
+    RuntimeFeedMapping("scap", "SCAP data feed", "build/var/lib/gvm/scap-data", "/runtime/feeds/gvm/scap-data"),
+    RuntimeFeedMapping("cert", "CERT data feed", "build/var/lib/gvm/cert-data", "/runtime/feeds/gvm/cert-data"),
 )
 
 BUILD_META: dict[str, BuildMeta] = {
@@ -408,6 +426,10 @@ def notus_signature_files(repo_root: Path) -> list[tuple[str, Path, Path]]:
     return [(subtree, root / subtree / "sha256sums", root / subtree / "sha256sums.asc") for subtree in NOTUS_SIGNATURE_SUBTREES]
 
 
+def runtime_feed_mapping_paths(repo_root: Path) -> list[tuple[RuntimeFeedMapping, Path]]:
+    return [(mapping, repo_root / mapping.build_rel) for mapping in RUNTIME_FEED_MAPPINGS]
+
+
 def feed_sync_binary(repo_root: Path) -> Path:
     return repo_root / "build" / "venvs" / "greenbone-feed-sync" / "bin" / "greenbone-feed-sync"
 
@@ -569,16 +591,20 @@ def gvmd_runtime_args(repo_root: Path) -> list[str]:
     ]
 
 
-def run_app_oneoff(repo_root: Path, service: str, command: list[str], no_deps: bool = True) -> subprocess.CompletedProcess[str]:
+def run_app_oneoff(repo_root: Path, service: str, command: list[str], no_deps: bool = True, timeout: int = 300) -> subprocess.CompletedProcess[str]:
     args = ["--profile", "app", "run", "--rm", "-T"]
     if no_deps:
         args.append("--no-deps")
     args.extend([service, *command])
-    return run_command(compose_command(repo_root, *args), repo_root, env=runtime_env(repo_root), timeout=300)
+    return run_command(compose_command(repo_root, *args), repo_root, env=runtime_env(repo_root), timeout=timeout)
 
 
-def run_gvmd_oneoff(repo_root: Path, args: list[str], no_deps: bool = True) -> subprocess.CompletedProcess[str]:
-    return run_app_oneoff(repo_root, "gvmd", ["gvmd", *gvmd_db_args(repo_root), *args], no_deps=no_deps)
+def run_gvmd_oneoff(repo_root: Path, args: list[str], no_deps: bool = True, timeout: int = 300) -> subprocess.CompletedProcess[str]:
+    return run_app_oneoff(repo_root, "gvmd", ["gvmd", *gvmd_db_args(repo_root), *args], no_deps=no_deps, timeout=timeout)
+
+
+def run_gvmd_runtime_oneoff(repo_root: Path, args: list[str], no_deps: bool = True, timeout: int = 300) -> subprocess.CompletedProcess[str]:
+    return run_app_oneoff(repo_root, "gvmd", ["gvmd", *gvmd_runtime_args(repo_root), *args], no_deps=no_deps, timeout=timeout)
 
 
 def parse_user_uuid(output: str, username: str) -> str | None:
@@ -617,6 +643,33 @@ def feed_signature_log_errors(lines: Iterable[str]) -> list[str]:
     return errors
 
 
+def ospd_vt_load_status_from_logs(lines: Iterable[str]) -> tuple[str, list[str]]:
+    relevant: list[str] = []
+    for line in lines:
+        if "Finished loading VTs" in line or "VTs were up to date" in line:
+            relevant.append(line)
+            return "pass", relevant
+        if "Updating VTs failed" in line or "failed to load VTs" in line or "OpenVAS Scanner failed to load VTs" in line:
+            relevant.append(line)
+            return "fail", relevant
+        if "Loading VTs" in line:
+            relevant.append(line)
+    return "wait", relevant
+
+
+def wait_for_ospd_vt_load(repo_root: Path, timeout_seconds: int = 300) -> tuple[str, list[str]]:
+    deadline = time.monotonic() + timeout_seconds
+    last_lines: list[str] = []
+    while time.monotonic() < deadline:
+        status, lines = ospd_vt_load_status_from_logs(service_log_tail(repo_root, "ospd-openvas", lines=200))
+        if lines:
+            last_lines = lines
+        if status in ("pass", "fail"):
+            return status, last_lines
+        time.sleep(5)
+    return "wait", last_lines
+
+
 def gvmd_socket_path(repo_root: Path) -> Path:
     return runtime_path(repo_root, "run", "gvmd", "gvmd.sock")
 
@@ -631,6 +684,22 @@ def scanner_redis_socket_path(repo_root: Path) -> Path:
 
 def openvas_runtime_config_path(repo_root: Path) -> Path:
     return repo_root / "build" / "prefix" / "etc" / "openvas" / "openvas.conf"
+
+
+def runtime_feed_objects_probe_path(repo_root: Path) -> Path:
+    return repo_root / "tools" / "runtime_feed_objects.py"
+
+
+def runtime_full_test_scan_probe_path(repo_root: Path) -> Path:
+    return repo_root / "tools" / "runtime_full_test_scan.py"
+
+
+def full_test_scan_artifact_dir(repo_root: Path) -> Path:
+    return runtime_path(repo_root, "artifacts", "full-test-scan")
+
+
+def gvm_cli_path(repo_root: Path) -> Path:
+    return repo_root / "build" / "venvs" / "gvm-tools" / "bin" / "gvm-cli"
 
 
 def wait_for_socket(path: Path, timeout_seconds: int = 20) -> bool:
@@ -695,6 +764,68 @@ def ensure_build_runtime_dirs(repo_root: Path) -> list[dict[str, Any]]:
             findings.append(finding("pass", "build-runtime.dir", f"Inherited build runtime directory is writable: {path}", str(path.relative_to(repo_root))))
         except OSError as error:
             findings.append(finding("fail", "build-runtime.dir", f"Inherited build runtime directory is not writable: {path}: {error}", str(path)))
+    return findings
+
+
+def directory_is_empty(path: Path) -> bool:
+    try:
+        next(path.iterdir())
+    except StopIteration:
+        return True
+    except OSError:
+        return False
+    return False
+
+
+def ensure_runtime_feed_mappings(repo_root: Path) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
+    for mapping, path in runtime_feed_mapping_paths(repo_root):
+        desired = mapping.container_target
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+        except OSError as error:
+            findings.append(finding("fail", f"feed-map.{mapping.key}", f"Could not create parent directory for {mapping.label}: {error}", str(path)))
+            continue
+
+        if path.is_symlink():
+            current = os.readlink(path)
+            if current == desired:
+                findings.append(finding("pass", f"feed-map.{mapping.key}", f"{mapping.label} mapping points at runtime feed copy.", str(path), {"target": current, "expected_target": desired}))
+            else:
+                try:
+                    path.unlink()
+                    path.symlink_to(desired)
+                    findings.append(finding("pass", f"feed-map.{mapping.key}", f"Stale {mapping.label} symlink retargeted to runtime feed copy.", str(path), {"old_target": current, "target": desired}))
+                except OSError as error:
+                    findings.append(finding("fail", f"feed-map.{mapping.key}", f"Could not retarget stale {mapping.label} symlink: {error}", str(path), {"target": current, "expected_target": desired}))
+            continue
+
+        if not path.exists():
+            try:
+                path.symlink_to(desired)
+                findings.append(finding("pass", f"feed-map.{mapping.key}", f"{mapping.label} mapping created.", str(path), {"target": desired}))
+            except OSError as error:
+                findings.append(finding("fail", f"feed-map.{mapping.key}", f"Could not create {mapping.label} mapping: {error}", str(path), {"target": desired}))
+            continue
+
+        if path.is_dir() and directory_is_empty(path):
+            try:
+                path.rmdir()
+                path.symlink_to(desired)
+                findings.append(finding("pass", f"feed-map.{mapping.key}", f"Empty {mapping.label} directory replaced with runtime feed mapping.", str(path), {"target": desired}))
+            except OSError as error:
+                findings.append(finding("fail", f"feed-map.{mapping.key}", f"Could not replace empty {mapping.label} directory with mapping: {error}", str(path), {"target": desired}))
+            continue
+
+        findings.append(
+            finding(
+                "fail",
+                f"feed-map.{mapping.key}",
+                f"{mapping.label} path already exists and is not an empty directory or expected symlink; refusing to replace it.",
+                str(path),
+                {"expected_target": desired},
+            )
+        )
     return findings
 
 
@@ -781,6 +912,56 @@ def psql_value(result: subprocess.CompletedProcess[str]) -> str:
         if clean and not clean.startswith(ignored_prefixes):
             return clean
     return ""
+
+
+def nvts_feed_version_query() -> str:
+    return "SELECT COALESCE((SELECT value FROM meta WHERE name = 'nvts_feed_version'), '');"
+
+
+def ospd_vts_version_probe_command(repo_root: Path) -> list[str]:
+    return [
+        str(gvm_cli_path(repo_root)),
+        "--protocol",
+        "OSP",
+        "socket",
+        "--socketpath",
+        str(ospd_socket_path(repo_root)),
+        "--raw",
+        "-X",
+        '<get_vts version_only="1"/>',
+    ]
+
+
+def xml_local_name(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1] if "}" in tag else tag
+
+
+def parse_ospd_vts_version(output: str) -> str | None:
+    try:
+        root = ET.fromstring(output)
+    except ET.ParseError:
+        return None
+    for element in root.iter():
+        if xml_local_name(str(element.tag)) == "vts":
+            version = element.get("vts_version")
+            return version if version else None
+    return None
+
+
+def wait_for_ospd_vts_version(repo_root: Path, timeout_seconds: int = 180) -> tuple[str | None, list[str]]:
+    deadline = time.monotonic() + timeout_seconds
+    last_output: list[str] = []
+    while time.monotonic() < deadline:
+        result = run_command(ospd_vts_version_probe_command(repo_root), repo_root, env=build_env(repo_root), timeout=60)
+        last_output = output_tail(result.stdout, 40)
+        if result.returncode == 0:
+            version = parse_ospd_vts_version(result.stdout)
+            if version:
+                return version, last_output
+        if "OSPd OpenVAS is still starting" not in result.stdout and result.returncode != 0:
+            break
+        time.sleep(5)
+    return None, last_output
 
 
 def ensure_postgres_collation(repo_root: Path, refresh_empty: bool = True) -> dict[str, Any]:
@@ -1502,6 +1683,202 @@ def command_runtime_feed_keyring_init(repo_root: Path) -> dict[str, Any]:
     return make_result("runtime-feed-keyring-init", repo_root, "Shared feed signature keyring initialization completed.", findings, [str(home), str(key_path)])
 
 
+def command_runtime_feed_import_init(repo_root: Path) -> dict[str, Any]:
+    findings: list[dict[str, Any]] = []
+    feed_state = command_feed_state(repo_root)
+    findings.extend(feed_state["findings"])
+    runtime_findings = [item for item in feed_state["findings"] if item["check"].startswith("feed.runtime.")]
+    runtime_class_findings = [item for item in runtime_findings if item["check"] != "feed.runtime.root"]
+    if any(item["status"] != "pass" for item in runtime_class_findings):
+        findings.append(finding("fail", "feed.runtime.ready", "Runtime feed copy is incomplete; refusing local feed import."))
+        return make_result("runtime-feed-import-init", repo_root, "Feed import stopped because runtime feed classes are missing.", findings, [str(feed_runtime_root(repo_root))])
+    findings.append(finding("pass", "feed.runtime.ready", "Runtime feed copy has all required feed classes."))
+
+    findings.extend(ensure_runtime_feed_mappings(repo_root))
+    if aggregate_status(findings) == "fail":
+        return make_result("runtime-feed-import-init", repo_root, "Feed import stopped while mapping runtime feed paths.", findings, [str(feed_runtime_root(repo_root))])
+
+    pre_manager_stop = run_command(compose_command(repo_root, "--profile", "app", "stop", "gvmd"), repo_root, env=runtime_env(repo_root), timeout=120)
+    findings.append(finding("pass" if pre_manager_stop.returncode == 0 else "fail", "gvmd.stop-for-manager-init", f"Stop gvmd service before manager one-shot initialization exit code {pre_manager_stop.returncode}.", details={"output_tail": output_tail(pre_manager_stop.stdout, 80)}))
+    if pre_manager_stop.returncode != 0:
+        return make_result("runtime-feed-import-init", repo_root, "Feed import stopped because gvmd could not be stopped before manager initialization.", findings, [str(runtime_dir(repo_root))])
+
+    manager = command_runtime_manager_init(repo_root)
+    findings.append(finding(manager["status"], "runtime.manager-init", manager["summary"], details={"status": manager["status"]}))
+    scanner_redis = command_runtime_scanner_redis_init(repo_root, probe_openvas=False)
+    findings.append(finding(scanner_redis["status"], "runtime.scanner-redis", scanner_redis["summary"], details={"status": scanner_redis["status"]}))
+    keyring = command_runtime_feed_keyring_init(repo_root)
+    findings.append(finding(keyring["status"], "runtime.feed-keyring", keyring["summary"], details={"status": keyring["status"]}))
+    if aggregate_status(findings) == "fail":
+        return make_result("runtime-feed-import-init", repo_root, "Feed import stopped at runtime prerequisites.", findings, [str(runtime_dir(repo_root))])
+
+    scanner_services = ("ospd-openvas", "notus-scanner")
+    scanner_up = run_command(compose_command(repo_root, "--profile", "app", "up", "-d", "--no-deps", "--build", *scanner_services), repo_root, env=runtime_env(repo_root), timeout=900)
+    findings.append(finding("pass" if scanner_up.returncode == 0 else "fail", "runtime.scanner-services-up", f"Start scanner-side app services for feed import exit code {scanner_up.returncode}.", details={"services": list(scanner_services), "output_tail": output_tail(scanner_up.stdout, 120)}))
+    for service in scanner_services:
+        running = container_running(repo_root, service)
+        findings.append(finding("pass" if running else "fail", "runtime.scanner-service.running", f"{service} container is {'running' if running else 'not running'}.", details={"service": service, "logs_tail": [] if running else service_log_tail(repo_root, service)}))
+    if aggregate_status(findings) == "fail":
+        return make_result("runtime-feed-import-init", repo_root, "Feed import stopped because scanner-side services are not ready.", findings, [str(runtime_dir(repo_root))])
+
+    ospd_ready = wait_for_socket(ospd_socket_path(repo_root), timeout_seconds=30)
+    findings.append(finding("pass" if ospd_ready else "fail", "ospd.socket", "ospd-openvas socket is ready for VT metadata rebuild." if ospd_ready else "ospd-openvas socket is not ready; cannot rebuild VT metadata.", str(ospd_socket_path(repo_root))))
+    if not ospd_ready:
+        return make_result("runtime-feed-import-init", repo_root, "Feed import stopped because OSPD is not ready.", findings, [str(runtime_dir(repo_root))])
+
+    vt_status, vt_lines = wait_for_ospd_vt_load(repo_root, timeout_seconds=300)
+    findings.append(
+        finding(
+            "pass" if vt_status == "pass" else "fail",
+            "ospd.vt-load",
+            "ospd-openvas finished loading VTs before manager rebuild." if vt_status == "pass" else "ospd-openvas did not finish loading VTs before manager rebuild.",
+            details={"status": vt_status, "log_lines": vt_lines[-20:]},
+        )
+    )
+    if vt_status != "pass":
+        return make_result("runtime-feed-import-init", repo_root, "Feed import stopped because OSPD did not finish loading VTs.", findings, [str(runtime_dir(repo_root))])
+
+    gvm_cli = gvm_cli_path(repo_root)
+    findings.append(finding("pass" if gvm_cli.is_file() else "fail", "gvm-tools.cli", "gvm-cli is available for direct OSP readiness probes." if gvm_cli.is_file() else "gvm-cli is missing; run just build-python or just build-baseline.", str(gvm_cli.relative_to(repo_root)) if gvm_cli.exists() else str(gvm_cli)))
+    if aggregate_status(findings) == "fail":
+        return make_result("runtime-feed-import-init", repo_root, "Feed import stopped because the OSP readiness probe is unavailable.", findings, [str(runtime_dir(repo_root))])
+
+    ospd_feed_version, ospd_probe_tail = wait_for_ospd_vts_version(repo_root, timeout_seconds=180)
+    findings.append(
+        finding(
+            "pass" if ospd_feed_version else "fail",
+            "ospd.vts-version",
+            f"ospd-openvas reports VT feed version {ospd_feed_version}." if ospd_feed_version else "ospd-openvas did not report a VT feed version before the readiness timeout.",
+            details={"feed_version": ospd_feed_version, "output_tail": ospd_probe_tail},
+        )
+    )
+
+    db_version_result = psql(repo_root, nvts_feed_version_query())
+    db_feed_version = psql_value(db_version_result) if db_version_result.returncode == 0 else ""
+    findings.append(
+        finding(
+            "pass" if db_version_result.returncode == 0 else "warn",
+            "gvmd.nvts-feed-version",
+            f"gvmd NVT database feed version is {db_feed_version or 'empty'}." if db_version_result.returncode == 0 else f"gvmd NVT database feed version query exit code {db_version_result.returncode}.",
+            details={"feed_version": db_feed_version, "output_tail": output_tail(db_version_result.stdout, 40)},
+        )
+    )
+    if not ospd_feed_version:
+        return make_result("runtime-feed-import-init", repo_root, "Feed import stopped because OSPD did not report a VT feed version.", findings, [str(runtime_dir(repo_root))])
+
+    stop_gvmd = run_command(compose_command(repo_root, "--profile", "app", "stop", "gvmd"), repo_root, env=runtime_env(repo_root), timeout=120)
+    findings.append(finding("pass" if stop_gvmd.returncode == 0 else "fail", "gvmd.stop-for-import", f"Stop gvmd service before one-shot feed import exit code {stop_gvmd.returncode}.", details={"output_tail": output_tail(stop_gvmd.stdout, 80)}))
+    if stop_gvmd.returncode != 0:
+        return make_result("runtime-feed-import-init", repo_root, "Feed import stopped because gvmd could not be stopped cleanly.", findings, [str(runtime_dir(repo_root))])
+
+    import_steps: list[tuple[str, list[str]]] = []
+    if db_feed_version == ospd_feed_version:
+        findings.append(finding("pass", "gvmd.rebuild-nvt", f"NVT database already matches OSPD feed version {ospd_feed_version}; skipped full NVT rebuild."))
+    else:
+        import_steps.append(("gvmd.rebuild-nvt", ["--rebuild", f"--osp-vt-update=/runtime/run/ospd/{ospd_socket_path(repo_root).name}"]))
+    import_steps.extend([
+        ("gvmd.rebuild-gvmd-data", ["--rebuild-gvmd-data=all"]),
+        ("gvmd.rebuild-scap", ["--rebuild-scap"]),
+        ("gvmd.optimize-feed-permissions", ["--optimize=add-feed-permissions"]),
+    ])
+    import_failed = False
+    for check, args in import_steps:
+        result = run_gvmd_runtime_oneoff(repo_root, args, no_deps=False, timeout=GVMD_IMPORT_TIMEOUT_SECONDS)
+        findings.append(finding("pass" if result.returncode == 0 else "fail", check, f"gvmd {' '.join(args)} exit code {result.returncode}.", details={"output_tail": output_tail(result.stdout, 120)}))
+        if result.returncode != 0:
+            import_failed = True
+            break
+
+    restart = run_command(compose_command(repo_root, "--profile", "app", "up", "-d", "--no-deps", "--build", *APP_SERVICES), repo_root, env=runtime_env(repo_root), timeout=900)
+    findings.append(finding("pass" if restart.returncode == 0 else "fail", "runtime.app-restart", f"Restart app services after feed import exit code {restart.returncode}.", details={"output_tail": output_tail(restart.stdout, 120)}))
+    for service in APP_SERVICES:
+        running = container_running(repo_root, service)
+        findings.append(finding("pass" if running else "fail", "runtime.app.running", f"{service} container is {'running' if running else 'not running'} after feed import.", details={"service": service, "logs_tail": [] if running else service_log_tail(repo_root, service)}))
+    if import_failed or restart.returncode != 0:
+        return make_result("runtime-feed-import-init", repo_root, "Feed import stopped because a rebuild/import step failed.", findings, [str(runtime_dir(repo_root))])
+
+    gvmd_ready = wait_for_socket(gvmd_socket_path(repo_root), timeout_seconds=180)
+    findings.append(finding("pass" if gvmd_ready else "fail", "gvmd.socket-wait", "gvmd socket became ready after feed import restart." if gvmd_ready else "gvmd socket did not become ready after feed import restart.", str(gvmd_socket_path(repo_root))))
+
+    probe_findings: list[dict[str, Any]] = []
+    secret_path = runtime_secret_path(repo_root, DEV_ADMIN_SECRET)
+    python = venv_python(repo_root, "python-gvm")
+    probe = runtime_feed_objects_probe_path(repo_root)
+    probe_findings.append(finding("pass" if gvmd_socket_path(repo_root).is_socket() else "fail", "gvmd.socket", "gvmd socket is ready." if gvmd_socket_path(repo_root).is_socket() else "gvmd socket is not ready.", str(gvmd_socket_path(repo_root))))
+    probe_findings.append(finding("pass" if secret_path.is_file() else "fail", "runtime.admin-secret", "Development admin secret exists." if secret_path.is_file() else "Development admin secret is missing.", str(secret_path)))
+    probe_findings.append(finding("pass" if python.is_file() else "fail", "python-gvm.venv", "python-gvm runtime venv exists." if python.is_file() else "python-gvm venv is missing.", str(python.relative_to(repo_root)) if python.exists() else str(python)))
+    probe_findings.append(finding("pass" if probe.is_file() else "fail", "feed-objects.probe", "Runtime feed object probe exists." if probe.is_file() else "Runtime feed object probe is missing.", str(probe.relative_to(repo_root)) if probe.exists() else str(probe)))
+    findings.extend(probe_findings)
+    if aggregate_status(probe_findings) == "fail":
+        return make_result("runtime-feed-import-init", repo_root, "Feed import completed but GMP feed object verification could not start.", findings, [str(runtime_dir(repo_root))])
+
+    verify = run_command([str(python), str(probe), "--socket", str(gvmd_socket_path(repo_root)), "--username", DEV_ADMIN_USER, "--password-file", str(secret_path)], repo_root, env=build_env(repo_root), timeout=120)
+    try:
+        parsed = json.loads(verify.stdout)
+    except json.JSONDecodeError:
+        parsed = None
+    verify_status = parsed.get("status") if parsed else None
+    password = secret_path.read_text(encoding="utf-8").strip() if secret_path.is_file() else ""
+    findings.append(finding("pass" if verify.returncode == 0 and verify_status == "pass" else "fail", "feed-objects.gmp", f"GMP feed object verification exit code {verify.returncode}.", details={"probe": parsed, "output_tail": output_tail(verify.stdout, 80, [password])}))
+    return make_result("runtime-feed-import-init", repo_root, "Runtime feed import and verification completed.", findings, [str(runtime_dir(repo_root)), str(feed_runtime_root(repo_root))])
+
+
+def command_runtime_full_test_scan(repo_root: Path, action: str, confirm_authorized_lan: bool = False) -> dict[str, Any]:
+    findings: list[dict[str, Any]] = []
+    secret_path = runtime_secret_path(repo_root, DEV_ADMIN_SECRET)
+    python = venv_python(repo_root, "python-gvm")
+    probe = runtime_full_test_scan_probe_path(repo_root)
+    artifact_dir = full_test_scan_artifact_dir(repo_root)
+    findings.append(finding("pass" if gvmd_socket_path(repo_root).is_socket() else "fail", "gvmd.socket", "gvmd socket is ready." if gvmd_socket_path(repo_root).is_socket() else "gvmd socket is not ready.", str(gvmd_socket_path(repo_root))))
+    findings.append(finding("pass" if secret_path.is_file() else "fail", "runtime.admin-secret", "Development admin secret exists." if secret_path.is_file() else "Development admin secret is missing.", str(secret_path)))
+    findings.append(finding("pass" if python.is_file() else "fail", "python-gvm.venv", "python-gvm runtime venv exists." if python.is_file() else "python-gvm venv is missing.", str(python.relative_to(repo_root)) if python.exists() else str(python)))
+    findings.append(finding("pass" if probe.is_file() else "fail", "full-test-scan.probe", "Full test scan helper exists." if probe.is_file() else "Full test scan helper is missing.", str(probe.relative_to(repo_root)) if probe.exists() else str(probe)))
+    try:
+        artifact_dir.mkdir(parents=True, exist_ok=True)
+        findings.append(finding("pass", "full-test-scan.artifact-dir", "Full test scan artifact directory is ready.", str(artifact_dir)))
+    except OSError as error:
+        findings.append(finding("fail", "full-test-scan.artifact-dir", f"Full test scan artifact directory is not usable: {error}", str(artifact_dir)))
+
+    command_name = f"runtime-full-test-scan-{action}"
+    if aggregate_status(findings) == "fail":
+        return make_result(command_name, repo_root, "Full test scan command stopped at prerequisites.", findings, [str(artifact_dir)])
+
+    args = [
+        str(python),
+        str(probe),
+        action,
+        "--socket",
+        str(gvmd_socket_path(repo_root)),
+        "--username",
+        DEV_ADMIN_USER,
+        "--password-file",
+        str(secret_path),
+        "--artifact-dir",
+        str(artifact_dir),
+    ]
+    if confirm_authorized_lan:
+        args.append("--confirm-authorized-lan")
+    result = run_command(args, repo_root, env=build_env(repo_root), timeout=120)
+    try:
+        parsed = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        parsed = None
+    helper_status = parsed.get("status") if parsed else None
+    finding_status = helper_status if result.returncode == 0 and helper_status in {"pass", "warn"} else "fail"
+    password = secret_path.read_text(encoding="utf-8").strip() if secret_path.is_file() else ""
+    findings.append(
+        finding(
+            finding_status,
+            f"full-test-scan.{action}",
+            parsed.get("summary", f"Full test scan helper exit code {result.returncode}.") if parsed else f"Full test scan helper exit code {result.returncode}.",
+            details={"helper": parsed, "output_tail": output_tail(result.stdout, 120, [password])},
+        )
+    )
+    artifacts = list(parsed.get("artifacts", [])) if parsed and isinstance(parsed.get("artifacts"), list) else [str(artifact_dir)]
+    summary = parsed.get("summary") if parsed else f"Full test scan {action} command completed with exit code {result.returncode}."
+    return make_result(command_name, repo_root, summary, findings, artifacts)
+
+
 def command_feed_state(repo_root: Path) -> dict[str, Any]:
     findings: list[dict[str, Any]] = []
     findings.extend(feed_location_findings(repo_root, "cache", feed_cache_var_lib(repo_root), "cache_rel"))
@@ -1663,6 +2040,15 @@ def command_runtime_app_smoke(repo_root: Path) -> dict[str, Any]:
         else:
             findings.append(finding("pass", "ospd.logs", "ospd-openvas logs contain no ERROR lines in the inspected tail."))
         findings.append(finding("fail" if ospd_feed_errors else "pass", "ospd.feed-signature-logs", "ospd-openvas logs contain feed signature or Notus advisory load errors." if ospd_feed_errors else "ospd-openvas logs contain no feed signature or Notus advisory load errors in the inspected tail.", details={"error_tail": ospd_feed_errors[-20:]}))
+        vt_status, vt_lines = ospd_vt_load_status_from_logs(ospd_logs)
+        findings.append(
+            finding(
+                {"pass": "pass", "fail": "fail", "wait": "warn"}[vt_status],
+                "ospd.vt-load",
+                "ospd-openvas reports VTs are loaded." if vt_status == "pass" else "ospd-openvas VT loading failed." if vt_status == "fail" else "ospd-openvas is still loading VTs.",
+                details={"status": vt_status, "log_lines": vt_lines[-20:]},
+            )
+        )
     if container_running(repo_root, "notus-scanner"):
         notus_logs = service_log_tail(repo_root, "notus-scanner", lines=120)
         notus_file_logs = runtime_file_tail(runtime_path(repo_root, "logs", "notus", "notus-scanner.log"), lines=120)
@@ -1809,7 +2195,7 @@ def command_doctor(repo_root: Path) -> dict[str, Any]:
     for tool in BASELINE_TOOLS:
         findings.append(finding("pass" if shutil.which(tool) else "warn", "tool.available", f"{tool} is available." if shutil.which(tool) else f"{tool} is not available on PATH."))
     findings.append(finding("pass", "surface.available", "Build readiness surface is available.", details={"commands": ["just deps", "just configure", "just build", "just build-core-c", "just build-c-services", "just build-ui", "just build-python", "just build-baseline"]}))
-    findings.append(finding("pass" if compose_file(repo_root).is_file() else "warn", "surface.available", "Runtime infrastructure command surface is available." if compose_file(repo_root).is_file() else "Runtime infrastructure command surface is not available.", details={"commands": ["just runtime-plan", "just up", "just down", "just logs", "just runtime-init", "just runtime-certs-init", "just runtime-manager-init", "just runtime-scanner-redis-init", "just runtime-gmp-smoke", "just runtime-scanner-register", "just runtime-feed-keyring-init", "just feed-state", "just feed-cache-sync", "just feed-copy-to-runtime", "just runtime-status", "just runtime-smoke", "just runtime-app-up", "just runtime-app-smoke", "just runtime-app-down", "just gvmd-smoke"]}))
+    findings.append(finding("pass" if compose_file(repo_root).is_file() else "warn", "surface.available", "Runtime infrastructure command surface is available." if compose_file(repo_root).is_file() else "Runtime infrastructure command surface is not available.", details={"commands": ["just runtime-plan", "just up", "just down", "just logs", "just runtime-init", "just runtime-certs-init", "just runtime-manager-init", "just runtime-scanner-redis-init", "just runtime-gmp-smoke", "just runtime-scanner-register", "just runtime-feed-keyring-init", "just runtime-feed-import-init", "just runtime-full-test-scan-preflight", "just runtime-full-test-scan-start", "just runtime-full-test-scan-status", "just feed-state", "just feed-cache-sync", "just feed-copy-to-runtime", "just runtime-status", "just runtime-smoke", "just runtime-app-up", "just runtime-app-smoke", "just runtime-app-down", "just gvmd-smoke"]}))
     findings.append(finding("warn", "surface.deferred", "Test command surface is deferred until component checks are mapped.", details={"command": "just test"}))
     findings.append(finding("warn", "surface.deferred", "Full inherited service orchestration remains experimental until feed, scanner registration, and first UI/API connectivity are stabilized.", details={"commands": ["gvmd", "gsad", "ospd-openvas", "notus-scanner"]}))
     return make_result("doctor", repo_root, "Monorepo health checks completed.", findings)
@@ -1867,6 +2253,11 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("runtime-gmp-smoke", parents=[common], help="run authenticated GMP smoke over the runtime gvmd socket")
     subparsers.add_parser("runtime-scanner-register", parents=[common], help="create or verify the OpenVAS scanner registration")
     subparsers.add_parser("runtime-feed-keyring-init", parents=[common], help="initialize the shared feed signature GnuPG keyring")
+    subparsers.add_parser("runtime-feed-import-init", parents=[common], help="import runtime feed copies into gvmd/OpenVAS state")
+    subparsers.add_parser("runtime-full-test-scan-preflight", parents=[common], help="preflight the fixed authorized full test scan")
+    full_test_start = subparsers.add_parser("runtime-full-test-scan-start", parents=[common], help="start the fixed authorized full test scan")
+    full_test_start.add_argument("--confirm-authorized-lan", action="store_true", help="confirm authorization for 192.168.178.0/24")
+    subparsers.add_parser("runtime-full-test-scan-status", parents=[common], help="show the fixed authorized full test scan status")
     subparsers.add_parser("feed-state", parents=[common], help="show Greenbone Community Feed cache and runtime-copy state")
     subparsers.add_parser("feed-cache-sync", parents=[common], help="start full Greenbone Community Feed cache sync in tmux")
     subparsers.add_parser("feed-copy-to-runtime", parents=[common], help="copy cached feed data into the runtime feed tree")
@@ -1929,6 +2320,14 @@ def main(argv: list[str] | None = None) -> int:
         result = command_runtime_scanner_register(repo_root)
     elif args.command == "runtime-feed-keyring-init":
         result = command_runtime_feed_keyring_init(repo_root)
+    elif args.command == "runtime-feed-import-init":
+        result = command_runtime_feed_import_init(repo_root)
+    elif args.command == "runtime-full-test-scan-preflight":
+        result = command_runtime_full_test_scan(repo_root, "preflight")
+    elif args.command == "runtime-full-test-scan-start":
+        result = command_runtime_full_test_scan(repo_root, "start", confirm_authorized_lan=args.confirm_authorized_lan)
+    elif args.command == "runtime-full-test-scan-status":
+        result = command_runtime_full_test_scan(repo_root, "status")
     elif args.command == "feed-state":
         result = command_feed_state(repo_root)
     elif args.command == "feed-cache-sync":

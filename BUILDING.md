@@ -79,6 +79,10 @@ just runtime-scanner-redis-init
 just runtime-gmp-smoke
 just runtime-scanner-register
 just runtime-feed-keyring-init
+just runtime-feed-import-init
+just runtime-full-test-scan-preflight
+just runtime-full-test-scan-start --confirm-authorized-lan
+just runtime-full-test-scan-status
 just feed-state
 just feed-cache-sync
 just feed-copy-to-runtime
@@ -102,5 +106,10 @@ The current app profile can start `gvmd`, `ospd-openvas`, `notus-scanner`, and
 Community Feed cache under `TurboVAS-runtime/feed-cache/`, then runtime services
 consume physical copies under `TurboVAS-runtime/feeds/`. OSPD and Notus share a
 persistent feed signature keyring under `TurboVAS-runtime/state/feed-gnupg`.
-Feed import, scan execution, and production packaging remain guarded follow-up
-steps.
+`runtime-feed-import-init` maps gvmd/OpenVAS build-time feed data paths to the
+runtime feed copy, then rebuilds VT metadata, gvmd data objects, and SCAP data
+from local files. The mapping points to `/runtime/feeds`; it never points at the
+canonical feed cache. The full-test scan commands are fixed to the authorized
+`192.168.178.0/24` target, the `Full and fast` scan config, and the `All IANA
+assigned TCP and UDP` port list; starting the scan requires the explicit
+`--confirm-authorized-lan` flag.

@@ -78,6 +78,18 @@ runtime-scanner-register:
 runtime-feed-keyring-init *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-feed-keyring-init "$@"
 
+runtime-feed-import-init *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-feed-import-init "$@"
+
+runtime-full-test-scan-preflight *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-full-test-scan-preflight "$@"
+
+runtime-full-test-scan-start *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-full-test-scan-start "$@"
+
+runtime-full-test-scan-status *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-full-test-scan-status "$@"
+
 feed-state *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl feed-state "$@"
 
