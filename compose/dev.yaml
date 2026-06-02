@@ -193,6 +193,9 @@ services:
       dockerfile: docker/dev/Dockerfile
     working_dir: /workspace
     user: "${TURBOVAS_UID:-1000}:${TURBOVAS_GID:-1000}"
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
     depends_on:
       redis:
         condition: service_healthy
@@ -202,7 +205,7 @@ services:
         condition: service_healthy
     environment:
       HOME: /tmp
-      GNUPGHOME: /runtime/state/ospd-gnupg
+      GNUPGHOME: /runtime/state/feed-gnupg
       LD_LIBRARY_PATH: /workspace/build/prefix/lib:/workspace/build/prefix/lib64
       PATH: /workspace/build/venvs/ospd-openvas/bin:/workspace/build/openvas-scanner/src:/workspace/build/prefix/sbin:/workspace/build/prefix/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       TURBOVAS_RUNTIME_DIR: /runtime
@@ -223,8 +226,8 @@ services:
       - sh
       - -lc
       - >
-        mkdir -p /runtime/run/ospd /runtime/logs/ospd /runtime/feeds/notus/advisories /runtime/state/ospd-gnupg &&
-        chmod 700 /runtime/state/ospd-gnupg &&
+        mkdir -p /runtime/run/ospd /runtime/logs/ospd /runtime/feeds/notus/advisories /runtime/state/feed-gnupg &&
+        chmod 700 /runtime/state/feed-gnupg &&
         rm -f /runtime/run/ospd/ospd-openvas.sock /runtime/run/ospd/ospd-openvas.pid &&
         exec /workspace/build/venvs/ospd-openvas/bin/ospd-openvas --foreground
         --unix-socket=/runtime/run/ospd/ospd-openvas.sock
@@ -239,6 +242,50 @@ services:
         --mqtt-broker-port=1883
         --max-scans=0
         --notus-feed-dir=/runtime/feeds/notus/advisories
+
+  notus-scanner:
+    profiles: ["app"]
+    build:
+      context: ..
+      dockerfile: docker/dev/Dockerfile
+    working_dir: /workspace
+    user: "${TURBOVAS_UID:-1000}:${TURBOVAS_GID:-1000}"
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    environment:
+      HOME: /tmp
+      GNUPGHOME: /runtime/state/feed-gnupg
+      LD_LIBRARY_PATH: /workspace/build/prefix/lib:/workspace/build/prefix/lib64
+      PATH: /workspace/build/venvs/notus-scanner/bin:/workspace/build/prefix/sbin:/workspace/build/prefix/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      TURBOVAS_RUNTIME_DIR: /runtime
+    volumes:
+      - type: bind
+        source: ..
+        target: /workspace
+      - type: bind
+        source: ..
+        target: /home/turboforge/Projects/TurboVAS
+      - type: bind
+        source: ${TURBOVAS_RUNTIME_DIR:-../../TurboVAS-runtime}
+        target: /runtime
+      - type: bind
+        source: ../build
+        target: /workspace/build
+    command:
+      - sh
+      - -lc
+      - >
+        mkdir -p /runtime/run/notus /runtime/logs/notus /runtime/feeds/notus/products /runtime/state/feed-gnupg &&
+        chmod 700 /runtime/state/feed-gnupg &&
+        rm -f /runtime/run/notus/notus-scanner.pid &&
+        exec /workspace/build/venvs/notus-scanner/bin/notus-scanner --foreground
+        --products-directory=/runtime/feeds/notus/products
+        --mqtt-broker-address=mosquitto
+        --mqtt-broker-port=1883
+        --pid-file=/runtime/run/notus/notus-scanner.pid
+        --log-file=/runtime/logs/notus/notus-scanner.log
+        --log-level=INFO
 
   gsad:
     profiles: ["app"]

@@ -112,17 +112,20 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(turbovasctl.RUNTIME_SERVICES, ("postgres", "redis", "redis-openvas", "mosquitto"))
 
     def test_app_services_are_experimental_profile_services(self):
-        self.assertEqual(turbovasctl.APP_SERVICES, ("gvmd", "ospd-openvas", "gsad"))
+        self.assertEqual(turbovasctl.APP_SERVICES, ("gvmd", "ospd-openvas", "notus-scanner", "gsad"))
 
     def test_runtime_dirs_include_application_state(self):
         self.assertIn("certs/CA", turbovasctl.RUNTIME_DIRS)
         self.assertIn("certs/private/CA", turbovasctl.RUNTIME_DIRS)
         self.assertIn("secrets", turbovasctl.RUNTIME_DIRS)
-        self.assertIn("state/ospd-gnupg", turbovasctl.RUNTIME_DIRS)
+        self.assertIn("state/feed-gnupg", turbovasctl.RUNTIME_DIRS)
         self.assertIn("redis-openvas", turbovasctl.RUNTIME_DIRS)
         self.assertIn("run/gvmd", turbovasctl.RUNTIME_DIRS)
         self.assertIn("run/ospd", turbovasctl.RUNTIME_DIRS)
+        self.assertIn("run/notus", turbovasctl.RUNTIME_DIRS)
         self.assertIn("run/redis-openvas", turbovasctl.RUNTIME_DIRS)
+        self.assertIn("logs/notus", turbovasctl.RUNTIME_DIRS)
+        self.assertIn("feeds/notus/products", turbovasctl.RUNTIME_DIRS)
 
     def test_cert_files_live_under_runtime_dir(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -153,6 +156,48 @@ class TurboVASCtlTests(unittest.TestCase):
             self.assertEqual(turbovasctl.feed_cache_var_lib(root), Path(tmp) / "TurboVAS-runtime" / "feed-cache" / "community" / "22.04" / "var-lib")
             self.assertEqual(turbovasctl.feed_runtime_root(root), Path(tmp) / "TurboVAS-runtime" / "feeds")
             self.assertEqual(turbovasctl.feed_sync_log_dir(root), Path(tmp) / "TurboVAS-runtime" / "logs" / "feed-sync")
+
+    def test_feed_keyring_paths_live_under_runtime_dir(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            root.mkdir()
+            self.assertEqual(turbovasctl.feed_gnupg_home(root), Path(tmp) / "TurboVAS-runtime" / "state" / "feed-gnupg")
+            self.assertEqual(turbovasctl.feed_keyring_artifact_dir(root), Path(tmp) / "TurboVAS-runtime" / "artifacts" / "feed-keyring")
+            self.assertEqual(turbovasctl.feed_community_key_path(root), Path(tmp) / "TurboVAS-runtime" / "artifacts" / "feed-keyring" / "GBCommunitySigningKey.asc")
+
+    def test_feed_keyring_constants_match_greenbone_community_key(self):
+        self.assertEqual(turbovasctl.GREENBONE_COMMUNITY_KEY_FPR, "8AE4BE429B60A59B311C2E739823FAA60ED1E580")
+        self.assertEqual(turbovasctl.GREENBONE_COMMUNITY_KEY_URL, "https://www.greenbone.net/GBCommunitySigningKey.asc")
+
+    def test_feed_community_key_download_command_targets_runtime_artifact(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            root.mkdir()
+            command = turbovasctl.feed_community_key_download_command(root)
+            self.assertEqual(command[:3], ["curl", "-fsSL", "-o"])
+            self.assertEqual(command[3], str(turbovasctl.feed_community_key_path(root)))
+            self.assertEqual(command[4], turbovasctl.GREENBONE_COMMUNITY_KEY_URL)
+
+    def test_notus_signature_files_use_runtime_copy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            root.mkdir()
+            signature_files = turbovasctl.notus_signature_files(root)
+            self.assertEqual(
+                signature_files,
+                [
+                    (
+                        "advisories",
+                        Path(tmp) / "TurboVAS-runtime" / "feeds" / "notus" / "advisories" / "sha256sums",
+                        Path(tmp) / "TurboVAS-runtime" / "feeds" / "notus" / "advisories" / "sha256sums.asc",
+                    ),
+                    (
+                        "products",
+                        Path(tmp) / "TurboVAS-runtime" / "feeds" / "notus" / "products" / "sha256sums",
+                        Path(tmp) / "TurboVAS-runtime" / "feeds" / "notus" / "products" / "sha256sums.asc",
+                    ),
+                ],
+            )
 
     def test_feed_sync_command_uses_full_22_04_cache(self):
         with tempfile.TemporaryDirectory() as tmp:

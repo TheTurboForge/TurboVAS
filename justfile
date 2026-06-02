@@ -75,6 +75,9 @@ runtime-gmp-smoke:
 runtime-scanner-register:
     @tools/turbovasctl runtime-scanner-register
 
+runtime-feed-keyring-init *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-feed-keyring-init "$@"
+
 feed-state *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl feed-state "$@"
 

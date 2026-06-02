@@ -45,7 +45,7 @@ C_SERVICES_CHAIN = ("gvm-libs", "openvas-smb", "openvas-scanner", "pg-gvm", "gvm
 PYTHON_CHAIN = ("python-gvm", "gvm-tools", "greenbone-feed-sync", "ospd-openvas", "notus-scanner")
 BASELINE_CHAIN = (*C_SERVICES_CHAIN, "gsa", *PYTHON_CHAIN)
 RUNTIME_SERVICES = ("postgres", "redis", "redis-openvas", "mosquitto")
-APP_SERVICES = ("gvmd", "ospd-openvas", "gsad")
+APP_SERVICES = ("gvmd", "ospd-openvas", "notus-scanner", "gsad")
 RUNTIME_DIRS = (
     "postgres",
     "redis",
@@ -58,19 +58,22 @@ RUNTIME_DIRS = (
     "certs/private/CA",
     "secrets",
     "state",
-    "state/ospd-gnupg",
+    "state/feed-gnupg",
     "redis-openvas",
     "run/gvmd",
     "run/ospd",
+    "run/notus",
     "run/redis-openvas",
     "logs/gvmd",
     "logs/ospd",
+    "logs/notus",
     "logs/gsad",
     "logs/redis-openvas",
     "logs/feed-sync",
     "feed-cache/community/22.04/var-lib",
     "feeds/openvas/plugins",
     "feeds/notus/advisories",
+    "feeds/notus/products",
     "feeds/gvm/scap-data",
     "feeds/gvm/cert-data",
     "feeds/gvm/data-objects/gvmd/22.04",
@@ -97,6 +100,9 @@ FEED_RELEASE = "22.04"
 FEED_SYNC_TYPE = "all"
 FEED_SYNC_SESSION = "turbovas-feed-sync"
 FEED_RSYNC_TIMEOUT_SECONDS = 900
+GREENBONE_COMMUNITY_KEY_URL = "https://www.greenbone.net/GBCommunitySigningKey.asc"
+GREENBONE_COMMUNITY_KEY_FPR = "8AE4BE429B60A59B311C2E739823FAA60ED1E580"
+NOTUS_SIGNATURE_SUBTREES = ("advisories", "products")
 
 
 @dataclass(frozen=True)
@@ -272,9 +278,15 @@ def run_git(repo_root: Path, args: list[str]) -> str | None:
     return result.stdout.strip()
 
 
-def run_command(command: list[str], cwd: Path, env: dict[str, str] | None = None, timeout: int | None = None) -> subprocess.CompletedProcess[str]:
+def run_command(
+    command: list[str],
+    cwd: Path,
+    env: dict[str, str] | None = None,
+    timeout: int | None = None,
+    input_text: str | None = None,
+) -> subprocess.CompletedProcess[str]:
     try:
-        return subprocess.run(command, cwd=cwd, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout)
+        return subprocess.run(command, cwd=cwd, env=env, text=True, input=input_text, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout)
     except subprocess.TimeoutExpired as error:
         stdout = error.stdout or ""
         if isinstance(stdout, bytes):
@@ -369,6 +381,31 @@ def feed_runtime_root(repo_root: Path) -> Path:
 
 def feed_sync_log_dir(repo_root: Path) -> Path:
     return runtime_path(repo_root, "logs", "feed-sync")
+
+
+def feed_gnupg_home(repo_root: Path) -> Path:
+    return runtime_path(repo_root, "state", "feed-gnupg")
+
+
+def feed_keyring_artifact_dir(repo_root: Path) -> Path:
+    return runtime_path(repo_root, "artifacts", "feed-keyring")
+
+
+def feed_community_key_path(repo_root: Path) -> Path:
+    return feed_keyring_artifact_dir(repo_root) / "GBCommunitySigningKey.asc"
+
+
+def gpg_command(repo_root: Path, *args: str) -> list[str]:
+    return ["gpg", "--batch", "--homedir", str(feed_gnupg_home(repo_root)), *args]
+
+
+def feed_community_key_download_command(repo_root: Path) -> list[str]:
+    return ["curl", "-fsSL", "-o", str(feed_community_key_path(repo_root)), GREENBONE_COMMUNITY_KEY_URL]
+
+
+def notus_signature_files(repo_root: Path) -> list[tuple[str, Path, Path]]:
+    root = feed_runtime_root(repo_root) / "notus"
+    return [(subtree, root / subtree / "sha256sums", root / subtree / "sha256sums.asc") for subtree in NOTUS_SIGNATURE_SUBTREES]
 
 
 def feed_sync_binary(repo_root: Path) -> Path:
@@ -560,6 +597,24 @@ def parse_user_uuid(output: str, username: str) -> str | None:
 def service_log_tail(repo_root: Path, service: str, lines: int = 80) -> list[str]:
     result = run_command(compose_command(repo_root, "logs", "--tail", str(lines), service), repo_root, env=runtime_env(repo_root))
     return result.stdout.splitlines()[-lines:]
+
+
+def runtime_file_tail(path: Path, lines: int = 80) -> list[str]:
+    try:
+        return path.read_text(encoding="utf-8", errors="replace").splitlines()[-lines:]
+    except OSError:
+        return []
+
+
+def feed_signature_log_errors(lines: Iterable[str]) -> list[str]:
+    errors: list[str] = []
+    marker_words = ("gpg", "signature", "sha256", "advisories", "notus")
+    error_words = ("error", "failed", "failure", "invalid", "not loaded")
+    for line in lines:
+        lower = line.lower()
+        if any(marker in lower for marker in marker_words) and any(word in lower for word in error_words):
+            errors.append(line)
+    return errors
 
 
 def gvmd_socket_path(repo_root: Path) -> Path:
@@ -1150,9 +1205,10 @@ def command_runtime_plan(repo_root: Path) -> dict[str, Any]:
         finding("pass", "runtime.scanner-redis", "OpenVAS scanner KB Redis uses a runtime Unix socket, not host TCP exposure.", str(scanner_redis_socket_path(repo_root))),
         finding("pass", "runtime.feed-cache", "Community feed downloads use a persistent host-local cache outside the repository.", str(feed_cache_var_lib(repo_root))),
         finding("pass", "runtime.feed-copy", "Runtime services consume physical copies of the cache under the runtime feed tree.", str(feed_runtime_root(repo_root))),
+        finding("pass", "runtime.feed-keyring", "OSPD and Notus share a persistent feed signature keyring under runtime state.", str(feed_gnupg_home(repo_root))),
         finding("pass", "runtime.pg-gvm", "Postgres pg-gvm extension initialization is handled by just runtime-init after pg-gvm is built."),
         finding("pass", "runtime.certs", "Certificate initialization is handled by just runtime-certs-init and persists outside the repository."),
-        finding("warn", "runtime.deferred", "Notus daemon bring-up and scan execution remain intentionally deferred."),
+        finding("warn", "runtime.deferred", "Feed import and scan execution remain guarded follow-up steps."),
     ]
     return make_result("runtime-plan", repo_root, "Persistent Docker runtime plan collected.", findings, [str(root), str(compose_file(repo_root).relative_to(repo_root))])
 
@@ -1249,7 +1305,7 @@ def command_runtime_certs_init(repo_root: Path) -> dict[str, Any]:
     return make_result("runtime-certs-init", repo_root, "Runtime certificate initialization completed.", findings, [str(cert_public_dir(repo_root)), str(cert_private_dir(repo_root))])
 
 
-def command_runtime_scanner_redis_init(repo_root: Path) -> dict[str, Any]:
+def command_runtime_scanner_redis_init(repo_root: Path, probe_openvas: bool = True) -> dict[str, Any]:
     findings = ensure_runtime_dirs(repo_root)
     config = run_command(compose_command(repo_root, "config", "--quiet"), repo_root, env=runtime_env(repo_root))
     findings.append(finding("pass" if config.returncode == 0 else "fail", "compose.config", f"Compose config validation exit code {config.returncode}.", str(compose_file(repo_root).relative_to(repo_root)), {"output_tail": output_tail(config.stdout, 40)}))
@@ -1272,6 +1328,9 @@ def command_runtime_scanner_redis_init(repo_root: Path) -> dict[str, Any]:
 
     config_path = write_openvas_runtime_config(repo_root)
     findings.append(finding("pass", "openvas.config", "OpenVAS runtime config points db_address and feed plugin paths to runtime state.", str(config_path.relative_to(repo_root))))
+    if not probe_openvas:
+        findings.append(finding("pass", "openvas.config-probe", "OpenVAS settings probe deferred until app services are built and started."))
+        return make_result("runtime-scanner-redis-init", repo_root, "Scanner Redis initialization completed.", findings, [str(runtime_dir(repo_root)), str(config_path.relative_to(repo_root))])
     app_build = run_command(compose_command(repo_root, "--profile", "app", "build", "ospd-openvas"), repo_root, env=runtime_env(repo_root), timeout=900)
     findings.append(finding("pass" if app_build.returncode == 0 else "fail", "compose.ospd-build", f"docker compose build ospd-openvas exit code {app_build.returncode}.", details={"output_tail": output_tail(app_build.stdout, 120)}))
     if app_build.returncode != 0:
@@ -1396,6 +1455,53 @@ def command_runtime_scanner_register(repo_root: Path) -> dict[str, Any]:
     return make_result("runtime-scanner-register", repo_root, "Runtime scanner registration completed.", findings, [str(runtime_dir(repo_root))])
 
 
+def command_runtime_feed_keyring_init(repo_root: Path) -> dict[str, Any]:
+    findings = ensure_runtime_dirs(repo_root)
+    home = feed_gnupg_home(repo_root)
+    key_path = feed_community_key_path(repo_root)
+    try:
+        home.mkdir(parents=True, exist_ok=True)
+        home.chmod(0o700)
+        key_path.parent.mkdir(parents=True, exist_ok=True)
+        findings.append(finding("pass", "feed-keyring.dir", "Shared feed signature keyring directory is ready.", str(home)))
+    except OSError as error:
+        findings.append(finding("fail", "feed-keyring.dir", f"Shared feed signature keyring directory is not usable: {error}", str(home)))
+
+    findings.append(finding("pass" if shutil.which("gpg") else "fail", "gpg.available", "gpg is available." if shutil.which("gpg") else "gpg is missing."))
+    findings.append(finding("pass" if shutil.which("curl") else "fail", "curl.available", "curl is available." if shutil.which("curl") else "curl is missing."))
+    if aggregate_status(findings) == "fail":
+        return make_result("runtime-feed-keyring-init", repo_root, "Feed keyring initialization stopped at prerequisites.", findings, [str(home)])
+
+    if key_path.is_file() and key_path.stat().st_size > 0:
+        findings.append(finding("pass", "feed-keyring.community-key", "Greenbone Community signing key artifact already exists.", str(key_path)))
+    else:
+        download = run_command(feed_community_key_download_command(repo_root), repo_root, timeout=120)
+        findings.append(finding("pass" if download.returncode == 0 else "fail", "feed-keyring.community-key", f"Download Greenbone Community signing key exit code {download.returncode}.", str(key_path), {"url": GREENBONE_COMMUNITY_KEY_URL, "output_tail": output_tail(download.stdout, 80)}))
+        if download.returncode != 0:
+            return make_result("runtime-feed-keyring-init", repo_root, "Feed keyring initialization stopped while downloading the signing key.", findings, [str(home), str(key_path)])
+
+    imported = run_command(gpg_command(repo_root, "--import", str(key_path)), repo_root, timeout=120)
+    findings.append(finding("pass" if imported.returncode == 0 else "fail", "feed-keyring.import", f"Import Greenbone Community signing key exit code {imported.returncode}.", details={"output_tail": output_tail(imported.stdout, 80)}))
+    if imported.returncode != 0:
+        return make_result("runtime-feed-keyring-init", repo_root, "Feed keyring initialization stopped while importing the signing key.", findings, [str(home), str(key_path)])
+
+    ownertrust = run_command(gpg_command(repo_root, "--import-ownertrust"), repo_root, timeout=60, input_text=f"{GREENBONE_COMMUNITY_KEY_FPR}:6:\n")
+    findings.append(finding("pass" if ownertrust.returncode == 0 else "fail", "feed-keyring.ownertrust", f"Set Greenbone Community signing key ownertrust exit code {ownertrust.returncode}.", details={"fingerprint": GREENBONE_COMMUNITY_KEY_FPR, "output_tail": output_tail(ownertrust.stdout, 80)}))
+
+    fingerprint = run_command(gpg_command(repo_root, "--with-colons", "--fingerprint", GREENBONE_COMMUNITY_KEY_FPR), repo_root, timeout=60)
+    fingerprint_ok = fingerprint.returncode == 0 and GREENBONE_COMMUNITY_KEY_FPR in fingerprint.stdout.replace(" ", "").upper()
+    findings.append(finding("pass" if fingerprint_ok else "fail", "feed-keyring.fingerprint", "Greenbone Community signing key fingerprint is present." if fingerprint_ok else "Greenbone Community signing key fingerprint was not found after import.", details={"fingerprint": GREENBONE_COMMUNITY_KEY_FPR, "output_tail": output_tail(fingerprint.stdout, 80)}))
+
+    for subtree, checksums, signature in notus_signature_files(repo_root):
+        paths_ok = checksums.is_file() and signature.is_file()
+        findings.append(finding("pass" if paths_ok else "fail", f"feed-keyring.notus-{subtree}-files", f"Notus {subtree} signature files are present." if paths_ok else f"Notus {subtree} signature files are missing.", details={"checksums": str(checksums), "signature": str(signature)}))
+        if paths_ok:
+            verify = run_command(gpg_command(repo_root, "--verify", str(signature), str(checksums)), repo_root, timeout=120)
+            findings.append(finding("pass" if verify.returncode == 0 else "fail", f"feed-keyring.notus-{subtree}-signature", f"Verify Notus {subtree} sha256sums signature exit code {verify.returncode}.", details={"output_tail": output_tail(verify.stdout, 80)}))
+
+    return make_result("runtime-feed-keyring-init", repo_root, "Shared feed signature keyring initialization completed.", findings, [str(home), str(key_path)])
+
+
 def command_feed_state(repo_root: Path) -> dict[str, Any]:
     findings: list[dict[str, Any]] = []
     findings.extend(feed_location_findings(repo_root, "cache", feed_cache_var_lib(repo_root), "cache_rel"))
@@ -1486,8 +1592,10 @@ def command_runtime_app_up(repo_root: Path) -> dict[str, Any]:
     findings.append(finding(infra["status"], "runtime.infrastructure", infra["summary"], details={"status": infra["status"]}))
     db_init = command_runtime_init(repo_root)
     findings.append(finding(db_init["status"], "runtime.database-init", db_init["summary"], details={"status": db_init["status"]}))
-    scanner_redis = command_runtime_scanner_redis_init(repo_root)
+    scanner_redis = command_runtime_scanner_redis_init(repo_root, probe_openvas=False)
     findings.append(finding(scanner_redis["status"], "runtime.scanner-redis", scanner_redis["summary"], details={"status": scanner_redis["status"]}))
+    keyring = command_runtime_feed_keyring_init(repo_root)
+    findings.append(finding(keyring["status"], "runtime.feed-keyring", keyring["summary"], details={"status": keyring["status"]}))
     cert_findings = cert_file_findings(repo_root)
     if not certs_complete(repo_root):
         cert_findings = [dict(item, status="fail") for item in cert_findings]
@@ -1524,6 +1632,12 @@ def command_runtime_app_smoke(repo_root: Path) -> dict[str, Any]:
     findings.append(finding("pass" if secret_path.is_file() else "warn", "runtime.admin-secret", "Development admin secret exists." if secret_path.is_file() else "Development admin secret is missing; run just runtime-manager-init.", str(secret_path)))
 
     password = secret_path.read_text(encoding="utf-8").strip() if secret_path.is_file() else ""
+    if feed_gnupg_home(repo_root).is_dir() and shutil.which("gpg"):
+        fingerprint = run_command(gpg_command(repo_root, "--with-colons", "--fingerprint", GREENBONE_COMMUNITY_KEY_FPR), repo_root, timeout=60)
+        fingerprint_ok = fingerprint.returncode == 0 and GREENBONE_COMMUNITY_KEY_FPR in fingerprint.stdout.replace(" ", "").upper()
+        findings.append(finding("pass" if fingerprint_ok else "fail", "feed-keyring.fingerprint", "Shared feed signature keyring contains the Greenbone Community signing key." if fingerprint_ok else "Shared feed signature keyring is missing the Greenbone Community signing key.", str(feed_gnupg_home(repo_root)), {"fingerprint": GREENBONE_COMMUNITY_KEY_FPR, "output_tail": output_tail(fingerprint.stdout, 60)}))
+    else:
+        findings.append(finding("fail", "feed-keyring.fingerprint", "Shared feed signature keyring is not initialized; run just runtime-feed-keyring-init.", str(feed_gnupg_home(repo_root))))
     for service in APP_SERVICES:
         running = container_running(repo_root, service)
         findings.append(finding("pass" if running else "warn", "runtime.app.running", f"{service} container is {'running' if running else 'not running'}.", details={"service": service, "logs_tail": [] if running else service_log_tail(repo_root, service)}))
@@ -1541,12 +1655,21 @@ def command_runtime_app_smoke(repo_root: Path) -> dict[str, Any]:
     if container_running(repo_root, "ospd-openvas"):
         ospd_logs = service_log_tail(repo_root, "ospd-openvas", lines=120)
         ospd_errors = [line for line in ospd_logs if "ERROR" in line]
+        ospd_feed_errors = feed_signature_log_errors(ospd_logs)
         known_feed_gap = any("failed to load VTs" in line or "Updating VTs failed" in line for line in ospd_errors)
         if ospd_errors:
             message = "ospd-openvas logs contain errors; current known blocker is missing feed/plugin cache." if known_feed_gap else "ospd-openvas logs contain errors that require investigation."
             findings.append(finding("warn", "ospd.logs", message, details={"known_deferred_feed_state": known_feed_gap, "error_tail": ospd_errors[-20:]}))
         else:
             findings.append(finding("pass", "ospd.logs", "ospd-openvas logs contain no ERROR lines in the inspected tail."))
+        findings.append(finding("fail" if ospd_feed_errors else "pass", "ospd.feed-signature-logs", "ospd-openvas logs contain feed signature or Notus advisory load errors." if ospd_feed_errors else "ospd-openvas logs contain no feed signature or Notus advisory load errors in the inspected tail.", details={"error_tail": ospd_feed_errors[-20:]}))
+    if container_running(repo_root, "notus-scanner"):
+        notus_logs = service_log_tail(repo_root, "notus-scanner", lines=120)
+        notus_file_logs = runtime_file_tail(runtime_path(repo_root, "logs", "notus", "notus-scanner.log"), lines=120)
+        notus_errors = [line for line in [*notus_logs, *notus_file_logs] if "ERROR" in line or "CRITICAL" in line]
+        notus_feed_errors = feed_signature_log_errors([*notus_logs, *notus_file_logs])
+        findings.append(finding("fail" if notus_errors else "pass", "notus.logs", "notus-scanner logs contain ERROR/CRITICAL lines." if notus_errors else "notus-scanner logs contain no ERROR/CRITICAL lines in the inspected tail.", details={"error_tail": notus_errors[-20:]}))
+        findings.append(finding("fail" if notus_feed_errors else "pass", "notus.feed-signature-logs", "notus-scanner logs contain GPG, signature, or advisory-load errors." if notus_feed_errors else "notus-scanner logs contain no GPG, signature, or advisory-load errors in the inspected tail.", details={"error_tail": notus_feed_errors[-20:]}))
     if ospd_ready:
         scanners = run_gvmd_oneoff(repo_root, ["--get-scanners"], no_deps=False)
         findings.append(finding("pass" if scanners.returncode == 0 else "warn", "gvmd.scanners", f"gvmd --get-scanners exit code {scanners.returncode}.", details={"output_tail": output_tail(scanners.stdout, 80, [password])}))
@@ -1686,7 +1809,7 @@ def command_doctor(repo_root: Path) -> dict[str, Any]:
     for tool in BASELINE_TOOLS:
         findings.append(finding("pass" if shutil.which(tool) else "warn", "tool.available", f"{tool} is available." if shutil.which(tool) else f"{tool} is not available on PATH."))
     findings.append(finding("pass", "surface.available", "Build readiness surface is available.", details={"commands": ["just deps", "just configure", "just build", "just build-core-c", "just build-c-services", "just build-ui", "just build-python", "just build-baseline"]}))
-    findings.append(finding("pass" if compose_file(repo_root).is_file() else "warn", "surface.available", "Runtime infrastructure command surface is available." if compose_file(repo_root).is_file() else "Runtime infrastructure command surface is not available.", details={"commands": ["just runtime-plan", "just up", "just down", "just logs", "just runtime-init", "just runtime-certs-init", "just runtime-manager-init", "just runtime-scanner-redis-init", "just runtime-gmp-smoke", "just runtime-scanner-register", "just feed-state", "just feed-cache-sync", "just feed-copy-to-runtime", "just runtime-status", "just runtime-smoke", "just runtime-app-up", "just runtime-app-smoke", "just runtime-app-down", "just gvmd-smoke"]}))
+    findings.append(finding("pass" if compose_file(repo_root).is_file() else "warn", "surface.available", "Runtime infrastructure command surface is available." if compose_file(repo_root).is_file() else "Runtime infrastructure command surface is not available.", details={"commands": ["just runtime-plan", "just up", "just down", "just logs", "just runtime-init", "just runtime-certs-init", "just runtime-manager-init", "just runtime-scanner-redis-init", "just runtime-gmp-smoke", "just runtime-scanner-register", "just runtime-feed-keyring-init", "just feed-state", "just feed-cache-sync", "just feed-copy-to-runtime", "just runtime-status", "just runtime-smoke", "just runtime-app-up", "just runtime-app-smoke", "just runtime-app-down", "just gvmd-smoke"]}))
     findings.append(finding("warn", "surface.deferred", "Test command surface is deferred until component checks are mapped.", details={"command": "just test"}))
     findings.append(finding("warn", "surface.deferred", "Full inherited service orchestration remains experimental until feed, scanner registration, and first UI/API connectivity are stabilized.", details={"commands": ["gvmd", "gsad", "ospd-openvas", "notus-scanner"]}))
     return make_result("doctor", repo_root, "Monorepo health checks completed.", findings)
@@ -1743,6 +1866,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("runtime-scanner-redis-init", parents=[common], help="initialize dedicated OpenVAS scanner Redis runtime")
     subparsers.add_parser("runtime-gmp-smoke", parents=[common], help="run authenticated GMP smoke over the runtime gvmd socket")
     subparsers.add_parser("runtime-scanner-register", parents=[common], help="create or verify the OpenVAS scanner registration")
+    subparsers.add_parser("runtime-feed-keyring-init", parents=[common], help="initialize the shared feed signature GnuPG keyring")
     subparsers.add_parser("feed-state", parents=[common], help="show Greenbone Community Feed cache and runtime-copy state")
     subparsers.add_parser("feed-cache-sync", parents=[common], help="start full Greenbone Community Feed cache sync in tmux")
     subparsers.add_parser("feed-copy-to-runtime", parents=[common], help="copy cached feed data into the runtime feed tree")
@@ -1803,6 +1927,8 @@ def main(argv: list[str] | None = None) -> int:
         result = command_runtime_gmp_smoke(repo_root)
     elif args.command == "runtime-scanner-register":
         result = command_runtime_scanner_register(repo_root)
+    elif args.command == "runtime-feed-keyring-init":
+        result = command_runtime_feed_keyring_init(repo_root)
     elif args.command == "feed-state":
         result = command_feed_state(repo_root)
     elif args.command == "feed-cache-sync":
