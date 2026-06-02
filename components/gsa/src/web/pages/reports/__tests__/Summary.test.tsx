@@ -1,10 +1,12 @@
 /* SPDX-FileCopyrightText: 2025 Greenbone AG
+ * SPDX-FileCopyrightText: 2026 TurboVAS contributors
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
 import {describe, test, expect} from '@gsa/testing';
-import {rendererWithTableBody, screen} from 'web/testing';
+import {rendererWith, screen} from 'web/testing';
+import CollectionCounts from 'gmp/collection/collection-counts';
 import type Filter from 'gmp/models/filter';
 import type ReportReport from 'gmp/models/report/report';
 import {TASK_STATUS} from 'gmp/models/task';
@@ -22,8 +24,14 @@ const createBaseReport = (): ReportReport =>
   ({
     id: 'report-1',
     scan_run_status: TASK_STATUS.running,
+    cves: {
+      counts: new CollectionCounts({all: 3}),
+    },
     hosts: {
-      counts: {all: 3},
+      counts: {all: 4},
+    },
+    result_count: {
+      full: 23,
     },
     task: {
       id: 'task-1',
@@ -34,6 +42,7 @@ const createBaseReport = (): ReportReport =>
     },
     timezone: 'UTC',
     timezone_abbrev: 'UTC',
+    vulns: new CollectionCounts({all: 6}),
   }) as unknown as ReportReport;
 
 const createGmp = () => ({
@@ -44,7 +53,7 @@ describe('Summary', () => {
   test('renders basic task info, comment, hosts, filter and timezone', () => {
     const report = createBaseReport();
     const filter = createFilter('severity>5');
-    const {render} = rendererWithTableBody({
+    const {render} = rendererWith({
       capabilities: true,
       gmp: createGmp(),
     });
@@ -64,6 +73,15 @@ describe('Summary', () => {
     expect(screen.getByText('Example comment')).toBeInTheDocument();
 
     expect(screen.getByText('Hosts scanned')).toBeInTheDocument();
+    expect(screen.getByText('4')).toBeInTheDocument();
+
+    expect(screen.getByText('Results')).toBeInTheDocument();
+    expect(screen.getByText('23')).toBeInTheDocument();
+
+    expect(screen.getByText('Vulnerabilities')).toBeInTheDocument();
+    expect(screen.getByText('6')).toBeInTheDocument();
+
+    expect(screen.getByText('CVEs')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
 
     expect(screen.getByText('Filter')).toBeInTheDocument();
@@ -85,7 +103,7 @@ describe('Summary', () => {
       },
     } as unknown as ReportReport;
 
-    const {render} = rendererWithTableBody({
+    const {render} = rendererWith({
       capabilities: true,
       gmp: createGmp(),
     });
@@ -112,7 +130,7 @@ describe('Summary', () => {
       isDeltaReport: () => true,
     } as unknown as ReportReport;
 
-    const {render} = rendererWithTableBody({
+    const {render} = rendererWith({
       capabilities: true,
       gmp: createGmp(),
     });
@@ -152,7 +170,7 @@ describe('Summary', () => {
       isDeltaReport: () => true,
     } as unknown as ReportReport;
 
-    const {render} = rendererWithTableBody({
+    const {render} = rendererWith({
       capabilities: true,
       gmp: createGmp(),
     });
@@ -177,7 +195,7 @@ describe('Summary', () => {
 
   test('shows error panel when reportError prop is provided', () => {
     const report = createBaseReport();
-    const {render} = rendererWithTableBody({
+    const {render} = rendererWith({
       capabilities: true,
       gmp: createGmp(),
     });

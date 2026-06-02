@@ -1,8 +1,10 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * SPDX-FileCopyrightText: 2026 TurboVAS contributors
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
+import CollectionCounts from 'gmp/collection/collection-counts';
 import {type CollectionList, parseFilter} from 'gmp/collection/parser';
 import {type Date} from 'gmp/models/date';
 import Filter, {type FilterKeyword} from 'gmp/models/filter';
@@ -180,6 +182,7 @@ interface ReportReportProperties extends ModelProperties {
   timezone?: string;
   timezone_abbrev?: string;
   tlsCertificates?: CollectionList<ReportTLSCertificate>;
+  vulns?: CollectionCounts;
 }
 
 class ReportReport extends Model {
@@ -205,6 +208,7 @@ class ReportReport extends Model {
   readonly timezone?: string;
   readonly timezone_abbrev?: string;
   readonly tlsCertificates?: CollectionList<ReportTLSCertificate>;
+  readonly vulns?: CollectionCounts;
 
   constructor({
     applications,
@@ -234,6 +238,7 @@ class ReportReport extends Model {
     // eslint-disable-next-line @typescript-eslint/naming-convention
     timezone_abbrev,
     tlsCertificates,
+    vulns,
     ...properties
   }: ReportReportProperties = {}) {
     super(properties);
@@ -258,6 +263,7 @@ class ReportReport extends Model {
     this.timezone = timezone;
     this.timezone_abbrev = timezone_abbrev;
     this.tlsCertificates = tlsCertificates;
+    this.vulns = vulns;
   }
 
   static fromElement(element?: ReportReportElement): ReportReport {
@@ -296,6 +302,15 @@ class ReportReport extends Model {
     copy.cves = parseCves(element, filter);
     copy.closedCves = parseClosedCves(element, filter);
     copy.errors = parseErrors(element, filter);
+    copy.vulns = isDefined(element.vulns)
+      ? new CollectionCounts({
+          all: element.vulns.count,
+          filtered: element.vulns.count,
+          first: 1,
+          length: element.vulns.count,
+          rows: element.vulns.count,
+        })
+      : undefined;
 
     copy.scan_start = parseDate(scan_start);
     copy.scan_end = parseDate(scan_end);

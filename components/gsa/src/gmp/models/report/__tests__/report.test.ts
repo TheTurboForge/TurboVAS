@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2025 Greenbone AG
+ * SPDX-FileCopyrightText: 2026 TurboVAS contributors
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -30,6 +31,7 @@ describe('ReportReport tests', () => {
     expect(report.severity).toBeUndefined();
     expect(report.task).toBeUndefined();
     expect(report.tlsCertificates).toBeUndefined();
+    expect(report.vulns).toBeUndefined();
   });
 
   test('should parse empty element', () => {
@@ -54,6 +56,7 @@ describe('ReportReport tests', () => {
     expect(report.severity).toBeUndefined();
     expect(report.task).toBeDefined();
     expect(report.tlsCertificates).toBeDefined();
+    expect(report.vulns).toBeUndefined();
   });
 
   test('should parse filter', () => {
@@ -507,6 +510,17 @@ describe('ReportReport tests', () => {
     expect(report.result_count?.false_positive?.filtered).toEqual(1);
     expect(report.result_count?.critical?.full).toEqual(8);
     expect(report.result_count?.critical?.filtered).toEqual(4);
+  });
+
+  test('should parse vulnerability count', () => {
+    const report = ReportReport.fromElement({
+      vulns: {
+        count: 6,
+      },
+    });
+    expect(report.vulns).toBeDefined();
+    expect(report.vulns?.all).toEqual(6);
+    expect(report.vulns?.filtered).toEqual(6);
   });
 
   test('should parse timezone', () => {

@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * SPDX-FileCopyrightText: 2026 TurboVAS contributors
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -55,7 +56,10 @@ const Summary = ({
   const [_] = useTranslation();
   const {
     delta_report,
+    cves,
     hosts,
+    result_count,
+    results,
     scan_end,
     scan_run_status,
     scan_start,
@@ -64,6 +68,7 @@ const Summary = ({
     task,
     timezone,
     timezone_abbrev,
+    vulns,
   } = report;
 
   const {id, name, comment, progress} = task ?? {};
@@ -124,6 +129,9 @@ const Summary = ({
     : false;
 
   const isEnded = isDefined(scan_end) && scan_end.isValid();
+  const resultCount = result_count?.full ?? results?.counts?.all;
+  const vulnerabilityCount = vulns?.all;
+  const cveCount = cves?.counts?.all;
 
   const reportType = audit ? 'auditreport' : 'report';
   const linkType = audit ? 'audit' : 'task';
@@ -272,6 +280,24 @@ const Summary = ({
             <TableRow>
               <TableData>{_('Hosts scanned')}</TableData>
               <TableData>{hostsCount}</TableData>
+            </TableRow>
+          )}
+          {isDefined(resultCount) && (
+            <TableRow>
+              <TableData>{_('Results')}</TableData>
+              <TableData>{resultCount}</TableData>
+            </TableRow>
+          )}
+          {isDefined(vulnerabilityCount) && (
+            <TableRow>
+              <TableData>{_('Vulnerabilities')}</TableData>
+              <TableData>{vulnerabilityCount}</TableData>
+            </TableRow>
+          )}
+          {isDefined(cveCount) && (
+            <TableRow>
+              <TableData>{_('CVEs')}</TableData>
+              <TableData>{cveCount}</TableData>
             </TableRow>
           )}
           <TableRow>
