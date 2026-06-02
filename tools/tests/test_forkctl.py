@@ -510,6 +510,81 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(row["progress"], "42")
         self.assertEqual(row["report_id"], "report-1")
 
+    def test_full_test_scan_report_rows_parse_inner_report_summary(self):
+        response = (
+            "<get_reports_response>"
+            "<report id=\"report-1\">"
+            "<name>2026-06-02T15:59:28Z</name>"
+            "<task id=\"task-1\"/>"
+            "<report id=\"report-1\">"
+            "<scan_run_status>Done</scan_run_status>"
+            "<scan_start>2026-06-02T15:59:50Z</scan_start>"
+            "<scan_end>2026-06-02T16:02:15Z</scan_end>"
+            "<hosts><count>4</count></hosts>"
+            "<vulns><count>6</count></vulns>"
+            "<cves><count>3</count></cves>"
+            "<os><count>2</count></os>"
+            "<result_count><full>23</full></result_count>"
+            "</report>"
+            "</report>"
+            "</get_reports_response>"
+        )
+        row = runtime_full_test_scan.report_rows(response)[0]
+        self.assertEqual(row["id"], "report-1")
+        self.assertEqual(row["task_id"], "task-1")
+        self.assertEqual(row["scan_run_status"], "Done")
+        self.assertEqual(row["scan_start"], "2026-06-02T15:59:50Z")
+        self.assertEqual(row["scan_end"], "2026-06-02T16:02:15Z")
+        self.assertEqual(row["result_count"], "23")
+        self.assertEqual(row["hosts_count"], "4")
+        self.assertEqual(row["vulns_count"], "6")
+
+    def test_full_test_scan_status_includes_latest_report(self):
+        class FakeGMP:
+            def get_scan_configs(self):
+                return "<get_configs_response/>"
+
+            def get_port_lists(self):
+                return "<get_port_lists_response/>"
+
+            def get_scanners(self, details=True):
+                return "<get_scanners_response/>"
+
+            def get_targets(self, tasks=True):
+                return "<get_targets_response/>"
+
+            def get_tasks(self, details=True, ignore_pagination=True):
+                return (
+                    "<get_tasks_response>"
+                    "<task id=\"task-1\">"
+                    f"<name>{runtime_full_test_scan.FULL_TEST_TASK_NAME}</name>"
+                    "<status>Done</status>"
+                    "</task>"
+                    "</get_tasks_response>"
+                )
+
+            def get_reports(self, filter_string=None, details=True, ignore_pagination=True):
+                self.filter_string = filter_string
+                return (
+                    "<get_reports_response>"
+                    "<report id=\"report-1\">"
+                    "<task id=\"task-1\"/>"
+                    "<report id=\"report-1\">"
+                    "<scan_run_status>Done</scan_run_status>"
+                    "<result_count><full>23</full></result_count>"
+                    "</report>"
+                    "</report>"
+                    "</get_reports_response>"
+                )
+
+        fake = FakeGMP()
+        with tempfile.TemporaryDirectory() as tmp:
+            payload = runtime_full_test_scan.command_status(fake, Path(tmp))
+        self.assertEqual(payload["status"], "pass")
+        self.assertEqual(payload["details"]["latest_report"]["id"], "report-1")
+        self.assertEqual(payload["details"]["latest_report"]["result_count"], "23")
+        self.assertIn("task_id=task-1", fake.filter_string)
+
 
 
 if __name__ == "__main__":

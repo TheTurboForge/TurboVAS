@@ -65,6 +65,29 @@ def child_id(element: Any, child_name: str) -> str | None:
     return None
 
 
+def child_element(element: Any, child_name: str) -> Any | None:
+    for child in list(element):
+        if local_name(str(child.tag)) == child_name:
+            return child
+    return None
+
+
+def descendant_text(element: Any, child_name: str) -> str | None:
+    for child in element.iter():
+        if local_name(str(child.tag)) == child_name and child.text:
+            return child.text
+    return None
+
+
+def child_path_text(element: Any, child_names: tuple[str, ...]) -> str | None:
+    current = element
+    for child_name in child_names:
+        current = child_element(current, child_name)
+        if current is None:
+            return None
+    return current.text
+
+
 def object_rows(response: Any, object_tag: str) -> list[dict[str, str | None]]:
     root = response_root(response)
     if root is None or not hasattr(root, "iter"):
@@ -86,6 +109,50 @@ def object_rows(response: Any, object_tag: str) -> list[dict[str, str | None]]:
             }
         )
     return rows
+
+
+def report_rows(response: Any) -> list[dict[str, str | None]]:
+    root = response_root(response)
+    if root is None or not hasattr(root, "iter"):
+        return []
+    rows: list[dict[str, str | None]] = []
+    for element in list(root):
+        if local_name(str(element.tag)) != "report":
+            continue
+        detail = child_element(element, "report")
+        if detail is None:
+            detail = element
+        rows.append(
+            {
+                "id": element.get("id"),
+                "task_id": child_id(element, "task") or child_id(detail, "task"),
+                "name": child_text(element, "name"),
+                "scan_run_status": descendant_text(detail, "scan_run_status"),
+                "scan_start": descendant_text(detail, "scan_start"),
+                "scan_end": descendant_text(detail, "scan_end"),
+                "result_count": child_path_text(detail, ("result_count", "full")),
+                "hosts_count": child_path_text(detail, ("hosts", "count")),
+                "vulns_count": child_path_text(detail, ("vulns", "count")),
+                "cves_count": child_path_text(detail, ("cves", "count")),
+                "os_count": child_path_text(detail, ("os", "count")),
+            }
+        )
+    return rows
+
+
+def latest_report_for_task(gmp: Any, task_id: str) -> tuple[dict[str, str | None] | None, str | None]:
+    try:
+        response = gmp.get_reports(
+            filter_string=f"task_id={task_id} rows=10 sort-reverse=date",
+            details=True,
+            ignore_pagination=True,
+        )
+    except Exception as error:  # pylint: disable=broad-except
+        return None, f"{type(error).__name__}: {error}"
+    for row in report_rows(response):
+        if row.get("task_id") == task_id:
+            return row, None
+    return None, None
 
 
 def response_id(response: Any) -> str | None:
@@ -287,7 +354,8 @@ def command_status(gmp: Any, artifact_dir: Path) -> dict[str, Any]:
     elif not task:
         payload = result("warn", "Full test scan task does not exist yet.", target_cidr=AUTHORIZED_TARGET_CIDR)
     else:
-        payload = result("pass", "Full test scan status read.", target_cidr=AUTHORIZED_TARGET_CIDR, task=task)
+        latest_report, report_error = latest_report_for_task(gmp, task["id"]) if task.get("id") else (None, None)
+        payload = result("pass", "Full test scan status read.", target_cidr=AUTHORIZED_TARGET_CIDR, task=task, latest_report=latest_report, report_lookup_error=report_error)
     payload["artifacts"] = [write_artifact(artifact_dir, "status.json", payload)]
     return payload
 
