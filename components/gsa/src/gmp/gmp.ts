@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -14,6 +15,7 @@ import 'gmp/commands/scan-configs';
 import 'gmp/commands/schedules';
 import 'gmp/commands/tickets';
 import 'gmp/commands/tls-certificates';
+import 'gmp/commands/vulns';
 
 import {getCommands} from 'gmp/command';
 import AgentCommand from 'gmp/commands/agent';

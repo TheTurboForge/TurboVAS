@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -90,6 +91,17 @@ describe('Gmp tests', () => {
     gmp.logout();
 
     expect(session.logout).toHaveBeenCalled();
+  });
+
+  test('should register vulnerability commands', () => {
+    const storage = createStorage();
+    const session = createSession();
+    const settings = new Settings(storage);
+    const gmp = new Gmp({settings, session});
+    const vulnGmp = gmp as unknown as {vuln: unknown; vulns: unknown};
+
+    expect(vulnGmp.vuln).toBeDefined();
+    expect(vulnGmp.vulns).toBeDefined();
   });
 
   test('should call logout handlers after logout', () => {
