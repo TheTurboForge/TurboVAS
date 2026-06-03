@@ -58,13 +58,6 @@ const createGmp = ({
   getSetting = testing.fn().mockResolvedValue({
     filter: null,
   }),
-  getDashboardSetting = testing.fn().mockResolvedValue({
-    data: [],
-    meta: {
-      filter: Filter.fromString(),
-      counts: new CollectionCounts(),
-    },
-  }),
   getAggregates = testing.fn().mockResolvedValue({
     data: [],
     meta: {
@@ -101,9 +94,6 @@ const createGmp = ({
     foo: 'bar',
   }),
 } = {}) => ({
-  dashboard: {
-    getSetting: getDashboardSetting,
-  },
   overrides: {
     get: getOverrides,
     deleteByFilter,
@@ -158,7 +148,6 @@ describe('OverridesPage tests', () => {
 
     await wait();
 
-    const display = screen.getAllByTestId('grid-item');
     const powerFilter = within(screen.queryPowerFilter());
     const select = powerFilter.getByTestId('powerfilter-select');
     const inputs = powerFilter.queryTextInputs();
@@ -180,13 +169,9 @@ describe('OverridesPage tests', () => {
     expect(select).toHaveValue('--');
 
     // Dashboard
-    expect(
-      screen.getAllByTitle('Add new Dashboard Display')[0],
-    ).toBeInTheDocument();
-    expect(screen.getAllByTitle('Reset to Defaults')[0]).toBeInTheDocument();
-    expect(display[0]).toHaveTextContent('Overrides by Active Days (Total: 0)');
-    expect(display[1]).toHaveTextContent('Overrides by Creation Time');
-    expect(display[2]).toHaveTextContent('Overrides Text Word Cloud');
+    expect(screen.queryByTitle('Add new Dashboard Display')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Reset to Defaults')).not.toBeInTheDocument();
+    expect(screen.queryAllByTestId('grid-item')).toHaveLength(0);
 
     // Table
     const header = baseElement.querySelectorAll('th');

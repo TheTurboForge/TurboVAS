@@ -842,43 +842,11 @@ modify_setting (const gchar *uuid, const gchar *name,
       else if (strcmp (uuid, "c7584d7c-649f-4f8b-9ded-9e1dc20f24c8") == 0)
         setting_name = g_strdup ("Scans Dashboard Configuration");
 
-      /* Tasks dashboard settings */
-      else if (strcmp (uuid, "3d5db3c7-5208-4b47-8c28-48efc621b1e0") == 0)
-        setting_name = g_strdup ("Tasks Top Dashboard Configuration");
-
-      /* Reports dashboard settings */
-      else if (strcmp (uuid, "e599bb6b-b95a-4bb2-a6bb-fe8ac69bc071") == 0)
-        setting_name = g_strdup ("Reports Top Dashboard Configuration");
-
-      /* Results dashboard settings */
-      else if (strcmp (uuid, "0b8ae70d-d8fc-4418-8a72-e65ac8d2828e") == 0)
-        setting_name = g_strdup ("Results Top Dashboard Configuration");
-
-      /* Vulns dashboard settings */
-      else if (strcmp (uuid, "43690dcb-3174-4d84-aa88-58c1936c7f5c") == 0)
-        setting_name = g_strdup ("Vulnerabilities Top Dashboard Configuration");
-
-      /* Overrides dashboard settings */
-      else if (strcmp (uuid, "054862fe-0781-4527-b1aa-2113bcd16ce7") == 0)
-        setting_name = g_strdup ("Overrides Top Dashboard Configuration");
-
       /*
        * Assets dashboards
        */
       else if (strcmp (uuid, "0320e0db-bf30-4d4f-9379-b0a022d07cf7") == 0)
         setting_name = g_strdup ("Assets Dashboard Configuration");
-
-      /* Hosts dashboard settings */
-      else if (strcmp (uuid, "d3f5f2de-a85b-43f2-a817-b127457cc8ba") == 0)
-        setting_name = g_strdup ("Hosts Top Dashboard Configuration");
-
-      /* TLS Certificate dashboard settings */
-      else if (strcmp (uuid, "9b62bf16-bf90-11e9-ad97-28d24461215b") == 0)
-        setting_name = g_strdup ("TLS Certificates Top Dashboard Configuration");
-
-      /* Operating Systems dashboard settings */
-      else if (strcmp (uuid, "e93b51ed-5881-40e0-bc4f-7d3268a36177") == 0)
-        setting_name = g_strdup ("OSs Top Dashboard Configuration");
 
       /*
        * SecInfo dashboards

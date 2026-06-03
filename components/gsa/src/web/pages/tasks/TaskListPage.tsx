@@ -5,7 +5,6 @@
 
 import {TASKS_FILTER_FILTER} from 'gmp/models/filter';
 import type Task from 'gmp/models/task';
-import DashboardControls from 'web/components/dashboard/Controls';
 import {TaskIcon} from 'web/components/icon';
 import PageTitle from 'web/components/layout/PageTitle';
 import {
@@ -17,7 +16,6 @@ import withEntitiesContainer, {
   type WithEntitiesContainerComponentProps,
 } from 'web/entities/withEntitiesContainer';
 import useTranslation from 'web/hooks/useTranslation';
-import TaskDashboard, {TASK_DASHBOARD_ID} from 'web/pages/tasks/dashboard';
 import TaskToolBarIcons from 'web/pages/tasks/icons/TaskListPageToolBarIcons';
 import TaskComponent from 'web/pages/tasks/TaskComponent';
 import TaskFilterDialog from 'web/pages/tasks/TaskFilterDialog';
@@ -98,15 +96,6 @@ const TaskListPage = ({
           <PageTitle title={_('Tasks')} />
           <EntitiesPage<Task, TaskEntitiesPageProps>
             {...props}
-            dashboard={() => (
-              <TaskDashboard
-                filter={filter}
-                onFilterChanged={onFilterChanged}
-              />
-            )}
-            dashboardControls={() => (
-              <DashboardControls dashboardId={TASK_DASHBOARD_ID} />
-            )}
             filter={filter}
             filterEditDialog={TaskFilterDialog}
             filtersFilter={TASKS_FILTER_FILTER}

@@ -11,7 +11,6 @@ import Filter, {REPORTS_FILTER_FILTER} from 'gmp/models/filter';
 import type Report from 'gmp/models/report';
 import {isActive} from 'gmp/models/task';
 import {isDefined} from 'gmp/utils/identity';
-import DashboardControls from 'web/components/dashboard/Controls';
 import {ReportIcon, UploadIcon} from 'web/components/icon';
 import ManualIcon from 'web/components/icon/ManualIcon';
 import IconDivider from 'web/components/layout/IconDivider';
@@ -27,9 +26,6 @@ import withEntitiesContainer, {
 import useGmp from 'web/hooks/useGmp';
 import useShallowEqualSelector from 'web/hooks/useShallowEqualSelector';
 import useTranslation from 'web/hooks/useTranslation';
-import ReportsDashboard, {
-  REPORTS_DASHBOARD_ID,
-} from 'web/pages/reports/dashboard';
 import ReportFilterDialog from 'web/pages/reports/ReportFilterDialog';
 import ReportImportDialog from 'web/pages/reports/ReportImportDialog';
 import ReportsTable from 'web/pages/reports/ReportTable';
@@ -187,12 +183,6 @@ const ReportListPage = ({
       <PageTitle title={_('Reports')} />
       <EntitiesPage<Report>
         {...props}
-        dashboard={() => (
-          <ReportsDashboard filter={filter} onFilterChanged={onFilterChanged} />
-        )}
-        dashboardControls={() => (
-          <DashboardControls dashboardId={REPORTS_DASHBOARD_ID} />
-        )}
         entities={entities}
         filter={filter}
         filterEditDialog={ReportFilterDialog}

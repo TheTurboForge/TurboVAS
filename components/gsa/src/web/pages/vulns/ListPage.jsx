@@ -5,7 +5,6 @@
 
 import React from 'react';
 import Filter, {VULNS_FILTER_FILTER} from 'gmp/models/filter';
-import DashboardControls from 'web/components/dashboard/Controls';
 import {VulnerabilityIcon} from 'web/components/icon';
 import ManualIcon from 'web/components/icon/ManualIcon';
 import Layout from 'web/components/layout/Layout';
@@ -13,9 +12,6 @@ import PageTitle from 'web/components/layout/PageTitle';
 import EntitiesPage from 'web/entities/EntitiesPage';
 import withEntitiesContainer from 'web/entities/withEntitiesContainer';
 import useTranslation from 'web/hooks/useTranslation';
-import VulnerabilitiesDashboard, {
-  VULNS_DASHBOARD_ID,
-} from 'web/pages/vulns/dashboard';
 import VulnsTable from 'web/pages/vulns/Table';
 import VulnerabilityFilterDialog from 'web/pages/vulns/VulnerabilityFilterDialog';
 import {
@@ -44,15 +40,6 @@ const Page = ({filter, onFilterChanged, ...props}) => {
       <PageTitle title={_('Vulnerabilities')} />
       <EntitiesPage
         {...props}
-        dashboard={() => (
-          <VulnerabilitiesDashboard
-            filter={filter}
-            onFilterChanged={onFilterChanged}
-          />
-        )}
-        dashboardControls={() => (
-          <DashboardControls dashboardId={VULNS_DASHBOARD_ID} />
-        )}
         filter={filter}
         filterEditDialog={VulnerabilityFilterDialog}
         filtersFilter={VULNS_FILTER_FILTER}

@@ -55,13 +55,6 @@ const createGmp = ({
   getUserSetting = testing.fn().mockResolvedValue({
     filter: null,
   }),
-  getDashboardSetting = testing.fn().mockResolvedValue({
-    data: [],
-    meta: {
-      filter: Filter.fromString(),
-      counts: new CollectionCounts(),
-    },
-  }),
   getFilters = testing.fn().mockReturnValue(
     Promise.resolve({
       data: [],
@@ -83,9 +76,6 @@ const createGmp = ({
   },
   filters: {
     get: getFilters,
-  },
-  dashboard: {
-    getSetting: getDashboardSetting,
   },
   reloadInterval,
   settings: {
@@ -136,7 +126,6 @@ describe('TlsCertificatePage tests', () => {
 
     await wait();
 
-    const display = screen.getAllByTestId('grid-item');
     const header = baseElement.querySelectorAll('th');
     const row = baseElement.querySelectorAll('tr');
     const powerFilter = within(screen.queryPowerFilter());
@@ -160,14 +149,9 @@ describe('TlsCertificatePage tests', () => {
     expect(select).toHaveValue('--');
 
     // Dashboard
-    screen.getAllByTitle('Add new Dashboard Display');
-    screen.getAllByTitle('Reset to Defaults');
-    expect(display[0]).toHaveTextContent(
-      'TLS Certificates by Status (Total: 1)',
-    );
-    expect(display[1]).toHaveTextContent(
-      'TLS Certificates by Modification Time (Total: 0)',
-    );
+    expect(screen.queryByTitle('Add new Dashboard Display')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Reset to Defaults')).not.toBeInTheDocument();
+    expect(screen.queryAllByTestId('grid-item')).toHaveLength(0);
 
     // Table
     expect(header[0]).toHaveTextContent('Subject DN');

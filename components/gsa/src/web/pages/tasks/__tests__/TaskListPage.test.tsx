@@ -58,13 +58,6 @@ const createGmp = ({
       counts: new CollectionCounts(),
     },
   }),
-  getDashboardSetting = testing.fn().mockResolvedValue({
-    data: [],
-    meta: {
-      filter: Filter.fromString(),
-      counts: new CollectionCounts(),
-    },
-  }),
   getUserSetting = testing.fn().mockResolvedValue({
     filter: null,
   }),
@@ -112,9 +105,6 @@ const createGmp = ({
   },
   reportformats: {
     get: getReportFormats,
-  },
-  dashboard: {
-    getSetting: getDashboardSetting,
   },
   reloadInterval,
   settings: {
@@ -194,20 +184,9 @@ describe('TaskListPage tests', () => {
     expect(select).toHaveValue('--');
 
     // Dashboard
-    expect(screen.getByTestId('add-dashboard-display')).toHaveAttribute(
-      'title',
-      'Add new Dashboard Display',
-    );
-    expect(screen.getByTestId('reset-dashboard')).toHaveAttribute(
-      'title',
-      'Reset to Defaults',
-    );
-    const displays = screen.getAllByTestId('grid-item');
-    expect(displays[0]).toHaveTextContent('Tasks by Severity Class (Total: 0)');
-    expect(displays[1]).toHaveTextContent(
-      'Tasks with most High Results per Host',
-    );
-    expect(displays[2]).toHaveTextContent('Tasks by Status (Total: 0)');
+    expect(screen.queryByTestId('add-dashboard-display')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('reset-dashboard')).not.toBeInTheDocument();
+    expect(screen.queryAllByTestId('grid-item')).toHaveLength(0);
 
     // Table
     const table = screen.getByTestId('entities-table');

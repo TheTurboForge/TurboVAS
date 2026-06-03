@@ -5,7 +5,6 @@
 
 import React from 'react';
 import {OVERRIDES_FILTER_FILTER} from 'gmp/models/filter';
-import DashboardControls from 'web/components/dashboard/Controls';
 import {NewIcon, OverrideIcon} from 'web/components/icon';
 import ManualIcon from 'web/components/icon/ManualIcon';
 import IconDivider from 'web/components/layout/IconDivider';
@@ -13,9 +12,6 @@ import PageTitle from 'web/components/layout/PageTitle';
 import EntitiesPage from 'web/entities/EntitiesPage';
 import withEntitiesContainer from 'web/entities/withEntitiesContainer';
 import useTranslation from 'web/hooks/useTranslation';
-import OverridesDashboard, {
-  OVERRIDES_DASHBOARD_ID,
-} from 'web/pages/overrides/dashboard';
 import OverrideComponent from 'web/pages/overrides/OverrideComponent';
 import OverrideFilterDialog from 'web/pages/overrides/OverrideFilterDialog';
 import OverridesTable from 'web/pages/overrides/Table';
@@ -76,15 +72,6 @@ const Page = ({
           <PageTitle title={_('Overrides')} />
           <EntitiesPage
             {...props}
-            dashboard={() => (
-              <OverridesDashboard
-                filter={filter}
-                onFilterChanged={onFilterChanged}
-              />
-            )}
-            dashboardControls={() => (
-              <DashboardControls dashboardId={OVERRIDES_DASHBOARD_ID} />
-            )}
             filter={filter}
             filterEditDialog={OverrideFilterDialog}
             filtersFilter={OVERRIDES_FILTER_FILTER}

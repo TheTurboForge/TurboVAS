@@ -5,7 +5,6 @@
 
 import React from 'react';
 import Filter, {OS_FILTER_FILTER} from 'gmp/models/filter';
-import DashboardControls from 'web/components/dashboard/Controls';
 import {OsSvgIcon} from 'web/components/icon';
 import ManualIcon from 'web/components/icon/ManualIcon';
 import Layout from 'web/components/layout/Layout';
@@ -14,9 +13,6 @@ import EntitiesPage from 'web/entities/EntitiesPage';
 import withEntitiesContainer from 'web/entities/withEntitiesContainer';
 import useTranslation from 'web/hooks/useTranslation';
 import OsComponent from 'web/pages/operatingsystems/Component';
-import OsDashboard, {
-  OS_DASHBOARD_ID,
-} from 'web/pages/operatingsystems/dashboard';
 import OperatingSystemFilterDialog from 'web/pages/operatingsystems/OperatingSystemFilterDialog';
 import OsTable from 'web/pages/operatingsystems/Table';
 import {
@@ -66,12 +62,6 @@ const Page = ({
           <EntitiesPage
             {...props}
             createFilterType="os"
-            dashboard={() => (
-              <OsDashboard filter={filter} onFilterChanged={onFilterChanged} />
-            )}
-            dashboardControls={() => (
-              <DashboardControls dashboardId={OS_DASHBOARD_ID} />
-            )}
             filter={filter}
             filterEditDialog={OperatingSystemFilterDialog}
             filtersFilter={OS_FILTER_FILTER}

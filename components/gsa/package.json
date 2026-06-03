@@ -13,7 +13,7 @@
     "type": "git",
     "url": "https://github.com/greenbone/gsa/"
   },
-  "author": "Bj\u00f6rn Ricks <bjoern.ricks@greenbone.net>",
+  "author": "Björn Ricks <bjoern.ricks@greenbone.net>",
   "license": "AGPL-3.0+",
   "type": "module",
   "scripts": {
@@ -46,9 +46,7 @@
     "@reduxjs/toolkit": "^2.11.2",
     "@tanstack/react-query": "^5.100.10",
     "d3-axis": "^3.0.0",
-    "d3-cloud": "^1.2.9",
     "d3-color": "^3.1.0",
-    "d3-force": "^3.0.0",
     "d3-format": "^3.1.2",
     "d3-hierarchy": "^3.1.2",
     "d3-interpolate": "^3.0.1",
@@ -87,8 +85,6 @@
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@types/d3-axis": "^3.0.6",
-    "@types/d3-cloud": "^1.2.9",
-    "@types/d3-force": "^3.0.10",
     "@types/d3-hierarchy": "^3.1.7",
     "@types/d3-scale": "^4.0.9",
     "@types/d3-selection": "^3.0.11",

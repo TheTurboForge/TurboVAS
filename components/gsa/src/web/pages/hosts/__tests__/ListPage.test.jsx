@@ -88,13 +88,6 @@ const createGmp = ({
       },
     }),
   ),
-  getDashboardSetting = testing.fn().mockResolvedValue({
-    data: [],
-    meta: {
-      filter: Filter.fromString(),
-      counts: new CollectionCounts(),
-    },
-  }),
   getAggregates = testing.fn().mockResolvedValue({
     data: [],
     meta: {
@@ -132,9 +125,6 @@ const createGmp = ({
   },
   filters: {
     get: getFilters,
-  },
-  dashboard: {
-    getSetting: getDashboardSetting,
   },
   settings: {
     manualUrl,
@@ -198,17 +188,9 @@ describe('Host ListPage tests', () => {
     expect(select).toHaveValue('--');
 
     // Dashboard
-    expect(
-      screen.getAllByTitle('Add new Dashboard Display')[0],
-    ).toBeInTheDocument();
-    expect(screen.getAllByTitle('Reset to Defaults')[0]).toBeInTheDocument();
-
-    const display = screen.getAllByTestId('grid-item');
-    expect(display[0]).toHaveTextContent('Hosts by Severity Class (Total: 0)');
-    expect(display[1]).toHaveTextContent('Hosts Topology');
-    expect(display[2]).toHaveTextContent(
-      'Hosts by Modification Time (Total: 0)',
-    );
+    expect(screen.queryByTitle('Add new Dashboard Display')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Reset to Defaults')).not.toBeInTheDocument();
+    expect(screen.queryAllByTestId('grid-item')).toHaveLength(0);
 
     // Table
     const header = baseElement.querySelectorAll('th');

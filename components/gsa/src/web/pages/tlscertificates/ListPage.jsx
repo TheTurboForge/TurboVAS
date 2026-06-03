@@ -5,7 +5,6 @@
 
 import React from 'react';
 import {TLS_CERTIFICATES_FILTER_FILTER} from 'gmp/models/filter';
-import DashboardControls from 'web/components/dashboard/Controls';
 import {TlsCertificateIcon} from 'web/components/icon';
 import ManualIcon from 'web/components/icon/ManualIcon';
 import Layout from 'web/components/layout/Layout';
@@ -13,9 +12,6 @@ import PageTitle from 'web/components/layout/PageTitle';
 import EntitiesPage from 'web/entities/EntitiesPage';
 import withEntitiesContainer from 'web/entities/withEntitiesContainer';
 import useTranslation from 'web/hooks/useTranslation';
-import TlsCertificatesDashboard, {
-  TLS_CERTIFICATES_DASHBOARD_ID,
-} from 'web/pages/tlscertificates/dashboard';
 import TlsCertificateTable from 'web/pages/tlscertificates/Table';
 import TlsCertificateComponent from 'web/pages/tlscertificates/TlsCertificateComponent';
 import TlsCertificateFilterDialog from 'web/pages/tlscertificates/TlsCertificateFilterDialog';
@@ -60,15 +56,6 @@ const Page = ({
           <PageTitle title={_('TLS Certificates')} />
           <EntitiesPage
             {...props}
-            dashboard={() => (
-              <TlsCertificatesDashboard
-                filter={filter}
-                onFilterChanged={onFilterChanged}
-              />
-            )}
-            dashboardControls={() => (
-              <DashboardControls dashboardId={TLS_CERTIFICATES_DASHBOARD_ID} />
-            )}
             filter={filter}
             filterEditDialog={TlsCertificateFilterDialog}
             filtersFilter={TLS_CERTIFICATES_FILTER_FILTER}

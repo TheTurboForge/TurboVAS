@@ -112,13 +112,6 @@ const createGmp = ({
       counts: new CollectionCounts(),
     },
   }),
-  getDashboardSetting = testing.fn().mockResolvedValue({
-    data: [],
-    meta: {
-      filter: Filter.fromString(),
-      counts: new CollectionCounts(),
-    },
-  }),
   getAggregates = testing.fn().mockResolvedValue({
     data: [],
     meta: {
@@ -148,9 +141,6 @@ const createGmp = ({
   },
   filters: {
     get: getFilters,
-  },
-  dashboard: {
-    getSetting: getDashboardSetting,
   },
   settings: {
     manualUrl,
@@ -214,16 +204,9 @@ describe('Results listpage tests', () => {
     expect(select).toHaveValue('--');
 
     // Dashboard
-    expect(
-      screen.getAllByTitle('Add new Dashboard Display')[0],
-    ).toBeInTheDocument();
-    expect(screen.getAllByTitle('Reset to Defaults')[0]).toBeInTheDocument();
-
-    const display = screen.getAllByTestId('grid-item');
-    expect(display[0]).toHaveTextContent(
-      'Results by Severity Class (Total: 0)',
-    );
-    expect(display[1]).toHaveTextContent('Results by CVSS (Total: 0)');
+    expect(screen.queryByTitle('Add new Dashboard Display')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Reset to Defaults')).not.toBeInTheDocument();
+    expect(screen.queryAllByTestId('grid-item')).toHaveLength(0);
 
     // Headings
     const header = baseElement.querySelectorAll('th');

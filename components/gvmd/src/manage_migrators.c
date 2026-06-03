@@ -4223,6 +4223,31 @@ migrate_276_to_277 ()
   return 0;
 }
 
+
+static int
+migrate_277_to_278 ()
+{
+  sql_begin_immediate ();
+
+  sql ("DELETE FROM settings"
+       " WHERE uuid IN"
+       " ('3d5db3c7-5208-4b47-8c28-48efc621b1e0',"
+       "  'e599bb6b-b95a-4bb2-a6bb-fe8ac69bc071',"
+       "  '0b8ae70d-d8fc-4418-8a72-e65ac8d2828e',"
+       "  '43690dcb-3174-4d84-aa88-58c1936c7f5c',"
+       "  '054862fe-0781-4527-b1aa-2113bcd16ce7',"
+       "  'd3f5f2de-a85b-43f2-a817-b127457cc8ba',"
+       "  '9b62bf16-bf90-11e9-ad97-28d24461215b',"
+       "  'e93b51ed-5881-40e0-bc4f-7d3268a36177');");
+
+  set_db_version (278);
+
+  sql_commit ();
+
+  return 0;
+}
+
+
 #undef UPDATE_DASHBOARD_SETTINGS
 
 /**
@@ -4306,6 +4331,7 @@ static migrator_t database_migrators[] = {
   {275, migrate_274_to_275},
   {276, migrate_275_to_276},
   {277, migrate_276_to_277},
+  {278, migrate_277_to_278},
   /* End marker. */
   {-1, NULL}};
 

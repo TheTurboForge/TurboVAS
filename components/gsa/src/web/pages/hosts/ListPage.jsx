@@ -6,7 +6,6 @@
 import React from 'react';
 import {useNavigate} from 'react-router';
 import Filter, {HOSTS_FILTER_FILTER} from 'gmp/models/filter';
-import DashboardControls from 'web/components/dashboard/Controls';
 import {HostIcon, NewIcon} from 'web/components/icon';
 import ManualIcon from 'web/components/icon/ManualIcon';
 import IconDivider from 'web/components/layout/IconDivider';
@@ -16,7 +15,6 @@ import withEntitiesContainer from 'web/entities/withEntitiesContainer';
 import {goToDetails} from 'web/entity/navigation';
 import useCapabilities from 'web/hooks/useCapabilities';
 import useTranslation from 'web/hooks/useTranslation';
-import HostsDashboard, {HOSTS_DASHBOARD_ID} from 'web/pages/hosts/dashboard';
 import HostComponent from 'web/pages/hosts/HostComponent';
 import HostFilterDialog from 'web/pages/hosts/HostFilterDialog';
 import HostsTable from 'web/pages/hosts/Table';
@@ -83,15 +81,6 @@ const Page = ({
           <PageTitle title={_('Hosts')} />
           <EntitiesPage
             {...props}
-            dashboard={() => (
-              <HostsDashboard
-                filter={filter}
-                onFilterChanged={onFilterChanged}
-              />
-            )}
-            dashboardControls={() => (
-              <DashboardControls dashboardId={HOSTS_DASHBOARD_ID} />
-            )}
             entitiesCounts={entitiesCounts}
             filter={filter}
             filterEditDialog={HostFilterDialog}
