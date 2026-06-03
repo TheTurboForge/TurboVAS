@@ -65,7 +65,7 @@ describe('Feed status page tests', () => {
     // Should render all links
     const links = element.querySelectorAll('a');
 
-    expect(links.length).toEqual(10);
+    expect(links.length).toEqual(9);
 
     expect(links[0]).toHaveAttribute(
       'href',
@@ -76,16 +76,15 @@ describe('Feed status page tests', () => {
     expect(links[3]).toHaveAttribute('href', '/cpes');
     expect(links[4]).toHaveAttribute('href', '/certbunds');
     expect(links[5]).toHaveAttribute('href', '/dfncerts');
-    expect(links[6]).toHaveAttribute('href', '/policies?filter=predefined%3D1');
-    expect(links[7]).toHaveAttribute(
+    expect(links[6]).toHaveAttribute(
       'href',
       '/portlists?filter=predefined%3D1',
     );
-    expect(links[8]).toHaveAttribute(
+    expect(links[7]).toHaveAttribute(
       'href',
       '/reportformats?filter=predefined%3D1',
     );
-    expect(links[9]).toHaveAttribute(
+    expect(links[8]).toHaveAttribute(
       'href',
       '/scanconfigs?filter=predefined%3D1',
     );

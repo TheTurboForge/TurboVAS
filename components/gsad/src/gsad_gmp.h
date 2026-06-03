@@ -397,28 +397,6 @@ save_group_gmp (gvm_connection_t *, gsad_credentials_t *, params_t *,
                 gsad_command_response_data_t *);
 
 char *
-get_notes_gmp (gvm_connection_t *, gsad_credentials_t *, params_t *,
-               gsad_command_response_data_t *);
-char *
-get_note_gmp (gvm_connection_t *, gsad_credentials_t *, params_t *,
-              gsad_command_response_data_t *);
-char *
-create_note_gmp (gvm_connection_t *, gsad_credentials_t *, params_t *,
-                 gsad_command_response_data_t *);
-char *
-delete_note_gmp (gvm_connection_t *, gsad_credentials_t *, params_t *,
-                 gsad_command_response_data_t *);
-char *
-save_note_gmp (gvm_connection_t *, gsad_credentials_t *, params_t *,
-               gsad_command_response_data_t *);
-char *
-export_note_gmp (gvm_connection_t *, gsad_credentials_t *, params_t *,
-                 gsad_command_response_data_t *);
-char *
-export_notes_gmp (gvm_connection_t *, gsad_credentials_t *, params_t *,
-                  gsad_command_response_data_t *);
-
-char *
 get_nvt_families_gmp (gvm_connection_t *, gsad_credentials_t *, params_t *,
                       gsad_command_response_data_t *);
 
@@ -695,9 +673,6 @@ char *
 get_trash_groups_gmp (gvm_connection_t *, gsad_credentials_t *,
                       params_t *params, gsad_command_response_data_t *);
 char *
-get_trash_notes_gmp (gvm_connection_t *, gsad_credentials_t *, params_t *params,
-                     gsad_command_response_data_t *);
-char *
 get_trash_overrides_gmp (gvm_connection_t *, gsad_credentials_t *,
                          params_t *params, gsad_command_response_data_t *);
 char *
@@ -731,10 +706,6 @@ get_trash_targets_gmp (gvm_connection_t *, gsad_credentials_t *,
 char *
 get_trash_tasks_gmp (gvm_connection_t *, gsad_credentials_t *, params_t *params,
                      gsad_command_response_data_t *);
-char *
-get_trash_tickets_gmp (gvm_connection_t *, gsad_credentials_t *,
-                       params_t *params, gsad_command_response_data_t *);
-
 char *
 get_trash_agent_group_gmp (gvm_connection_t *connection,
                            gsad_credentials_t *credentials, params_t *params,
@@ -797,22 +768,6 @@ export_assets_gmp (gvm_connection_t *, gsad_credentials_t *, params_t *,
 char *
 get_assets_chart_gmp (gvm_connection_t *, gsad_credentials_t *, params_t *,
                       gsad_command_response_data_t *);
-
-char *
-get_tickets_gmp (gvm_connection_t *, gsad_credentials_t *, params_t *,
-                 gsad_command_response_data_t *);
-char *
-get_ticket_gmp (gvm_connection_t *, gsad_credentials_t *, params_t *,
-                gsad_command_response_data_t *);
-char *
-create_ticket_gmp (gvm_connection_t *, gsad_credentials_t *, params_t *,
-                   gsad_command_response_data_t *);
-char *
-save_ticket_gmp (gvm_connection_t *, gsad_credentials_t *, params_t *,
-                 gsad_command_response_data_t *);
-char *
-delete_ticket_gmp (gvm_connection_t *, gsad_credentials_t *, params_t *,
-                   gsad_command_response_data_t *);
 
 char *
 get_timezones_gmp (gvm_connection_t *, gsad_credentials_t *, params_t *,

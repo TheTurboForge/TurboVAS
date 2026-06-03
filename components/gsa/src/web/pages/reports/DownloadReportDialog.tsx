@@ -21,11 +21,9 @@ import ThresholdMessage from 'web/pages/reports/ThresholdMessage';
 import {renderSelectItems, type RenderSelectItemProps} from 'web/utils/Render';
 
 interface DownloadReportDialogProps {
-  audit?: boolean;
   defaultReportConfigId?: string;
   defaultReportFormatId?: string;
   filter: Filter | string;
-  includeNotes?: boolean;
   includeOverrides?: boolean;
   reportConfigs?: ReportConfig[];
   reportFormats?: ReportFormat[];
@@ -38,11 +36,9 @@ interface DownloadReportDialogProps {
 }
 
 const DownloadReportDialog = ({
-  audit = false,
   defaultReportConfigId,
   defaultReportFormatId,
   filter,
-  includeNotes = COMPOSER_CONTENT_DEFAULTS.includeNotes,
   includeOverrides = COMPOSER_CONTENT_DEFAULTS.includeOverrides,
   reportConfigs,
   reportFormats,
@@ -72,7 +68,6 @@ const DownloadReportDialog = ({
   );
 
   const unControlledValues = {
-    includeNotes,
     includeOverrides,
     storeAsDefault,
   };
@@ -100,8 +95,7 @@ const DownloadReportDialog = ({
     }
     return reportFormats.filter(format => {
       if (isDefined(format.report_type)) {
-        const allowedTypes = audit ? ['audit', 'all'] : ['scan', 'all'];
-        return allowedTypes.includes(format.report_type);
+        return ['scan', 'all'].includes(format.report_type);
       }
       return true;
     });
@@ -111,11 +105,7 @@ const DownloadReportDialog = ({
     <SaveDialog
       buttonTitle={_('OK')}
       defaultValues={unControlledValues}
-      title={
-        audit
-          ? _('Compose Content for Compliance Report')
-          : _('Compose Content for Scan Report')
-      }
+      title={_('Compose Content for Scan Report')}
       onClose={onClose}
       onSave={handleSave}
     >
@@ -131,9 +121,7 @@ const DownloadReportDialog = ({
         return (
           <>
             <ComposerContent
-              audit={audit}
               filterString={filterString}
-              includeNotes={values.includeNotes}
               includeOverrides={values.includeOverrides}
               onValueChange={onValueChange}
             />

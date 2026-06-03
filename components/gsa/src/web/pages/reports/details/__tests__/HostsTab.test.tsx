@@ -8,7 +8,6 @@ import {rendererWith, screen, within} from 'web/testing';
 import Filter from 'gmp/models/filter';
 import {createSession} from 'gmp/testing';
 import {SEVERITY_RATING_CVSS_3} from 'gmp/utils/severity';
-import {getMockAuditReport} from 'web/pages/reports/__fixtures__/MockAuditReport';
 import {getMockReport} from 'web/pages/reports/__fixtures__/MockReport';
 import HostsTab from 'web/pages/reports/details/HostsTab';
 
@@ -124,127 +123,6 @@ describe('Report Hosts Tab tests', () => {
     // Filter
     screen.getByText(
       '(Applied filter: apply_overrides=0 levels=hml rows=2 min_qod=70 first=1 sort-reverse=severity)',
-    );
-  });
-});
-
-const auditFilter = Filter.fromString(
-  'apply_overrides=0 levels=hmlg rows=3 min_qod=70 first=1 sort=compliant',
-);
-
-describe('Audit Report Hosts Tab tests', () => {
-  test('should render Audit Report Hosts Tab', () => {
-    const {hosts} = getMockAuditReport();
-
-    const onSortChange = testing.fn();
-
-    const {render} = rendererWith({
-      gmp: createGmp(),
-      capabilities: true,
-      router: true,
-    });
-
-    render(
-      <HostsTab
-        audit={true}
-        counts={hosts?.counts}
-        filter={auditFilter}
-        hosts={hosts?.entities}
-        isUpdating={false}
-        sortField={'compliant'}
-        sortReverse={false}
-        onSortChange={sortField => onSortChange('hosts', sortField)}
-      />,
-    );
-
-    // Headings (audit)
-    screen.getByRole('columnheader', {name: /IP Address/i});
-    screen.getByRole('columnheader', {name: /Hostname/i});
-    screen.getByRole('columnheader', {name: /^OS/i});
-    screen.getByRole('columnheader', {name: /Ports/i});
-    screen.getByRole('columnheader', {name: /Apps/i});
-    screen.getByRole('columnheader', {name: /Distance/i});
-    screen.getByRole('columnheader', {name: /Auth/i});
-    screen.getByRole('columnheader', {name: /Start/i});
-    screen.getByRole('columnheader', {name: /End/i});
-    screen.getByRole('columnheader', {name: /Yes/i});
-    screen.getByRole('columnheader', {name: /No/i});
-    screen.getByRole('columnheader', {name: /Incomplete/i});
-    screen.getByRole('columnheader', {name: /Total/i});
-    screen.getByRole('columnheader', {name: /Compliant/i});
-
-    // Row 1
-    const auditHost1 = screen.getByRole('link', {name: '109.876.54.321'});
-    expect(auditHost1).toHaveAttribute(
-      'href',
-      '/hosts?filter=name%3D109.876.54.321',
-    );
-    const auditRow1 = getRow(auditHost1);
-    expect(auditRow1).toHaveTextContent('lorem.ipsum');
-    expect(getImgSrc(auditRow1)).toContain('/img/os_unknown.svg');
-    expect(auditRow1).toHaveTextContent('1521');
-    expect(auditRow1).toHaveTextContent(
-      'Mon, Jun 3, 2019 1:15 PM Central European Summer Time',
-    );
-    expect(auditRow1).toHaveTextContent(
-      'Mon, Jun 3, 2019 1:31 PM Central European Summer Time',
-    );
-    expect(auditRow1).toHaveTextContent('170540');
-    expect(within(auditRow1).getByTestId('progressbar-box')).toHaveAttribute(
-      'title',
-      'Incomplete',
-    );
-    expect(within(auditRow1).getByTestId('progressbar-box')).toHaveTextContent(
-      'Incomplete',
-    );
-
-    // Row 2
-    const auditHost2 = screen.getByRole('link', {name: '123.456.78.910'});
-    expect(auditHost2).toHaveAttribute('href', '/host/123');
-    const auditRow2 = getRow(auditHost2);
-    expect(auditRow2).toHaveTextContent('foo.bar');
-    expect(getImgSrc(auditRow2)).toContain('/img/os_unknown.svg');
-    expect(auditRow2).toHaveTextContent('1032');
-    expect(auditRow2).toHaveTextContent(
-      'Mon, Jun 3, 2019 1:00 PM Central European Summer Time',
-    );
-    expect(auditRow2).toHaveTextContent(
-      'Mon, Jun 3, 2019 1:15 PM Central European Summer Time',
-    );
-    expect(auditRow2).toHaveTextContent('7301450');
-    expect(within(auditRow2).getByTestId('progressbar-box')).toHaveAttribute(
-      'title',
-      'No',
-    );
-    expect(within(auditRow2).getByTestId('progressbar-box')).toHaveTextContent(
-      'No',
-    );
-
-    // Row 3
-    const auditHost3 = screen.getByRole('link', {name: '123.456.78.810'});
-    expect(auditHost3).toHaveAttribute('href', '/host/123');
-    const auditRow3 = getRow(auditHost3);
-    expect(auditRow3).toHaveTextContent('foo.bar');
-    expect(getImgSrc(auditRow3)).toContain('/img/os_unknown.svg');
-    expect(auditRow3).toHaveTextContent('1032');
-    expect(auditRow3).toHaveTextContent(
-      'Mon, Jun 3, 2019 1:00 PM Central European Summer Time',
-    );
-    expect(auditRow3).toHaveTextContent(
-      'Mon, Jun 3, 2019 1:15 PM Central European Summer Time',
-    );
-    expect(auditRow3).toHaveTextContent('200020');
-    expect(within(auditRow3).getByTestId('progressbar-box')).toHaveAttribute(
-      'title',
-      'Yes',
-    );
-    expect(within(auditRow3).getByTestId('progressbar-box')).toHaveTextContent(
-      'Yes',
-    );
-
-    // Filter
-    screen.getByText(
-      '(Applied filter: apply_overrides=0 levels=hmlg rows=3 min_qod=70 first=1 sort=compliant)',
     );
   });
 });

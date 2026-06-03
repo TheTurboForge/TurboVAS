@@ -1126,7 +1126,7 @@ describe('Filter merge extra keywords', () => {
     const filter1 = Filter.fromString('abc=1');
     const filter2 = Filter.fromString(
       'apply_overrides=1 overrides=1 ' +
-        'delta_states=1 first=1 levels=hml min_qod=70 notes=1 ' +
+        'delta_states=1 first=1 levels=hml min_qod=70 ' +
         'result_hosts_only=1 rows=10 sort=name timezone=CET',
     );
 
@@ -1139,7 +1139,6 @@ describe('Filter merge extra keywords', () => {
     expect(filter3.get('first')).toBe(1);
     expect(filter3.get('levels')).toBe('hml');
     expect(filter3.get('min_qod')).toBe(70);
-    expect(filter3.get('notes')).toBe(1);
     expect(filter3.get('result_hosts_only')).toBe(1);
     expect(filter3.get('rows')).toBe(10);
     expect(filter3.get('sort')).toBe('name');
@@ -1229,7 +1228,7 @@ describe('Filter merge extra keywords', () => {
     filter1.id = 'f1';
     const filter2 = Filter.fromString(
       'apply_overrides=1 overrides=1 ' +
-        'delta_states=1 first=1 levels=hml min_qod=70 notes=1 ' +
+        'delta_states=1 first=1 levels=hml min_qod=70 ' +
         'result_hosts_only=1 rows=10 sort=name timezone=CET',
     );
     // @ts-expect-error

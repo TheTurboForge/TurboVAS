@@ -78,7 +78,7 @@ interface ScannerParamElement {
 interface ScannerTaskElement {
   _id: string;
   name?: string;
-  usage_type: 'scan' | 'audit';
+  usage_type: 'scan';
 }
 
 export interface ScannerElement extends ModelElement {
@@ -143,7 +143,7 @@ interface CaPub {
 interface ScannerTask {
   id: string;
   name?: string;
-  usageType: 'scan' | 'audit';
+  usageType: 'scan';
 }
 
 interface AgentControlRetry {
@@ -334,7 +334,7 @@ class Scanner extends Model {
       return {
         id: task._id as string,
         name: task.name,
-        usageType: task.usage_type as 'scan' | 'audit',
+        usageType: task.usage_type,
       };
     });
     ret.configs = map(element.configs?.config, config =>

@@ -74,14 +74,7 @@ const NvtDetails = ({entity, links = true}: NvtDetailsProps) => {
               tags.cvss_base_vector !== TAG_NA && (
                 <TableRow>
                   <TableData>{_('CVSS Base Vector')}</TableData>
-                  <TableData>
-                    <Link
-                      query={{cvssVector: tags.cvss_base_vector}}
-                      to="cvsscalculator"
-                    >
-                      {tags.cvss_base_vector}
-                    </Link>
-                  </TableData>
+                  <TableData>{tags.cvss_base_vector}</TableData>
                 </TableRow>
               )}
             <TableRow>

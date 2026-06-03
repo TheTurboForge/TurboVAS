@@ -31,7 +31,6 @@ interface UpdatingTableProps {
 }
 
 interface SummaryProps {
-  audit?: boolean;
   filter: Filter;
   isUpdating?: boolean;
   links?: boolean;
@@ -45,7 +44,6 @@ const UpdatingTable = styled(Table)<UpdatingTableProps>`
 `;
 
 const Summary = ({
-  audit = false,
   filter,
   isUpdating = false,
   links = true,
@@ -133,9 +131,6 @@ const Summary = ({
   const vulnerabilityCount = vulns?.all;
   const cveCount = cves?.counts?.all;
 
-  const reportType = audit ? 'auditreport' : 'report';
-  const linkType = audit ? 'audit' : 'task';
-
   return (
     <Layout flex="column">
       {isDefined(reportError) && (
@@ -157,7 +152,7 @@ const Summary = ({
                 <DetailsLink
                   id={id as string}
                   textOnly={!links}
-                  type={linkType}
+                  type="task"
                 >
                   {name}
                 </DetailsLink>
@@ -178,7 +173,7 @@ const Summary = ({
                   <DetailsLink
                     id={report.id as string}
                     textOnly={!links}
-                    type={reportType}
+                    type="report"
                   >
                     {report.id}
                   </DetailsLink>
@@ -228,7 +223,7 @@ const Summary = ({
                   <DetailsLink
                     id={delta_report?.id as string}
                     textOnly={!links}
-                    type={reportType}
+                    type="report"
                   >
                     {delta_report?.id}
                   </DetailsLink>

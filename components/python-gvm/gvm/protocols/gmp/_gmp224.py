@@ -19,7 +19,6 @@ from .requests.v224 import (
     AlertMethod,
     Alerts,
     AliveTest,
-    Audits,
     Authentication,
     CertBundAdvisories,
     Cpes,
@@ -40,13 +39,11 @@ from .requests.v224 import (
     Hosts,
     HostsOrdering,
     InfoType,
-    Notes,
     Nvts,
     OperatingSystems,
     Overrides,
     Permissions,
     PermissionSubjectType,
-    Policies,
     PortLists,
     PortRangeType,
     ReportFormats,
@@ -67,8 +64,6 @@ from .requests.v224 import (
     Tags,
     Targets,
     Tasks,
-    Tickets,
-    TicketStatus,
     TLSCertificates,
     TrashCan,
     UserAuthType,
@@ -99,7 +94,6 @@ _TYPE_FIELDS = [
     SnmpAuthAlgorithm,
     SnmpPrivacyAlgorithm,
     SortOrder,
-    TicketStatus,
     UserAuthType,
 ]
 
@@ -1063,142 +1057,6 @@ class GMPv224(GvmProtocol[T]):
             Users.get_user(user_id)
         )
 
-    def create_note(
-        self,
-        text: str,
-        nvt_oid: str,
-        *,
-        days_active: int | None = None,
-        hosts: list[str] | None = None,
-        port: str | None = None,
-        result_id: EntityID | None = None,
-        severity: Severity | None = None,
-        task_id: EntityID | None = None,
-    ) -> T:
-        """Create a new note
-
-        Args:
-            text: Text of the new note
-            nvt_oid: OID of the nvt to which note applies
-            days_active: Days note will be active. -1 on
-                always, 0 off
-            hosts: A list of host addresses
-            port: Port to which the override applies, needs to be a string
-                  in the form {number}/{protocol}
-            result_id: UUID of a result to which note applies
-            severity: Severity to which note applies
-            task_id: UUID of task to which note applies
-        """
-        return self._send_request_and_transform_response(
-            Notes.create_note(
-                text,
-                nvt_oid,
-                days_active=days_active,
-                hosts=hosts,
-                port=port,
-                result_id=result_id,
-                severity=severity,
-                task_id=task_id,
-            )
-        )
-
-    def modify_note(
-        self,
-        note_id: EntityID,
-        text: str,
-        *,
-        days_active: int | None = None,
-        hosts: list[str] | None = None,
-        port: str | None = None,
-        result_id: EntityID | None = None,
-        severity: Severity | None = None,
-        task_id: EntityID | None = None,
-    ) -> T:
-        """Modify a note
-
-        Args:
-            note_id: The UUID of the note to modify
-            text: Text of the note
-            days_active: Days note will be active. -1 on always, 0 off
-            hosts: A list of host addresses
-            port: Port to which the override applies, needs to be a string
-                  in the form {number}/{protocol}
-            result_id: UUID of a result to which note applies
-            severity: Severity to which note applies
-            task_id: UUID of task to which note applies
-        """
-        return self._send_request_and_transform_response(
-            Notes.modify_note(
-                note_id,
-                text,
-                days_active=days_active,
-                hosts=hosts,
-                port=port,
-                result_id=result_id,
-                severity=severity,
-                task_id=task_id,
-            )
-        )
-
-    def clone_note(self, note_id: EntityID) -> T:
-        """Clone an existing note
-
-        Args:
-            note_id: UUID of an existing note to clone from
-        """
-        return self._send_request_and_transform_response(
-            Notes.clone_note(note_id)
-        )
-
-    def delete_note(
-        self, note_id: EntityID, *, ultimate: bool | None = False
-    ) -> T:
-        """Delete an existing note
-
-        Args:
-            note_id: UUID of the note to be deleted.
-            ultimate: Whether to remove entirely or to the trashcan.
-        """
-        return self._send_request_and_transform_response(
-            Notes.delete_note(note_id, ultimate=ultimate)
-        )
-
-    def get_notes(
-        self,
-        *,
-        filter_string: str | None = None,
-        filter_id: EntityID | None = None,
-        details: bool | None = None,
-        result: bool | None = None,
-    ) -> T:
-        """Request a list of notes
-
-        Args:
-            filter_string: Filter notes by a string
-            filter_string: Filter term to use for the query
-            filter_id: UUID of an existing filter to use for the query
-            details: Add info about connected results and tasks
-            result: Return the details of possible connected results.
-        """
-        return self._send_request_and_transform_response(
-            Notes.get_notes(
-                filter_string=filter_string,
-                filter_id=filter_id,
-                details=details,
-                result=result,
-            )
-        )
-
-    def get_note(self, note_id: EntityID) -> T:
-        """Request a single note
-
-        Arguments:
-            note_id: UUID of an existing note
-        """
-        return self._send_request_and_transform_response(
-            Notes.get_note(note_id)
-        )
-
     def create_override(
         self,
         text: str,
@@ -1730,202 +1588,6 @@ class GMPv224(GvmProtocol[T]):
         """
         return self._send_request_and_transform_response(
             Alerts.get_alert(alert_id, tasks=tasks)
-        )
-
-    def create_audit(
-        self,
-        name: str,
-        policy_id: EntityID,
-        target_id: EntityID,
-        scanner_id: EntityID,
-        *,
-        alterable: bool | None = None,
-        hosts_ordering: HostsOrdering | str | None = None,
-        schedule_id: str | None = None,
-        alert_ids: list[EntityID] | None = None,
-        comment: str | None = None,
-        schedule_periods: int | None = None,
-        observers: list[EntityID] | None = None,
-        preferences: dict[str, str] | None = None,
-    ) -> T:
-        """Create a new audit
-
-        Args:
-            name: Name of the new audit
-            policy_id: UUID of policy to use by the audit
-            target_id: UUID of target to be scanned
-            scanner_id: UUID of scanner to use for scanning the target
-            comment: Comment for the audit
-            alterable: Whether the task should be alterable
-            alert_ids: List of UUIDs for alerts to be applied to the audit
-            hosts_ordering: The order hosts are scanned in
-            schedule_id: UUID of a schedule when the audit should be run.
-            schedule_periods: A limit to the number of times the audit will be
-                scheduled, or 0 for no limit
-            observers: List of names or ids of users which should be allowed to
-                observe this audit
-            preferences: Name/Value pairs of scanner preferences.
-        """
-        return self._send_request_and_transform_response(
-            Audits.create_audit(
-                name,
-                policy_id,
-                target_id,
-                scanner_id,
-                alterable=alterable,
-                hosts_ordering=hosts_ordering,
-                schedule_id=schedule_id,
-                alert_ids=alert_ids,
-                comment=comment,
-                schedule_periods=schedule_periods,
-                observers=observers,
-                preferences=preferences,
-            )
-        )
-
-    def modify_audit(
-        self,
-        audit_id: EntityID,
-        *,
-        name: str | None = None,
-        policy_id: EntityID | None = None,
-        target_id: EntityID | None = None,
-        scanner_id: EntityID | None = None,
-        alterable: bool | None = None,
-        hosts_ordering: str | HostsOrdering | None = None,
-        schedule_id: EntityID | None = None,
-        schedule_periods: int | None = None,
-        comment: str | None = None,
-        alert_ids: list[EntityID] | None = None,
-        observers: list[EntityID] | None = None,
-        preferences: dict[str, str] | None = None,
-    ) -> T:
-        """Modifies an existing audit.
-
-        Args:
-            audit_id: UUID of audit to modify.
-            name: The name of the audit.
-            policy_id: UUID of policy to use by the audit
-            target_id: UUID of target to be scanned
-            scanner_id: UUID of scanner to use for scanning the target
-            comment: The comment on the audit.
-            alert_ids: List of UUIDs for alerts to be applied to the audit
-            hosts_ordering: The order hosts are scanned in
-            schedule_id: UUID of a schedule when the audit should be run.
-            schedule_periods: A limit to the number of times the audit will be
-                scheduled, or 0 for no limit.
-            observers: List of names or ids of users which should be allowed to
-                observe this audit
-            preferences: Name/Value pairs of scanner preferences.
-        """
-        return self._send_request_and_transform_response(
-            Audits.modify_audit(
-                audit_id,
-                name=name,
-                policy_id=policy_id,
-                target_id=target_id,
-                scanner_id=scanner_id,
-                alterable=alterable,
-                hosts_ordering=hosts_ordering,
-                schedule_id=schedule_id,
-                alert_ids=alert_ids,
-                comment=comment,
-                schedule_periods=schedule_periods,
-                observers=observers,
-                preferences=preferences,
-            )
-        )
-
-    def clone_audit(self, audit_id: EntityID) -> T:
-        """Clone an existing audit
-
-        Args:
-            audit_id: UUID of the audit to clone
-        """
-        return self._send_request_and_transform_response(
-            Audits.clone_audit(audit_id)
-        )
-
-    def delete_audit(
-        self, audit_id: EntityID, *, ultimate: bool | None = False
-    ) -> T:
-        """Delete an existing audit
-
-        Args:
-            audit_id: UUID of the audit to be deleted.
-            ultimate: Whether to remove entirely, or to the trashcan.
-        """
-        return self._send_request_and_transform_response(
-            Audits.delete_audit(audit_id, ultimate=ultimate)
-        )
-
-    def get_audits(
-        self,
-        *,
-        filter_string: str | None = None,
-        filter_id: EntityID | None = None,
-        trash: bool | None = None,
-        details: bool | None = None,
-        schedules_only: bool | None = None,
-    ) -> T:
-        """Request a list of audits
-
-        Args:
-            filter_string: Filter term to use for the query
-            filter_id: UUID of an existing filter to use for the query
-            trash: Whether to get the trashcan audits instead
-            details: Whether to include full audit details
-            schedules_only: Whether to only include id, name and schedule
-                details
-        """
-        return self._send_request_and_transform_response(
-            Audits.get_audits(
-                filter_string=filter_string,
-                filter_id=filter_id,
-                trash=trash,
-                details=details,
-                schedules_only=schedules_only,
-            )
-        )
-
-    def get_audit(self, audit_id: EntityID) -> T:
-        """Request a single audit
-
-        Args:
-            audit_id: UUID of an existing audit
-        """
-        return self._send_request_and_transform_response(
-            Audits.get_audit(audit_id)
-        )
-
-    def resume_audit(self, audit_id: EntityID) -> T:
-        """Resume an existing stopped audit
-
-        Args:
-            audit_id: UUID of the audit to be resumed
-        """
-        return self._send_request_and_transform_response(
-            Audits.resume_audit(audit_id)
-        )
-
-    def start_audit(self, audit_id: EntityID) -> T:
-        """Start an existing audit
-
-        Args:
-            audit_id: UUID of the audit to be started
-        """
-        return self._send_request_and_transform_response(
-            Audits.start_audit(audit_id)
-        )
-
-    def stop_audit(self, audit_id: EntityID) -> T:
-        """Stop an existing running audit
-
-        Args:
-            audit_id: UUID of the audit to be stopped
-        """
-        return self._send_request_and_transform_response(
-            Audits.stop_audit(audit_id)
         )
 
     def clone_credential(self, credential_id: EntityID) -> T:
@@ -2670,220 +2332,6 @@ class GMPv224(GvmProtocol[T]):
             )
         )
 
-    def clone_policy(self, policy_id: EntityID) -> T:
-        """Clone a policy from an existing one
-
-        Args:
-            policy_id: UUID of the existing policy
-        """
-        return self._send_request_and_transform_response(
-            Policies.clone_policy(policy_id)
-        )
-
-    def create_policy(
-        self,
-        name: str,
-        *,
-        policy_id: EntityID | None = None,
-        comment: str | None = None,
-    ) -> T:
-        """Create a new policy
-
-        Args:
-            name: Name of the new policy
-            policy_id: UUID of an existing policy as base. By default the empty
-                policy is used.
-            comment: A comment on the policy
-        """
-        return self._send_request_and_transform_response(
-            Policies.create_policy(name, policy_id=policy_id, comment=comment)
-        )
-
-    def delete_policy(
-        self, policy_id: EntityID, *, ultimate: bool | None = False
-    ) -> T:
-        """Deletes an existing policy
-
-        Args:
-            policy_id: UUID of the policy to be deleted.
-            ultimate: Whether to remove entirely, or to the trashcan.
-        """
-        return self._send_request_and_transform_response(
-            Policies.delete_policy(policy_id, ultimate=ultimate)
-        )
-
-    def get_policies(
-        self,
-        *,
-        audits: bool | None = None,
-        filter_string: str | None = None,
-        filter_id: EntityID | None = None,
-        details: bool | None = None,
-        families: bool | None = None,
-        preferences: bool | None = None,
-        trash: bool | None = None,
-    ) -> T:
-        """Request a list of policies
-
-        Args:
-            audits: Whether to get audits using the policy
-            filter_string: Filter term to use for the query
-            filter_id: UUID of an existing filter to use for the query
-            details: Whether to get  families, preferences, nvt selectors
-                and tasks.
-            families: Whether to include the families if no details are
-                requested
-            preferences: Whether to include the preferences if no details are
-                requested
-            trash: Whether to get the trashcan audits instead
-        """
-        return self._send_request_and_transform_response(
-            Policies.get_policies(
-                audits=audits,
-                filter_string=filter_string,
-                filter_id=filter_id,
-                details=details,
-                families=families,
-                preferences=preferences,
-                trash=trash,
-            )
-        )
-
-    def get_policy(
-        self, policy_id: EntityID, *, audits: bool | None = None
-    ) -> T:
-        """Request a single policy
-
-        Args:
-            policy_id: UUID of an existing policy
-            audits: Whether to get audits using this policy
-        """
-        return self._send_request_and_transform_response(
-            Policies.get_policy(policy_id, audits=audits)
-        )
-
-    def import_policy(self, policy: str) -> T:
-        """Import a policy from XML
-
-        Args:
-            policy: Policy XML as string to import. This XML must
-                contain a :code:`<get_configs_response>` root element.
-        """
-        return self._send_request_and_transform_response(
-            Policies.import_policy(policy)
-        )
-
-    def modify_policy_set_nvt_preference(
-        self,
-        policy_id: EntityID,
-        name: str,
-        nvt_oid: str,
-        *,
-        value: str | None = None,
-    ) -> T:
-        """Modifies the nvt preferences of an existing policy.
-
-        Args:
-            policy_id: UUID of policy to modify.
-            name: Name for preference to change.
-            nvt_oid: OID of the NVT associated with preference to modify
-            value: New value for the preference. None to delete the preference
-                and to use the default instead.
-        """
-        return self._send_request_and_transform_response(
-            Policies.modify_policy_set_nvt_preference(
-                policy_id, name, nvt_oid, value=value
-            )
-        )
-
-    def modify_policy_set_name(self, policy_id: EntityID, name: str) -> T:
-        """Modifies the name of an existing policy
-
-        Args:
-            policy_id: UUID of policy to modify.
-            name: New name for the policy.
-        """
-        return self._send_request_and_transform_response(
-            Policies.modify_policy_set_name(policy_id, name)
-        )
-
-    def modify_policy_set_comment(
-        self, policy_id: EntityID, comment: str | None = None
-    ) -> T:
-        """Modifies the comment of an existing policy
-
-        Args:
-            policy_id: UUID of policy to modify.
-            comment: Comment to set on a policy. Default is an
-                empty comment and the previous comment will be
-                removed.
-        """
-        return self._send_request_and_transform_response(
-            Policies.modify_policy_set_comment(policy_id, comment=comment)
-        )
-
-    def modify_policy_set_scanner_preference(
-        self, policy_id: EntityID, name: str, *, value: str | None = None
-    ) -> T:
-        """Modifies the scanner preferences of an existing policy
-
-        Args:
-            policy_id: UUID of policy to modify.
-            name: Name of the scanner preference to change
-            value: New value for the preference. None to delete the preference
-                and to use the default instead.
-        """
-        return self._send_request_and_transform_response(
-            Policies.modify_policy_set_scanner_preference(
-                policy_id, name, value=value
-            )
-        )
-
-    def modify_policy_set_nvt_selection(
-        self, policy_id: EntityID, family: str, nvt_oids: Sequence[str]
-    ) -> T:
-        """Modifies the selected nvts of an existing policy
-
-        The manager updates the given family in the policy to include only the
-        given NVTs.
-
-        Args:
-            policy_id: UUID of policy to modify.
-            family: Name of the NVT family to include NVTs from
-            nvt_oids: List of NVTs to select for the family.
-        """
-        return self._send_request_and_transform_response(
-            Policies.modify_policy_set_nvt_selection(
-                policy_id, family, nvt_oids
-            )
-        )
-
-    def modify_policy_set_family_selection(
-        self,
-        policy_id: EntityID,
-        families: Sequence[tuple[str, bool, bool]],
-        *,
-        auto_add_new_families: bool | None = True,
-    ) -> T:
-        """
-        Selected the NVTs of a policy at a family level.
-
-        Args:
-            policy_id: UUID of policy to modify.
-            families: A list of tuples with the first entry being the name
-                of the NVT family selected, second entry a boolean indicating
-                whether new NVTs should be added to the family automatically,
-                and third entry a boolean indicating whether all nvts from
-                the family should be included.
-            auto_add_new_families: Whether new families should be added to the
-                policy automatically. Default: True.
-        """
-        return self._send_request_and_transform_response(
-            Policies.modify_policy_set_family_selection(
-                policy_id, families, auto_add_new_families=auto_add_new_families
-            )
-        )
-
     def delete_report(self, report_id: EntityID) -> T:
         """Deletes an existing report
 
@@ -2936,7 +2384,6 @@ class GMPv224(GvmProtocol[T]):
         *,
         filter_string: str | None = None,
         filter_id: EntityID | None = None,
-        note_details: bool | None = None,
         override_details: bool | None = None,
         ignore_pagination: bool | None = None,
         details: bool | None = None,
@@ -2946,7 +2393,6 @@ class GMPv224(GvmProtocol[T]):
         Args:
             filter_string: Filter term to use for the query
             filter_id: UUID of an existing filter to use for the query
-            note_details: If notes are included, whether to include note details
             override_details: If overrides are included, whether to include
                 override details
             ignore_pagination: Whether to ignore the filter terms "first" and
@@ -2954,13 +2400,12 @@ class GMPv224(GvmProtocol[T]):
             details: Whether to exclude results
         """
         return self._send_request_and_transform_response(
-            Reports.get_reports(
-                filter_string=filter_string,
-                filter_id=filter_id,
-                note_details=note_details,
-                override_details=override_details,
-                ignore_pagination=ignore_pagination,
-                details=details,
+                Reports.get_reports(
+                    filter_string=filter_string,
+                    filter_id=filter_id,
+                    override_details=override_details,
+                    ignore_pagination=ignore_pagination,
+                    details=details,
             )
         )
 
@@ -2999,7 +2444,6 @@ class GMPv224(GvmProtocol[T]):
         filter_string: str | None = None,
         filter_id: str | None = None,
         task_id: str | None = None,
-        note_details: bool | None = None,
         override_details: bool | None = None,
         details: bool | None = None,
     ) -> T:
@@ -3008,20 +2452,18 @@ class GMPv224(GvmProtocol[T]):
         Args:
             filter_string: Filter term to use for the query
             filter_id: UUID of an existing filter to use for the query
-            task_id: UUID of task for note and override handling
-            note_details: If notes are included, whether to include note details
+            task_id: UUID of task for override handling
             override_details: If overrides are included, whether to include
                 override details
             details: Whether to include additional details of the results
         """
         return self._send_request_and_transform_response(
             Results.get_results(
-                filter_string=filter_string,
-                filter_id=filter_id,
-                task_id=task_id,
-                note_details=note_details,
-                override_details=override_details,
-                details=details,
+                    filter_string=filter_string,
+                    filter_id=filter_id,
+                    task_id=task_id,
+                    override_details=override_details,
+                    details=details,
             )
         )
 
@@ -3966,113 +3408,6 @@ class GMPv224(GvmProtocol[T]):
         """
         return self._send_request_and_transform_response(
             Tasks.stop_task(task_id)
-        )
-
-    def clone_ticket(self, ticket_id: EntityID) -> T:
-        """Clone an existing ticket
-
-        Args:
-            ticket_id: UUID of an existing ticket to clone from
-        """
-        return self._send_request_and_transform_response(
-            Tickets.clone_ticket(ticket_id)
-        )
-
-    def create_ticket(
-        self,
-        *,
-        result_id: EntityID,
-        assigned_to_user_id: EntityID,
-        note: str,
-        comment: str | None = None,
-    ) -> T:
-        """Create a new ticket
-
-        Args:
-            result_id: UUID of the result the ticket applies to
-            assigned_to_user_id: UUID of a user the ticket should be assigned to
-            note: A note about opening the ticket
-            comment: Comment for the ticket
-        """
-        return self._send_request_and_transform_response(
-            Tickets.create_ticket(
-                result_id=result_id,
-                assigned_to_user_id=assigned_to_user_id,
-                note=note,
-                comment=comment,
-            )
-        )
-
-    def delete_ticket(
-        self, ticket_id: EntityID, *, ultimate: bool | None = False
-    ) -> T:
-        """Deletes an existing ticket
-
-        Args:
-            ticket_id: UUID of the ticket to be deleted.
-            ultimate: Whether to remove entirely, or to the trashcan.
-        """
-        return self._send_request_and_transform_response(
-            Tickets.delete_ticket(ticket_id, ultimate=ultimate)
-        )
-
-    def get_tickets(
-        self,
-        *,
-        trash: bool | None = None,
-        filter_string: str | None = None,
-        filter_id: EntityID | None = None,
-    ) -> T:
-        """Request a list of tickets
-
-        Args:
-            filter_string: Filter term to use for the query
-            filter_id: UUID of an existing filter to use for the query
-            trash: True to request the tickets in the trashcan
-        """
-        return self._send_request_and_transform_response(
-            Tickets.get_tickets(
-                filter_string=filter_string, filter_id=filter_id, trash=trash
-            )
-        )
-
-    def get_ticket(self, ticket_id: EntityID) -> T:
-        """Request a single ticket
-
-        Args:
-            ticket_id: UUID of an existing ticket
-        """
-        return self._send_request_and_transform_response(
-            Tickets.get_ticket(ticket_id)
-        )
-
-    def modify_ticket(
-        self,
-        ticket_id: EntityID,
-        *,
-        status: TicketStatus | str | None = None,
-        note: str | None = None,
-        assigned_to_user_id: EntityID | None = None,
-        comment: str | None = None,
-    ) -> T:
-        """Modify a single ticket
-
-        Args:
-            ticket_id: UUID of an existing ticket
-            status: New status for the ticket
-            note: Note for the status change. Required if status is set.
-            assigned_to_user_id: UUID of the user the ticket should be assigned
-                to
-            comment: Comment for the ticket
-        """
-        return self._send_request_and_transform_response(
-            Tickets.modify_ticket(
-                ticket_id,
-                status=status,
-                note=note,
-                assigned_to_user_id=assigned_to_user_id,
-                comment=comment,
-            )
         )
 
     def clone_tls_certificate(self, tls_certificate_id: EntityID) -> T:

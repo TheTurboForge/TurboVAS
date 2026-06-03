@@ -36,8 +36,6 @@ export const getEntityType = (model: WithEntityType): EntityType =>
 export const pluralizeType = (type: string): string => {
   if (type[type.length - 1] === 's' || type === 'info') {
     return type;
-  } else if (type === 'policy') {
-    return 'policies';
   } else if (type === 'vulnerability') {
     return 'vulns';
   }
@@ -47,7 +45,6 @@ export const pluralizeType = (type: string): string => {
 const NORMALIZE_TYPES = {
   agent_group: 'agentgroup',
   agent_installer: 'agentinstaller',
-  audit_report: 'auditreport',
   config: 'scanconfig',
   cert_bund_adv: 'certbund',
   dfn_cert_adv: 'dfncert',
@@ -78,8 +75,6 @@ const ENTITY_TYPES = {
   agentinstaller: _l('Agent Installer'),
   alert: _l('Alert'),
   asset: _l('Asset'),
-  audit: _l('Audit'),
-  auditreport: _l('Audit Report'),
   certbund: _l('CERT-Bund Advisory'),
   cpe: _l('CPE'),
   credential: _l('Credential'),
@@ -91,10 +86,8 @@ const ENTITY_TYPES = {
   info: _l('Info'),
   operatingsystem: _l('Operating System'),
   override: _l('Override'),
-  note: _l('Note'),
   nvt: _l('NVT'),
   permission: _l('Permission'),
-  policy: _l('Policy'),
   portlist: _l('Port List'),
   portrange: _l('Port Range'),
   report: _l('Report'),
@@ -108,7 +101,6 @@ const ENTITY_TYPES = {
   tag: _l('Tag'),
   target: _l('Target'),
   task: _l('Task'),
-  ticket: _l('Ticket'),
   tlscertificate: _l('TLS Certificate'),
   user: _l('User'),
   vulnerability: _l('Vulnerability'),
@@ -130,8 +122,6 @@ export const typeName = (type?: NormalizeType): string => {
 const ENTITY_TO_API_TYPES = {
   agentgroup: 'agent_group',
   agentinstaller: 'agent_installer',
-  audit: 'task',
-  auditreport: 'report',
   certbund: 'info',
   cpe: 'info',
   cve: 'info',
@@ -139,7 +129,6 @@ const ENTITY_TO_API_TYPES = {
   host: 'asset',
   nvt: 'info',
   operatingsystem: 'asset',
-  policy: 'config',
   portlist: 'port_list',
   portrange: 'port_range',
   reportconfig: 'report_config',
@@ -155,14 +144,12 @@ export const API_TYPES = [
   'agent',
   'alert',
   'asset',
-  'audit_report',
   'config',
   'credential',
   'feed',
   'filter',
   'group',
   'info',
-  'note',
   'override',
   'permission',
   'port_list',
@@ -178,7 +165,6 @@ export const API_TYPES = [
   'tag',
   'target',
   'task',
-  'ticket',
   'tls_certificate',
   'user',
   'vuln',
@@ -207,8 +193,6 @@ export const apiType = (type?: EntityType | ApiType): ApiType | undefined => {
 };
 
 const RESOURCE_TYPES = {
-  audit: 'audit',
-  auditreport: 'audit_report',
   certbund: 'cert_bund_adv',
   cpe: 'cpe',
   cve: 'cve',
@@ -216,7 +200,6 @@ const RESOURCE_TYPES = {
   operatingsystem: 'os',
   host: 'host',
   nvt: 'nvt',
-  policy: 'policy',
   scanconfig: 'config',
 };
 
@@ -240,7 +223,6 @@ export const resourceType = (type?: EntityType): string | undefined => {
 const ENTITY_URLS = {
   agentgroup: 'agent-group',
   agentinstaller: 'agent-installer',
-  auditreport: 'audit-report',
   certbund: 'cert-bund-advisory',
   dfncert: 'dfn-cert-advisory',
   operatingsystem: 'operating-system',

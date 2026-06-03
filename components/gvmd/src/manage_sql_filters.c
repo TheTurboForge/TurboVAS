@@ -223,7 +223,6 @@ filter_control_str (keyword_t **point, const char *column, gchar **string)
  * @param[out]  search_phrase      Phrase that results must include.  All results
  *                                 if NULL or "".
  * @param[out]  search_phrase_exact  Whether search phrase is exact.
- * @param[out]  notes              Whether to include notes.
  * @param[out]  overrides          Whether to include overrides.
  * @param[out]  apply_overrides    Whether to apply overrides.
  * @param[out]  zone               Timezone.
@@ -234,9 +233,8 @@ manage_report_filter_controls (const gchar *filter, int *first, int *max,
                                int *result_hosts_only, gchar **min_qod,
                                gchar **levels, gchar **compliance_levels,
                                gchar **delta_states, gchar **search_phrase,
-                               int *search_phrase_exact, int *notes,
-                               int *overrides, int *apply_overrides,
-                               gchar **zone)
+                               int *search_phrase_exact, int *overrides,
+                               int *apply_overrides, gchar **zone)
 {
   keyword_t **point;
   array_t *split;
@@ -359,16 +357,6 @@ manage_report_filter_controls (const gchar *filter, int *first, int *max,
         *result_hosts_only = val;
     }
 
-  if (notes)
-    {
-      if (filter_control_int ((keyword_t **) split->pdata,
-                              "notes",
-                              &val))
-        *notes = 1;
-      else
-        *notes = val;
-    }
-
   if (overrides)
     {
       if (filter_control_int ((keyword_t **) split->pdata,
@@ -469,7 +457,6 @@ manage_report_filter_controls (const gchar *filter, int *first, int *max,
  * @param[out] delta_states         Delta states filter.
  * @param[out] search_phrase        Search phrase.
  * @param[out] search_phrase_exact  Whether search phrase must match exactly.
- * @param[out] notes                Whether notes are enabled.
  * @param[out] overrides            Whether overrides are enabled.
  * @param[out] apply_overrides      Whether overrides should be applied.
  * @param[out] zone                 Timezone.
@@ -490,7 +477,6 @@ manage_report_filter_controls_from_get (const get_data_t *get,
                                         gchar **delta_states,
                                         gchar **search_phrase,
                                         int *search_phrase_exact,
-                                        int *notes,
                                         int *overrides,
                                         int *apply_overrides,
                                         gchar **zone)
@@ -530,7 +516,6 @@ manage_report_filter_controls_from_get (const get_data_t *get,
                                      delta_states,
                                      search_phrase,
                                      search_phrase_exact,
-                                     notes,
                                      overrides,
                                      apply_overrides,
                                      zone);
@@ -551,7 +536,6 @@ manage_report_filter_controls_from_get (const get_data_t *get,
                                      delta_states,
                                      search_phrase,
                                      search_phrase_exact,
-                                     notes,
                                      overrides,
                                      apply_overrides,
                                      zone);
@@ -1432,8 +1416,7 @@ filter_clause (const char* type, const char* filter,
                                           " ORDER BY order_inet (%s) ASC",
                                           column);
                 }
-              else if ((strcmp (type, "note")
-                        && strcmp (type, "override"))
+              else if ((strcmp (type, "override") != 0)
                        || (strcmp (keyword->string, "nvt")
                            && strcmp (keyword->string, "name")))
                 {
@@ -1459,7 +1442,6 @@ filter_clause (const char* type, const char* filter,
                                             column);
                 }
               else
-                /* Special case for notes text sorting. */
                 g_string_append_printf (order,
                                         " ORDER BY nvt ASC,"
                                         "          lower (%ss%s.text) ASC",
@@ -1635,8 +1617,7 @@ filter_clause (const char* type, const char* filter,
                                           " ORDER BY order_inet (%s) DESC",
                                           column);
                 }
-              else if ((strcmp (type, "note")
-                        && strcmp (type, "override"))
+              else if ((strcmp (type, "override") != 0)
                        || (strcmp (keyword->string, "nvt")
                            && strcmp (keyword->string, "name")))
                 {
@@ -1662,7 +1643,6 @@ filter_clause (const char* type, const char* filter,
                                             column);
                 }
               else
-                /* Special case for notes text sorting. */
                 g_string_append_printf (order,
                                         " ORDER BY nvt DESC,"
                                         "          lower (%ss%s.text) DESC",
@@ -1762,7 +1742,7 @@ filter_clause (const char* type, const char* filter,
               && (strcmp (keyword->column + strlen (keyword->column) - 3, "_id")
                   == 0)
               && strcasecmp (keyword->column, "nvt_id")
-              /* Tickets have a custom result_id column. */
+              /* Results have a custom result_id column. */
               && strcasecmp (keyword->column, "result_id"))
             {
               gchar *type_term;

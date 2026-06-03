@@ -609,7 +609,6 @@ def status(gmp, im, script_args):
                     filter_string=(
                         "sort-reverse=id result_hosts_only=1 min_cvss_base= "
                         f"min_qod= levels=hmlgd autofp={script_args.autofp} "
-                        "notes=0 "
                         f"apply_overrides={script_args.apply_overrides} "
                         f"overrides={script_args.overrides} first=1 rows=-1 "
                         f"delta_states=cgns host={host}"

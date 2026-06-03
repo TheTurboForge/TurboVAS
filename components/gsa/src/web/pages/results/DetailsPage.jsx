@@ -30,18 +30,14 @@ import TableRow from 'web/components/table/TableRow';
 import DetailsBlock from 'web/entity/DetailsBlock';
 import EntitiesTab from 'web/entity/EntitiesTab';
 import EntityPage from 'web/entity/EntityPage';
-import {goToDetails} from 'web/entity/navigation';
-import NoteBox from 'web/entity/NoteBox';
 import OverrideBox from 'web/entity/OverrideBox';
 import EntityTags from 'web/entity/Tags';
 import withEntityContainer from 'web/entity/withEntityContainer';
 import useGmp from 'web/hooks/useGmp';
 import useTranslation from 'web/hooks/useTranslation';
-import NoteComponent from 'web/pages/notes/NoteComponent';
 import OverrideComponent from 'web/pages/overrides/OverrideComponent';
 import ResultDetails from 'web/pages/results/ResultDetails';
 import ResultDetailsPageToolBarIcons from 'web/pages/results/ResultDetailsPageToolBarIcons';
-import TicketComponent from 'web/pages/tickets/TicketComponent';
 import {loadEntity, selector} from 'web/store/entities/results';
 import {loadUserSettingDefaults} from 'web/store/usersettings/defaults/actions';
 import {getUserSettingsDefaults} from 'web/store/usersettings/defaults/selectors';
@@ -62,8 +58,7 @@ const ResultDetailsColGroup = () => (
 );
 
 const Details = ({entity, ...props}) => {
-  const {notes, overrides, qod, host, userTags} = entity;
-  const active_notes = notes.filter(activeFilter);
+  const {overrides, qod, host, userTags} = entity;
   const active_overrides = overrides.filter(activeFilter);
   const epss = entity?.information?.epss;
   const gmp = useGmp();
@@ -231,16 +226,6 @@ const Details = ({entity, ...props}) => {
             </Divider>
           </DetailsBlock>
         )}
-
-        {active_notes.length > 0 && (
-          <DetailsBlock id="notes" title={_('Notes')}>
-            <Divider wrap align={['start', 'stretch']} width="15px">
-              {active_notes.map(note => (
-                <NoteBox key={note.id} note={note} />
-              ))}
-            </Divider>
-          </DetailsBlock>
-        )}
       </Layout>
     </>
   );
@@ -306,61 +291,49 @@ class Page extends React.Component {
 
     const {entity, onChanged, onError} = this.props;
     return (
-      <NoteComponent onCreated={onChanged}>
-        {({create: createNote}) => (
-          <OverrideComponent onCreated={onChanged}>
-            {({create: createOverride}) => (
-              <TicketComponent onCreated={goToDetails('ticket', this.props)}>
-                {({createFromResult: createTicket}) => (
-                  <EntityPage
-                    {...this.props}
-                    entity={entity}
-                    sectionIcon={<ResultIcon size="large" />}
-                    title={_('Result')}
-                    toolBarIcons={ResultDetailsPageToolBarIcons}
-                    onNoteCreateClick={result =>
-                      this.openDialog(result, createNote)
-                    }
-                    onOverrideCreateClick={result =>
-                      this.openDialog(result, createOverride)
-                    }
-                    onResultDownloadClick={this.handleDownload}
-                    onTicketCreateClick={createTicket}
-                  >
-                    {() => (
-                      <TabsContainer flex="column" grow="1">
-                        <TabLayout align={['start', 'end']} grow="1">
-                          <TabList align={['start', 'stretch']}>
-                            <Tab>{_('Information')}</Tab>
-                            <EntitiesTab entities={entity.userTags}>
-                              {_('User Tags')}
-                            </EntitiesTab>
-                          </TabList>
-                        </TabLayout>
+      <OverrideComponent onCreated={onChanged}>
+        {({create: createOverride}) => (
+          <EntityPage
+            {...this.props}
+            entity={entity}
+            sectionIcon={<ResultIcon size="large" />}
+            title={_('Result')}
+            toolBarIcons={ResultDetailsPageToolBarIcons}
+            onOverrideCreateClick={result =>
+              this.openDialog(result, createOverride)
+            }
+            onResultDownloadClick={this.handleDownload}
+          >
+            {() => (
+              <TabsContainer flex="column" grow="1">
+                <TabLayout align={['start', 'end']} grow="1">
+                  <TabList align={['start', 'stretch']}>
+                    <Tab>{_('Information')}</Tab>
+                    <EntitiesTab entities={entity.userTags}>
+                      {_('User Tags')}
+                    </EntitiesTab>
+                  </TabList>
+                </TabLayout>
 
-                        <Tabs>
-                          <TabPanels>
-                            <TabPanel>
-                              <Details entity={entity} />
-                            </TabPanel>
-                            <TabPanel>
-                              <EntityTags
-                                entity={entity}
-                                onChanged={onChanged}
-                                onError={onError}
-                              />
-                            </TabPanel>
-                          </TabPanels>
-                        </Tabs>
-                      </TabsContainer>
-                    )}
-                  </EntityPage>
-                )}
-              </TicketComponent>
+                <Tabs>
+                  <TabPanels>
+                    <TabPanel>
+                      <Details entity={entity} />
+                    </TabPanel>
+                    <TabPanel>
+                      <EntityTags
+                        entity={entity}
+                        onChanged={onChanged}
+                        onError={onError}
+                      />
+                    </TabPanel>
+                  </TabPanels>
+                </Tabs>
+              </TabsContainer>
             )}
-          </OverrideComponent>
+          </EntityPage>
         )}
-      </NoteComponent>
+      </OverrideComponent>
     );
   }
 }

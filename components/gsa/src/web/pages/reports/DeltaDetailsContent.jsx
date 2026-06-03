@@ -39,7 +39,6 @@ const Span = styled.span`
 `;
 
 const PageContent = ({
-  audit = false,
   entity,
   entityError,
   filter,
@@ -77,7 +76,6 @@ const PageContent = ({
 
   const {
     results = {},
-    complianceCounts = {},
     result_count = {},
     timestamp,
     scan_run_status,
@@ -95,7 +93,7 @@ const PageContent = ({
 
   const header_title = (
     <Divider>
-      {audit ? <span>{_('Audit Report:')}</span> : <span>{_('Report:')}</span>}
+      <span>{_('Report:')}</span>
       {isLoading ? (
         <span>{_('Loading')}</span>
       ) : (
@@ -115,13 +113,12 @@ const PageContent = ({
     </SectionHeader>
   );
 
-  const {filtered} = audit ? complianceCounts : result_count;
+  const {filtered} = result_count;
 
   return (
     <Layout grow align={['start', 'stretch']} flex="column">
       <ToolBar>
         <ToolBarIcons
-          audit={audit}
           delta={true}
           filter={filter}
           isLoading={isLoading}
@@ -171,7 +168,6 @@ const PageContent = ({
                 <TabPanels>
                   <TabPanel>
                     <Summary
-                      audit={audit}
                       filter={filter}
                       report={report}
                       reportId={reportId}
@@ -181,7 +177,6 @@ const PageContent = ({
                   </TabPanel>
                   <TabPanel>
                     <DeltaResultsTab
-                      audit={audit}
                       counts={isDefined(results.counts) ? results.counts : {}}
                       delta={true}
                       filter={filter}
@@ -223,7 +218,6 @@ const PageContent = ({
 };
 
 PageContent.propTypes = {
-  audit: PropTypes.bool,
   entity: PropTypes.model,
   entityError: PropTypes.object,
   filter: PropTypes.filter,

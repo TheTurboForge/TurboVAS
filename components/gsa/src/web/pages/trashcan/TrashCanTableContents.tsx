@@ -26,14 +26,11 @@ const TrashCanTableContents = ({trash}: TrashCanContentsTableProps) => {
   }
 
   const hasAlerts = hasItems(trash.alerts);
-  const hasAudits = hasItems(trash.audits);
   const hasCredentials = hasItems(trash.credentials);
   const hasFilters = hasItems(trash.filters);
   const hasGroups = hasItems(trash.groups);
-  const hasNotes = hasItems(trash.notes);
   const hasOverrides = hasItems(trash.overrides);
   const hasPermissions = hasItems(trash.permissions);
-  const hasPolicies = hasItems(trash.policies);
   const hasPortLists = hasItems(trash.portLists);
   const hasReportConfigs = hasItems(trash.reportConfigs);
   const hasReportFormats = hasItems(trash.reportFormats);
@@ -42,7 +39,6 @@ const TrashCanTableContents = ({trash}: TrashCanContentsTableProps) => {
   const hasSchedules = hasItems(trash.schedules);
   const hasTags = hasItems(trash.tags);
   const hasTargets = hasItems(trash.targets);
-  const hasTickets = hasItems(trash.tickets);
   const hasTasks = hasItems(trash.tasks);
   const hasScanConfigs = hasItems(trash.scanConfigs);
   const hasAgentGroups = hasItems(trash.agentGroups);
@@ -54,13 +50,6 @@ const TrashCanTableContents = ({trash}: TrashCanContentsTableProps) => {
           count={trash.alerts.length}
           title={_('Alerts')}
           type="alert"
-        />
-      )}
-      {hasAudits && (
-        <TrashCanTableRow
-          count={trash.audits.length}
-          title={_('Audits')}
-          type="audit"
         />
       )}
       {hasCredentials && (
@@ -84,13 +73,6 @@ const TrashCanTableContents = ({trash}: TrashCanContentsTableProps) => {
           type="group"
         />
       )}
-      {hasNotes && (
-        <TrashCanTableRow
-          count={trash.notes.length}
-          title={_('Notes')}
-          type="note"
-        />
-      )}
       {hasOverrides && (
         <TrashCanTableRow
           count={trash.overrides.length}
@@ -103,13 +85,6 @@ const TrashCanTableContents = ({trash}: TrashCanContentsTableProps) => {
           count={trash.permissions.length}
           title={_('Permissions')}
           type="permission"
-        />
-      )}
-      {hasPolicies && (
-        <TrashCanTableRow
-          count={trash.policies.length}
-          title={_('Policies')}
-          type="policy"
         />
       )}
       {hasPortLists && (
@@ -180,13 +155,6 @@ const TrashCanTableContents = ({trash}: TrashCanContentsTableProps) => {
           count={trash.tasks.length}
           title={_('Tasks')}
           type="task"
-        />
-      )}
-      {hasTickets && (
-        <TrashCanTableRow
-          count={trash.tickets.length}
-          title={_('Tickets')}
-          type="ticket"
         />
       )}
       {hasAgentGroups && (

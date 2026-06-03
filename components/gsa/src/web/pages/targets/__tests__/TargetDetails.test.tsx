@@ -463,7 +463,7 @@ describe('Target Details tests', () => {
     },
   );
 
-  test('should render tasks and audits with correct entity types', () => {
+  test('should render tasks with correct entity type', () => {
     const target = Target.fromElement({
       _id: 'target123',
       name: 'Test Target',
@@ -478,11 +478,6 @@ describe('Target Details tests', () => {
             name: 'Scan Task',
             usage_type: 'scan',
           },
-          {
-            _id: 'audit1',
-            name: 'Compliance Audit',
-            usage_type: 'audit',
-          },
         ],
       },
     });
@@ -496,7 +491,7 @@ describe('Target Details tests', () => {
     render(<Details entity={target} />);
 
     const heading = screen.getByRole('heading', {
-      name: /Tasks using this Target \(2\)/i,
+      name: /Tasks using this Target \(1\)/i,
     });
     expect(heading).toBeInTheDocument();
 
@@ -509,11 +504,5 @@ describe('Target Details tests', () => {
     expect(taskLink).toBeDefined();
     expect(taskLink).toHaveAttribute('href', '/task/task1');
 
-    // Find the audit link - should point to /audit/audit1
-    const auditLink = detailsLinks.find(
-      link => link.textContent === 'Compliance Audit',
-    );
-    expect(auditLink).toBeDefined();
-    expect(auditLink).toHaveAttribute('href', '/audit/audit1');
   });
 });

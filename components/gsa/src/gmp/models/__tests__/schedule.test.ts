@@ -46,16 +46,11 @@ describe('Schedule model tests', () => {
             name: 'task1',
             usage_type: 'scan',
           },
-          {
-            _id: '456',
-            name: 'audit1',
-            usage_type: 'audit',
-          },
         ],
       },
     });
 
-    expect(schedule.tasks?.length).toEqual(2);
+    expect(schedule.tasks?.length).toEqual(1);
 
     const task = schedule.tasks?.[0];
     expect(task).toBeDefined();
@@ -63,11 +58,6 @@ describe('Schedule model tests', () => {
     expect(task?.id).toEqual('123');
     expect(task?.name).toEqual('task1');
 
-    const audit = schedule.tasks?.[1];
-    expect(audit).toBeDefined();
-    expect(audit?.entityType).toEqual('audit');
-    expect(audit?.id).toEqual('456');
-    expect(audit?.name).toEqual('audit1');
   });
 
   test('should handle invalid ical data safely', () => {

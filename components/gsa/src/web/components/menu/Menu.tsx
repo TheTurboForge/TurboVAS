@@ -5,9 +5,6 @@
 
 import {AppNavigation} from '@greenbone/ui-lib';
 import {
-  BarChart3,
-  CircleHelp,
-  FileCheck,
   Server,
   ShieldCheck,
   SlidersHorizontal,
@@ -29,9 +26,6 @@ const Menu = () => {
   const features = useFeatures();
   const gmp = useGmp();
 
-  const dashboardsMatch = useMatch('/dashboards');
-  const isDashboardsActive = Boolean(dashboardsMatch);
-
   const tasksMatch = useMatch('/tasks');
   const taskMatch = useMatch('/task/*');
   const isTasksActive = Boolean(tasksMatch || taskMatch);
@@ -50,10 +44,6 @@ const Menu = () => {
   const isVulnerabilitiesActive = Boolean(
     vulnerabilitiesMatch || vulnerabilityMatch,
   );
-
-  const notesMatch = useMatch('/notes');
-  const noteMatch = useMatch('/note/*');
-  const isNotesActive = Boolean(notesMatch || noteMatch);
 
   const overridesMatch = useMatch('/overrides');
   const overrideMatch = useMatch('/override/*');
@@ -74,22 +64,6 @@ const Menu = () => {
   const isTlsCertificatesActive = Boolean(
     tlsCertificatesMatch || tlsCertificateMatch,
   );
-
-  const ticketsMatch = useMatch('/tickets');
-  const ticketMatch = useMatch('/ticket/*');
-  const isTicketsActive = Boolean(ticketsMatch || ticketMatch);
-
-  const policiesMatch = useMatch('/policies');
-  const policyMatch = useMatch('/policy/*');
-  const isPoliciesActive = Boolean(policiesMatch || policyMatch);
-
-  const auditsMatch = useMatch('/audits');
-  const auditMatch = useMatch('/audit/*');
-  const isAuditsActive = Boolean(auditsMatch || auditMatch);
-
-  const auditReportsMatch = useMatch('/audit-reports');
-  const auditReportMatch = useMatch('/audit-report/*');
-  const isAuditReportsActive = Boolean(auditReportsMatch || auditReportMatch);
 
   const nvtsMatch = useMatch('/nvts');
   const nvtMatch = useMatch('/nvt/*');
@@ -195,8 +169,6 @@ const Menu = () => {
   const isLdapActive = Boolean(useMatch('/ldap'));
   const isCredentialStoreActive = Boolean(useMatch('/credential-store'));
   const isRadiusActive = Boolean(useMatch('/radius'));
-  const isCvssCalculatorActive = Boolean(useMatch('/cvss-calculator'));
-
   const mayAccessAny = (keys: EntityType[]) =>
     keys.some(key => isDefined(capabilities) && capabilities.mayAccess(key));
 
@@ -206,7 +178,6 @@ const Menu = () => {
     'result',
     'vulnerability',
     'override',
-    'note',
   ]);
   const mayOpConfiguration = mayAccessAny([
     'agent',
@@ -224,25 +195,9 @@ const Menu = () => {
     'filter',
     'tag',
   ]);
-  const mayOpResilience = mayAccessAny([
-    'ticket',
-    'policy',
-    'audit',
-    'auditreport',
-  ]);
   const mayOpAssets = mayAccessAny(['asset', 'tlscertificate']);
 
   const menuPoints = [
-    [
-      {
-        icon: BarChart3,
-        label: _('Dashboards'),
-        to: '/dashboards',
-        key: 'dashboards',
-        isPathMatch: Boolean(dashboardsMatch),
-        active: isDashboardsActive,
-      },
-    ],
     [
       mayOpScans && {
         icon: ShieldCheck,
@@ -253,7 +208,6 @@ const Menu = () => {
           isReportsActive,
           isResultsActive,
           isVulnerabilitiesActive,
-          isNotesActive,
           isOverridesActive,
         ].some(Boolean),
         subNav: [
@@ -280,12 +234,6 @@ const Menu = () => {
             to: '/vulnerabilities',
             isPathMatch: Boolean(vulnerabilitiesMatch),
             active: isVulnerabilitiesActive,
-          },
-          capabilities.mayAccess('note') && {
-            label: _('Notes'),
-            to: '/notes',
-            isPathMatch: Boolean(notesMatch),
-            active: isNotesActive,
           },
           capabilities.mayAccess('override') && {
             label: _('Overrides'),
@@ -322,43 +270,6 @@ const Menu = () => {
             to: '/tls-certificates',
             isPathMatch: Boolean(tlsCertificatesMatch),
             active: isTlsCertificatesActive,
-          },
-        ].filter(Boolean),
-      },
-      mayOpResilience && {
-        icon: FileCheck,
-        label: _('Resilience'),
-        key: 'resilience',
-        defaultOpened: [
-          isTicketsActive,
-          isPoliciesActive,
-          isAuditsActive,
-          isAuditReportsActive,
-        ].some(Boolean),
-        subNav: [
-          capabilities.mayAccess('ticket') && {
-            label: _('Remediation Tickets'),
-            to: '/tickets',
-            isPathMatch: Boolean(ticketsMatch),
-            active: isTicketsActive,
-          },
-          capabilities.mayAccess('policy') && {
-            label: _('Compliance Policies'),
-            to: '/policies',
-            isPathMatch: Boolean(policiesMatch),
-            active: isPoliciesActive,
-          },
-          capabilities.mayAccess('audit') && {
-            label: _('Compliance Audits'),
-            to: '/audits',
-            isPathMatch: Boolean(auditsMatch),
-            active: isAuditsActive,
-          },
-          capabilities.mayAccess('auditreport') && {
-            label: _('Compliance Audit Reports'),
-            to: '/audit-reports',
-            isPathMatch: Boolean(auditReportsMatch),
-            active: isAuditReportsActive,
           },
         ].filter(Boolean),
       },
@@ -598,20 +509,6 @@ const Menu = () => {
               active: isRadiusActive,
             },
         ].filter(Boolean),
-      },
-      {
-        label: _('Help'),
-        key: 'help',
-        icon: CircleHelp,
-        defaultOpened: [isCvssCalculatorActive].some(Boolean),
-        subNav: [
-          {
-            label: _('CVSS Calculator'),
-            to: '/cvss-calculator',
-            isPathMatch: isCvssCalculatorActive,
-            active: isCvssCalculatorActive,
-          },
-        ],
       },
     ].filter(Boolean),
     [

@@ -19,7 +19,6 @@ import {
   DfnCertAdvIcon,
   FeedIcon,
   NvtIcon,
-  PolicyIcon,
   PortListIcon,
   ReportFormatIcon,
   ScanConfigIcon,
@@ -183,12 +182,6 @@ const FeedStatus = ({feeds}: FeedStatusProps) => {
                     )}
                     {feed.feedType === GVMD_DATA_FEED && (
                       <IconDivider>
-                        <Link filter="predefined=1" to="policies">
-                          <IconDivider align={['start', 'center']}>
-                            <PolicyIcon size="medium" />
-                            <span>{_('Compliance Policies')}</span>
-                          </IconDivider>
-                        </Link>
                         <Link filter="predefined=1" to="portlists">
                           <IconDivider align={['start', 'center']}>
                             <PortListIcon size="medium" />

@@ -17,7 +17,6 @@ import {
 } from 'web/utils/Sort';
 
 interface HostsTabProps {
-  audit?: boolean;
   counts?: CollectionCounts;
   hosts?: ReportHost[];
   filter: Filter;
@@ -46,17 +45,9 @@ const hostsSortFunctions = {
   start: makeCompareDate(entity => entity.start),
   end: makeCompareDate(entity => entity.end),
   total: makeCompareNumber(entity => entity.result_counts.total),
-  complianceYes: makeCompareNumber(entity => entity.complianceCounts.yes),
-  complianceNo: makeCompareNumber(entity => entity.complianceCounts.no),
-  complianceIncomplete: makeCompareNumber(
-    entity => entity.complianceCounts.incomplete,
-  ),
-  complianceTotal: makeCompareNumber(entity => entity.complianceCounts.total),
-  compliant: makeCompareString('hostCompliance'),
 };
 
 const HostsTab = ({
-  audit = false,
   counts,
   hosts,
   filter,
@@ -84,7 +75,6 @@ const HostsTab = ({
       onPreviousClick,
     }) => (
       <HostsTable
-        audit={audit}
         // @ts-expect-error
         entities={entities}
         entitiesCounts={entitiesCounts}

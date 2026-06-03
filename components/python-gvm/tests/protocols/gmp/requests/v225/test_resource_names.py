@@ -61,9 +61,9 @@ class ResourceNamesTestCase(unittest.TestCase):
 
         self.assertEqual(bytes(request), b'<get_resource_names type="HOST"/>')
 
-        request = ResourceNames.get_resource_names(ResourceType.NOTE)
+        request = ResourceNames.get_resource_names(ResourceType.NVT)
 
-        self.assertEqual(bytes(request), b'<get_resource_names type="NOTE"/>')
+        self.assertEqual(bytes(request), b'<get_resource_names type="NVT"/>')
 
         request = ResourceNames.get_resource_names(ResourceType.NVT)
 
@@ -252,12 +252,12 @@ class ResourceNamesTestCase(unittest.TestCase):
         )
 
         request = ResourceNames.get_resource_name(
-            resource_type=ResourceType.NOTE, resource_id="i1"
+            resource_type=ResourceType.NVT, resource_id="i1"
         )
 
         self.assertEqual(
             bytes(request),
-            b'<get_resource_names resource_id="i1" type="NOTE"/>',
+            b'<get_resource_names resource_id="i1" type="NVT"/>',
         )
 
         request = ResourceNames.get_resource_name(

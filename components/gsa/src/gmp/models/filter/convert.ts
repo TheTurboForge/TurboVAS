@@ -92,7 +92,6 @@ const KEYWORD_CONVERTERS: Record<string, ConvertFunc> = {
   apply_overrides: convertBooleanInt,
   first: convertFirst,
   min_qod: convertInt,
-  notes: convertBooleanInt,
   overrides: convertBooleanInt,
   result_hosts_only: convertBooleanInt,
   rows: convertRows,

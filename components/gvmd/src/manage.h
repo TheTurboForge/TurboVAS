@@ -498,14 +498,14 @@ delete_resource (const char *, const char *, int);
  "After the event $e,\n"                                                      \
  "the following condition was met: $c\n"                                      \
  "\n"                                                                         \
- "This ticket includes reports in the following format(s):\n"                 \
+ "This alert includes reports in the following format(s):\n"                  \
  "$r.\n"                                                                      \
  "Full details and other report formats are available on the scan engine.\n"  \
  "\n"                                                                         \
  "$t"                                                                         \
  "\n"                                                                         \
  "Note:\n"                                                                    \
- "This ticket was created automatically as a security scan escalation.\n"     \
+ "This alert was created automatically as a security scan escalation.\n"      \
  "Please contact your local system administrator if you think it\n"           \
  "was created or assigned erroneously.\n"
 
@@ -984,7 +984,7 @@ result_detection_reference (result_t, report_t, const char *, const char *,
 #define QOD_DEFAULT 75
 
 /**
- * @brief Default size to limit note and override text to in reports.
+ * @brief Default size to limit override text to in reports.
  */
 #define EXCERPT_SIZE_DEFAULT 300
 
@@ -1296,13 +1296,7 @@ const char*
 result_iterator_asset_host_id (iterator_t*);
 
 int
-result_iterator_may_have_notes (iterator_t*);
-
-int
 result_iterator_may_have_overrides (iterator_t*);
-
-int
-result_iterator_may_have_tickets (iterator_t*);
 
 double
 result_iterator_epss_score (iterator_t*);
@@ -1401,13 +1395,7 @@ result_t
 result_iterator_delta_result (iterator_t*);
 
 int
-result_iterator_delta_may_have_notes (iterator_t*);
-
-int
 result_iterator_delta_may_have_overrides (iterator_t*);
-
-int
-result_iterator_delta_may_have_tickets (iterator_t*);
 
 const char *
 result_iterator_delta_hostname (iterator_t*);
@@ -1427,13 +1415,13 @@ report_progress (report_t);
 gchar *
 manage_report (report_t, report_t, const get_data_t *,
                report_format_t, report_config_t,
-               int, int, gsize *, gchar **, gchar **, gchar **, gchar **,
+               int, gsize *, gchar **, gchar **, gchar **, gchar **,
                gchar **);
 
 int
 manage_send_report (report_t, report_t, report_format_t, report_config_t,
                     const get_data_t *,
-                    int, int, int, int, int, int,
+                    int, int, int, int, int,
                     gboolean (*) (const char *,
                                   int (*) (const char*, void*),
                                   void*),

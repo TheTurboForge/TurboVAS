@@ -16,7 +16,6 @@ import {
   EMAIL_NOTICE_INCLUDE,
   EMAIL_NOTICE_SIMPLE,
   EVENT_TYPE_TASK_RUN_STATUS_CHANGED,
-  EVENT_TYPE_TICKET_RECEIVED,
 } from 'gmp/models/alert';
 import Credential, {
   EMAIL_CREDENTIAL_TYPES,
@@ -55,35 +54,6 @@ describe('EmailMethodPart tests', () => {
     expect(screen.getByName('notice_attach_format')).toBeInTheDocument();
     expect(screen.getByName('notice_attach_config')).toBeInTheDocument();
     expect(screen.getByName('message_attach')).toBeInTheDocument();
-  });
-
-  test('should render the EmailMethodPart for ticket alerts', () => {
-    const onChange = testing.fn();
-    const onCredentialChange = testing.fn();
-    const onNewCredentialClick = testing.fn();
-    const {render} = rendererWith({capabilities: true});
-
-    render(
-      <EmailMethodPart
-        event={EVENT_TYPE_TICKET_RECEIVED}
-        notice={EMAIL_NOTICE_SIMPLE}
-        onChange={onChange}
-        onCredentialChange={onCredentialChange}
-        onNewCredentialClick={onNewCredentialClick}
-      />,
-    );
-
-    expect(screen.getByName('to_address')).toBeInTheDocument();
-    expect(screen.getByName('from_address')).toBeInTheDocument();
-    expect(screen.queryByName('subject')).not.toBeInTheDocument();
-    expect(screen.getByName('recipient_credential')).toBeInTheDocument();
-    expect(screen.queryByName('notice')).not.toBeInTheDocument();
-    expect(screen.queryByName('notice_report_format')).not.toBeInTheDocument();
-    expect(screen.queryByName('notice_report_config')).not.toBeInTheDocument();
-    expect(screen.queryByName('message')).not.toBeInTheDocument();
-    expect(screen.queryByName('notice_attach_format')).not.toBeInTheDocument();
-    expect(screen.queryByName('notice_attach_config')).not.toBeInTheDocument();
-    expect(screen.queryByName('message_attach')).not.toBeInTheDocument();
   });
 
   test('should allow to use a prefix', () => {

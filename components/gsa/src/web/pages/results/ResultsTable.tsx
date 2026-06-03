@@ -26,7 +26,6 @@ import ResultsRow, {
 import {type SortDirectionType} from 'web/utils/sort-direction';
 
 interface ResultTableHeaderProps extends WithEntitiesHeaderComponentProps {
-  audit?: boolean;
   delta?: boolean;
   sort?: boolean;
   currentSortBy?: string;
@@ -36,7 +35,6 @@ interface ResultTableHeaderProps extends WithEntitiesHeaderComponentProps {
 
 const ResultTableHeader = ({
   actionsColumn,
-  audit = false,
   delta = false,
   sort = true,
   currentSortBy,
@@ -82,29 +80,16 @@ const ResultTableHeader = ({
         >
           <SolutionTypeSvgIcon title={_('Solution type')} />
         </TableHead>
-        {audit ? (
-          <TableHead
-            currentSortBy={currentSortBy}
-            currentSortDir={currentSortDir}
-            rowSpan={2}
-            sort={sort}
-            sortBy="compliant"
-            title={_('Compliant')}
-            width="8%"
-            onSortChange={onSortChange}
-          />
-        ) : (
-          <TableHead
-            currentSortBy={currentSortBy}
-            currentSortDir={currentSortDir}
-            rowSpan={2}
-            sort={sort}
-            sortBy="severity"
-            title={_('Severity')}
-            width="8%"
-            onSortChange={onSortChange}
-          />
-        )}
+        <TableHead
+          currentSortBy={currentSortBy}
+          currentSortDir={currentSortDir}
+          rowSpan={2}
+          sort={sort}
+          sortBy="severity"
+          title={_('Severity')}
+          width="8%"
+          onSortChange={onSortChange}
+        />
         <TableHead
           currentSortBy={currentSortBy}
           currentSortDir={currentSortDir}
@@ -127,7 +112,7 @@ const ResultTableHeader = ({
           width="9%"
           onSortChange={onSortChange}
         />
-        {gmp.settings.enableEPSS && !audit && (
+        {gmp.settings.enableEPSS && (
           <TableHead colSpan={2}>{_('EPSS')}</TableHead>
         )}
         <TableHead
@@ -159,7 +144,7 @@ const ResultTableHeader = ({
           title={_('Name')}
           onSortChange={onSortChange}
         />
-        {enableEPSS && !audit && (
+      {enableEPSS && (
           <>
             <TableHead
               currentSortBy={currentSortBy}

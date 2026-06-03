@@ -58,12 +58,10 @@ interface SortingState {
 interface ReportComposerDefaults {
   defaultReportConfigId?: string;
   defaultReportFormatId?: string;
-  includeNotes?: boolean;
   includeOverrides?: boolean;
 }
 
 interface DownloadReportState {
-  includeNotes: boolean;
   includeOverrides: boolean;
   reportConfigId: string;
   reportFormatId: string;
@@ -344,7 +342,6 @@ const ReportDetailsPage = () => {
       const state = values as unknown as DownloadReportState;
       if (!entity || !reportFilter) return;
       const {
-        includeNotes,
         includeOverrides,
         reportConfigId,
         reportFormatId,
@@ -352,7 +349,6 @@ const ReportDetailsPage = () => {
       } = state;
 
       const newFilter = reportFilter.copy();
-      newFilter.set('notes', includeNotes);
       newFilter.set('overrides', includeOverrides);
 
       if (storeAsDefault) {
@@ -360,7 +356,6 @@ const ReportDetailsPage = () => {
           ...reportComposerDefaults,
           defaultReportConfigId: reportConfigId,
           defaultReportFormatId: reportFormatId,
-          includeNotes,
           includeOverrides,
         };
         try {
@@ -573,7 +568,6 @@ const ReportDetailsPage = () => {
           defaultReportConfigId={reportComposerDefaults.defaultReportConfigId}
           defaultReportFormatId={reportComposerDefaults.defaultReportFormatId}
           filter={reportFilter}
-          includeNotes={reportComposerDefaults.includeNotes}
           includeOverrides={reportComposerDefaults.includeOverrides}
           reportConfigs={reportConfigs}
           reportFormats={reportFormats ?? []}

@@ -8,7 +8,6 @@ import {isDefined} from 'gmp/utils/identity';
 import Badge from 'web/components/badge/Badge';
 import {
   AlterableIcon,
-  NoteIcon,
   OverrideIcon,
   ReportIcon,
   ResultIcon,
@@ -34,7 +33,6 @@ import {formattedUserSettingShortDate} from 'web/utils/user-setting-time-date-fo
 interface TaskDetailsPageToolBarIconsProps {
   entity: Task;
   links?: boolean;
-  notesCount?: number;
   overridesCount?: number;
   onImportTaskCreateClick?: () => void | Promise<void>;
   onReportImportClick?: (value: Task) => void | Promise<void>;
@@ -51,7 +49,6 @@ interface TaskDetailsPageToolBarIconsProps {
 export const TaskDetailsPageToolBarIcons = ({
   entity,
   links,
-  notesCount = 0,
   overridesCount = 0,
   onTaskDeleteClick,
   onTaskCloneClick,
@@ -186,18 +183,6 @@ export const TaskDetailsPageToolBarIcons = ({
         </Link>
 
         <IconDivider>
-          <Link
-            filter={'task_id=' + entity.id}
-            title={_('Notes for Task {{- name}}', {
-              name: entity.name as string,
-            })}
-            to="notes"
-          >
-            <Badge content={notesCount}>
-              <NoteIcon />
-            </Badge>
-          </Link>
-
           <Link
             filter={'task_id=' + entity.id}
             title={_('Overrides for Task {{- name}}', {

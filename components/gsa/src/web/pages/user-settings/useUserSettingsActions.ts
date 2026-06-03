@@ -83,8 +83,6 @@ const useUserSettingsActions = () => {
       // @ts-expect-error
       dispatch(loadUserSettingsDefaultFilter(gmp)('alert')),
       // @ts-expect-error
-      dispatch(loadUserSettingsDefaultFilter(gmp)('auditreport')),
-      // @ts-expect-error
       dispatch(loadUserSettingsDefaultFilter(gmp)('scanconfig')),
       // @ts-expect-error
       dispatch(loadUserSettingsDefaultFilter(gmp)('credential')),
@@ -94,8 +92,6 @@ const useUserSettingsActions = () => {
       dispatch(loadUserSettingsDefaultFilter(gmp)('group')),
       // @ts-expect-error
       dispatch(loadUserSettingsDefaultFilter(gmp)('host')),
-      // @ts-expect-error
-      dispatch(loadUserSettingsDefaultFilter(gmp)('note')),
       // @ts-expect-error
       dispatch(loadUserSettingsDefaultFilter(gmp)('operatingsystem')),
       // @ts-expect-error
@@ -122,8 +118,6 @@ const useUserSettingsActions = () => {
       dispatch(loadUserSettingsDefaultFilter(gmp)('target')),
       // @ts-expect-error
       dispatch(loadUserSettingsDefaultFilter(gmp)('task')),
-      // @ts-expect-error
-      dispatch(loadUserSettingsDefaultFilter(gmp)('ticket')),
       // @ts-expect-error
       dispatch(loadUserSettingsDefaultFilter(gmp)('tlscertificate')),
       // @ts-expect-error

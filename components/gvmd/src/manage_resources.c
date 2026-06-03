@@ -48,7 +48,6 @@ valid_type (const char* type)
          || (strcasecmp (type, "group") == 0)
          || (strcasecmp (type, "host") == 0)
          || (strcasecmp (type, "info") == 0)
-         || (strcasecmp (type, "note") == 0)
          || (strcasecmp (type, "os") == 0)
          || (strcasecmp (type, "override") == 0)
          || (strcasecmp (type, "permission") == 0)
@@ -63,7 +62,6 @@ valid_type (const char* type)
          || (strcasecmp (type, "tag") == 0)
          || (strcasecmp (type, "target") == 0)
          || (strcasecmp (type, "task") == 0)
-         || (strcasecmp (type, "ticket") == 0)
          || (strcasecmp (type, "tls_certificate") == 0)
          || (strcasecmp (type, "user") == 0)
          || (strcasecmp (type, "vuln") == 0);
@@ -79,9 +77,7 @@ valid_type (const char* type)
 int
 valid_subtype (const char* type)
 {
-    return (strcasecmp (type, "audit_report") == 0)
-          || (strcasecmp (type, "audit") == 0)
-          || (strcasecmp (type, "policy") == 0);
+    return 0;
 }
 
 /**
@@ -119,8 +115,6 @@ type_db_name (const char* type)
     return "credential";
   if (strcasecmp (type, "Filter") == 0)
     return "filter";
-  if (strcasecmp (type, "Note") == 0)
-    return "note";
   if (strcasecmp (type, "Override") == 0)
     return "override";
   if (strcasecmp (type, "Permission") == 0)
@@ -147,8 +141,6 @@ type_db_name (const char* type)
     return "target";
   if (strcasecmp (type, "Task") == 0)
     return "task";
-  if (strcasecmp (type, "Ticket") == 0)
-    return "ticket";
   if (strcasecmp (type, "TLS Certificate") == 0)
     return "tls_certificate";
   if (strcasecmp (type, "SecInfo") == 0)
@@ -199,7 +191,7 @@ type_is_info_subtype (const char *type)
 int
 type_is_report_subtype (const char *type)
 {
-  return (strcasecmp (type, "audit_report") == 0);
+  return 0;
 }
 
 /**
@@ -212,7 +204,7 @@ type_is_report_subtype (const char *type)
 int
 type_is_task_subtype (const char *type)
 {
-  return (strcasecmp (type, "audit") == 0);
+  return 0;
 }
 
 /**
@@ -225,7 +217,7 @@ type_is_task_subtype (const char *type)
 int
 type_is_config_subtype (const char *type)
 {
-  return (strcasecmp (type, "policy") == 0);
+  return 0;
 }
 
 /**
@@ -238,8 +230,7 @@ type_is_config_subtype (const char *type)
 int
 type_named (const char *type)
 {
-  return strcasecmp (type, "note")
-         && strcasecmp (type, "override");
+  return strcasecmp (type, "override");
 }
 
 /**

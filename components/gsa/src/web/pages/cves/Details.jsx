@@ -9,7 +9,6 @@ import {isDefined} from 'gmp/utils/identity';
 import SeverityBar from 'web/components/bar/SeverityBar';
 import Layout from 'web/components/layout/Layout';
 import ExternalLink from 'web/components/link/ExternalLink';
-import Link from 'web/components/link/Link';
 import InfoTable from 'web/components/table/InfoTable';
 import TableBody from 'web/components/table/TableBody';
 import TableData from 'web/components/table/TableData';
@@ -63,14 +62,7 @@ const CveDetails = ({entity}) => {
             {isDefined(cvssBaseVector) && (
               <TableRow>
                 <TableData>{_('Base Vector')}</TableData>
-                <TableData>
-                  <Link
-                    query={{cvssVector: cvssBaseVector}}
-                    to="cvsscalculator"
-                  >
-                    {cvssBaseVector}
-                  </Link>
-                </TableData>
+                <TableData>{cvssBaseVector}</TableData>
               </TableRow>
             )}
             {Object.entries(CVSS_PROPS)

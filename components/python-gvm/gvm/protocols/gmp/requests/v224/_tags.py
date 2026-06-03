@@ -88,12 +88,7 @@ class Tags:
                 "resource", attrs={"id": str(resource_id)}
             )
 
-        actual_resource_type = resource_type
-        if resource_type.value == EntityType.AUDIT.value:
-            actual_resource_type = EntityType.TASK
-        elif resource_type.value == EntityType.POLICY.value:
-            actual_resource_type = EntityType.SCAN_CONFIG
-        xml_resources.add_element("type", actual_resource_type.value)
+        xml_resources.add_element("type", resource_type.value)
 
         if comment:
             cmd.add_element("comment", comment)
@@ -244,11 +239,6 @@ class Tags:
                 if not isinstance(resource_type, EntityType):
                     resource_type = EntityType(resource_type)
 
-                actual_resource_type = resource_type
-                if resource_type.value == EntityType.AUDIT.value:
-                    actual_resource_type = EntityType.TASK
-                elif resource_type.value == EntityType.POLICY.value:
-                    actual_resource_type = EntityType.SCAN_CONFIG
-                xml_resources.add_element("type", actual_resource_type.value)
+                xml_resources.add_element("type", resource_type.value)
 
         return cmd

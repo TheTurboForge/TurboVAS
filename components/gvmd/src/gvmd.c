@@ -1451,7 +1451,7 @@ fork_feed_sync ()
 }
 
 /**
- * @brief Forks a process for handling queued scan or audit task actions.
+ * @brief Forks a process for handling queued scan task actions.
  *
  * These actions include processing imported reports and handling the task
  *  queue.

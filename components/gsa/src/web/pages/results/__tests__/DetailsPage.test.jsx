@@ -69,20 +69,7 @@ const result = Result.fromElement({
   qod: {value: 80},
   task: {_id: '314', name: 'task 1'},
   report: {_id: '159'},
-  tickets: {
-    ticket: [{_id: '265'}],
-  },
   scan_nvt_version: '2019-02-14T07:33:50Z',
-  notes: {
-    note: [
-      {
-        _id: '358',
-        text: 'TestNote',
-        modification_time: '2021-03-11T13:00:32Z',
-        active: 1,
-      },
-    ],
-  },
   overrides: {
     override: [
       {
@@ -103,15 +90,10 @@ const createGmp = ({
     filter: Filter.fromString(),
     counts: new CollectionCounts(),
   }),
-  getUsersResponse = new Response([], {
-    filter: Filter.fromString(),
-    counts: new CollectionCounts(),
-  }),
   currentSettingsResponse = currentSettingsDefaultResponse,
   exportResultResponse = new Response({foo: 'bar'}),
   getResult = testing.fn().mockResolvedValue(getResultResponse),
   getPermissions = testing.fn().mockResolvedValue(getPermissionsResponse),
-  getUsers = testing.fn().mockResolvedValue(getUsersResponse),
   currentSettings = testing.fn().mockResolvedValue(currentSettingsResponse),
   exportResult = testing.fn().mockResolvedValue(exportResultResponse),
 } = {}) => ({
@@ -130,9 +112,6 @@ const createGmp = ({
   session: createSession({timezone: 'CET'}),
   user: {
     currentSettings,
-  },
-  users: {
-    get: getUsers,
   },
 });
 
@@ -163,14 +142,11 @@ describe('ResultDetailsPage tests', () => {
     );
 
     expect(screen.getByTitle('Export Result as XML')).toBeInTheDocument();
-    expect(screen.getByTitle('Add new Note')).toBeInTheDocument();
     expect(screen.getByTitle('Add new Override')).toBeInTheDocument();
-    expect(screen.getByTitle('Create new Ticket')).toBeInTheDocument();
     expect(
       screen.getByTitle('Corresponding Task (task 1)'),
     ).toBeInTheDocument();
     expect(screen.getByTitle('Corresponding Report')).toBeInTheDocument();
-    expect(screen.getByTitle('Corresponding Tickets')).toBeInTheDocument();
 
     expect(
       screen.getByRole('heading', {name: /Result: foo/}),
@@ -323,14 +299,6 @@ describe('ResultDetailsPage tests', () => {
     expect(overrides.getByRole('row', {name: /^Modified/})).toHaveTextContent(
       'Fri, Mar 12, 2021 2:00 PM',
     );
-
-    const notes = within(
-      screen.getByRole('heading', {name: /^Notes/}).parentNode,
-    );
-    expect(notes.getByText(/^TestNote/)).toBeInTheDocument();
-    expect(notes.getByRole('row', {name: /^Modified/})).toHaveTextContent(
-      'Thu, Mar 11, 2021 2:00 PM',
-    );
   });
 
   test('should render user tags tab', () => {
@@ -367,9 +335,5 @@ describe('ResultDetailsPage tests', () => {
     // export result
     fireEvent.click(screen.getByTitle('Export Result as XML'));
     expect(gmp.result.export).toHaveBeenCalledWith(result);
-
-    // load users for create ticket dialog
-    fireEvent.click(screen.getByTitle('Create new Ticket'));
-    expect(gmp.users.get).toHaveBeenCalled();
   });
 });

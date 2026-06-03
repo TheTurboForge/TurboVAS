@@ -99,7 +99,6 @@
 #include "gmp_report_ports.h"
 #include "gmp_report_tls_certificates.h"
 #include "gmp_report_vulns.h"
-#include "gmp_tickets.h"
 #include "gmp_tls_certificates.h"
 #include "manage.h"
 #include "manage_acl.h"
@@ -107,7 +106,6 @@
 #include "manage_assets.h"
 #include "manage_filters.h"
 #include "manage_groups.h"
-#include "manage_notes.h"
 #include "manage_overrides.h"
 #include "manage_permissions.h"
 #include "manage_port_lists.h"
@@ -164,7 +162,7 @@
 
 /** @todo Exported for manage_sql.c. */
 void
-buffer_results_xml (GString *, iterator_t *, task_t, int, int, int, int, int,
+buffer_results_xml (GString *, iterator_t *, task_t, int, int, int,
                     int, int, const char *, iterator_t *, int, int, int, int);
 
 
@@ -653,45 +651,6 @@ create_group_data_reset (create_group_data_t *data)
 }
 
 /**
- * @brief Command data for the create_note command.
- */
-typedef struct
-{
-  char *active;       ///< Whether the note is active.
-  char *copy;         ///< UUID of resource to copy.
-  char *hosts;        ///< Hosts to which to limit override.
-  char *nvt_oid;      ///< NVT to which to limit override.
-  char *port;         ///< Port to which to limit override.
-  char *result_id;    ///< ID of result to which to limit override.
-  char *severity;     ///< Severity score to which to limit note.
-  char *task_id;      ///< ID of task to which to limit override.
-  char *text;         ///< Text of override.
-  char *threat;       ///< Threat to which to limit override.
-} create_note_data_t;
-
-/**
- * @brief Reset command data.
- *
- * @param[in]  data  Command data.
- */
-static void
-create_note_data_reset (create_note_data_t *data)
-{
-  free (data->active);
-  free (data->copy);
-  free (data->hosts);
-  free (data->nvt_oid);
-  free (data->port);
-  free (data->result_id);
-  free (data->severity);
-  free (data->task_id);
-  free (data->text);
-  free (data->threat);
-
-  memset (data, 0, sizeof (create_note_data_t));
-}
-
-/**
  * @brief Command data for the create_override command.
  */
 typedef struct
@@ -1153,7 +1112,7 @@ typedef struct
   char *target_id;      ///< ID of task target.
   char *agent_group_id; ///< ID of task agent group.
   task_t task;          ///< ID of new task.
-  char *usage_type;     ///< Usage type ("scan" or "audit")
+  char *usage_type;     ///< Usage type ("scan")
 } create_task_data_t;
 
 /**
@@ -1370,28 +1329,6 @@ delete_group_data_reset (delete_group_data_t *data)
   free (data->group_id);
 
   memset (data, 0, sizeof (delete_group_data_t));
-}
-
-/**
- * @brief Command data for the delete_note command.
- */
-typedef struct
-{
-  char *note_id;   ///< ID of note to delete.
-  int ultimate;    ///< Boolean.  Whether to remove entirely or to trashcan.
-} delete_note_data_t;
-
-/**
- * @brief Reset command data.
- *
- * @param[in]  data  Command data.
- */
-static void
-delete_note_data_reset (delete_note_data_t *data)
-{
-  free (data->note_id);
-
-  memset (data, 0, sizeof (delete_note_data_t));
 }
 
 /**
@@ -1906,31 +1843,6 @@ get_info_data_reset (get_info_data_t *data)
 }
 
 /**
- * @brief Command data for the get_notes command.
- */
-typedef struct
-{
-  get_data_t get;        ///< Get args.
-  char *nvt_oid;         ///< OID of NVT to which to limit listing.
-  char *task_id;         ///< ID of task to which to limit listing.
-  int result;            ///< Boolean.  Whether to include associated results.
-} get_notes_data_t;
-
-/**
- * @brief Reset command data.
- *
- * @param[in]  data  Command data.
- */
-static void
-get_notes_data_reset (get_notes_data_t *data)
-{
-  free (data->nvt_oid);
-  free (data->task_id);
-
-  memset (data, 0, sizeof (get_notes_data_t));
-}
-
-/**
  * @brief Command data for the get_nvts command.
  */
 typedef struct
@@ -2090,7 +2002,6 @@ typedef struct
   char *alert_id;        ///< ID of alert.
   char *report_id;       ///< ID of single report to get.
   int lean;              ///< Boolean.  Whether to return lean report.
-  int notes_details;     ///< Boolean.  Whether to include details of above.
   int overrides_details; ///< Boolean.  Whether to include details of above.
   int result_tags;       ///< Boolean.  Whether to include result tags.
   int ignore_pagination; ///< Boolean.  Whether to ignore pagination filters.
@@ -2188,7 +2099,6 @@ typedef struct
 {
   get_data_t get;        ///< Get args.
   char *task_id;         ///< Task associated with results.
-  int notes_details;     ///< Boolean.  Whether to include details of above.
   int overrides_details; ///< Boolean.  Whether to include details of above.
   int get_counts;        ///< Boolean.  Whether to include result counts.
 } get_results_data_t;
@@ -3119,45 +3029,6 @@ modify_task_data_reset (modify_task_data_t *data)
 }
 
 /**
- * @brief Command data for the modify_note command.
- */
-typedef struct
-{
-  char *active;       ///< Whether the note is active.
-  char *hosts;        ///< Hosts to which to limit override.
-  char *note_id;      ///< ID of note to modify.
-  char *nvt_oid;      ///< NVT to which to limit override.
-  char *port;         ///< Port to which to limit override.
-  char *result_id;    ///< ID of result to which to limit override.
-  char *severity;     ///< Severity score to which to limit note.
-  char *task_id;      ///< ID of task to which to limit override.
-  char *text;         ///< Text of override.
-  char *threat;       ///< Threat to which to limit override.
-} modify_note_data_t;
-
-/**
- * @brief Reset command data.
- *
- * @param[in]  data  Command data.
- */
-static void
-modify_note_data_reset (modify_note_data_t *data)
-{
-  free (data->active);
-  free (data->hosts);
-  free (data->note_id);
-  free (data->nvt_oid);
-  free (data->port);
-  free (data->result_id);
-  free (data->severity);
-  free (data->task_id);
-  free (data->text);
-  free (data->threat);
-
-  memset (data, 0, sizeof (modify_note_data_t));
-}
-
-/**
  * @brief Command data for the modify_override command.
  */
 typedef struct
@@ -3465,7 +3336,6 @@ typedef union
   create_credential_data_t create_credential;         ///< create_credential
   create_filter_data_t create_filter;                 ///< create_filter
   create_group_data_t create_group;                   ///< create_group
-  create_note_data_t create_note;                     ///< create_note
   create_override_data_t create_override;             ///< create_override
   create_permission_data_t create_permission;         ///< create_permission
   create_port_range_data_t create_port_range;         ///< create_port_range
@@ -3483,7 +3353,6 @@ typedef union
   delete_alert_data_t delete_alert;                   ///< delete_alert
   delete_filter_data_t delete_filter;                 ///< delete_filter
   delete_group_data_t delete_group;                   ///< delete_group
-  delete_note_data_t delete_note;                     ///< delete_note
   delete_override_data_t delete_override;             ///< delete_override
   delete_permission_data_t delete_permission;         ///< delete_permission
   delete_port_list_data_t delete_port_list;           ///< delete_port_list
@@ -3506,7 +3375,6 @@ typedef union
   get_filters_data_t get_filters;                     ///< get_filters
   get_groups_data_t get_groups;                       ///< get_groups
   get_info_data_t get_info;                           ///< get_info
-  get_notes_data_t get_notes;                         ///< get_notes
   get_nvts_data_t get_nvts;                           ///< get_nvts
   get_nvt_families_data_t get_nvt_families;           ///< get_nvt_families
   get_overrides_data_t get_overrides;                 ///< get_overrides
@@ -3606,12 +3474,6 @@ static create_filter_data_t *create_filter_data
  */
 static create_group_data_t *create_group_data
  = (create_group_data_t*) &(command_data.create_group);
-
-/**
- * @brief Parser callback data for CREATE_NOTE.
- */
-static create_note_data_t *create_note_data
- = (create_note_data_t*) &(command_data.create_note);
 
 /**
  * @brief Parser callback data for CREATE_OVERRIDE.
@@ -3714,12 +3576,6 @@ static delete_filter_data_t *delete_filter_data
  */
 static delete_group_data_t *delete_group_data
  = (delete_group_data_t*) &(command_data.delete_group);
-
-/**
- * @brief Parser callback data for DELETE_NOTE.
- */
-static delete_note_data_t *delete_note_data
- = (delete_note_data_t*) &(command_data.delete_note);
 
 /**
  * @brief Parser callback data for DELETE_OVERRIDE.
@@ -3852,12 +3708,6 @@ static get_groups_data_t *get_groups_data
  */
 static get_info_data_t *get_info_data
  = &(command_data.get_info);
-
-/**
- * @brief Parser callback data for GET_NOTES.
- */
-static get_notes_data_t *get_notes_data
- = &(command_data.get_notes);
 
 /**
  * @brief Parser callback data for GET_NVTS.
@@ -4026,12 +3876,6 @@ static modify_filter_data_t *modify_filter_data
  */
 static modify_group_data_t *modify_group_data
  = &(command_data.modify_group);
-
-/**
- * @brief Parser callback data for MODIFY_NOTE.
- */
-static modify_note_data_t *modify_note_data
- = (modify_note_data_t*) &(command_data.create_note);
 
 /**
  * @brief Parser callback data for MODIFY_OVERRIDE.
@@ -4266,17 +4110,6 @@ typedef enum
   CLIENT_CREATE_GROUP_USERS,
   CLIENT_CREATE_GROUP_SPECIALS,
   CLIENT_CREATE_GROUP_SPECIALS_FULL,
-  CLIENT_CREATE_NOTE,
-  CLIENT_CREATE_NOTE_ACTIVE,
-  CLIENT_CREATE_NOTE_COPY,
-  CLIENT_CREATE_NOTE_HOSTS,
-  CLIENT_CREATE_NOTE_NVT,
-  CLIENT_CREATE_NOTE_PORT,
-  CLIENT_CREATE_NOTE_RESULT,
-  CLIENT_CREATE_NOTE_SEVERITY,
-  CLIENT_CREATE_NOTE_TASK,
-  CLIENT_CREATE_NOTE_TEXT,
-  CLIENT_CREATE_NOTE_THREAT,
   CLIENT_CREATE_OVERRIDE,
   CLIENT_CREATE_OVERRIDE_ACTIVE,
   CLIENT_CREATE_OVERRIDE_COPY,
@@ -4365,7 +4198,6 @@ typedef enum
   CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_HOST_HOSTNAME,
   CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_MODIFICATION_TIME,
   CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_NAME,
-  CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_NOTES,
   CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_NVT,
   CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_NVT_BID,
   CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_NVT_CERT,
@@ -4472,7 +4304,6 @@ typedef enum
   CLIENT_CREATE_TASK_SCHEDULE_PERIODS,
   CLIENT_CREATE_TASK_TARGET,
   CLIENT_CREATE_TASK_USAGE_TYPE,
-  CLIENT_CREATE_TICKET,
   CLIENT_CREATE_TLS_CERTIFICATE,
   CLIENT_CREATE_USER,
   CLIENT_CREATE_USER_COMMENT,
@@ -4495,7 +4326,6 @@ typedef enum
   CLIENT_DELETE_CREDENTIAL,
   CLIENT_DELETE_FILTER,
   CLIENT_DELETE_GROUP,
-  CLIENT_DELETE_NOTE,
   CLIENT_DELETE_OVERRIDE,
   CLIENT_DELETE_PERMISSION,
   CLIENT_DELETE_PORT_LIST,
@@ -4509,7 +4339,6 @@ typedef enum
   CLIENT_DELETE_TAG,
   CLIENT_DELETE_TARGET,
   CLIENT_DELETE_TASK,
-  CLIENT_DELETE_TICKET,
   CLIENT_DELETE_TLS_CERTIFICATE,
   CLIENT_DELETE_USER,
   CLIENT_DESCRIBE_AUTH,
@@ -4538,7 +4367,6 @@ typedef enum
   CLIENT_GET_INFO,
   CLIENT_GET_INTEGRATION_CONFIGS,
   CLIENT_GET_LICENSE,
-  CLIENT_GET_NOTES,
   CLIENT_GET_NVTS,
   CLIENT_GET_NVT_FAMILIES,
   CLIENT_GET_OVERRIDES,
@@ -4567,7 +4395,6 @@ typedef enum
   CLIENT_GET_TAGS,
   CLIENT_GET_TARGETS,
   CLIENT_GET_TASKS,
-  CLIENT_GET_TICKETS,
   CLIENT_GET_TIMEZONES,
   CLIENT_GET_TLS_CERTIFICATES,
   CLIENT_GET_USERS,
@@ -4640,16 +4467,6 @@ typedef enum
   CLIENT_MODIFY_GROUP_USERS,
   CLIENT_MODIFY_INTEGRATION_CONFIG,
   CLIENT_MODIFY_LICENSE,
-  CLIENT_MODIFY_NOTE,
-  CLIENT_MODIFY_NOTE_ACTIVE,
-  CLIENT_MODIFY_NOTE_HOSTS,
-  CLIENT_MODIFY_NOTE_PORT,
-  CLIENT_MODIFY_NOTE_RESULT,
-  CLIENT_MODIFY_NOTE_SEVERITY,
-  CLIENT_MODIFY_NOTE_TASK,
-  CLIENT_MODIFY_NOTE_TEXT,
-  CLIENT_MODIFY_NOTE_THREAT,
-  CLIENT_MODIFY_NOTE_NVT,
   CLIENT_MODIFY_OVERRIDE,
   CLIENT_MODIFY_OVERRIDE_ACTIVE,
   CLIENT_MODIFY_OVERRIDE_HOSTS,
@@ -4753,7 +4570,6 @@ typedef enum
   CLIENT_MODIFY_TASK_SCHEDULE_PERIODS,
   CLIENT_MODIFY_TASK_TARGET,
   CLIENT_MODIFY_TASK_SCANNER,
-  CLIENT_MODIFY_TICKET,
   CLIENT_MODIFY_TLS_CERTIFICATE,
   CLIENT_MODIFY_USER,
   CLIENT_MODIFY_USER_COMMENT,
@@ -5013,8 +4829,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
             gvm_append_string (&create_role_data->users, "");
             set_client_state (CLIENT_CREATE_ROLE);
           }
-        else if (strcasecmp ("CREATE_NOTE", element_name) == 0)
-          set_client_state (CLIENT_CREATE_NOTE);
         else if (strcasecmp ("CREATE_OVERRIDE", element_name) == 0)
           set_client_state (CLIENT_CREATE_OVERRIDE);
         else if (strcasecmp ("CREATE_PORT_LIST", element_name) == 0)
@@ -5066,12 +4880,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
             create_task_data->alerts = make_array ();
             create_task_data->groups = make_array ();
             set_client_state (CLIENT_CREATE_TASK);
-          }
-        else if (strcasecmp ("CREATE_TICKET", element_name) == 0)
-          {
-            create_ticket_start (gmp_parser, attribute_names,
-                                 attribute_values);
-            set_client_state (CLIENT_CREATE_TICKET);
           }
         else if (strcasecmp ("CREATE_TLS_CERTIFICATE", element_name) == 0)
           {
@@ -5169,18 +4977,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
             else
               delete_group_data->ultimate = 0;
             set_client_state (CLIENT_DELETE_GROUP);
-          }
-        else if (strcasecmp ("DELETE_NOTE", element_name) == 0)
-          {
-            const gchar* attribute;
-            append_attribute (attribute_names, attribute_values, "note_id",
-                              &delete_note_data->note_id);
-            if (find_attribute (attribute_names, attribute_values,
-                                "ultimate", &attribute))
-              delete_note_data->ultimate = strcmp (attribute, "0");
-            else
-              delete_note_data->ultimate = 0;
-            set_client_state (CLIENT_DELETE_NOTE);
           }
         else if (strcasecmp ("DELETE_OVERRIDE", element_name) == 0)
           {
@@ -5321,12 +5117,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
             else
               delete_task_data->ultimate = 0;
             set_client_state (CLIENT_DELETE_TASK);
-          }
-        else if (strcasecmp ("DELETE_TICKET", element_name) == 0)
-          {
-            delete_start ("ticket", "Ticket",
-                          attribute_names, attribute_values);
-            set_client_state (CLIENT_DELETE_TICKET);
           }
         else if (strcasecmp ("DELETE_TLS_CERTIFICATE", element_name) == 0)
           {
@@ -5582,28 +5372,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
                                attribute_values);
             set_client_state (CLIENT_GET_LICENSE);
           }
-        else if (strcasecmp ("GET_NOTES", element_name) == 0)
-          {
-            const gchar* attribute;
-
-            get_data_parse_attributes (&get_notes_data->get, "note",
-                                       attribute_names,
-                                       attribute_values);
-
-            append_attribute (attribute_names, attribute_values, "nvt_oid",
-                              &get_notes_data->nvt_oid);
-
-            append_attribute (attribute_names, attribute_values, "task_id",
-                              &get_notes_data->task_id);
-
-            if (find_attribute (attribute_names, attribute_values,
-                                "result", &attribute))
-              get_notes_data->result = strcmp (attribute, "0");
-            else
-              get_notes_data->result = 0;
-
-            set_client_state (CLIENT_GET_NOTES);
-          }
         else if (strcasecmp ("GET_NVTS", element_name) == 0)
           {
             const gchar* attribute;
@@ -5773,12 +5541,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
               get_reports_data->lean = 0;
 
             if (find_attribute (attribute_names, attribute_values,
-                                "notes_details", &attribute))
-              get_reports_data->notes_details = strcmp (attribute, "0");
-            else
-              get_reports_data->notes_details = 0;
-
-            if (find_attribute (attribute_names, attribute_values,
                                 "overrides_details", &attribute))
               get_reports_data->overrides_details = strcmp (attribute, "0");
             else
@@ -5885,12 +5647,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
 
             append_attribute (attribute_names, attribute_values, "task_id",
                               &get_results_data->task_id);
-
-            if (find_attribute (attribute_names, attribute_values,
-                                "notes_details", &attribute))
-              get_results_data->notes_details = strcmp (attribute, "0");
-            else
-              get_results_data->notes_details = 0;
 
             if (find_attribute (attribute_names, attribute_values,
                                 "overrides_details", &attribute))
@@ -6040,7 +5796,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
 
             set_client_state (CLIENT_GET_TASKS);
           }
-        ELSE_GET_START (tickets, TICKETS)
         ELSE_GET_START (tls_certificates, TLS_CERTIFICATES)
         else if (strcasecmp ("GET_TIMEZONES", element_name) == 0)
           {
@@ -6198,12 +5953,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
                                   attribute_values);
             set_client_state (CLIENT_MODIFY_LICENSE);
           }
-        else if (strcasecmp ("MODIFY_NOTE", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "note_id",
-                              &modify_note_data->note_id);
-            set_client_state (CLIENT_MODIFY_NOTE);
-          }
         else if (strcasecmp ("MODIFY_OVERRIDE", element_name) == 0)
           {
             append_attribute (attribute_names, attribute_values, "override_id",
@@ -6277,12 +6026,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
             modify_task_data->alerts = make_array ();
             modify_task_data->groups = make_array ();
             set_client_state (CLIENT_MODIFY_TASK);
-          }
-        else if (strcasecmp ("MODIFY_TICKET", element_name) == 0)
-          {
-            modify_ticket_start (gmp_parser, attribute_names,
-                                 attribute_values);
-            set_client_state (CLIENT_MODIFY_TICKET);
           }
         else if (strcasecmp ("MODIFY_TLS_CERTIFICATE", element_name) == 0)
           {
@@ -7221,12 +6964,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
           set_client_state (CLIENT_MODIFY_TASK_PREFERENCES_PREFERENCE_VALUE);
         ELSE_READ_OVER;
 
-      case CLIENT_MODIFY_TICKET:
-        modify_ticket_element_start (gmp_parser, element_name,
-                                     attribute_names,
-                                     attribute_values);
-        break;
-
       case CLIENT_MODIFY_TLS_CERTIFICATE:
         modify_tls_certificate_element_start (gmp_parser, element_name,
                                               attribute_names,
@@ -7539,54 +7276,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
             set_client_state (CLIENT_CREATE_GROUP_SPECIALS_FULL);
           }
         ELSE_READ_OVER;
-
-      case CLIENT_CREATE_NOTE:
-        if (strcasecmp ("ACTIVE", element_name) == 0)
-          set_client_state (CLIENT_CREATE_NOTE_ACTIVE);
-        else if (strcasecmp ("COPY", element_name) == 0)
-          set_client_state (CLIENT_CREATE_NOTE_COPY);
-        else if (strcasecmp ("HOSTS", element_name) == 0)
-          set_client_state (CLIENT_CREATE_NOTE_HOSTS);
-        else if (strcasecmp ("NVT", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "oid",
-                              &create_note_data->nvt_oid);
-            set_client_state (CLIENT_CREATE_NOTE_NVT);
-          }
-        else if (strcasecmp ("PORT", element_name) == 0)
-          set_client_state (CLIENT_CREATE_NOTE_PORT);
-        else if (strcasecmp ("RESULT", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &create_note_data->result_id);
-            if (create_note_data->result_id
-                && create_note_data->result_id[0] == '\0')
-              {
-                g_free (create_note_data->result_id);
-                create_note_data->result_id = NULL;
-              }
-            set_client_state (CLIENT_CREATE_NOTE_RESULT);
-          }
-        else if (strcasecmp ("SEVERITY", element_name) == 0)
-          set_client_state (CLIENT_CREATE_NOTE_SEVERITY);
-        else if (strcasecmp ("TASK", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &create_note_data->task_id);
-            if (create_note_data->task_id
-                && create_note_data->task_id[0] == '\0')
-              {
-                g_free (create_note_data->task_id);
-                create_note_data->task_id = NULL;
-              }
-            set_client_state (CLIENT_CREATE_NOTE_TASK);
-          }
-        else if (strcasecmp ("TEXT", element_name) == 0)
-          set_client_state (CLIENT_CREATE_NOTE_TEXT);
-        else if (strcasecmp ("THREAT", element_name) == 0)
-          set_client_state (CLIENT_CREATE_NOTE_THREAT);
-        ELSE_READ_OVER;
-
 
       case CLIENT_CREATE_PERMISSION:
         if (strcasecmp ("COMMENT", element_name) == 0)
@@ -8276,12 +7965,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
           set_client_state (CLIENT_CREATE_TASK_PREFERENCES_PREFERENCE_VALUE);
         ELSE_READ_OVER;
 
-      case CLIENT_CREATE_TICKET:
-        create_ticket_element_start (gmp_parser, element_name,
-                                     attribute_names,
-                                     attribute_values);
-        break;
-
       case CLIENT_CREATE_TLS_CERTIFICATE:
         create_tls_certificate_element_start (gmp_parser, element_name,
                                               attribute_names,
@@ -8360,52 +8043,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
         modify_license_element_start (gmp_parser, element_name,
                                       attribute_names, attribute_values);
         break;
-
-      case CLIENT_MODIFY_NOTE:
-        if (strcasecmp ("ACTIVE", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_NOTE_ACTIVE);
-        else if (strcasecmp ("HOSTS", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_NOTE_HOSTS);
-        else if (strcasecmp ("PORT", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_NOTE_PORT);
-        else if (strcasecmp ("RESULT", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &modify_note_data->result_id);
-            if (modify_note_data->result_id
-                && modify_note_data->result_id[0] == '\0')
-              {
-                g_free (modify_note_data->result_id);
-                modify_note_data->result_id = NULL;
-              }
-            set_client_state (CLIENT_MODIFY_NOTE_RESULT);
-          }
-        else if (strcasecmp ("SEVERITY", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_NOTE_SEVERITY);
-        else if (strcasecmp ("TASK", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &modify_note_data->task_id);
-            if (modify_note_data->task_id
-                && modify_note_data->task_id[0] == '\0')
-              {
-                g_free (modify_note_data->task_id);
-                modify_note_data->task_id = NULL;
-              }
-            set_client_state (CLIENT_MODIFY_NOTE_TASK);
-          }
-        else if (strcasecmp ("TEXT", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_NOTE_TEXT);
-        else if (strcasecmp ("THREAT", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_NOTE_THREAT);
-        else if (strcasecmp ("NVT", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "oid",
-                              &modify_note_data->nvt_oid);
-            set_client_state (CLIENT_MODIFY_NOTE_NVT);
-          }
-        ELSE_READ_OVER;
-
 
       case CLIENT_MODIFY_OVERRIDE:
         if (strcasecmp ("ACTIVE", element_name) == 0)
@@ -8615,304 +8252,6 @@ strip_control_chars (gchar *str)
     }
 
   *write_ptr = '\0'; // null-terminate the cleaned string
-}
-
-/**
- * @brief Buffer XML for a single note.
- *
- * @param[in]  buffer                 Buffer into which to buffer note.
- * @param[in]  notes                  Notes iterator.
- * @param[in]  include_notes_details  Whether to include details of note.
- * @param[in]  include_result         Whether to include associated result.
- * @param[out] count                  Number of notes.
- */
-static void
-buffer_note_xml (GString *buffer, iterator_t *notes, int include_notes_details,
-                 int include_result, int *count)
-{
-  int tag_count;
-  char *uuid_task, *uuid_result;
-
-  tag_count = resource_tag_count ("note",
-                                  get_iterator_resource (notes),
-                                  1);
-
-  if (count)
-    (*count)++;
-
-  if (note_iterator_task (notes))
-    task_uuid (note_iterator_task (notes),
-               &uuid_task);
-  else
-    uuid_task = NULL;
-
-  if (note_iterator_result (notes))
-    result_uuid (note_iterator_result (notes),
-                 &uuid_result);
-  else
-    uuid_result = NULL;
-
-  buffer_xml_append_printf (buffer,
-                            "<note id=\"%s\">"
-                            "<permissions>",
-                            get_iterator_uuid (notes));
-
-  if (/* The user is the owner. */
-      (current_credentials.username
-       && get_iterator_owner_name (notes)
-       && (strcmp (get_iterator_owner_name (notes),
-                   current_credentials.username)
-           == 0))
-      /* Or the user is effectively the owner. */
-      || acl_user_has_super (current_credentials.uuid,
-                             get_iterator_owner (notes)))
-    buffer_xml_append_printf (buffer,
-                              "<permission><name>Everything</name></permission>"
-                              "</permissions>");
-  else
-    {
-      iterator_t perms;
-      get_data_t perms_get;
-
-      memset (&perms_get, '\0', sizeof (perms_get));
-      perms_get.filter = g_strdup_printf ("resource_uuid=%s"
-                                          " owner=any"
-                                          " permission=any",
-                                          get_iterator_uuid (notes));
-      init_permission_iterator (&perms, &perms_get);
-      g_free (perms_get.filter);
-      while (next (&perms))
-        buffer_xml_append_printf (buffer,
-                                  "<permission><name>%s</name></permission>",
-                                  get_iterator_name (&perms));
-      cleanup_iterator (&perms);
-
-      buffer_xml_append_printf (buffer, "</permissions>");
-    }
-
-  if (include_notes_details == 0)
-    {
-      gchar *excerpt;
-      const char *text;
-
-      text = note_iterator_text (notes);
-      excerpt = g_utf8_substring (text, 0, setting_excerpt_size_int ());
-
-      /* This must match send_get_common. */
-
-      buffer_xml_append_printf (buffer,
-                                "<owner><name>%s</name></owner>"
-                                "<nvt oid=\"%s\">"
-                                "<name>%s</name>"
-                                "<type>%s</type>"
-                                "</nvt>",
-                                get_iterator_owner_name (notes)
-                                ? get_iterator_owner_name (notes)
-                                : "",
-                                note_iterator_nvt_oid (notes),
-                                note_iterator_nvt_name (notes),
-                                note_iterator_nvt_type (notes));
-
-      buffer_xml_append_printf (buffer,
-                                "<creation_time>%s</creation_time>",
-                                iso_if_time (get_iterator_creation_time (notes)));
-
-      buffer_xml_append_printf (buffer,
-                                "<modification_time>%s</modification_time>",
-                                iso_if_time (get_iterator_modification_time (notes)));
-
-      buffer_xml_append_printf (buffer,
-                                "<writable>1</writable>"
-                                "<in_use>0</in_use>"
-                                "<active>%i</active>"
-                                "<text excerpt=\"%i\">%s</text>"
-                                "<orphan>%i</orphan>",
-                                note_iterator_active (notes),
-                                strlen (excerpt) < strlen (text),
-                                excerpt,
-                                ((note_iterator_task (notes)
-                                  && (uuid_task == NULL))
-                                 || (note_iterator_result (notes)
-                                     && (uuid_result == NULL))));
-
-      if (tag_count)
-        {
-          buffer_xml_append_printf (buffer,
-                                    "<user_tags>"
-                                    "<count>%i</count>"
-                                    "</user_tags>",
-                                    tag_count);
-        }
-
-      g_string_append (buffer, "</note>");
-
-      g_free (excerpt);
-    }
-  else
-    {
-      char *name_task;
-      int trash_task;
-      time_t end_time;
-      iterator_t tags;
-
-      if (uuid_task)
-        {
-          name_task = task_name (note_iterator_task (notes));
-          trash_task = task_in_trash (note_iterator_task (notes));
-        }
-      else
-        {
-          name_task = NULL;
-          trash_task = 0;
-        }
-
-      end_time = note_iterator_end_time (notes);
-
-      /* This must match send_get_common. */
-
-      buffer_xml_append_printf
-        (buffer,
-         "<owner><name>%s</name></owner>"
-         "<nvt oid=\"%s\">"
-         "<name>%s</name>"
-         "<type>%s</type>"
-         "</nvt>",
-         get_iterator_owner_name (notes)
-         ? get_iterator_owner_name (notes)
-         : "",
-         note_iterator_nvt_oid (notes),
-         note_iterator_nvt_name (notes),
-         note_iterator_nvt_type (notes));
-
-      buffer_xml_append_printf
-        (buffer,
-         "<creation_time>%s</creation_time>",
-         iso_if_time (get_iterator_creation_time (notes)));
-
-      buffer_xml_append_printf
-        (buffer,
-         "<modification_time>%s</modification_time>",
-         iso_if_time (get_iterator_modification_time (notes)));
-
-      buffer_xml_append_printf
-        (buffer,
-         "<writable>1</writable>"
-         "<in_use>0</in_use>"
-         "<active>%i</active>"
-         "<end_time>%s</end_time>"
-         "<text>%s</text>"
-         "<hosts>%s</hosts>"
-         "<port>%s</port>"
-         "<severity>%s</severity>"
-         "<task id=\"%s\"><name>%s</name><trash>%i</trash></task>"
-         "<orphan>%i</orphan>",
-         note_iterator_active (notes),
-         end_time > 1 ? iso_time (&end_time) : "",
-         note_iterator_text (notes),
-         note_iterator_hosts (notes)
-         ? note_iterator_hosts (notes) : "",
-         note_iterator_port (notes)
-         ? note_iterator_port (notes) : "",
-         note_iterator_severity (notes)
-         ? note_iterator_severity (notes) : "",
-         uuid_task ? uuid_task : "",
-         name_task ? name_task : "",
-         trash_task,
-         ((note_iterator_task (notes) && (uuid_task == NULL))
-          || (note_iterator_result (notes) && (uuid_result == NULL))));
-
-      free (name_task);
-
-      if (include_result && uuid_result && note_iterator_result (notes))
-        {
-          iterator_t results;
-          get_data_t *result_get;
-          result_get = report_results_get_data (1, 1,
-                                                1, /* apply_overrides */
-                                                0  /* min_qod */);
-          result_get->id = g_strdup (uuid_result);
-          init_result_get_iterator (&results, result_get,
-                                    0,     /* No report restriction */
-                                    NULL,  /* No host restriction */
-                                    NULL); /* No extra order SQL. */
-          get_data_reset (result_get);
-          free (result_get);
-
-          while (next (&results))
-            buffer_results_xml (buffer,
-                                &results,
-                                0,
-                                0,  /* Notes. */
-                                0,  /* Note details. */
-                                0,  /* Overrides. */
-                                0,  /* Override details. */
-                                0,  /* Tags. */
-                                0,  /* Tag details. */
-                                0,  /* Result details. */
-                                NULL,
-                                NULL,
-                                0,
-                                -1,
-                                0,  /* Lean. */
-                                0); /* Delta fields. */
-          cleanup_iterator (&results);
-        }
-      else
-        buffer_xml_append_printf (buffer,
-                                  "<result id=\"%s\"/>",
-                                  uuid_result ? uuid_result : "");
-      if (tag_count)
-        {
-          buffer_xml_append_printf (buffer,
-                                    "<user_tags>"
-                                    "<count>%i</count>",
-                                    tag_count);
-
-          init_resource_tag_iterator (&tags, "note",
-                                      get_iterator_resource (notes),
-                                      1, NULL, 1);
-
-          while (next (&tags))
-            {
-              buffer_xml_append_printf
-                (buffer,
-                 "<tag id=\"%s\">"
-                 "<name>%s</name>"
-                 "<value>%s</value>"
-                 "<comment>%s</comment>"
-                 "</tag>",
-                 resource_tag_iterator_uuid (&tags),
-                 resource_tag_iterator_name (&tags),
-                 resource_tag_iterator_value (&tags),
-                 resource_tag_iterator_comment (&tags));
-            }
-
-          cleanup_iterator (&tags);
-
-          g_string_append (buffer, "</user_tags>");
-        }
-
-      g_string_append (buffer, "</note>");
-    }
-  free (uuid_task);
-  free (uuid_result);
-}
-
-/**
- * @brief Buffer XML for some notes.
- *
- * @param[in]  buffer                 Buffer into which to buffer notes.
- * @param[in]  notes                  Notes iterator.
- * @param[in]  include_notes_details  Whether to include details of notes.
- * @param[in]  include_result         Whether to include associated result.
- * @param[out] count                  Number of notes.
- */
-static void
-buffer_notes_xml (GString *buffer, iterator_t *notes, int include_notes_details,
-                  int include_result, int *count)
-{
-  while (next (notes))
-    buffer_note_xml (buffer, notes, include_notes_details, include_result, count);
 }
 
 /**
@@ -9162,8 +8501,6 @@ buffer_override_xml (GString *buffer, iterator_t *overrides,
             buffer_results_xml (buffer,
                                 &results,
                                 0,
-                                0,  /* Overrides. */
-                                0,  /* Override details. */
                                 0,  /* Overrides. */
                                 0,  /* Override details. */
                                 0,  /* Tags. */
@@ -9485,57 +8822,6 @@ strdiff (const gchar *one, const gchar *two)
   gvm_file_remove_recurse (dir);
 
   return ret;
-}
-
-/**
- * @brief Buffer XML for notes of a result.
- *
- * @param[in]  buffer                 Buffer into which to buffer results.
- * @param[in]  result                 Result.
- * @param[in]  task                   Task associated with result.
- * @param[in]  include_notes_details  Whether to include details of notes.
- * @param[in]  lean                   Whether to include less info.
- */
-static void
-buffer_result_notes_xml (GString *buffer, result_t result, task_t task,
-                         int include_notes_details, int lean)
-{
-  if (task)
-    {
-      get_data_t get;
-      iterator_t notes;
-      GString *temp_buffer;
-
-      memset (&get, '\0', sizeof (get));
-      /* Most recent first. */
-      get.filter = "sort-reverse=created owner=any permission=any";
-
-      if (note_count (&get, 0, result, task) == 0)
-        return;
-
-      init_note_iterator (&notes,
-                          &get,
-                          0,
-                          result,
-                          task);
-
-      temp_buffer = g_string_new ("");
-      buffer_notes_xml (temp_buffer,
-                        &notes,
-                        include_notes_details,
-                        0,
-                        NULL);
-
-      if (lean == 0 || strlen (temp_buffer->str))
-        {
-          g_string_append (buffer, "<notes>");
-          g_string_append (buffer, temp_buffer->str);
-          g_string_append (buffer, "</notes>");
-        }
-      g_string_free (temp_buffer, TRUE);
-
-      cleanup_iterator (&notes);
-    }
 }
 
 /**
@@ -9959,10 +9245,7 @@ buffer_diff(GString *buffer, const char *descr, const char *delta_descr)
  * @param[in]  buffer                 Buffer into which to buffer results.
  * @param[in]  results                Result iterator.
  * @param[in]  task                   Task associated with results.  Only
- *                                    needed with include_notes or
- *                                    include_overrides.
- * @param[in]  include_notes          Whether to include notes.
- * @param[in]  include_notes_details  Whether to include details of notes.
+ *                                    needed with include_overrides.
  * @param[in]  include_overrides          Whether to include overrides.
  * @param[in]  include_overrides_details  Whether to include details of overrides.
  * @param[in]  include_tags           Whether to include user tag count.
@@ -9979,7 +9262,6 @@ buffer_diff(GString *buffer, const char *descr, const char *delta_descr)
  */
 void
 buffer_results_xml (GString *buffer, iterator_t *results, task_t task,
-                    int include_notes, int include_notes_details,
                     int include_overrides, int include_overrides_details,
                     int include_tags, int include_tags_details,
                     int include_details,
@@ -10300,13 +9582,6 @@ buffer_results_xml (GString *buffer, iterator_t *results, task_t task,
 
   buffer_xml_append_printf (buffer, "<compliance>%s</compliance>", compliance);
 
-  if (include_notes
-      && (use_delta_fields
-          ? result_iterator_delta_may_have_notes (results)
-          : result_iterator_may_have_notes (results)))
-    buffer_result_notes_xml (buffer, result,
-                             selected_task, include_notes_details, lean);
-
   if (include_overrides
       && (use_delta_fields
           ? result_iterator_delta_may_have_overrides (results)
@@ -10328,7 +9603,6 @@ buffer_results_xml (GString *buffer, iterator_t *results, task_t task,
             gchar *delta_nl_descr;
             const char *delta_descr;
             buffer_results_xml (buffer, delta_results, selected_task,
-                                include_notes, include_notes_details,
                                 include_overrides, include_overrides_details,
                                 include_tags, include_tags_details,
                                 include_details, delta_state, NULL, 0, -1,
@@ -10347,7 +9621,6 @@ buffer_results_xml (GString *buffer, iterator_t *results, task_t task,
             gchar *delta_nl_descr;
             const char *delta_descr;
             buffer_results_xml (buffer, results, selected_task,
-                                include_notes, include_notes_details,
                                 include_overrides, include_overrides_details,
                                 include_tags, include_tags_details,
                                 include_details, delta_state, NULL, 0, -1,
@@ -10363,13 +9636,6 @@ buffer_results_xml (GString *buffer, iterator_t *results, task_t task,
 
       if (delta_results)
         {
-          if (include_notes)
-            buffer_result_notes_xml (buffer,
-                                     result_iterator_result (delta_results),
-                                     selected_task,
-                                     include_notes_details,
-                                     lean);
-
           if (include_overrides)
             buffer_result_overrides_xml (buffer,
                                          result_iterator_result (delta_results),
@@ -10385,11 +9651,6 @@ buffer_results_xml (GString *buffer, iterator_t *results, task_t task,
       g_free (nl_descr);
       g_free (nl_descr_escaped);
     }
-
-  if (use_delta_fields
-      ? result_iterator_delta_may_have_tickets (results)
-      : result_iterator_may_have_tickets (results))
-    buffer_result_tickets_xml (buffer, result);
 
   g_string_append (buffer, "</result>");
 }
@@ -14621,131 +13882,6 @@ handle_get_info (gmp_parser_t *gmp_parser, GError **error)
 }
 
 /**
- * @brief Handle end of GET_NOTES element.
- *
- * @param[in]  gmp_parser   GMP parser.
- * @param[in]  error        Error parameter.
- */
-static void
-handle_get_notes (gmp_parser_t *gmp_parser, GError **error)
-{
-  nvt_t nvt = 0;
-  task_t task = 0;
-
-  if (get_notes_data->get.id && get_notes_data->nvt_oid)
-    SEND_TO_CLIENT_OR_FAIL
-     (XML_ERROR_SYNTAX ("get_notes",
-                        "Only one of NVT and the note_id attribute"
-                        " may be given"));
-  else if (get_notes_data->get.id && get_notes_data->task_id)
-    SEND_TO_CLIENT_OR_FAIL
-     (XML_ERROR_SYNTAX ("get_notes",
-                        "Only one of the note_id and task_id"
-                        " attributes may be given"));
-  else if (get_notes_data->task_id
-           && find_task_with_permission (get_notes_data->task_id, &task,
-                                         "get_tasks"))
-    SEND_TO_CLIENT_OR_FAIL (XML_INTERNAL_ERROR ("get_notes"));
-  else if (get_notes_data->task_id && task == 0)
-    {
-      if (send_find_error_to_client ("get_notes",
-                                     "task", get_notes_data->task_id,
-                                     gmp_parser))
-        {
-          error_send_to_client (error);
-          return;
-        }
-    }
-  else if (get_notes_data->nvt_oid
-            && find_nvt (get_notes_data->nvt_oid, &nvt))
-    SEND_TO_CLIENT_OR_FAIL (XML_INTERNAL_ERROR ("get_notes"));
-  else if (get_notes_data->nvt_oid && nvt == 0)
-    {
-      if (send_find_error_to_client ("get_notes", "NVT",
-                                     get_notes_data->nvt_oid,
-                                     gmp_parser))
-        {
-          error_send_to_client (error);
-          return;
-        }
-    }
-  else
-    {
-      iterator_t notes;
-      GString *buffer;
-      int count, filtered, ret, first;
-
-      INIT_GET (note, Note);
-
-      ret = init_note_iterator (&notes, &get_notes_data->get, nvt, 0,
-                                task);
-      if (ret)
-        {
-          switch (ret)
-            {
-              case 1:
-                if (send_find_error_to_client ("get_notes", "note",
-                                               get_notes_data->get.id,
-                                               gmp_parser))
-                  {
-                    error_send_to_client (error);
-                    return;
-                  }
-                break;
-              case 2:
-                if (send_find_error_to_client
-                      ("get_notes", "filter",
-                       get_notes_data->get.filt_id, gmp_parser))
-                  {
-                    error_send_to_client (error);
-                    return;
-                  }
-                break;
-              case -1:
-                SEND_TO_CLIENT_OR_FAIL
-                  (XML_INTERNAL_ERROR ("get_notes"));
-                break;
-            }
-          get_notes_data_reset (get_notes_data);
-          set_client_state (CLIENT_AUTHENTIC);
-          return;
-        }
-
-      SEND_GET_START ("note");
-
-      buffer = g_string_new ("");
-
-      while (1)
-        {
-          ret = get_next (&notes, &get_notes_data->get, &first, &count,
-                          init_note_iterator_all);
-          if (ret == 1)
-            break;
-          if (ret == -1)
-            {
-              internal_error_send_to_client (error);
-              return;
-            }
-
-          buffer_note_xml (buffer, &notes, get_notes_data->get.details,
-                           get_notes_data->result, &count);
-        }
-
-      SEND_TO_CLIENT_OR_FAIL (buffer->str);
-      g_string_free (buffer, TRUE);
-
-      cleanup_iterator (&notes);
-      filtered = get_notes_data->get.id
-                  ? 1
-                  : note_count (&get_notes_data->get, nvt, 0, task);
-      SEND_GET_END ("note", &get_notes_data->get, count, filtered);
-    }
-  get_notes_data_reset (get_notes_data);
-  set_client_state (CLIENT_AUTHENTIC);
-
-}
-
-/**
  * @brief Handle end of GET_NVTS element.
  *
  * @param[in]  gmp_parser   GMP parser.
@@ -16098,7 +15234,6 @@ handle_get_reports (gmp_parser_t *gmp_parser, GError **error)
                                 no_report_format ? -1 : report_format,
                                 report_config,
                                 &get_reports_data->get,
-                                get_reports_data->notes_details,
                                 get_reports_data->overrides_details,
                                 get_reports_data->result_tags,
                                 get_reports_data->ignore_pagination,
@@ -16964,10 +16099,6 @@ select_resource_iterator (get_resource_names_data_t *resource_names_data,
     {
       *iterator = (int (*) (iterator_t*, get_data_t *))init_group_iterator;
     }
-  else if (g_strcmp0 ("note", resource_names_data->type) == 0)
-    {
-      *iterator = init_note_iterator_all;
-    }
   else if (g_strcmp0 ("override", resource_names_data->type) == 0)
     {
       *iterator = init_override_iterator_all;
@@ -16986,13 +16117,6 @@ select_resource_iterator (get_resource_names_data_t *resource_names_data,
       get_data_set_extra (&resource_names_data->get,
                           "usage_type",
                           g_strdup ("scan"));
-    }
-  else if (g_strcmp0 ("audit_report", resource_names_data->type) == 0)
-    {
-      *iterator = (int (*) (iterator_t*, get_data_t *))init_report_iterator;
-      get_data_set_extra (&resource_names_data->get,
-                          "usage_type",
-                          g_strdup ("audit"));
     }
   else if (g_strcmp0 ("report_config", resource_names_data->type) == 0)
     {
@@ -17013,13 +16137,6 @@ select_resource_iterator (get_resource_names_data_t *resource_names_data,
                           "usage_type",
                           g_strdup ("scan"));
     }
-  else if (g_strcmp0 ("policy", resource_names_data->type) == 0)
-    {
-      *iterator = (int (*) (iterator_t*, get_data_t *))init_config_iterator;
-      get_data_set_extra (&resource_names_data->get,
-                          "usage_type",
-                          g_strdup ("policy"));
-    }
   else if (g_strcmp0 ("scanner", resource_names_data->type) == 0)
     {
       *iterator = (int (*) (iterator_t*, get_data_t *))init_scanner_iterator;
@@ -17038,13 +16155,6 @@ select_resource_iterator (get_resource_names_data_t *resource_names_data,
       get_data_set_extra (&resource_names_data->get,
                     "usage_type",
                     g_strdup ("scan"));
-    }
-  else if (g_strcmp0 ("audit", resource_names_data->type) == 0)
-    {
-      *iterator = (int (*) (iterator_t*, get_data_t *))init_task_iterator;
-      get_data_set_extra (&resource_names_data->get,
-                    "usage_type",
-                    g_strdup ("audit"));
     }
   else if (g_strcmp0 ("tls_certificate", resource_names_data->type) == 0)
     {
@@ -17089,8 +16199,7 @@ handle_get_resource_names (gmp_parser_t *gmp_parser, GError **error)
        && (acl_user_may ("get_assets") == 0))
       || ((g_strcmp0 ("result", get_resource_names_data->type) == 0)
           && (acl_user_may ("get_results") == 0))
-      || (((g_strcmp0 ("report", get_resource_names_data->type) == 0)
-           || (g_strcmp0 ("audit_report", get_resource_names_data->type) == 0))
+      || ((g_strcmp0 ("report", get_resource_names_data->type) == 0)
           && (acl_user_may ("get_reports") == 0))
       || (((g_strcmp0 ("cpe", get_resource_names_data->type) == 0)
            || (g_strcmp0 ("cve", get_resource_names_data->type) == 0)
@@ -17098,11 +16207,9 @@ handle_get_resource_names (gmp_parser_t *gmp_parser, GError **error)
            || (g_strcmp0 ("cert_bund_adv", get_resource_names_data->type) == 0)
            || (g_strcmp0 ("dfn_cert_adv", get_resource_names_data->type) == 0))
           && (acl_user_may ("get_info") == 0))
-      || (((g_strcmp0 ("config", get_resource_names_data->type) == 0)
-          ||(g_strcmp0 ("policy", get_resource_names_data->type) == 0))
-       && (acl_user_may ("get_configs") == 0))
-      || (((g_strcmp0 ("task", get_resource_names_data->type) == 0)
-          ||(g_strcmp0 ("audit", get_resource_names_data->type) == 0))
+      || ((g_strcmp0 ("config", get_resource_names_data->type) == 0)
+          && (acl_user_may ("get_configs") == 0))
+      || ((g_strcmp0 ("task", get_resource_names_data->type) == 0)
        && (acl_user_may ("get_tasks") == 0)))
       {
         SEND_TO_CLIENT_OR_FAIL
@@ -17314,7 +16421,7 @@ handle_get_results (gmp_parser_t *gmp_parser, GError **error)
     {
       const char* filter;
       iterator_t results;
-      int notes, overrides;
+      int overrides;
       int count, ret, first;
       gchar *report_id;
       report_t report;
@@ -17376,7 +16483,6 @@ handle_get_results (gmp_parser_t *gmp_parser, GError **error)
                                       NULL, /* delta_states */
                                       NULL, /* search_phrase */
                                       NULL, /* search_phrase_exact */
-                                      &notes,
                                       &overrides,
                                       NULL, /* apply_overrides */
                                       NULL);/* zone */
@@ -17404,8 +16510,6 @@ handle_get_results (gmp_parser_t *gmp_parser, GError **error)
               buffer_results_xml (buffer,
                                   &results,
                                   task,
-                                  notes,
-                                  get_results_data->notes_details,
                                   overrides,
                                   get_results_data->overrides_details,
                                   1,
@@ -19770,76 +18874,44 @@ handle_get_tasks (gmp_parser_t *gmp_parser, GError **error)
               scan_start = scan_start_time_uuid (last_report_id);
               scan_end = scan_end_time_uuid (last_report_id);
 
-              if (strcmp (task_iterator_usage_type (&tasks), "audit") == 0)
-                {
-                  int compliance_yes, compliance_no, compliance_incomplete;
-
-                  report_compliance_by_uuid (last_report_id,
-                                             &compliance_yes,
-                                             &compliance_no,
-                                             &compliance_incomplete,
-                                             NULL);
-
-                  last_report
-                    = g_strdup_printf ("<last_report>"
-                                       "<report id=\"%s\">"
-                                       "<timestamp>%s</timestamp>"
-                                       "<scan_start>%s</scan_start>"
-                                       "<scan_end>%s</scan_end>"
-                                       "<compliance_count>"
-                                       "<yes>%d</yes>"
-                                       "<no>%d</no>"
-                                       "<incomplete>%d</incomplete>"
-                                       "</compliance_count>"
-                                       "</report>"
-                                       "</last_report>",
-                                       last_report_id,
-                                       timestamp,
-                                       scan_start,
-                                       scan_end,
-                                       compliance_yes,
-                                       compliance_no,
-                                       compliance_incomplete);
-                }
-              else
-                last_report
-                    = g_strdup_printf ("<last_report>"
-                                       "<report id=\"%s\">"
-                                       "<timestamp>%s</timestamp>"
-                                       "<scan_start>%s</scan_start>"
-                                       "<scan_end>%s</scan_end>"
-                                       "<result_count>"
-                                       "<critical>%i</critical>"
-                                       "<hole deprecated='1'>%i</hole>"
-                                       "<high>%i</high>"
-                                       "<info deprecated='1'>%i</info>"
-                                       "<low>%i</low>"
-                                       "<log>%i</log>"
-                                       "<warning deprecated='1'>%i</warning>"
-                                       "<medium>%i</medium>"
-                                       "<false_positive>"
-                                       "%i"
-                                       "</false_positive>"
-                                       "</result_count>"
-                                       "<severity>"
-                                       "%1.1f"
-                                       "</severity>"
-                                       "</report>"
-                                       "</last_report>",
-                                       last_report_id,
-                                       timestamp,
-                                       scan_start,
-                                       scan_end,
-                                       criticals,
-                                       holes,
-                                       holes,
-                                       infos,
-                                       infos,
-                                       logs,
-                                       warnings,
-                                       warnings,
-                                       false_positives,
-                                       severity);
+              last_report
+                  = g_strdup_printf ("<last_report>"
+                                     "<report id=\"%s\">"
+                                     "<timestamp>%s</timestamp>"
+                                     "<scan_start>%s</scan_start>"
+                                     "<scan_end>%s</scan_end>"
+                                     "<result_count>"
+                                     "<critical>%i</critical>"
+                                     "<hole deprecated='1'>%i</hole>"
+                                     "<high>%i</high>"
+                                     "<info deprecated='1'>%i</info>"
+                                     "<low>%i</low>"
+                                     "<log>%i</log>"
+                                     "<warning deprecated='1'>%i</warning>"
+                                     "<medium>%i</medium>"
+                                     "<false_positive>"
+                                     "%i"
+                                     "</false_positive>"
+                                     "</result_count>"
+                                     "<severity>"
+                                     "%1.1f"
+                                     "</severity>"
+                                     "</report>"
+                                     "</last_report>",
+                                     last_report_id,
+                                     timestamp,
+                                     scan_start,
+                                     scan_end,
+                                     criticals,
+                                     holes,
+                                     holes,
+                                     infos,
+                                     infos,
+                                     logs,
+                                     warnings,
+                                     warnings,
+                                     false_positives,
+                                     severity);
               free (scan_start);
               free (scan_end);
               g_free (timestamp);
@@ -21359,7 +20431,6 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
       CASE_DELETE (CREDENTIAL, credential, "Credential");
       CASE_DELETE (FILTER, filter, "Filter");
       CASE_DELETE (GROUP, group, "Group");
-      CASE_DELETE (NOTE, note, "Note");
       CASE_DELETE (OVERRIDE, override, "Override");
       CASE_DELETE (PERMISSION, permission, "Permission");
       CASE_DELETE (PORT_LIST, port_list, "Port list");
@@ -21520,7 +20591,6 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
         set_client_state (CLIENT_AUTHENTIC);
         break;
 
-      case CLIENT_DELETE_TICKET:
       case CLIENT_DELETE_TLS_CERTIFICATE:
         delete_run (gmp_parser, error);
         set_client_state (CLIENT_AUTHENTIC);
@@ -21846,10 +20916,6 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
           break;
         }
 
-      case CLIENT_GET_NOTES:
-        handle_get_notes (gmp_parser, error);
-        break;
-
       case CLIENT_GET_NVTS:
         handle_get_nvts (gmp_parser, error);
         break;
@@ -21945,7 +21011,6 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
         handle_get_tasks (gmp_parser, error);
         break;
 
-      CASE_GET_END (TICKETS, tickets);
 
       CASE_GET_END (TLS_CERTIFICATES, tls_certificates);
 
@@ -23250,171 +22315,6 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
       CLOSE (CLIENT_CREATE_GROUP, SPECIALS);
       CLOSE (CLIENT_CREATE_GROUP_SPECIALS, FULL);
       CLOSE (CLIENT_CREATE_GROUP, USERS);
-
-      case CLIENT_CREATE_NOTE:
-        {
-          task_t task = 0;
-          result_t result = 0;
-          note_t new_note;
-          int max;
-
-          if (create_note_data->copy)
-            switch (copy_note (create_note_data->copy, &new_note))
-              {
-                case 0:
-                  {
-                    char *uuid;
-                    note_uuid (new_note, &uuid);
-                    SENDF_TO_CLIENT_OR_FAIL (XML_OK_CREATED_ID ("create_note"),
-                                             uuid);
-                    log_event ("note", "Note", uuid, "created");
-                    free (uuid);
-                    break;
-                  }
-                case 1:
-                  SEND_TO_CLIENT_OR_FAIL
-                   (XML_ERROR_SYNTAX ("create_note",
-                                      "Note exists already"));
-                  log_event_fail ("note", "Note", NULL, "created");
-                  break;
-                case 2:
-                  if (send_find_error_to_client ("create_note", "note",
-                                                 create_note_data->copy,
-                                                 gmp_parser))
-                    {
-                      error_send_to_client (error);
-                      return;
-                    }
-                  log_event_fail ("note", "Note", NULL, "created");
-                  break;
-                case 99:
-                  SEND_TO_CLIENT_OR_FAIL
-                   (XML_ERROR_SYNTAX ("create_note",
-                                      "Permission denied"));
-                  log_event_fail ("note", "Note", NULL, "created");
-                  break;
-                case -1:
-                default:
-                  SEND_TO_CLIENT_OR_FAIL
-                   (XML_INTERNAL_ERROR ("create_note"));
-                  log_event_fail ("note", "Note", NULL, "created");
-                  break;
-              }
-          else if (create_note_data->nvt_oid == NULL)
-            SEND_TO_CLIENT_OR_FAIL
-             (XML_ERROR_SYNTAX ("create_note",
-                                "An NVT entity is required"));
-          else if (create_note_data->text == NULL)
-            SEND_TO_CLIENT_OR_FAIL
-             (XML_ERROR_SYNTAX ("create_note",
-                                "A TEXT entity is required"));
-          else if (create_note_data->hosts
-                   && ((max = manage_count_hosts (create_note_data->hosts, NULL))
-                       == -1))
-            SEND_TO_CLIENT_OR_FAIL
-             (XML_ERROR_SYNTAX ("create_note",
-                                "Error in host specification"));
-          else if (create_note_data->hosts && (max > manage_max_hosts ()))
-            SEND_TO_CLIENT_OR_FAIL
-             (XML_ERROR_SYNTAX ("create_note",
-                                "Host specification exceeds maximum number of"
-                                " hosts"));
-          else if (create_note_data->task_id
-                   && find_task_with_permission (create_note_data->task_id,
-                                                 &task,
-                                                 NULL))
-            SEND_TO_CLIENT_OR_FAIL (XML_INTERNAL_ERROR ("create_note"));
-          else if (create_note_data->task_id && task == 0)
-            {
-              if (send_find_error_to_client ("create_note", "task",
-                                             create_note_data->task_id,
-                                             gmp_parser))
-                {
-                  error_send_to_client (error);
-                  return;
-                }
-            }
-          else if (create_note_data->result_id
-                   && find_result_with_permission (create_note_data->result_id,
-                                                   &result,
-                                                   NULL))
-            SEND_TO_CLIENT_OR_FAIL (XML_INTERNAL_ERROR ("create_note"));
-          else if (create_note_data->result_id && result == 0)
-            {
-              if (send_find_error_to_client ("create_note", "result",
-                                             create_note_data->result_id,
-                                             gmp_parser))
-                {
-                  error_send_to_client (error);
-                  return;
-                }
-            }
-          else switch (create_note (create_note_data->active,
-                                    create_note_data->nvt_oid,
-                                    create_note_data->text,
-                                    create_note_data->hosts,
-                                    create_note_data->port,
-                                    create_note_data->severity,
-                                    create_note_data->threat,
-                                    task,
-                                    result,
-                                    &new_note))
-            {
-              case 0:
-                {
-                  char *uuid;
-                  note_uuid (new_note, &uuid);
-                  SENDF_TO_CLIENT_OR_FAIL (XML_OK_CREATED_ID ("create_note"),
-                                           uuid);
-                  log_event ("note", "Note", uuid, "created");
-                  free (uuid);
-                  break;
-                }
-              case 1:
-                if (send_find_error_to_client ("create_note", "nvt",
-                                               create_note_data->nvt_oid,
-                                               gmp_parser))
-                  {
-                    error_send_to_client (error);
-                    return;
-                  }
-                break;
-              case 2:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("create_note",
-                                    "Error in port specification"));
-                log_event_fail ("note", "Note", NULL, "created");
-                break;
-              case 99:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("create_note",
-                                    "Permission denied"));
-                break;
-              case -1:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_INTERNAL_ERROR ("create_note"));
-                break;
-              default:
-                assert (0);
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_INTERNAL_ERROR ("create_note"));
-                break;
-            }
-          create_note_data_reset (create_note_data);
-          set_client_state (CLIENT_AUTHENTIC);
-          break;
-        }
-      CLOSE (CLIENT_CREATE_NOTE, ACTIVE);
-      CLOSE (CLIENT_CREATE_NOTE, COPY);
-      CLOSE (CLIENT_CREATE_NOTE, HOSTS);
-      CLOSE (CLIENT_CREATE_NOTE, NVT);
-      CLOSE (CLIENT_CREATE_NOTE, PORT);
-      CLOSE (CLIENT_CREATE_NOTE, SEVERITY);
-      CLOSE (CLIENT_CREATE_NOTE, RESULT);
-      CLOSE (CLIENT_CREATE_NOTE, TASK);
-      CLOSE (CLIENT_CREATE_NOTE, TEXT);
-      CLOSE (CLIENT_CREATE_NOTE, THREAT);
-
 
       case CLIENT_CREATE_OVERRIDE:
         {
@@ -25333,11 +24233,6 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
         break;
       CLOSE (CLIENT_CREATE_TASK_PREFERENCES_PREFERENCE, VALUE);
 
-      case CLIENT_CREATE_TICKET:
-        if (create_ticket_element_end (gmp_parser, error, element_name))
-          set_client_state (CLIENT_AUTHENTIC);
-        break;
-
       case CLIENT_CREATE_TLS_CERTIFICATE:
         if (create_tls_certificate_element_end (gmp_parser, error,
                                                 element_name))
@@ -26582,119 +25477,6 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
             set_client_state (CLIENT_AUTHENTIC);
           break;
         }
-
-      case CLIENT_MODIFY_NOTE:
-        {
-          if (acl_user_may ("modify_note") == 0)
-            {
-              SEND_TO_CLIENT_OR_FAIL
-               (XML_ERROR_SYNTAX ("modify_note",
-                                  "Permission denied"));
-              modify_note_data_reset (modify_note_data);
-              set_client_state (CLIENT_AUTHENTIC);
-              break;
-            }
-
-          if (modify_note_data->note_id == NULL)
-            SEND_TO_CLIENT_OR_FAIL
-             (XML_ERROR_SYNTAX ("modify_note",
-                                "A note_id attribute is required"));
-          else if (modify_note_data->text == NULL)
-            SEND_TO_CLIENT_OR_FAIL
-             (XML_ERROR_SYNTAX ("modify_note",
-                                "A TEXT entity is required"));
-          else switch (modify_note (modify_note_data->note_id,
-                                    modify_note_data->active,
-                                    modify_note_data->nvt_oid,
-                                    modify_note_data->text,
-                                    modify_note_data->hosts,
-                                    modify_note_data->port,
-                                    modify_note_data->severity,
-                                    modify_note_data->threat,
-                                    modify_note_data->task_id,
-                                    modify_note_data->result_id))
-            {
-              case 0:
-                SENDF_TO_CLIENT_OR_FAIL (XML_OK ("modify_note"));
-                break;
-              case -1:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_INTERNAL_ERROR ("modify_note"));
-                break;
-              case 2:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("modify_note",
-                                    "Error in port specification"));
-                log_event_fail ("note", "Note", modify_note_data->note_id,
-                                "modified");
-                break;
-              case 3:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("modify_note",
-                                    "Error in severity specification"));
-                log_event_fail ("note", "Note", modify_note_data->note_id,
-                                "modified");
-                break;
-              case 4:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("modify_note",
-                                    "Invalid nvt oid"));
-                log_event_fail ("note", "Note", modify_note_data->note_id,
-                                "modified");
-                break;
-              case 5:
-                if (send_find_error_to_client ("modify_note", "note",
-                                               modify_note_data->note_id,
-                                               gmp_parser))
-                  {
-                    error_send_to_client (error);
-                    return;
-                  }
-                log_event_fail ("note", "Note", modify_note_data->note_id,
-                                "modified");
-                break;
-              case 6:
-                if (send_find_error_to_client ("modify_note", "task",
-                                               modify_note_data->task_id,
-                                               gmp_parser))
-                  {
-                    error_send_to_client (error);
-                    return;
-                  }
-                log_event_fail ("note", "Note", modify_note_data->note_id,
-                                "modified");
-                break;
-              case 7:
-                if (send_find_error_to_client ("modify_note", "result",
-                                               modify_note_data->result_id,
-                                               gmp_parser))
-                  {
-                    error_send_to_client (error);
-                    return;
-                  }
-                log_event_fail ("note", "Note", modify_note_data->note_id,
-                                "modified");
-                break;
-              default:
-                assert (0);
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_INTERNAL_ERROR ("modify_note"));
-                break;
-            }
-          modify_note_data_reset (modify_note_data);
-          set_client_state (CLIENT_AUTHENTIC);
-          break;
-        }
-      CLOSE (CLIENT_MODIFY_NOTE, ACTIVE);
-      CLOSE (CLIENT_MODIFY_NOTE, HOSTS);
-      CLOSE (CLIENT_MODIFY_NOTE, PORT);
-      CLOSE (CLIENT_MODIFY_NOTE, RESULT);
-      CLOSE (CLIENT_MODIFY_NOTE, SEVERITY);
-      CLOSE (CLIENT_MODIFY_NOTE, TASK);
-      CLOSE (CLIENT_MODIFY_NOTE, TEXT);
-      CLOSE (CLIENT_MODIFY_NOTE, THREAT);
-      CLOSE (CLIENT_MODIFY_NOTE, NVT);
-
 
       case CLIENT_MODIFY_OVERRIDE:
         {
@@ -28153,11 +26935,6 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
         break;
       CLOSE (CLIENT_MODIFY_TASK_PREFERENCES_PREFERENCE, VALUE);
 
-      case CLIENT_MODIFY_TICKET:
-        if (modify_ticket_element_end (gmp_parser, error, element_name))
-          set_client_state (CLIENT_AUTHENTIC);
-        break;
-
       case CLIENT_MODIFY_TLS_CERTIFICATE:
         if (modify_tls_certificate_element_end (gmp_parser,
                                                 error,
@@ -29451,27 +28228,6 @@ gmp_xml_handle_text (/* unused */ GMarkupParseContext* context,
               &create_group_data->users);
 
 
-      APPEND (CLIENT_CREATE_NOTE_ACTIVE,
-              &create_note_data->active);
-
-      APPEND (CLIENT_CREATE_NOTE_COPY,
-              &create_note_data->copy);
-
-      APPEND (CLIENT_CREATE_NOTE_HOSTS,
-              &create_note_data->hosts);
-
-      APPEND (CLIENT_CREATE_NOTE_PORT,
-              &create_note_data->port);
-
-      APPEND (CLIENT_CREATE_NOTE_SEVERITY,
-              &create_note_data->severity);
-
-      APPEND (CLIENT_CREATE_NOTE_TEXT,
-              &create_note_data->text);
-
-      APPEND (CLIENT_CREATE_NOTE_THREAT,
-              &create_note_data->threat);
-
 
       APPEND (CLIENT_CREATE_OVERRIDE_ACTIVE,
               &create_override_data->active);
@@ -29829,10 +28585,6 @@ gmp_xml_handle_text (/* unused */ GMarkupParseContext* context,
       APPEND (CLIENT_CREATE_TASK_USAGE_TYPE,
               &create_task_data->usage_type);
 
-      case CLIENT_CREATE_TICKET:
-        create_ticket_element_text (text, text_len);
-        break;
-
       case CLIENT_CREATE_TLS_CERTIFICATE:
         create_tls_certificate_element_text (text, text_len);
         break;
@@ -29973,27 +28725,6 @@ gmp_xml_handle_text (/* unused */ GMarkupParseContext* context,
         modify_license_element_text (text, text_len);
         break;
 
-
-      APPEND (CLIENT_MODIFY_NOTE_ACTIVE,
-              &modify_note_data->active);
-
-      APPEND (CLIENT_MODIFY_NOTE_HOSTS,
-              &modify_note_data->hosts);
-
-      APPEND (CLIENT_MODIFY_NOTE_PORT,
-              &modify_note_data->port);
-
-      APPEND (CLIENT_MODIFY_NOTE_SEVERITY,
-              &modify_note_data->severity);
-
-      APPEND (CLIENT_MODIFY_NOTE_TEXT,
-              &modify_note_data->text);
-
-      APPEND (CLIENT_MODIFY_NOTE_THREAT,
-              &modify_note_data->threat);
-
-      APPEND (CLIENT_MODIFY_NOTE_NVT,
-              &modify_note_data->nvt_oid);
 
 
       APPEND (CLIENT_MODIFY_OVERRIDE_ACTIVE,
@@ -30137,10 +28868,6 @@ gmp_xml_handle_text (/* unused */ GMarkupParseContext* context,
       APPEND (CLIENT_MODIFY_TARGET_SSH_LSC_CREDENTIAL_PORT,
               &modify_target_data->ssh_lsc_port);
 
-
-      case CLIENT_MODIFY_TICKET:
-        modify_ticket_element_text (text, text_len);
-        break;
 
       case CLIENT_MODIFY_TLS_CERTIFICATE:
         modify_tls_certificate_element_text (text, text_len);

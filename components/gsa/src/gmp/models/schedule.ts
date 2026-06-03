@@ -10,7 +10,7 @@ import {map} from 'gmp/utils/array';
 import {isDefined} from 'gmp/utils/identity';
 
 interface ScheduleTaskElement extends ModelElement {
-  usage_type?: 'scan' | 'audit';
+  usage_type?: 'scan';
 }
 
 interface ScheduleElement extends ModelElement {
@@ -81,9 +81,7 @@ class Schedule extends Model {
     }
 
     ret.tasks = map(element.tasks?.task, task => {
-      // Use 'audit' entity type for audits, 'task' for scans
-      const entityType = task.usage_type === 'audit' ? 'audit' : 'task';
-      return Model.fromElement(task, entityType);
+      return Model.fromElement(task, 'task');
     });
 
     return ret;

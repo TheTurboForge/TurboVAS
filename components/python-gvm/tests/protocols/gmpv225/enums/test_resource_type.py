@@ -60,10 +60,6 @@ class GetResourceTypeFromStringTestCase(unittest.TestCase):
         ct = ResourceType.from_string("host")
         self.assertEqual(ct, ResourceType.HOST)
 
-    def test_note(self):
-        ct = ResourceType.from_string("note")
-        self.assertEqual(ct, ResourceType.NOTE)
-
     def test_nvt(self):
         ct = ResourceType.from_string("nvt")
         self.assertEqual(ct, ResourceType.NVT)

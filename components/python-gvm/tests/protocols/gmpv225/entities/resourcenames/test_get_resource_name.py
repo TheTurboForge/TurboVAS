@@ -90,11 +90,11 @@ class GmpGetResourceNameTestMixin:
         )
 
         self.gmp.get_resource_name(
-            resource_type=ResourceType.NOTE, resource_id="i1"
+            resource_type=ResourceType.NVT, resource_id="i1"
         )
 
         self.connection.send.has_been_called_with(
-            b'<get_resource_names resource_id="i1" type="NOTE"/>'
+            b'<get_resource_names resource_id="i1" type="NVT"/>'
         )
 
         self.gmp.get_resource_name(

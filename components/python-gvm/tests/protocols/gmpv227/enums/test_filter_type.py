@@ -34,10 +34,6 @@ class GetFilterTypeFomStringTestCase(unittest.TestCase):
         ft = FilterType.from_string("host")
         self.assertEqual(ft, FilterType.HOST)
 
-    def test_filter_type_note(self):
-        ft = FilterType.from_string("note")
-        self.assertEqual(ft, FilterType.NOTE)
-
     def test_filter_type_override(self):
         ft = FilterType.from_string("override")
         self.assertEqual(ft, FilterType.OVERRIDE)
@@ -90,10 +86,6 @@ class GetFilterTypeFomStringTestCase(unittest.TestCase):
         ft = FilterType.from_string("target")
         self.assertEqual(ft, FilterType.TARGET)
 
-    def test_filter_type_ticket(self):
-        ft = FilterType.from_string("ticket")
-        self.assertEqual(ft, FilterType.TICKET)
-
     def test_filter_type_tls_certificate(self):
         ft = FilterType.from_string("tls_certificate")
         self.assertEqual(ft, FilterType.TLS_CERTIFICATE)
@@ -129,10 +121,6 @@ class GetFilterTypeFomStringTestCase(unittest.TestCase):
     def test_filter_type_report_config(self):
         ft = FilterType.from_string("report_config")
         self.assertEqual(ft, FilterType.REPORT_CONFIG)
-
-    def test_filter_type_audit_report(self):
-        ft = FilterType.from_string("audit_report")
-        self.assertEqual(ft, FilterType.AUDIT_REPORT)
 
     def test_invalid_filter_type(self):
         with self.assertRaises(InvalidArgument):

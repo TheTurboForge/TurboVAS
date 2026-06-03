@@ -91,7 +91,6 @@ manage_send_report_tls_certificates (report_t report,
                                                 NULL,
                                                 NULL,
                                                 NULL,
-                                                NULL,
                                                 NULL);
   if (ret)
     goto cleanup;

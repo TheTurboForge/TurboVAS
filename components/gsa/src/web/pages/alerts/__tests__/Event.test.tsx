@@ -9,9 +9,6 @@ import {
   EVENT_TYPE_UPDATED_SECINFO,
   EVENT_TYPE_NEW_SECINFO,
   EVENT_TYPE_TASK_RUN_STATUS_CHANGED,
-  EVENT_TYPE_TICKET_RECEIVED,
-  EVENT_TYPE_ASSIGNED_TICKET_CHANGED,
-  EVENT_TYPE_OWNED_TICKET_CHANGED,
 } from 'gmp/models/alert';
 import Event from 'web/pages/alerts/Event';
 
@@ -75,24 +72,6 @@ describe('Event Component', () => {
     };
     render(<Event event={event} />);
     expect(screen.getByText('Task run status changed')).toBeInTheDocument();
-  });
-
-  test('should render "Ticket received" for EVENT_TYPE_TICKET_RECEIVED', () => {
-    const event = {type: EVENT_TYPE_TICKET_RECEIVED, data: {}};
-    render(<Event event={event} />);
-    expect(screen.getByText('Ticket received')).toBeInTheDocument();
-  });
-
-  test('should render "Assigned Ticket changed" for EVENT_TYPE_ASSIGNED_TICKET_CHANGED', () => {
-    const event = {type: EVENT_TYPE_ASSIGNED_TICKET_CHANGED, data: {}};
-    render(<Event event={event} />);
-    expect(screen.getByText('Assigned Ticket changed')).toBeInTheDocument();
-  });
-
-  test('should render "Owned Ticket changed" for EVENT_TYPE_OWNED_TICKET_CHANGED', () => {
-    const event = {type: EVENT_TYPE_OWNED_TICKET_CHANGED, data: {}};
-    render(<Event event={event} />);
-    expect(screen.getByText('Owned Ticket changed')).toBeInTheDocument();
   });
 
   test('should render event type as fallback for unknown event types', () => {

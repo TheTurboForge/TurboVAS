@@ -221,14 +221,9 @@ const EditScanConfigDialog = ({
     familyTrend: configFamiliesTrend,
   };
 
-  const notification =
-    usageType === 'policy'
-      ? _(
-          'The policy is currently in use by one or more audits, therefore only name and comment can be modified.',
-        )
-      : _(
-          'The scan config is currently in use by one or more tasks, therefore only name and comment can be modified.',
-        );
+  const notification = _(
+    'The scan config is currently in use by one or more tasks, therefore only name and comment can be modified.',
+  );
 
   const handleSearchChangeCallback = useCallback(
     query => {

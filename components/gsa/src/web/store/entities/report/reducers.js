@@ -72,7 +72,7 @@ const byId = (state = {}, action) => {
 };
 
 export const reportReducer = (state = {}, action) => {
-  if (action.entityType !== 'report' && action.entityType !== 'auditreport') {
+  if (action.entityType !== 'report') {
     return state;
   }
 

@@ -8,14 +8,11 @@ import type Nvt from 'gmp/models/nvt';
 import type Result from 'gmp/models/result';
 import {isDefined} from 'gmp/utils/identity';
 import {shorten} from 'gmp/utils/string';
-import ComplianceBar from 'web/components/bar/ComplianceBar';
 import SeverityBar from 'web/components/bar/SeverityBar';
 import DateTime from 'web/components/date/DateTime';
 import {
   DeltaDifferenceIcon,
-  NoteIcon,
   OverrideIcon,
-  TicketIcon,
 } from 'web/components/icon';
 import SolutionTypeIcon from 'web/components/icon/SolutionTypeIcon';
 import IconDivider from 'web/components/layout/IconDivider';
@@ -35,7 +32,6 @@ import {renderPercentile, renderScore} from 'web/utils/severity';
 
 export interface ResultTableRowProps extends EntitiesActionsProps<Result> {
   actionsComponent?: React.ComponentType<EntitiesActionsProps<Result>>;
-  audit?: boolean;
   delta?: boolean;
   entity: Result;
   links?: boolean;
@@ -44,7 +40,6 @@ export interface ResultTableRowProps extends EntitiesActionsProps<Result> {
 
 const ResultTableRow = ({
   actionsComponent: ActionsComponent = EntitiesActions,
-  audit = false,
   'data-testid': dataTestId = 'result-table-row',
   delta = false,
   entity,
@@ -58,15 +53,10 @@ const ResultTableRow = ({
   if (!isDefined(shownName)) {
     shownName = entity.id;
   }
-  const hasActiveNotes =
-    isDefined(entity.notes) &&
-    entity.notes.filter(note => note.isActive()).length > 0;
   const hasActiveOverrides =
     isDefined(entity.overrides) &&
     entity.overrides.filter(override => override.isActive()).length > 0;
-  const hasTickets = entity.tickets.length > 0;
   const deltaSeverity = entity.delta?.result?.severity;
-  const deltaCompliance = entity.delta?.result?.compliance;
   const deltaHostname = entity.delta?.result?.host?.hostname;
   const deltaQoD = entity.delta?.result?.qod?.value;
   const epssScore = entity?.information?.epss?.maxEpss?.score;
@@ -86,14 +76,8 @@ const ResultTableRow = ({
             <span>{shownName}</span>
           </RowDetailsToggle>
           <IconDivider>
-            {hasActiveNotes && (
-              <NoteIcon title={_('There are notes for this result')} />
-            )}
             {hasActiveOverrides && (
               <OverrideIcon title={_('There are overrides for this result')} />
-            )}
-            {hasTickets && (
-              <TicketIcon title={_('There are tickets for this result')} />
             )}
           </IconDivider>
         </Layout>
@@ -106,30 +90,16 @@ const ResultTableRow = ({
         )}
       </TableData>
       <TableData>
-        {audit ? (
-          <IconDivider>
-            <ComplianceBar compliance={entity.compliance} />
-            {isDefined(deltaCompliance) &&
-              entity.compliance !== deltaCompliance && (
-                <DeltaDifferenceIcon
-                  title={_('Compliance is changed from {{deltaCompliance}}.', {
-                    deltaCompliance,
-                  })}
-                />
-              )}
-          </IconDivider>
-        ) : (
-          <IconDivider>
-            {<SeverityBar severity={entity.severity} />}
-            {isDefined(deltaSeverity) && entity.severity !== deltaSeverity && (
-              <DeltaDifferenceIcon
-                title={_('Severity is changed from {{deltaSeverity}}.', {
-                  deltaSeverity,
-                })}
-              />
-            )}
-          </IconDivider>
-        )}
+        <IconDivider>
+          {<SeverityBar severity={entity.severity} />}
+          {isDefined(deltaSeverity) && entity.severity !== deltaSeverity && (
+            <DeltaDifferenceIcon
+              title={_('Severity is changed from {{deltaSeverity}}.', {
+                deltaSeverity,
+              })}
+            />
+          )}
+        </IconDivider>
       </TableData>
       <TableData align="end">
         <IconDivider>
@@ -167,7 +137,7 @@ const ResultTableRow = ({
         </IconDivider>
       </TableData>
       <TableData>{entity.port}</TableData>
-      {enableEPSS && !audit && (
+      {enableEPSS && (
         <>
           <TableData>{renderScore(epssScore)}</TableData>
           <TableData>{renderPercentile(epssPercentile)}</TableData>

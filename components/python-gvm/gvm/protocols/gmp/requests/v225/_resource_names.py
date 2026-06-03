@@ -24,7 +24,6 @@ class ResourceType(Enum):
     FILTER = "FILTER"
     GROUP = "GROUP"
     HOST = "HOST"
-    NOTE = "NOTE"
     NVT = "NVT"
     OS = "OS"
     OVERRIDE = "OVERRIDE"
@@ -55,7 +54,7 @@ class ResourceNames:
         Args:
             resource_type: Type must be either ALERT, CERT_BUND_ADV,
                 CONFIG, CPE, CREDENTIAL, CVE, DFN_CERT_ADV, FILTER,
-                GROUP, HOST, NOTE, NVT, OS, OVERRIDE, PERMISSION,
+                GROUP, HOST, NVT, OS, OVERRIDE, PERMISSION,
                 PORT_LIST, REPORT_FORMAT, REPORT, RESULT, ROLE,
                 SCANNER, SCHEDULE, TARGET, TASK, TLS_CERTIFICATE
                 or USER
@@ -88,7 +87,7 @@ class ResourceNames:
             resource_id: ID of an existing resource
             resource_type: Type must be either ALERT, CERT_BUND_ADV,
                 CONFIG, CPE, CREDENTIAL, CVE, DFN_CERT_ADV, FILTER,
-                GROUP, HOST, NOTE, NVT, OS, OVERRIDE, PERMISSION,
+                GROUP, HOST, NVT, OS, OVERRIDE, PERMISSION,
                 PORT_LIST, REPORT_FORMAT, REPORT, RESULT, ROLE,
                 SCANNER, SCHEDULE, TARGET, TASK, TLS_CERTIFICATE
                 or USER

@@ -28,7 +28,7 @@ interface AlertDataElement {
 }
 
 interface AlertTaskElement extends ModelElement {
-  usage_type?: 'scan' | 'audit';
+  usage_type?: 'scan';
 }
 
 interface AlertElement extends ModelElement {
@@ -67,10 +67,7 @@ interface AlertProperties extends ModelProperties {
 export type AlertEventType =
   | typeof EVENT_TYPE_NEW_SECINFO
   | typeof EVENT_TYPE_UPDATED_SECINFO
-  | typeof EVENT_TYPE_TASK_RUN_STATUS_CHANGED
-  | typeof EVENT_TYPE_TICKET_RECEIVED
-  | typeof EVENT_TYPE_ASSIGNED_TICKET_CHANGED
-  | typeof EVENT_TYPE_OWNED_TICKET_CHANGED;
+  | typeof EVENT_TYPE_TASK_RUN_STATUS_CHANGED;
 
 export type AlertConditionType =
   | typeof CONDITION_TYPE_FILTER_COUNT_AT_LEAST
@@ -105,9 +102,6 @@ export type AlertMethodNoticeType =
 export const EVENT_TYPE_UPDATED_SECINFO = 'Updated SecInfo arrived';
 export const EVENT_TYPE_NEW_SECINFO = 'New SecInfo arrived';
 export const EVENT_TYPE_TASK_RUN_STATUS_CHANGED = 'Task run status changed';
-export const EVENT_TYPE_TICKET_RECEIVED = 'Ticket received';
-export const EVENT_TYPE_ASSIGNED_TICKET_CHANGED = 'Assigned ticket changed';
-export const EVENT_TYPE_OWNED_TICKET_CHANGED = 'Owned ticket changed';
 
 export const CONDITION_TYPE_FILTER_COUNT_AT_LEAST = 'Filter count at least';
 export const CONDITION_TYPE_FILTER_COUNT_CHANGED = 'Filter count changed';
@@ -141,10 +135,6 @@ export const DELTA_TYPE_REPORT = 'Report';
 
 export const isTaskEvent = (event?: string) =>
   event === EVENT_TYPE_TASK_RUN_STATUS_CHANGED;
-export const isTicketEvent = (event?: string) =>
-  event === EVENT_TYPE_ASSIGNED_TICKET_CHANGED ||
-  event === EVENT_TYPE_OWNED_TICKET_CHANGED ||
-  event === EVENT_TYPE_TICKET_RECEIVED;
 export const isSecinfoEvent = (event?: string) =>
   event === EVENT_TYPE_NEW_SECINFO || event === EVENT_TYPE_UPDATED_SECINFO;
 
@@ -243,9 +233,7 @@ class Alert extends Model {
     }
 
     ret.tasks = map(element.tasks?.task, task => {
-      // Use 'audit' entity type for audits, 'task' for scans
-      const entityType = task.usage_type === 'audit' ? 'audit' : 'task';
-      return Model.fromElement(task, entityType);
+      return Model.fromElement(task, 'task');
     });
 
     if (isDefined(ret.method?.data?.report_formats)) {

@@ -43,7 +43,7 @@ class GMPv225(GMPv224[T]):
         Arguments:
             resource_type: Type must be either ALERT, CERT_BUND_ADV,
                 CONFIG, CPE, CREDENTIAL, CVE, DFN_CERT_ADV, FILTER,
-                GROUP, HOST, NOTE, NVT, OS, OVERRIDE, PERMISSION,
+                GROUP, HOST, NVT, OS, OVERRIDE, PERMISSION,
                 PORT_LIST, REPORT_FORMAT, REPORT, RESULT, ROLE,
                 SCANNER, SCHEDULE, TARGET, TASK, TLS_CERTIFICATE
                 or USER
@@ -64,7 +64,7 @@ class GMPv225(GMPv224[T]):
             resource_id: ID of an existing resource
             resource_type: Type must be either ALERT, CERT_BUND_ADV,
                 CONFIG, CPE, CREDENTIAL, CVE, DFN_CERT_ADV, FILTER,
-                GROUP, HOST, NOTE, NVT, OS, OVERRIDE, PERMISSION,
+                GROUP, HOST, NVT, OS, OVERRIDE, PERMISSION,
                 PORT_LIST, REPORT_FORMAT, REPORT, RESULT, ROLE,
                 SCANNER, SCHEDULE, TARGET, TASK, TLS_CERTIFICATE
                 or USER

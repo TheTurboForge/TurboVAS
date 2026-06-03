@@ -20,8 +20,6 @@
 #include "manage_acl.h"
 #include "manage_sql_report_formats.h"
 #include "manage_sql_resources.h"
-#include "manage_sql_tickets.h"
-#include "manage_tickets.h"
 #include "manage_users.h"
 
 #include <bsd/unistd.h>
@@ -3448,78 +3446,6 @@ scp_alert_path_print (const gchar *message, task_t task)
 }
 
 /**
- * @brief Build and send email for a ticket alert.
- *
- * @param[in]  alert       Alert.
- * @param[in]  ticket      Ticket.
- * @param[in]  event       Event.
- * @param[in]  event_data  Event data.
- * @param[in]  method      Method from alert.
- * @param[in]  condition   Condition from alert, which was met by event.
- * @param[in]  to_address    To address.
- * @param[in]  from_address  From address.
- * @param[in]  subject       Subject.
- *
- * @return 0 success, -1 error.
- */
-static int
-email_ticket (alert_t alert, ticket_t ticket, event_t event,
-              const void* event_data, alert_method_t method,
-              alert_condition_t condition, const gchar *to_address,
-              const gchar *from_address, const gchar *subject)
-{
-  gchar *full_subject, *body;
-  char *recipient_credential_id;
-  credential_t recipient_credential;
-  int ret;
-
-  /* Setup subject. */
-
-  full_subject = g_strdup_printf ("%s: %s (UUID: %s)",
-                                  subject,
-                                  ticket_nvt_name (ticket)
-                                   ? ticket_nvt_name (ticket)
-                                   : "[Orphan]",
-                                  ticket_uuid (ticket));
-
-  /* Setup body. */
-
-  {
-    gchar *event_desc, *condition_desc;
-
-    event_desc = event_description (event, event_data, NULL);
-    condition_desc = alert_condition_description
-                      (condition, alert);
-    body = g_strdup_printf (SIMPLE_NOTICE_FORMAT,
-                            event_desc,
-                            event_desc,
-                            condition_desc);
-    free (event_desc);
-    free (condition_desc);
-  }
-
-  /* Get credential */
-  recipient_credential_id = alert_data (alert, "method",
-                                        "recipient_credential");
-  recipient_credential = 0;
-  if (recipient_credential_id)
-    {
-      find_credential_with_permission (recipient_credential_id,
-                                       &recipient_credential, NULL);
-    }
-
-  /* Send email. */
-
-  ret = email (to_address, from_address, full_subject,
-               body, NULL, NULL, NULL, NULL,
-               recipient_credential);
-  g_free (body);
-  g_free (full_subject);
-  free (recipient_credential_id);
-  return ret;
-}
-
-/**
  * @brief Build and send email for SecInfo alert.
  *
  * @param[in]  alert       Alert.
@@ -3765,13 +3691,13 @@ generate_alert_filter_get (alert_t alert, const get_data_t *base_get_data,
 
   /* Adjust filter for report composer.
    *
-   * As a first step towards a full composer we have two fields stored
-   * on the alert for controlling visibility of notes and overrides.
+   * As a first step towards a full composer we store a field on the alert
+   * for controlling visibility of overrides.
    *
    * We simply use these fields to adjust the filter.  In the future we'll
    * remove the filter terms and extend the way we get the report. */
 
-  gchar *include_notes, *include_overrides;
+  gchar *include_overrides;
 
   ignore_pagination = alert_data (alert, "method",
                                   "composer_ignore_pagination");
@@ -3779,21 +3705,6 @@ generate_alert_filter_get (alert_t alert, const get_data_t *base_get_data,
     {
       (*alert_filter_get)->ignore_pagination = atoi (ignore_pagination);
       g_free (ignore_pagination);
-    }
-
-  include_notes = alert_data (alert, "method",
-                              "composer_include_notes");
-  if (include_notes)
-    {
-      gchar *new_filter;
-
-      new_filter = g_strdup_printf ("notes=%i %s",
-                                    atoi (include_notes),
-                                    (*alert_filter_get)->filter);
-      g_free ((*alert_filter_get)->filter);
-      (*alert_filter_get)->filter = new_filter;
-      (*alert_filter_get)->filt_id = NULL;
-      g_free (include_notes);
     }
 
   include_overrides = alert_data (alert, "method",
@@ -3832,7 +3743,6 @@ generate_alert_filter_get (alert_t alert, const get_data_t *base_get_data,
  *                                      report_format_lookup are NULL or fail.
  * @param[in]  report_config_data_name  Name of alert data of the report config
  *                                      if one is set.
- * @param[in]  notes_details     Whether to include details of notes in report.
  * @param[in]  overrides_details Whether to include override details in report.
  * @param[out] content              Report content location.
  * @param[out] content_length       Length of report content.
@@ -3854,7 +3764,7 @@ report_content_for_alert (alert_t alert, report_t report, task_t task,
                           const char *report_format_lookup,
                           const char *fallback_format_id,
                           const char *report_config_data_name,
-                          int notes_details, int overrides_details,
+                          int overrides_details,
                           gchar **content, gsize *content_length,
                           gchar **extension, gchar **content_type,
                           gchar **term, gchar **report_zone,
@@ -4037,7 +3947,6 @@ report_content_for_alert (alert_t alert, report_t report, task_t task,
                                   alert_filter_get ? alert_filter_get : get,
                                   report_format,
                                   report_config,
-                                  notes_details,
                                   overrides_details,
                                   content_length,
                                   extension,
@@ -4139,7 +4048,6 @@ generate_report_filename (report_t report, report_format_t report_format,
  * @param[in]  method      Method from alert.
  * @param[in]  condition   Condition from alert, which was met by event.
  * @param[in]  get         GET data for report.
- * @param[in]  notes_details      If notes, Whether to include details.
  * @param[in]  overrides_details  If overrides, Whether to include details.
  * @param[out] script_message  Custom error message from the script.
  *
@@ -4150,8 +4058,7 @@ static int
 trigger_to_vfire (alert_t alert, task_t task, report_t report, event_t event,
                   const void* event_data, alert_method_t method,
                   alert_condition_t condition, const get_data_t *get,
-                  int notes_details, int overrides_details,
-                  gchar **script_message)
+                  int overrides_details, gchar **script_message)
 {
   int ret;
   char *credential_id;
@@ -4170,16 +4077,6 @@ trigger_to_vfire (alert_t alert, task_t task, report_t report, event_t event,
   iterator_t data_iterator;
   GTree *call_input;
   char *description_template;
-
-  if ((event == EVENT_TICKET_RECEIVED)
-      || (event == EVENT_ASSIGNED_TICKET_CHANGED)
-      || (event == EVENT_OWNED_TICKET_CHANGED))
-    {
-      g_warning ("%s: Ticket events with method"
-                 " \"Alemba vFire\" not support",
-                 __func__);
-      return -1;
-    }
 
   // Get report
   if (report == 0)
@@ -4252,7 +4149,6 @@ trigger_to_vfire (alert_t alert, task_t task, report_t report, event_t event,
                                             : get,
                                           report_format,
                                           report_config,
-                                          notes_details,
                                           overrides_details,
                                           &content_length,
                                           NULL /* extension */,
@@ -4427,7 +4323,6 @@ trigger_to_vfire (alert_t alert, task_t task, report_t report, event_t event,
  * @param[in]  method      Method from alert.
  * @param[in]  condition   Condition from alert, which was met by event.
  * @param[in]  get         GET data for report.
- * @param[in]  notes_details      If notes, Whether to include details.
  * @param[in]  overrides_details  If overrides, Whether to include details.
  * @param[out] script_message  Custom error message from the script.
  *
@@ -4438,8 +4333,7 @@ int
 trigger (alert_t alert, task_t task, report_t report, event_t event,
          const void* event_data, alert_method_t method,
          alert_condition_t condition,
-          const get_data_t *get, int notes_details, int overrides_details,
-          gchar **script_message)
+         const get_data_t *get, int overrides_details, gchar **script_message)
 {
   if (script_message)
     *script_message = NULL;
@@ -4496,36 +4390,6 @@ trigger (alert_t alert, task_t task, report_t report, event_t event,
                   return ret;
                 }
 
-              if (event == EVENT_TICKET_RECEIVED)
-                {
-                  ret = email_ticket (alert, task, event, event_data, method,
-                                      condition, to_address, from_address,
-                                      "Ticket received");
-                  free (to_address);
-                  free (from_address);
-                  return ret;
-                }
-
-              if (event == EVENT_ASSIGNED_TICKET_CHANGED)
-                {
-                  ret = email_ticket (alert, task, event, event_data, method,
-                                      condition, to_address, from_address,
-                                      "Assigned ticket changed");
-                  free (to_address);
-                  free (from_address);
-                  return ret;
-                }
-
-              if (event == EVENT_OWNED_TICKET_CHANGED)
-                {
-                  ret = email_ticket (alert, task, event, event_data, method,
-                                      condition, to_address, from_address,
-                                      "Owned ticket changed");
-                  free (to_address);
-                  free (from_address);
-                  return ret;
-                }
-
               notice = alert_data (alert, "method", "notice");
               name = task_name (task);
 
@@ -4553,7 +4417,7 @@ trigger (alert_t alert, task_t task, report_t report, event_t event,
                            /* TXT fallback */
                            "a3810a62-1f62-11e1-9219-406186ea4fc5",
                            "notice_report_config",
-                           notes_details, overrides_details,
+                           overrides_details,
                            &report_content, &content_length, &extension,
                            NULL, &term, &report_zone, &host_summary,
                            &report_format, &filter);
@@ -4634,7 +4498,7 @@ trigger (alert_t alert, task_t task, report_t report, event_t event,
                            /* TXT fallback */
                            "a3810a62-1f62-11e1-9219-406186ea4fc5",
                            "notice_attach_config",
-                           notes_details, overrides_details,
+                           overrides_details,
                            &report_content, &content_length, &extension,
                            &type, &term, &report_zone, &host_summary,
                            &report_format, &filter);
@@ -4794,16 +4658,6 @@ trigger (alert_t alert, task_t task, report_t report, event_t event,
         {
           char *url;
 
-          if ((event == EVENT_TICKET_RECEIVED)
-              || (event == EVENT_ASSIGNED_TICKET_CHANGED)
-              || (event == EVENT_OWNED_TICKET_CHANGED))
-            {
-              g_warning ("%s: Ticket events with method"
-                         " \"HTTP Get\" not support",
-                         __func__);
-              return -1;
-            }
-
           if (event == EVENT_NEW_SECINFO || event == EVENT_UPDATED_SECINFO)
             {
               g_warning ("%s: Event \"%s NVTs arrived\" with method"
@@ -4888,16 +4742,6 @@ trigger (alert_t alert, task_t task, report_t report, event_t event,
           report_format_t report_format;
           int ret;
 
-          if ((event == EVENT_TICKET_RECEIVED)
-              || (event == EVENT_ASSIGNED_TICKET_CHANGED)
-              || (event == EVENT_OWNED_TICKET_CHANGED))
-            {
-              g_warning ("%s: Ticket events with method"
-                         " \"SCP\" not support",
-                         __func__);
-              return -1;
-            }
-
           if (event == EVENT_NEW_SECINFO || event == EVENT_UPDATED_SECINFO)
             {
               gchar *message;
@@ -4960,7 +4804,7 @@ trigger (alert_t alert, task_t task, report_t report, event_t event,
                    /* XML fallback. */
                    REPORT_FORMAT_UUID_XML,
                    "scp_report_config",
-                   notes_details, overrides_details,
+                   overrides_details,
                    &report_content, &content_length, NULL,
                    NULL, NULL, NULL, NULL,
                    &report_format, NULL);
@@ -5027,16 +4871,6 @@ trigger (alert_t alert, task_t task, report_t report, event_t event,
           report_format_t report_format;
           int ret;
 
-          if ((event == EVENT_TICKET_RECEIVED)
-              || (event == EVENT_ASSIGNED_TICKET_CHANGED)
-              || (event == EVENT_OWNED_TICKET_CHANGED))
-            {
-              g_warning ("%s: Ticket events with method"
-                         " \"Send\" not support",
-                         __func__);
-              return -1;
-            }
-
           if (event == EVENT_NEW_SECINFO || event == EVENT_UPDATED_SECINFO)
             {
               gchar *message;
@@ -5065,7 +4899,7 @@ trigger (alert_t alert, task_t task, report_t report, event_t event,
                    /* XML fallback. */
                    REPORT_FORMAT_UUID_XML,
                    "send_report_config",
-                   notes_details, overrides_details,
+                   overrides_details,
                    &report_content, &content_length, NULL,
                    NULL, NULL, NULL, NULL,
                    &report_format, NULL);
@@ -5100,16 +4934,6 @@ trigger (alert_t alert, task_t task, report_t report, event_t event,
           gsize content_length;
           credential_t credential;
           int ret;
-
-          if ((event == EVENT_TICKET_RECEIVED)
-              || (event == EVENT_ASSIGNED_TICKET_CHANGED)
-              || (event == EVENT_OWNED_TICKET_CHANGED))
-            {
-              g_warning ("%s: Ticket events with method"
-                         " \"SMP\" not support",
-                         __func__);
-              return -1;
-            }
 
           if (report == 0)
             switch (task_last_report_any_status (task, &report))
@@ -5157,7 +4981,7 @@ trigger (alert_t alert, task_t task, report_t report, event_t event,
                    NULL,
                    REPORT_FORMAT_UUID_XML, /* XML fallback */
                    "smb_report_config",
-                   notes_details, overrides_details,
+                   overrides_details,
                    &report_content, &content_length, &extension,
                    NULL, NULL, NULL, NULL, &report_format, NULL);
           if (ret || report_content == NULL)
@@ -5233,16 +5057,6 @@ trigger (alert_t alert, task_t task, report_t report, event_t event,
           int ret;
           gchar *message;
 
-          if ((event == EVENT_TICKET_RECEIVED)
-              || (event == EVENT_ASSIGNED_TICKET_CHANGED)
-              || (event == EVENT_OWNED_TICKET_CHANGED))
-            {
-              g_warning ("%s: Ticket events with method"
-                         " \"SNMP\" not support",
-                         __func__);
-              return -1;
-            }
-
           community = alert_data (alert, "method", "snmp_community");
           agent = alert_data (alert, "method", "snmp_agent");
           snmp_message = alert_data (alert, "method", "snmp_message");
@@ -5300,16 +5114,6 @@ trigger (alert_t alert, task_t task, report_t report, event_t event,
           report_format_t report_format;
           int ret;
 
-          if ((event == EVENT_TICKET_RECEIVED)
-              || (event == EVENT_ASSIGNED_TICKET_CHANGED)
-              || (event == EVENT_OWNED_TICKET_CHANGED))
-            {
-              g_warning ("%s: Ticket events with method"
-                         " \"Sourcefire\" not support",
-                         __func__);
-              return -1;
-            }
-
           if (event == EVENT_NEW_SECINFO || event == EVENT_UPDATED_SECINFO)
             {
               g_warning ("%s: Event \"%s NVTs arrived\" with method"
@@ -5325,7 +5129,7 @@ trigger (alert_t alert, task_t task, report_t report, event_t event,
                    "Sourcefire",
                    NULL,
                    NULL,
-                   notes_details, overrides_details,
+                   overrides_details,
                    &report_content, &content_length, NULL,
                    NULL, NULL, NULL, NULL, &report_format, NULL);
           if (ret || report_content == NULL)
@@ -5421,16 +5225,6 @@ trigger (alert_t alert, task_t task, report_t report, event_t event,
           char *tls_cert_workaround_str;
           int tls_cert_workaround;
 
-          if ((event == EVENT_TICKET_RECEIVED)
-              || (event == EVENT_ASSIGNED_TICKET_CHANGED)
-              || (event == EVENT_OWNED_TICKET_CHANGED))
-            {
-              g_warning ("%s: Ticket events with method"
-                         " \"TippingPoint SMS\" not support",
-                         __func__);
-              return -1;
-            }
-
           /* TLS certificate subject workaround setting */
           tls_cert_workaround_str
             = alert_data (alert, "method",
@@ -5482,7 +5276,7 @@ trigger (alert_t alert, task_t task, report_t report, event_t event,
                    NULL,
                    REPORT_FORMAT_UUID_XML, /* XML fallback */
                    NULL,
-                   notes_details, overrides_details,
+                   overrides_details,
                    &report_content, &content_length, &extension,
                    NULL, NULL, NULL, NULL, &report_format, NULL);
           g_free (extension);
@@ -5517,16 +5311,6 @@ trigger (alert_t alert, task_t task, report_t report, event_t event,
           report_format_t report_format;
           int ret;
 
-          if ((event == EVENT_TICKET_RECEIVED)
-              || (event == EVENT_ASSIGNED_TICKET_CHANGED)
-              || (event == EVENT_OWNED_TICKET_CHANGED))
-            {
-              g_warning ("%s: Ticket events with method"
-                         " \"Verinice\" not support",
-                         __func__);
-              return -1;
-            }
-
           if (event == EVENT_NEW_SECINFO || event == EVENT_UPDATED_SECINFO)
             {
               g_warning ("%s: Event \"%s NVTs arrived\" with method"
@@ -5542,7 +5326,7 @@ trigger (alert_t alert, task_t task, report_t report, event_t event,
                    "Verinice ISM",
                    NULL,
                    "verinice_server_report_config",
-                   notes_details, overrides_details,
+                   overrides_details,
                    &report_content, &content_length, NULL,
                    NULL, NULL, NULL, NULL, &report_format, NULL);
           if (ret || report_content == NULL)
@@ -5592,7 +5376,7 @@ trigger (alert_t alert, task_t task, report_t report, event_t event,
           int ret;
           ret = trigger_to_vfire (alert, task, report, event,
                                   event_data, method, condition,
-                                  get, notes_details, overrides_details,
+                                  get, overrides_details,
                                   script_message);
           return ret;
         }

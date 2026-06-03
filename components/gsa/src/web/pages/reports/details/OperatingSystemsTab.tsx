@@ -21,7 +21,6 @@ import ReportEntitiesContainer from 'web/pages/reports/details/ReportEntitiesCon
 import {makeCompareNumber, makeCompareString} from 'web/utils/Sort';
 
 interface OperatingSystemsTabWrapperProps {
-  audit?: boolean;
   filter?: Filter;
   reportId: string;
   status: TaskStatus;
@@ -37,22 +36,17 @@ type OperatingSystemsSortFunctions = {
   hosts: (
     sortReverse?: boolean,
   ) => (a: ReportOperatingSystem, b: ReportOperatingSystem) => number;
-  compliant: (
-    sortReverse?: boolean,
-  ) => (a: ReportOperatingSystem, b: ReportOperatingSystem) => number;
 };
 
 const operatingSystemsSortFunctions: OperatingSystemsSortFunctions = {
   name: makeCompareString('name'),
   cpe: makeCompareString('id'),
   hosts: makeCompareNumber(entity => entity.hosts.count),
-  compliant: makeCompareString('compliance'),
 };
 
 const OperatingSystemsTabWrapper = ({
   filter,
   reportId,
-  audit = false,
   status,
 }: OperatingSystemsTabWrapperProps) => {
   const [_] = useTranslation();
@@ -121,7 +115,6 @@ const OperatingSystemsTabWrapper = ({
         onPreviousClick,
       }) => (
         <OperatingSystemsTable
-          audit={audit}
           // @ts-expect-error entities are ReportOperatingSystem[], not Model[]
           entities={entities}
           entitiesCounts={entitiesCounts}

@@ -31,7 +31,6 @@ gsad_init_validator ()
                      "|(create_filter)"
                      "|(create_group)"
                      "|(create_host)"
-                     "|(create_note)"
                      "|(create_override)"
                      "|(create_permission)"
                      "|(create_permissions)"
@@ -46,12 +45,10 @@ gsad_init_validator ()
                      "|(create_tags)"
                      "|(create_target)"
                      "|(create_task)"
-                     "|(create_ticket)"
                      "|(create_tls_certificate)"
                      "|(create_user)"
                      "|(create_agent_group)"
                      "|(create_agent_group_task)"
-                     "|(cvss_calculator)"
                      "|(delete_agent)"
                      "|(delete_agent_group)"
                      "|(delete_asset)"
@@ -61,7 +58,6 @@ gsad_init_validator ()
                      "|(delete_filter)"
                      "|(delete_from_trash)"
                      "|(delete_group)"
-                     "|(delete_note)"
                      "|(delete_override)"
                      "|(delete_permission)"
                      "|(delete_port_list)"
@@ -75,7 +71,6 @@ gsad_init_validator ()
                      "|(delete_tag)"
                      "|(delete_target)"
                      "|(delete_task)"
-                     "|(delete_ticket)"
                      "|(delete_tls_certificate)"
                      "|(delete_user)"
                      "|(download_credential)"
@@ -99,8 +94,6 @@ gsad_init_validator ()
                      "|(export_filters)"
                      "|(export_group)"
                      "|(export_groups)"
-                     "|(export_note)"
-                     "|(export_notes)"
                      "|(export_omp_doc)"
                      "|(export_override)"
                      "|(export_overrides)"
@@ -157,8 +150,6 @@ gsad_init_validator ()
                      "|(get_groups)"
                      "|(get_info)"
                      "|(get_license)"
-                     "|(get_note)"
-                     "|(get_notes)"
                      "|(get_nvt_families)"
                      "|(get_override)"
                      "|(get_overrides)"
@@ -200,8 +191,6 @@ gsad_init_validator ()
                      "|(get_targets)"
                      "|(get_task)"
                      "|(get_tasks)"
-                     "|(get_ticket)"
-                     "|(get_tickets)"
                      "|(get_timezones)"
                      "|(get_tls_certificate)"
                      "|(get_tls_certificates)"
@@ -211,7 +200,6 @@ gsad_init_validator ()
                      "|(get_trash_credentials)"
                      "|(get_trash_filters)"
                      "|(get_trash_groups)"
-                     "|(get_trash_notes)"
                      "|(get_trash_overrides)"
                      "|(get_trash_permissions)"
                      "|(get_trash_port_lists)"
@@ -223,7 +211,6 @@ gsad_init_validator ()
                      "|(get_trash_tags)"
                      "|(get_trash_targets)"
                      "|(get_trash_tasks)"
-                     "|(get_trash_tickets)"
                      "|(get_user)"
                      "|(get_users)"
                      "|(get_vulns)"
@@ -259,7 +246,6 @@ gsad_init_validator ()
                      "|(save_group)"
                      "|(save_license)"
                      "|(save_my_settings)"
-                     "|(save_note)"
                      "|(save_override)"
                      "|(save_permission)"
                      "|(save_port_list)"
@@ -271,7 +257,6 @@ gsad_init_validator ()
                      "|(save_tag)"
                      "|(save_target)"
                      "|(save_task)"
-                     "|(save_ticket)"
                      "|(save_tls_certificate)"
                      "|(save_user)"
                      "|(start_task)"
@@ -294,7 +279,7 @@ gsad_init_validator ()
   gvm_validator_add (
     validator, "aggregate_type",
     "^(agent|agent_group|agent_installer|alert|config|credential|filter|group|"
-    "host|nvt|note|os|override|permission|port_list|report|report_config|"
+    "host|nvt|os|override|permission|port_list|report|report_config|"
     "report_format|result|role|scanner|schedule|"
     "tag|target|task|user|cve|cpe|ovaldef|cert_bund_adv|dfn_cert_adv|"
     "vuln|tls_certificate)$");
@@ -424,8 +409,6 @@ gsad_init_validator ()
   gvm_validator_add (validator, "max_groups", "^-?[0-9]+$");
   gvm_validator_add (validator, "minute", "^[0-5]{0,1}[0-9]{1,1}$");
   gvm_validator_add (validator, "month", "^((0??[1-9])|1[012])$");
-  gvm_validator_add (validator, "note_optional", "(?s)^(.)*$");
-  gvm_validator_add (validator, "note_required", "(?s)^(.)+$");
   gvm_validator_add (validator, "name", "^[[:graph:] ]*$");
   gvm_validator_add (validator, "info_name", "(?s)^.*$");
   gvm_validator_add (validator, "info_type", "(?s)^.*$");
@@ -498,7 +481,6 @@ gsad_init_validator ()
   gvm_validator_add (validator, "text", "^.*");
   gvm_validator_add (validator, "text_columns:name", "^[0123456789]+$");
   gvm_validator_add (validator, "text_columns:value", "^[_[:alnum:]]+$");
-  gvm_validator_add (validator, "ticket_status", "^(Open|Fixed|Closed)$");
   gvm_validator_add (validator, "trend", "^(0|1)$");
   gvm_validator_add (validator, "trend:value", "^(0|1)$");
   gvm_validator_add (validator, "type", "^(assets)$");
@@ -524,7 +506,7 @@ gsad_init_validator ()
   gvm_validator_add (validator, "severity_optional",
                      "^(-1(\\.0)?|[0-9](\\.[0-9])?|10(\\.0)?)?$");
   gvm_validator_add (validator, "uuid", "^[0-9abcdefABCDEF\\-]{1,40}$");
-  gvm_validator_add (validator, "usage_type", "^(audit|policy|scan|)$");
+  gvm_validator_add (validator, "usage_type", "^(scan|)$");
   /* This must be "login" with space and comma. */
   gvm_validator_add (validator, "users", "^[[:alnum:]\\-_@., ]*$");
   gvm_validator_add (validator, "x_field", "^[\\[\\]_[:alnum:]]+$");
@@ -578,7 +560,6 @@ gsad_init_validator ()
   gvm_validator_alias (validator, "group_id", "id");
   gvm_validator_alias (validator, "inheritor_id", "id");
   gvm_validator_alias (validator, "krb5_credential_id", "id");
-  gvm_validator_alias (validator, "note_id", "id");
   gvm_validator_alias (validator, "override_id", "id");
   gvm_validator_alias (validator, "permission_group_id", "id");
   gvm_validator_alias (validator, "permission_id", "id");
@@ -603,7 +584,6 @@ gsad_init_validator ()
   gvm_validator_alias (validator, "tag_id", "id");
   gvm_validator_alias (validator, "target_id", "id");
   gvm_validator_alias (validator, "task_id", "id");
-  gvm_validator_alias (validator, "ticket_id", "id");
   gvm_validator_alias (validator, "tls_certificate_id", "id");
   gvm_validator_alias (validator, "user_id", "id");
   gvm_validator_alias (validator, "report_format_ids:value", "id");
@@ -661,7 +641,6 @@ gsad_init_validator ()
   gvm_validator_alias (validator, "chart_type", "name");
   gvm_validator_alias (validator, "chart_template", "name");
   gvm_validator_alias (validator, "community", "lsc_password");
-  gvm_validator_alias (validator, "closed_note", "note_optional");
   gvm_validator_alias (validator, "cs_allow_failed_retrieval", "boolean");
   gvm_validator_alias (validator, "custom_severity", "boolean");
   gvm_validator_alias (validator, "current_user", "boolean");
@@ -679,7 +658,6 @@ gsad_init_validator ()
   gvm_validator_alias (validator, "end_time", "isodate");
   gvm_validator_alias (validator, "filter_extra", "filter");
   gvm_validator_alias (validator, "filterbox", "boolean");
-  gvm_validator_alias (validator, "fixed_note", "note_optional");
   gvm_validator_alias (validator, "from_file", "boolean");
   gvm_validator_alias (validator, "force_wizard", "boolean");
   gvm_validator_alias (validator, "get_name", "name");
@@ -719,15 +697,12 @@ gsad_init_validator ()
   gvm_validator_alias (validator, "next_type", "resource_type");
   gvm_validator_alias (validator, "next_subtype", "info_type");
   gvm_validator_alias (validator, "next_xml", "boolean");
-  gvm_validator_alias (validator, "note", "note_required");
-  gvm_validator_alias (validator, "notes", "boolean");
   gvm_validator_alias (validator, "no_chart_links", "boolean");
   gvm_validator_alias (validator, "no_filter_history", "boolean");
   gvm_validator_alias (validator, "no_redirect", "boolean");
   gvm_validator_alias (validator, "nvt:value", "uuid");
   gvm_validator_alias (validator, "old_login", "login");
   gvm_validator_alias (validator, "old_password", "password");
-  gvm_validator_alias (validator, "open_note", "note_optional");
   gvm_validator_alias (validator, "original_overrides", "boolean");
   gvm_validator_alias (validator, "owner", "name");
   gvm_validator_alias (validator, "passphrase", "lsc_password");

@@ -16,7 +16,6 @@
 #include "manage_acl.h"
 #include "manage_settings.h"
 #include "manage_sql.h"
-#include "manage_sql_tickets.h"
 
 #undef G_LOG_DOMAIN
 /**
@@ -432,13 +431,13 @@ trigger_with_presets (alert_t alert, task_t task, report_t report,
   else
     {
       get.filt_id = g_strdup ("0");
-      get.filter = g_strdup_printf ("notes=1 overrides=1 sort-reverse=severity"
+      get.filter = g_strdup_printf ("overrides=1 sort-reverse=severity"
                                     " rows=%d",
                                     method == ALERT_METHOD_EMAIL ? 1000 : -1);
     }
 
   ret = trigger (alert, task, report, event, event_data, method, condition,
-                 &get, 1, 1, script_message);
+                 &get, 1, script_message);
   free (results_filter);
   g_free (get.filter);
   return ret;
@@ -459,9 +458,6 @@ event_name (event_t event)
       case EVENT_TASK_RUN_STATUS_CHANGED: return "Task run status changed";
       case EVENT_NEW_SECINFO:             return "New SecInfo arrived";
       case EVENT_UPDATED_SECINFO:         return "Updated SecInfo arrived";
-      case EVENT_TICKET_RECEIVED:         return "Ticket received";
-      case EVENT_ASSIGNED_TICKET_CHANGED: return "Assigned ticket changed";
-      case EVENT_OWNED_TICKET_CHANGED:    return "Owned ticket changed";
       default:                            return "Internal Error";
     }
 }
@@ -495,15 +491,6 @@ event_description (event_t event, const void *event_data, const char *task_name)
       case EVENT_UPDATED_SECINFO:
         return g_strdup_printf ("Updated SecInfo arrived");
         break;
-      case EVENT_TICKET_RECEIVED:
-        return g_strdup_printf ("Ticket received");
-        break;
-      case EVENT_ASSIGNED_TICKET_CHANGED:
-        return g_strdup_printf ("Assigned ticket changed");
-        break;
-      case EVENT_OWNED_TICKET_CHANGED:
-        return g_strdup_printf ("Owned ticket changed");
-        break;
       default:
         return g_strdup ("Internal Error");
     }
@@ -525,12 +512,6 @@ event_from_name (const char* name)
     return EVENT_NEW_SECINFO;
   if (strcasecmp (name, "Updated SecInfo arrived") == 0)
     return EVENT_UPDATED_SECINFO;
-  if (strcasecmp (name, "Ticket received") == 0)
-    return EVENT_TICKET_RECEIVED;
-  if (strcasecmp (name, "Assigned ticket changed") == 0)
-    return EVENT_ASSIGNED_TICKET_CHANGED;
-  if (strcasecmp (name, "Owned ticket changed") == 0)
-    return EVENT_OWNED_TICKET_CHANGED;
   return EVENT_ERROR;
 }
 
@@ -582,11 +563,6 @@ event_applies (event_t event, const void *event_data,
           free (alert_event_data);
           return ret;
         }
-      case EVENT_TICKET_RECEIVED:
-      case EVENT_ASSIGNED_TICKET_CHANGED:
-        return ticket_assigned_to (event_resource) == alert_owner (alert);
-      case EVENT_OWNED_TICKET_CHANGED:
-        return ticket_owner (event_resource) == alert_owner (alert);
       default:
         return 0;
     }
@@ -612,10 +588,6 @@ event (event_t event, void* event_data, resource_t resource_1,
   g_debug ("   EVENT %i on resource %llu", event, resource_1);
 
   alerts_triggered = g_array_new (TRUE, TRUE, sizeof (alert_t));
-
-  if ((event == EVENT_TASK_RUN_STATUS_CHANGED)
-      && (((task_status_t) event_data) == TASK_STATUS_DONE))
-    check_tickets (resource_1);
 
   init_event_alert_iterator (&alerts, event);
   while (next (&alerts))

@@ -14,7 +14,6 @@ import Column from 'web/components/layout/Column';
 import Divider from 'web/components/layout/Divider';
 import Layout from 'web/components/layout/Layout';
 import DetailsLink from 'web/components/link/DetailsLink';
-import Link from 'web/components/link/Link';
 import Loading from 'web/components/loading/Loading';
 import SimpleTable from 'web/components/table/SimpleTable';
 import Table from 'web/components/table/StripedTable';
@@ -204,12 +203,7 @@ const EditNvtDetailsDialog = ({
                     <TableRow>
                       <TableData>{_('CVSS base vector')}</TableData>
                       <TableData>
-                        <Link
-                          query={{cvssVector: nvtCvssVector}}
-                          to="cvsscalculator"
-                        >
-                          {nvtCvssVector}
-                        </Link>
+                        {nvtCvssVector}
                       </TableData>
                     </TableRow>
                   )}

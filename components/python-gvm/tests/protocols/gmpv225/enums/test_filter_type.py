@@ -34,10 +34,6 @@ class GetFilterTypeFomStringTestCase(unittest.TestCase):
         ft = FilterType.from_string("host")
         self.assertEqual(ft, FilterType.HOST)
 
-    def test_filter_type_note(self):
-        ft = FilterType.from_string("note")
-        self.assertEqual(ft, FilterType.NOTE)
-
     def test_filter_type_override(self):
         ft = FilterType.from_string("override")
         self.assertEqual(ft, FilterType.OVERRIDE)
@@ -89,10 +85,6 @@ class GetFilterTypeFomStringTestCase(unittest.TestCase):
     def test_filter_type_target(self):
         ft = FilterType.from_string("target")
         self.assertEqual(ft, FilterType.TARGET)
-
-    def test_filter_type_ticket(self):
-        ft = FilterType.from_string("ticket")
-        self.assertEqual(ft, FilterType.TICKET)
 
     def test_filter_type_tls_certificate(self):
         ft = FilterType.from_string("tls_certificate")

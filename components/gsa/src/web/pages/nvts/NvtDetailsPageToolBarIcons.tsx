@@ -5,7 +5,6 @@
 
 import type Nvt from 'gmp/models/nvt';
 import {
-  NewNoteIcon,
   ResultIcon,
   VulnerabilityIcon,
   NewOverrideIcon,
@@ -21,14 +20,12 @@ import useTranslation from 'web/hooks/useTranslation';
 
 interface NvtDetailsPageToolBarIconsProps {
   entity: Nvt;
-  onNoteCreateClick?: (entity: Nvt) => void;
   onNvtDownloadClick?: (entity: Nvt) => void;
   onOverrideCreateClick?: (entity: Nvt) => void;
 }
 
 const NvtDetailsPageToolBarIcons = ({
   entity,
-  onNoteCreateClick,
   onNvtDownloadClick,
   onOverrideCreateClick,
 }: NvtDetailsPageToolBarIconsProps) => {
@@ -52,13 +49,6 @@ const NvtDetailsPageToolBarIcons = ({
       />
 
       <IconDivider>
-        {capabilities.mayCreate('note') && (
-          <NewNoteIcon
-            title={_('Add new Note')}
-            value={entity}
-            onClick={onNoteCreateClick}
-          />
-        )}
         {capabilities.mayCreate('override') && (
           <NewOverrideIcon
             title={_('Add new Override')}

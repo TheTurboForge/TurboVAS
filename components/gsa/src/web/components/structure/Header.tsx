@@ -66,7 +66,7 @@ const Header = () => {
       isThemeSwitchVisible={false}
       languageSwitch={<LanguageSwitch />}
       logo={logoComponent}
-      logoLink="/dashboards"
+      logoLink="/tasks"
       manualLink={manualURL}
       menuPoints={menuPoints}
       sessionTimer={<SessionTimer />}

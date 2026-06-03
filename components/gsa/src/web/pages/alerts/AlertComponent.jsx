@@ -127,7 +127,6 @@ const AlertComponent = ({
   const [composerFilterId, setComposerFilterId] = useState(undefined);
   const [composerIgnorePagination, setComposerIgnorePagination] =
     useState(undefined);
-  const [composerIncludeNotes, setComposerIncludeNotes] = useState(undefined);
   const [composerIncludeOverrides, setComposerIncludeOverrides] =
     useState(undefined);
   const [composerStoreAsDefault, setComposerStoreAsDefault] =
@@ -166,8 +165,6 @@ const AlertComponent = ({
     methodDataComposerIgnorePagination,
     setMethodDataComposerIgnorePagination,
   ] = useState(undefined);
-  const [methodDataComposerIncludeNotes, setMethodDataComposerIncludeNotes] =
-    useState(undefined);
   const [
     methodDataComposerIncludeOverrides,
     setMethodDataComposerIncludeOverrides,
@@ -336,7 +333,6 @@ const AlertComponent = ({
 
   const closeContentComposerDialog = () => {
     setComposerIgnorePagination(methodDataComposerIgnorePagination);
-    setComposerIncludeNotes(methodDataComposerIncludeNotes);
     setComposerIncludeOverrides(methodDataComposerIncludeOverrides);
     setComposerFilterId(filterId);
     setComposerStoreAsDefault(NO_VALUE);
@@ -345,7 +341,6 @@ const AlertComponent = ({
 
   const handleSaveComposerContent = ({
     ignorePagination,
-    includeNotes,
     includeOverrides,
     filterId,
     storeAsDefault,
@@ -355,7 +350,6 @@ const AlertComponent = ({
         ...reportComposerDefaults,
         reportResultFilterId: filterId === UNSET_VALUE ? undefined : filterId,
         ignorePagination,
-        includeNotes,
         includeOverrides,
       };
       saveDefaults(defaults);
@@ -363,7 +357,6 @@ const AlertComponent = ({
 
     setFilterId(filterId);
     setMethodDataComposerIgnorePagination(ignorePagination);
-    setMethodDataComposerIncludeNotes(includeNotes);
     setMethodDataComposerIncludeOverrides(includeOverrides);
     setComposerStoreAsDefault(NO_VALUE);
     setContentComposerDialogVisible(false);
@@ -529,7 +522,6 @@ const AlertComponent = ({
       setComposerIgnorePagination(
         getValue(method.data.composer_ignore_pagination),
       );
-      setComposerIncludeNotes(getValue(method.data.composer_include_notes));
       setComposerIncludeOverrides(
         getValue(method.data.composer_include_overrides),
       );
@@ -568,9 +560,6 @@ const AlertComponent = ({
 
       setMethodDataComposerIgnorePagination(
         getValue(method.data.composer_ignore_pagination),
-      );
-      setMethodDataComposerIncludeNotes(
-        getValue(method.data.composer_include_notes),
       );
       setMethodDataComposerIncludeOverrides(
         getValue(method.data.composer_include_overrides),
@@ -778,13 +767,11 @@ const AlertComponent = ({
       setFilters(filters);
       setComposerFilterId(reportComposerDefaults.reportResultFilterId);
       setComposerIgnorePagination(reportComposerDefaults.ignorePagination);
-      setComposerIncludeNotes(reportComposerDefaults.includeNotes);
       setComposerIncludeOverrides(reportComposerDefaults.includeOverrides);
       setComposerStoreAsDefault(NO_VALUE);
       setId(undefined);
       setMethod(undefined);
       setMethodDataComposerIgnorePagination(undefined);
-      setMethodDataComposerIncludeNotes(undefined);
       setMethodDataComposerIncludeOverrides(undefined);
       setMethodDataDefenseCenterIp(undefined);
       setMethodDataDefenseCenterPort(undefined);
@@ -863,7 +850,6 @@ const AlertComponent = ({
 
   const handleCloseAlertDialog = () => {
     setComposerIgnorePagination(undefined);
-    setComposerIncludeNotes(undefined);
     setComposerIncludeOverrides(undefined);
     setComposerFilterId(undefined);
     setComposerStoreAsDefault(NO_VALUE);
@@ -960,8 +946,6 @@ const AlertComponent = ({
 
     if (name === 'IgnorePagination') {
       setComposerIgnorePagination(value);
-    } else if (name === 'IncludeNotes') {
-      setComposerIncludeNotes(value);
     } else if (name === 'IncludeOverrides') {
       setComposerIncludeOverrides(value);
     } else if (name === 'StoreAsDefault') {
@@ -1020,9 +1004,6 @@ const AlertComponent = ({
               method_data_URL={methodDataURL}
               method_data_composer_ignore_pagination={
                 methodDataComposerIgnorePagination
-              }
-              method_data_composer_include_notes={
-                methodDataComposerIncludeNotes
               }
               method_data_composer_include_overrides={
                 methodDataComposerIncludeOverrides
@@ -1151,7 +1132,6 @@ const AlertComponent = ({
               filterId={composerFilterId}
               filters={resultFilters}
               ignorePagination={parseYesNo(composerIgnorePagination)}
-              includeNotes={parseYesNo(composerIncludeNotes)}
               includeOverrides={parseYesNo(composerIncludeOverrides)}
               storeAsDefault={parseYesNo(composerStoreAsDefault)}
               title={_('Compose Content for Scan Report')}

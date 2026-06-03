@@ -8,15 +8,12 @@ import type Response from 'gmp/http/response';
 import {type XmlMeta, type XmlResponseData} from 'gmp/http/transform/fast-xml';
 import AgentGroup from 'gmp/models/agent-group';
 import Alert from 'gmp/models/alert';
-import Audit from 'gmp/models/audit';
 import Credential from 'gmp/models/credential';
 import Filter from 'gmp/models/filter';
 import Group from 'gmp/models/group';
 import {type ModelElement} from 'gmp/models/model';
-import Note from 'gmp/models/note';
 import Override from 'gmp/models/override';
 import Permission from 'gmp/models/permission';
-import Policy from 'gmp/models/policy';
 import PortList from 'gmp/models/port-list';
 import ReportConfig from 'gmp/models/report-config';
 import ReportFormat from 'gmp/models/report-format';
@@ -27,21 +24,17 @@ import Schedule from 'gmp/models/schedule';
 import Tag from 'gmp/models/tag';
 import Target from 'gmp/models/target';
 import Task from 'gmp/models/task';
-import Ticket from 'gmp/models/ticket';
-import {forEach, map} from 'gmp/utils/array';
+import {map} from 'gmp/utils/array';
 import {apiType, type EntityType} from 'gmp/utils/entity-type';
 
 export interface TrashCanGetData {
   alerts: Alert[];
-  audits: Audit[];
   scanConfigs: ScanConfig[];
   credentials: Credential[];
   filters: Filter[];
   groups: Group[];
-  notes: Note[];
   overrides: Override[];
   permissions: Permission[];
-  policies: Policy[];
   portLists: PortList[];
   reportConfigs: ReportConfig[];
   reportFormats: ReportFormat[];
@@ -51,7 +44,6 @@ export interface TrashCanGetData {
   tags: Tag[];
   targets: Target[];
   tasks: Task[];
-  tickets: Ticket[];
   agentGroups: AgentGroup[];
   failedRequests?: string[];
 }
@@ -87,12 +79,6 @@ interface FiltersResponseData {
 interface GroupsResponseData {
   get_groups_response?: {
     group: ModelElement[] | ModelElement;
-  };
-}
-
-interface NotesResponseData {
-  get_notes_response?: {
-    note: ModelElement[] | ModelElement;
   };
 }
 
@@ -162,12 +148,6 @@ interface TasksResponseData {
   };
 }
 
-interface TicketsResponseData {
-  get_tickets_response?: {
-    ticket: ModelElement[] | ModelElement;
-  };
-}
-
 interface AgentGroupResponseData {
   get_agent_groups_response?: {
     agent_group: ModelElement[] | ModelElement;
@@ -229,9 +209,6 @@ class TrashCanCommand extends HttpCommand {
     const groupsRequest = this.httpGetWithTransform({
       cmd: 'get_trash_groups',
     }) as TrashCanGetPromise<GroupsResponseData>;
-    const notesRequest = this.httpGetWithTransform({
-      cmd: 'get_trash_notes',
-    }) as TrashCanGetPromise<NotesResponseData>;
     const overridesRequest = this.httpGetWithTransform({
       cmd: 'get_trash_overrides',
     }) as TrashCanGetPromise<OverridesResponseData>;
@@ -265,9 +242,6 @@ class TrashCanCommand extends HttpCommand {
     const tasksRequest = this.httpGetWithTransform({
       cmd: 'get_trash_tasks',
     }) as TrashCanGetPromise<TasksResponseData>;
-    const ticketsRequest = this.httpGetWithTransform({
-      cmd: 'get_trash_tickets',
-    }) as TrashCanGetPromise<TicketsResponseData>;
     const agentGroupRequest = requestAgentGroups
       ? (this.httpGetWithTransform({
           cmd: 'get_trash_agent_group',
@@ -279,7 +253,6 @@ class TrashCanCommand extends HttpCommand {
       credentialsRequest,
       filtersRequest,
       groupsRequest,
-      notesRequest,
       overridesRequest,
       permissionsRequest,
       portListsRequest,
@@ -291,7 +264,6 @@ class TrashCanCommand extends HttpCommand {
       tagsRequest,
       targetsRequest,
       tasksRequest,
-      ticketsRequest,
       agentGroupRequest,
     ];
 
@@ -309,7 +281,6 @@ class TrashCanCommand extends HttpCommand {
       'credentials',
       'filters',
       'groups',
-      'notes',
       'overrides',
       'permissions',
       'portLists',
@@ -321,7 +292,6 @@ class TrashCanCommand extends HttpCommand {
       'tags',
       'targets',
       'tasks',
-      'tickets',
       'agentGroups',
     ];
 
@@ -337,7 +307,6 @@ class TrashCanCommand extends HttpCommand {
       credentialsResponse,
       filtersResponse,
       groupsResponse,
-      notesResponse,
       overridesResponse,
       permissionsResponse,
       portListsResponse,
@@ -349,7 +318,6 @@ class TrashCanCommand extends HttpCommand {
       tagsResponse,
       targetsResponse,
       tasksResponse,
-      ticketsResponse,
       agentGroupsResponse,
     ] = [
       getResponse<TrashCanGetResponse<AlertResponseData>>(0),
@@ -357,27 +325,24 @@ class TrashCanCommand extends HttpCommand {
       getResponse<TrashCanGetResponse<CredentialsResponseData>>(2),
       getResponse<TrashCanGetResponse<FiltersResponseData>>(3),
       getResponse<TrashCanGetResponse<GroupsResponseData>>(4),
-      getResponse<TrashCanGetResponse<NotesResponseData>>(5),
-      getResponse<TrashCanGetResponse<OverridesResponseData>>(6),
-      getResponse<TrashCanGetResponse<PermissionsResponseData>>(7),
-      getResponse<TrashCanGetResponse<PortListsResponseData>>(8),
-      getResponse<TrashCanGetResponse<ReportConfigsResponseData>>(9),
-      getResponse<TrashCanGetResponse<ReportFormatsResponseData>>(10),
-      getResponse<TrashCanGetResponse<RolesResponseData>>(11),
-      getResponse<TrashCanGetResponse<ScannersResponseData>>(12),
-      getResponse<TrashCanGetResponse<SchedulesResponseData>>(13),
-      getResponse<TrashCanGetResponse<TagsResponseData>>(14),
-      getResponse<TrashCanGetResponse<TargetsResponseData>>(15),
-      getResponse<TrashCanGetResponse<TasksResponseData>>(16),
-      getResponse<TrashCanGetResponse<TicketsResponseData>>(17),
-      getResponse<TrashCanGetResponse<AgentGroupResponseData>>(18),
+      getResponse<TrashCanGetResponse<OverridesResponseData>>(5),
+      getResponse<TrashCanGetResponse<PermissionsResponseData>>(6),
+      getResponse<TrashCanGetResponse<PortListsResponseData>>(7),
+      getResponse<TrashCanGetResponse<ReportConfigsResponseData>>(8),
+      getResponse<TrashCanGetResponse<ReportFormatsResponseData>>(9),
+      getResponse<TrashCanGetResponse<RolesResponseData>>(10),
+      getResponse<TrashCanGetResponse<ScannersResponseData>>(11),
+      getResponse<TrashCanGetResponse<SchedulesResponseData>>(12),
+      getResponse<TrashCanGetResponse<TagsResponseData>>(13),
+      getResponse<TrashCanGetResponse<TargetsResponseData>>(14),
+      getResponse<TrashCanGetResponse<TasksResponseData>>(15),
+      getResponse<TrashCanGetResponse<AgentGroupResponseData>>(16),
     ];
     const alertsData = alertsResponse?.data.get_trash;
     const configsData = configsResponse?.data.get_trash;
     const credentialsData = credentialsResponse?.data.get_trash;
     const filtersData = filtersResponse?.data.get_trash;
     const groupsData = groupsResponse?.data.get_trash;
-    const notesData = notesResponse?.data.get_trash;
     const overridesData = overridesResponse?.data.get_trash;
     const permissionsData = permissionsResponse?.data.get_trash;
     const portListsData = portListsResponse?.data.get_trash;
@@ -389,22 +354,15 @@ class TrashCanCommand extends HttpCommand {
     const tagsData = tagsResponse?.data.get_trash;
     const targetsData = targetsResponse?.data.get_trash;
     const tasksData = tasksResponse?.data.get_trash;
-    const ticketsData = ticketsResponse?.data.get_trash;
     const agentGroupsData = agentGroupsResponse?.data.get_trash;
 
     const alerts = map(alertsData?.get_alerts_response?.alert, element =>
       Alert.fromElement(element),
     );
 
-    const scanConfigs: ScanConfig[] = [];
-    const policies: Policy[] = [];
-    forEach(configsData?.get_configs_response?.config, element => {
-      if (element.usage_type === 'scan')
-        scanConfigs.push(ScanConfig.fromElement(element));
-      else {
-        policies.push(Policy.fromElement(element));
-      }
-    });
+    const scanConfigs = map(configsData?.get_configs_response?.config, element =>
+      ScanConfig.fromElement(element),
+    );
 
     const credentials = map(
       credentialsData?.get_credentials_response?.credential,
@@ -415,9 +373,6 @@ class TrashCanCommand extends HttpCommand {
     );
     const groups = map(groupsData?.get_groups_response?.group, element =>
       Group.fromElement(element),
-    );
-    const notes = map(notesData?.get_notes_response?.note, element =>
-      Note.fromElement(element),
     );
     const overrides = map(
       overridesData?.get_overrides_response?.override,
@@ -456,17 +411,8 @@ class TrashCanCommand extends HttpCommand {
     const targets = map(targetsData?.get_targets_response?.target, element =>
       Target.fromElement(element),
     );
-    const tasks: Task[] = [];
-    const audits: Audit[] = [];
-    forEach(tasksData?.get_tasks_response?.task, element => {
-      if (element.usage_type === 'scan') {
-        tasks.push(Task.fromElement(element));
-      } else {
-        audits.push(Audit.fromElement(element));
-      }
-    });
-    const tickets = map(ticketsData?.get_tickets_response?.ticket, element =>
-      Ticket.fromElement(element),
+    const tasks = map(tasksData?.get_tasks_response?.task, element =>
+      Task.fromElement(element),
     );
     const agentGroups = map(
       agentGroupsData?.get_agent_groups_response?.agent_group,
@@ -479,7 +425,6 @@ class TrashCanCommand extends HttpCommand {
       credentialsResponse ||
       filtersResponse ||
       groupsResponse ||
-      notesResponse ||
       overridesResponse ||
       permissionsResponse ||
       portListsResponse ||
@@ -490,7 +435,6 @@ class TrashCanCommand extends HttpCommand {
       schedulesResponse ||
       tagsResponse ||
       tasksResponse ||
-      ticketsResponse ||
       agentGroupsResponse;
 
     if (!baseResponse) {
@@ -500,15 +444,12 @@ class TrashCanCommand extends HttpCommand {
 
     return baseResponse.setData({
       alerts,
-      audits,
       scanConfigs,
       credentials,
       filters,
       groups,
-      notes,
       overrides,
       permissions,
-      policies,
       portLists,
       reportConfigs,
       reportFormats,
@@ -518,7 +459,6 @@ class TrashCanCommand extends HttpCommand {
       tags,
       targets,
       tasks,
-      tickets,
       agentGroups,
       failedRequests: failedRequests.length > 0 ? failedRequests : undefined,
     });

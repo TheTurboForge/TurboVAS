@@ -2415,7 +2415,7 @@ config_insert_preferences (config_t config,
  * @param[in]   all_selector   Whether to use "all" selector instead of selectors.
  * @param[in]   selectors      NVT selectors.
  * @param[in]   preferences    Preferences.
- * @param[in]   usage_type     The usage type ("scan" or "policy")
+ * @param[in]   usage_type     The usage type. Only "scan" is retained.
  * @param[in]   allow_errors   Whether certain errors are allowed.
  * @param[in]   predefined     Whether config is predefined.
  * @param[out]  config         On success the config.
@@ -2482,10 +2482,7 @@ create_config_internal (int check_access, const char *config_id,
 
   candidate_name = g_strdup (proposed_name);
   quoted_candidate_name = sql_quote (candidate_name);
-  if (usage_type && strcasecmp (usage_type, "policy") == 0)
-    actual_usage_type = "policy";
-  else
-    actual_usage_type = "scan";
+  actual_usage_type = "scan";
 
   while (make_name_unique)
     {
@@ -2559,19 +2556,6 @@ create_config_internal (int check_access, const char *config_id,
 
   update_config_caches (*config);
 
-  /* Workaround to disable notus checks in compliance policies */
-
-  sql ("INSERT INTO config_preferences (config, type, name, value)"
-       " SELECT id, 'SERVER_PREFS', 'table_driven_lsc', '0'"
-       "    FROM configs"
-       "   WHERE configs.id = %llu"
-       "     AND usage_type='policy'"
-       "     AND configs.id NOT IN"
-       "          (SELECT config FROM config_preferences"
-       "           WHERE name = 'table_driven_lsc'"
-       "           AND type = 'SERVER_PREFS');",
-       *config);
-
   sql_commit ();
   *name = candidate_name;
   return 0;
@@ -2590,7 +2574,7 @@ create_config_internal (int check_access, const char *config_id,
  * @param[in]   all_selector   Whether to use "all" selector instead of selectors.
  * @param[in]   selectors      NVT selectors.
  * @param[in]   preferences    Preferences.
- * @param[in]   usage_type     The usage type ("scan" or "policy")
+ * @param[in]   usage_type     The usage type. Only "scan" is retained.
  * @param[out]  config         On success the config.
  * @param[out]  name           On success the name of the config.
  *
@@ -2626,7 +2610,7 @@ create_config (const char *config_id, const char *proposed_name,
  * @param[in]   all_selector   Whether to use "all" selector instead of selectors.
  * @param[in]   selectors      NVT selectors.
  * @param[in]   preferences    Preferences.
- * @param[in]   usage_type     The usage type ("scan" or "policy")
+ * @param[in]   usage_type     The usage type. Only "scan" is retained.
  * @param[out]  config         On success the config.
  * @param[out]  name           On success the name of the config.
  *
@@ -2897,16 +2881,7 @@ copy_config (const char* name, const char* comment, const char *config_id,
 
   if (usage_type && strcmp (usage_type, ""))
     {
-      const char *actual_usage_type;
-
-      if (strcasecmp (usage_type, "policy") == 0)
-        actual_usage_type = "policy";
-      else
-        actual_usage_type = "scan";
-
-      sql ("UPDATE configs SET usage_type = '%s' WHERE id = %llu;",
-           actual_usage_type,
-           new);
+      sql ("UPDATE configs SET usage_type = 'scan' WHERE id = %llu;", new);
     }
 
   config_selector = config_nvt_selector (old);
@@ -2926,19 +2901,6 @@ copy_config (const char* name, const char* comment, const char *config_id,
        new,
        quoted_config_selector);
   g_free (quoted_config_selector);
-
-  /* Workaround to disable notus checks in compliance policies */
-
-  sql ("INSERT INTO config_preferences (config, type, name, value)"
-       " SELECT id, 'SERVER_PREFS', 'table_driven_lsc', '0'"
-       "    FROM configs"
-       "   WHERE configs.id = %llu"
-       "     AND usage_type='policy'"
-       "     AND configs.id NOT IN"
-       "          (SELECT config FROM config_preferences"
-       "           WHERE name = 'table_driven_lsc'"
-       "           AND type = 'SERVER_PREFS');",
-       new);
 
   sql_commit ();
   if (new_config) *new_config = new;
@@ -4346,14 +4308,9 @@ update_config (config_t config, const gchar *name,
                const array_t* preferences /* preference_t. */,
                const gchar *deprecated)
 {
-  gchar *quoted_name, *quoted_comment, *actual_usage_type, *config_id;
+  gchar *quoted_name, *quoted_comment, *config_id;
 
   sql_begin_immediate ();
-
-  if (usage_type && strcasecmp (usage_type, "policy") == 0)
-    actual_usage_type = "policy";
-  else
-    actual_usage_type = "scan";
 
   quoted_name = sql_quote (name);
   quoted_comment = sql_quote (comment ? comment : "");
@@ -4363,7 +4320,7 @@ update_config (config_t config, const gchar *name,
        " WHERE id = %llu;",
        quoted_name,
        quoted_comment,
-       actual_usage_type,
+       "scan",
        config);
   g_free (quoted_name);
   g_free (quoted_comment);
@@ -4415,19 +4372,6 @@ update_config (config_t config, const gchar *name,
       return;
     }
 
-  /* Workaround to disable notus checks in compliance policies */
-
-  sql ("INSERT INTO config_preferences (config, type, name, value)"
-       " SELECT id, 'SERVER_PREFS', 'table_driven_lsc', '0'"
-       "    FROM configs"
-       "   WHERE configs.id = %llu"
-       "     AND usage_type='policy'"
-       "     AND configs.id NOT IN"
-       "          (SELECT config FROM config_preferences"
-       "           WHERE name = 'table_driven_lsc'"
-       "           AND type = 'SERVER_PREFS');",
-       config);
-
   /* Handle deprecation status */
 
   config_id = resource_uuid ("config", config);
@@ -4474,7 +4418,7 @@ check_db_configs (int avoid_db_check_inserts)
   if (sql_int ("SELECT EXISTS (SELECT * FROM configs_trash"
                "               WHERE predefined = 1);"))
     {
-      g_warning ("%s: There are feed configs/policies in the trash."
+      g_warning ("%s: There are feed configs in the trash."
                  " These will be excluded from the sync.",
                  __func__);
     }

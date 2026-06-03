@@ -69,13 +69,6 @@ export interface TaskElement extends ModelElement {
     // Only available for tasks with finished scans
     report?: {
       _id?: string;
-      compliance_count?: {
-        // only available for audits
-        incomplete?: number;
-        yes?: number;
-        no?: number;
-        undefined?: number;
-      };
       // get_tasks result_counts are different then compared to get_reports
       result_count?: {
         false_positive?: number;
@@ -177,13 +170,6 @@ export interface TaskObservers {
 }
 
 export interface TaskReport {
-  compliance_count?: {
-    // only available for audits
-    incomplete?: number;
-    yes?: number;
-    no?: number;
-    undefined?: number;
-  };
   entityType: 'report';
   id: string;
   result_count?: {
@@ -268,7 +254,6 @@ export const TASK_STATUS = {
 
 export const USAGE_TYPE = {
   scan: 'scan',
-  audit: 'audit',
 } as const;
 
 const TASK_STATUS_TRANSLATIONS = {
@@ -424,9 +409,7 @@ class Task extends Model {
   static parseElement(element: TaskElement = {}): TaskProperties {
     const copy = super.parseElement(element) as TaskProperties;
 
-    const usageType = (element.usage_type ?? USAGE_TYPE.scan) as
-      | typeof USAGE_TYPE.scan
-      | typeof USAGE_TYPE.audit;
+    const usageType = (element.usage_type ?? USAGE_TYPE.scan) as TaskUsageType;
 
     if (!Object.values(USAGE_TYPE).includes(usageType)) {
       throw new Error("Task.parseElement: usage_type must be 'scan'");
@@ -490,18 +473,6 @@ class Task extends Model {
           log: parseInt(element.last_report?.report?.result_count?.log),
           false_positive: parseInt(
             element.last_report?.report?.result_count?.false_positive,
-          ),
-        };
-      }
-      if (isDefined(element.last_report?.report?.compliance_count)) {
-        lastReport.compliance_count = {
-          incomplete: parseInt(
-            element.last_report?.report?.compliance_count?.incomplete,
-          ),
-          yes: parseInt(element.last_report?.report?.compliance_count?.yes),
-          no: parseInt(element.last_report?.report?.compliance_count?.no),
-          undefined: parseInt(
-            element.last_report?.report?.compliance_count?.undefined,
           ),
         };
       }

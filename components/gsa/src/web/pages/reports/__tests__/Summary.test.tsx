@@ -160,39 +160,6 @@ describe('Summary', () => {
     expect(report2Link).toBeDefined();
   });
 
-  test('uses audit link types when audit prop is true', () => {
-    const report = {
-      ...createBaseReport(),
-      delta_report: {
-        id: 'audit-report-2',
-        scan_run_status: TASK_STATUS.done,
-      },
-      isDeltaReport: () => true,
-    } as unknown as ReportReport;
-
-    const {render} = rendererWith({
-      capabilities: true,
-      gmp: createGmp(),
-    });
-    render(
-      <Summary
-        audit={true}
-        filter={createFilter('')}
-        report={report}
-        reportId={report.id as string}
-      />,
-    );
-
-    const links = screen.getAllByTestId('details-link');
-    const taskLink = links[0] as HTMLAnchorElement;
-    expect(taskLink).toHaveAttribute('href', '/audit/task-1');
-
-    const reportLinks = links.filter(link =>
-      (link as HTMLAnchorElement).href.includes('/audit-report/'),
-    ) as HTMLAnchorElement[];
-    expect(reportLinks.length).toBeGreaterThanOrEqual(1);
-  });
-
   test('shows error panel when reportError prop is provided', () => {
     const report = createBaseReport();
     const {render} = rendererWith({

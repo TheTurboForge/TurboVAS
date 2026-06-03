@@ -66,7 +66,6 @@ const nvt = Nvt.fromElement({
 describe('NvtDetailsPageToolBarIcons tests', () => {
   test('should render', () => {
     const handleNvtDownloadClick = testing.fn();
-    const handleOnNoteCreateClick = testing.fn();
     const handleOnOverrideCreateClick = testing.fn();
 
     const gmp = {settings: {manualUrl, enableEPSS: true}};
@@ -80,7 +79,6 @@ describe('NvtDetailsPageToolBarIcons tests', () => {
     render(
       <NvtDetailsPageToolBarIcons
         entity={nvt}
-        onNoteCreateClick={handleOnNoteCreateClick}
         onNvtDownloadClick={handleNvtDownloadClick}
         onOverrideCreateClick={handleOnOverrideCreateClick}
       />,
@@ -99,7 +97,6 @@ describe('NvtDetailsPageToolBarIcons tests', () => {
     );
 
     expect(screen.getByTitle('Export NVT')).toBeInTheDocument();
-    expect(screen.getByTitle('Add new Note')).toBeInTheDocument();
     expect(screen.getByTitle('Add new Override')).toBeInTheDocument();
 
     const resultsIcon = screen.getByTitle('Corresponding Results');
@@ -121,7 +118,6 @@ describe('NvtDetailsPageToolBarIcons tests', () => {
 
   test('should call click handlers', () => {
     const handleNvtDownloadClick = testing.fn();
-    const handleOnNoteCreateClick = testing.fn();
     const handleOnOverrideCreateClick = testing.fn();
 
     const gmp = {settings: {manualUrl, enableEPSS: true}};
@@ -135,21 +131,16 @@ describe('NvtDetailsPageToolBarIcons tests', () => {
     render(
       <NvtDetailsPageToolBarIcons
         entity={nvt}
-        onNoteCreateClick={handleOnNoteCreateClick}
         onNvtDownloadClick={handleNvtDownloadClick}
         onOverrideCreateClick={handleOnOverrideCreateClick}
       />,
     );
 
     const exportIcon = screen.getByTitle('Export NVT');
-    const addNewNoteIcon = screen.getByTitle('Add new Note');
     const addNewOverrideIcon = screen.getByTitle('Add new Override');
 
     fireEvent.click(exportIcon);
     expect(handleNvtDownloadClick).toHaveBeenCalledWith(nvt);
-
-    fireEvent.click(addNewNoteIcon);
-    expect(handleOnNoteCreateClick).toHaveBeenCalledWith(nvt);
 
     fireEvent.click(addNewOverrideIcon);
     expect(handleOnOverrideCreateClick).toHaveBeenCalledWith(nvt);

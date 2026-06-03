@@ -67,10 +67,8 @@ describe('Page tests', () => {
     await wait();
 
     expect(screen.getByRole('banner')).toBeInTheDocument();
-    expect(screen.getByRole('link', {name: /dashboards/i})).toBeInTheDocument();
     expect(screen.getByRole('link', {name: /scans/i})).toBeInTheDocument();
     expect(screen.getByRole('link', {name: /assets/i})).toBeInTheDocument();
-    expect(screen.getByRole('link', {name: /resilience/i})).toBeInTheDocument();
     expect(
       screen.getByRole('link', {name: /security information/i}),
     ).toBeInTheDocument();
@@ -80,7 +78,6 @@ describe('Page tests', () => {
     expect(
       screen.getByRole('link', {name: /administration/i}),
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', {name: /help/i})).toBeInTheDocument();
     expect(screen.getByRole('main')).toBeInTheDocument();
     expect(
       screen.getByText(/Please wait while the feed is syncing./i),

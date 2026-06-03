@@ -584,14 +584,6 @@ Lists all groups
 
 Returns Group Name, uuid, members
 
-## `list-policies.gmp.py`
-
-Lists compliance policies.
-
-### Example
-
-`$ gvm-script --gmp-username *admin-user* --gmp-password *password* socket list-policies.gmp.py`
-
 ## `list-portlists.gmp.py`
 
 Lists port lists.
@@ -675,16 +667,6 @@ Lists all targets currently configured.
 
 - No targets configured by default, however using the provided files in this repo, you should now have a few (5).
 - Returns targets Name, uuid, number of Hosts, and credentials (SSH, SMB, ESXi, & SNMP Credentials)
-
-## `list-tickets.gmp.py`
-
-Lists all tickets created
-
-### Example
-
-`$ gvm-script --gmp-username *admin-user* --gmp-password *password* socket list-tickets.gmp.py`
-
-Returns the tickets name, Host, Associated Task, Status, and Note (depending on status either Open-, Fixed-, or Closed note).
 
 ## `list-users.gmp.py`
 

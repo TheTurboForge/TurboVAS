@@ -86,13 +86,7 @@ class Aggregates:
         cmd = XmlCommand("get_aggregates")
 
         _actual_resource_type = resource_type
-        if resource_type.value == EntityType.AUDIT.value:
-            _actual_resource_type = EntityType.TASK
-            cmd.set_attribute("usage_type", "audit")
-        elif resource_type.value == EntityType.POLICY.value:
-            _actual_resource_type = EntityType.SCAN_CONFIG
-            cmd.set_attribute("usage_type", "policy")
-        elif resource_type.value == EntityType.SCAN_CONFIG.value:
+        if resource_type.value == EntityType.SCAN_CONFIG.value:
             cmd.set_attribute("usage_type", "scan")
         elif resource_type.value == EntityType.TASK.value:
             cmd.set_attribute("usage_type", "scan")

@@ -354,7 +354,6 @@ cleanup_keyword (keyword_t *keyword)
     }
   else if (strcasecmp (keyword->column, "apply_overrides") == 0
            || strcasecmp (keyword->column, "overrides") == 0
-           || strcasecmp (keyword->column, "notes") == 0
            || strcasecmp (keyword->column, "result_hosts_only") == 0)
     {
       /* Boolean options (0 or 1) */
@@ -495,21 +494,6 @@ keyword_applies (array_t *array, const keyword_t *keyword)
           keyword_t *item;
           item = (keyword_t*) g_ptr_array_index (array, index);
           if (item->column && (strcmp (item->column, "min_qod") == 0))
-            return 0;
-        }
-    }
-
-  if (keyword->column
-      && (strcmp (keyword->column, "notes") == 0))
-    {
-      int index;
-
-      index = array->len;
-      while (index--)
-        {
-          keyword_t *item;
-          item = (keyword_t*) g_ptr_array_index (array, index);
-          if (item->column && (strcmp (item->column, "notes") == 0))
             return 0;
         }
     }

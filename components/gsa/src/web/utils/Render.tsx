@@ -184,8 +184,6 @@ const getPermissionTypeName = (type: string) => {
       return _('SecInfo');
     case 'os':
       return _('Operating Systems');
-    case 'notes':
-      return _('Notes');
     case 'nvts':
       return _('NVTs');
     case 'nvt_families':
@@ -224,8 +222,6 @@ const getPermissionTypeName = (type: string) => {
       return _('Targets');
     case 'tasks':
       return _('Tasks');
-    case 'tickets':
-      return _('Tickets');
     case 'tlscertificates':
       return _('TLS Certificates');
     case 'users':

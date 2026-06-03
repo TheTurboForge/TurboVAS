@@ -69,10 +69,10 @@ class GmpGetResourceNamesListTestMixin:
             b'<get_resource_names type="HOST"/>'
         )
 
-        self.gmp.get_resource_names(ResourceType.NOTE)
+        self.gmp.get_resource_names(ResourceType.NVT)
 
         self.connection.send.has_been_called_with(
-            b'<get_resource_names type="NOTE"/>'
+            b'<get_resource_names type="NVT"/>'
         )
 
         self.gmp.get_resource_names(ResourceType.NVT)

@@ -8,7 +8,6 @@ import {rendererWith, screen, within, userEvent} from 'web/testing';
 import CollectionCounts from 'gmp/collection/collection-counts';
 import Filter from 'gmp/models/filter';
 import {SEVERITY_RATING_CVSS_3} from 'gmp/utils/severity';
-import {getMockAuditReport} from 'web/pages/reports/__fixtures__/MockAuditReport';
 import {getMockReport} from 'web/pages/reports/__fixtures__/MockReport';
 import OperatingSystemsTable from 'web/pages/reports/details/OperatingSystemsTable';
 
@@ -161,74 +160,6 @@ describe('OperatingSystemsTable', () => {
     screen.getByText('No Operating Systems available');
   });
 
-  test('should render audit report with compliance column', () => {
-    const {operatingsystems} = getMockAuditReport();
-
-    const auditFilter = Filter.fromString('first=1 rows=10');
-
-    const {render} = rendererWith({
-      router: true,
-
-      gmp: createGmp(),
-    });
-
-    render(
-      <OperatingSystemsTable
-        audit={true}
-        // @ts-expect-error entities are ReportOperatingSystem[], not Model[]
-        entities={operatingsystems?.entities ?? []}
-        entitiesCounts={operatingsystems?.counts}
-        filter={auditFilter}
-      />,
-    );
-
-    const table = screen.getByRole('table');
-
-    const columnHeaders = within(table).getAllByRole('columnheader');
-
-    expect(columnHeaders).toHaveLength(4);
-
-    expect(
-      columnHeaders.some(th => /Operating System/i.exec(th.textContent)),
-    ).toBe(true);
-
-    expect(columnHeaders.some(th => /CPE/i.exec(th.textContent))).toBe(true);
-
-    expect(columnHeaders.some(th => /Hosts/i.exec(th.textContent))).toBe(true);
-
-    expect(columnHeaders.some(th => /Compliant/i.exec(th.textContent))).toBe(
-      true,
-    );
-  });
-
-  test('should render compliance bar instead of severity bar for audit reports', () => {
-    const {operatingsystems} = getMockAuditReport();
-
-    const auditFilter = Filter.fromString('first=1 rows=10');
-
-    const {render} = rendererWith({
-      router: true,
-
-      gmp: createGmp(),
-    });
-
-    render(
-      <OperatingSystemsTable
-        audit={true}
-        // @ts-expect-error entities are ReportOperatingSystem[], not Model[]
-        entities={operatingsystems?.entities ?? []}
-        entitiesCounts={operatingsystems?.counts}
-        filter={auditFilter}
-      />,
-    );
-
-    // Should render compliance bars, not severity bars
-
-    screen.getByText('No');
-
-    screen.getByText('Incomplete');
-  });
-
   test('should handle sorting by operating system column', async () => {
     const {operatingsystems} = getMockReport();
 
@@ -313,7 +244,7 @@ describe('OperatingSystemsTable', () => {
     expect(onSortChange).toHaveBeenCalledWith('hosts');
   });
 
-  test('should not render severity column for regular or audit reports', () => {
+  test('should not render severity column for regular reports', () => {
     const {operatingsystems} = getMockReport();
 
     const {render} = rendererWith({

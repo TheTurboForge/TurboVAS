@@ -14,9 +14,6 @@ class FilterTypeTestsCase(unittest.TestCase):
     def test_filter_type_alert(self):
         self.assertEqual(FilterType.ALERT.value, "alert")
 
-    def test_filter_type_audit_report(self):
-        self.assertEqual(FilterType.AUDIT_REPORT.value, "audit_report")
-
     def test_filter_type_asset(self):
         self.assertEqual(FilterType.ASSET.value, "asset")
 
@@ -31,9 +28,6 @@ class FilterTypeTestsCase(unittest.TestCase):
 
     def test_filter_type_host(self):
         self.assertEqual(FilterType.HOST.value, "host")
-
-    def test_filter_type_note(self):
-        self.assertEqual(FilterType.NOTE.value, "note")
 
     def test_filter_type_operating_system(self):
         self.assertEqual(FilterType.OPERATING_SYSTEM.value, "os")
@@ -76,9 +70,6 @@ class FilterTypeTestsCase(unittest.TestCase):
 
     def test_filter_type_task(self):
         self.assertEqual(FilterType.TASK.value, "task")
-
-    def test_filter_type_ticket(self):
-        self.assertEqual(FilterType.TICKET.value, "ticket")
 
     def test_filter_type_tls_certificate(self):
         self.assertEqual(FilterType.TLS_CERTIFICATE.value, "tls_certificate")

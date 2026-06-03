@@ -64,20 +64,7 @@ resource_name (const char *type, const char *uuid, int location, char **name)
 
   GString *query = g_string_new ("");
 
-  if (strcasecmp (type, "note") == 0)
-    {
-      g_string_printf (query,
-                       "SELECT 'Note for: '"
-                       " || (SELECT name"
-                       "     FROM nvts"
-                       "     WHERE nvts.uuid = tnotes.nvt)"
-                       " FROM notes%s AS tnotes"
-                       " WHERE uuid = $1;",
-                       location == LOCATION_TABLE ? "" : "_trash");
-
-      *name = sql_string_ps (query->str, SQL_STR_PARAM (uuid), NULL);
-    }
-  else if (strcasecmp (type, "override") == 0)
+  if (strcasecmp (type, "override") == 0)
     {
       g_string_printf (query,
                        "SELECT 'Override for: '"

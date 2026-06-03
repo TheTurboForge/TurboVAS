@@ -85,8 +85,6 @@ interface TagComponentProps {
 
 const RESOURCE_TYPES: EntityType[] = [
   'alert',
-  'audit',
-  'auditreport',
   'host',
   'operatingsystem',
   'cpe',
@@ -96,11 +94,9 @@ const RESOURCE_TYPES: EntityType[] = [
   'dfncert',
   'filter',
   'group',
-  'note',
   'nvt',
   'override',
   'permission',
-  'policy',
   'portlist',
   'report',
   'reportconfig',

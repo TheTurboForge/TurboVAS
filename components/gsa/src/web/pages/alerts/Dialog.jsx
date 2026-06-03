@@ -25,7 +25,6 @@ import {
   DELTA_TYPE_PREVIOUS,
   DELTA_TYPE_REPORT,
   isTaskEvent,
-  isTicketEvent,
   isSecinfoEvent,
 } from 'gmp/models/alert';
 import {parseInt, NO_VALUE, YES_VALUE} from 'gmp/parser';
@@ -57,7 +56,6 @@ import SecInfoEventPart from 'web/pages/alerts/SecInfoEventPart';
 import SeverityChangedConditionPart from 'web/pages/alerts/SeverityChangedConditionPart';
 import SeverityLeastConditionPart from 'web/pages/alerts/SeverityLeastConditionPart';
 import TaskEventPart from 'web/pages/alerts/TaskEventPart';
-import TicketEventPart from 'web/pages/alerts/TicketEventPart';
 import PropTypes from 'web/utils/PropTypes';
 import {UNSET_VALUE} from 'web/utils/Render';
 import withCapabilities from 'web/utils/withCapabilities';
@@ -146,16 +144,16 @@ should not have received it.
 export const VFIRE_CALL_DESCRIPTION = `After the event $e,
 the following condition was met: $c
 
-This ticket includes reports in the following format(s):
+This alert includes reports in the following format(s):
 $r.
 
 Full details and other report formats are available on the scan engine.
 $t
 
 Note:
-This ticket was created automatically as a security scan escalation.
+This alert was created automatically as a security scan escalation.
 Please contact your local system administrator if you think it
-was created or assigned erroneously.
+was created erroneously.
 `;
 
 const DEFAULTS = {
@@ -248,13 +246,6 @@ class AlertDialog extends React.Component {
         onValueChange(DELTA_TYPE_NONE, 'method_data_delta_type');
 
         filter_id = selectSaveId(result_filters);
-      } else if (isTicketEvent(value)) {
-        onValueChange(DEFAULT_METHOD, 'method'); // reset method to avoid having an invalid method for tickets
-        onValueChange(UNSET_VALUE, 'filter_id'); // reset filter_id
-        onValueChange(undefined, 'method_data_subject');
-        onValueChange(undefined, 'method_data_message');
-        onValueChange(undefined, 'method_data_message_attach');
-        onValueChange(undefined, 'method_data_delta_type');
       } else {
         onValueChange(DEFAULT_METHOD, 'method'); // reset method to avoid having an invalid method for secinfo
         onValueChange(SECINFO_SUBJECT, 'method_data_subject');
@@ -284,7 +275,6 @@ class AlertDialog extends React.Component {
       report_format_ids,
       report_formats,
       method_data_composer_ignore_pagination,
-      method_data_composer_include_notes,
       method_data_composer_include_overrides,
       method_data_recipient_credential,
       method_data_scp_credential,
@@ -330,7 +320,6 @@ class AlertDialog extends React.Component {
 
     const taskEvent = isTaskEvent(event);
     const secinfoEvent = isSecinfoEvent(event);
-    const ticketEvent = isTicketEvent(event);
 
     if (taskEvent) {
       methodTypes.push(
@@ -381,21 +370,6 @@ class AlertDialog extends React.Component {
         {
           value: METHOD_TYPE_ALEMBA_VFIRE,
           label: _('Alemba vFire'),
-        },
-      );
-    } else if (ticketEvent) {
-      methodTypes.push(
-        {
-          value: METHOD_TYPE_EMAIL,
-          label: _('Email'),
-        },
-        {
-          value: METHOD_TYPE_SYSLOG,
-          label: _('System Logger'),
-        },
-        {
-          value: METHOD_TYPE_START_TASK,
-          label: _('Start Task'),
         },
       );
     } else {
@@ -468,7 +442,6 @@ class AlertDialog extends React.Component {
       filter_id,
       method_data_pkcs12_credential,
       method_data_composer_ignore_pagination,
-      method_data_composer_include_notes,
       method_data_composer_include_overrides,
       method_data_recipient_credential,
       method_data_scp_credential,
@@ -526,13 +499,6 @@ class AlertDialog extends React.Component {
                   prefix="event_data"
                   secinfoType={values.event_data_secinfo_type}
                   onChange={onValueChange}
-                  onEventChange={value =>
-                    this.handleEventChange(value, onValueChange)
-                  }
-                />
-
-                <TicketEventPart
-                  event={values.event}
                   onEventChange={value =>
                     this.handleEventChange(value, onValueChange)
                   }
@@ -884,7 +850,6 @@ AlertDialog.propTypes = {
   method: PropTypes.string,
   method_data_URL: PropTypes.string,
   method_data_composer_ignore_pagination: PropTypes.number,
-  method_data_composer_include_notes: PropTypes.number,
   method_data_composer_include_overrides: PropTypes.number,
   method_data_defense_center_ip: PropTypes.string,
   method_data_defense_center_port: PropTypes.numberOrNumberString,

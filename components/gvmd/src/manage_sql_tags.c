@@ -9,7 +9,6 @@
 #include "manage_sql_filters.h"
 #include "manage_sql_permissions.h"
 #include "manage_sql_resources.h"
-#include "manage_sql_tickets.h"
 #include "sql.h"
 
 /**
@@ -349,13 +348,7 @@ tag_add_resource_uuid (tag_t tag,
 
       int same_type = (strcmp (tag_type, type) == 0);
 
-      if (same_type && ((strcmp (usage_type, "audit") == 0)
-                        || (strcmp (usage_type, "policy") == 0)))
-        {
-          g_free (usage_type);
-          return 1;
-        }
-      if (!same_type && (strcmp (usage_type, "scan") == 0))
+      if (!same_type || (strcmp (usage_type, "scan") != 0))
         {
           g_free (usage_type);
           return 1;
@@ -457,52 +450,12 @@ tag_add_resources_filter (tag_t tag, const char *type, const char *filter)
   resources_get.ignore_max_rows_per_page = 1;
   filtered_select = NULL;
 
-  if (strcasecmp (type, "TICKET") == 0)
-    {
-      /* TODO This is how it should be done for all types, in order
-       * to contain each per-resource implementation in its own file. */
-      if (init_ticket_iterator (&resources, &resources_get))
-        {
-          g_warning ("%s: Failed to build filter SELECT", __func__);
-          sql_rollback ();
-          g_free (resources_get.filter);
-          g_free (resources_get.type);
-          return -1;
-        }
-    }
-  else
-    {
-      if (strcasecmp (type, "task") == 0)
-        {
-          get_data_set_extra (&resources_get, "usage_type", g_strdup ("scan"));
-        }
-      else if (strcasecmp (type, "audit") == 0)
-        {
-          type = g_strdup ("task");
-          resources_get.type = g_strdup (type);
-          get_data_set_extra (&resources_get, "usage_type", g_strdup ("audit"));
-        }
-      else if (strcasecmp (type, "policy") == 0)
-        {
-          type = g_strdup ("config");
-          resources_get.type = g_strdup (type);
-          get_data_set_extra (&resources_get, "usage_type", g_strdup ("policy"));
-        }
-      else if (strcasecmp (type, "config") == 0)
-        {
-          get_data_set_extra (&resources_get, "usage_type", g_strdup ("scan"));
-        }
-      else if (strcasecmp (type, "audit_report") == 0)
-        {
-          type = g_strdup ("report");
-          resources_get.type = g_strdup (type);
-          get_data_set_extra (&resources_get, "usage_type", g_strdup ("audit"));
-        }
-      else if (strcasecmp (type, "report") == 0)
-        {
-          get_data_set_extra (&resources_get, "usage_type", g_strdup ("scan"));
-        }
+  if ((strcasecmp (type, "task") == 0)
+      || (strcasecmp (type, "config") == 0)
+      || (strcasecmp (type, "report") == 0))
+    get_data_set_extra (&resources_get, "usage_type", g_strdup ("scan"));
 
+  {
       gchar *columns;
 
       columns = g_strdup_printf ("%ss.id, %ss.uuid", type, type);
@@ -535,7 +488,7 @@ tag_add_resources_filter (tag_t tag, const char *type, const char *filter)
               g_hash_table_destroy (resources_get.extra_params);
             return -1;
         }
-    }
+  }
 
   g_free (resources_get.filter);
   g_free (resources_get.type);
@@ -635,54 +588,12 @@ tag_remove_resources_filter (tag_t tag, const char *type, const char *filter)
 
   iterator_select = NULL;
 
-  if (strcasecmp (type, "TICKET") == 0)
-    {
-      /* TODO This is how it should be done for all types, in order
-       * to contain each per-resource implementation in its own file. */
-      if (init_ticket_iterator (&resources, &resources_get))
-        {
-          g_warning ("%s: Failed to init ticket iterator", __func__);
-          sql_rollback ();
-          g_free (resources_get.filter);
-          g_free (resources_get.type);
-          return -1;
-        }
-    }
-  else
-    {
-      if (strcasecmp (type, "task") == 0)
-        {
-          get_data_set_extra (&resources_get, "usage_type", g_strdup ("scan"));
-        }
-      else if (strcasecmp (type, "audit") == 0)
-        {
-          type = g_strdup ("task");
-          resources_get.type = g_strdup (type);
-          get_data_set_extra (&resources_get, "usage_type", g_strdup ("audit"));
-        }
-      else if (strcasecmp (type, "policy") == 0)
-        {
-          type = g_strdup ("config");
-          resources_get.type = g_strdup (type);
-          get_data_set_extra (&resources_get, "usage_type", g_strdup ("policy"));
-        }
-      else if (strcasecmp (type, "config") == 0)
-        {
-          get_data_set_extra (&resources_get, "usage_type", g_strdup ("scan"));
-        }
-      else if (strcasecmp (type, "audit_report") == 0)
-        {
-          type = g_strdup ("report");
-          resources_get.type = g_strdup (type);
-          get_data_set_extra (&resources_get,
-                              "usage_type",
-                              g_strdup ("audit"));
-        }
-      else if (strcasecmp (type, "report") == 0)
-        {
-          get_data_set_extra (&resources_get, "usage_type", g_strdup ("scan"));
-        }
+  if ((strcasecmp (type, "task") == 0)
+      || (strcasecmp (type, "config") == 0)
+      || (strcasecmp (type, "report") == 0))
+    get_data_set_extra (&resources_get, "usage_type", g_strdup ("scan"));
 
+  {
       gchar *columns;
 
       columns = g_strdup_printf ("%ss.id", type);
@@ -705,7 +616,7 @@ tag_remove_resources_filter (tag_t tag, const char *type, const char *filter)
               g_hash_table_destroy (resources_get.extra_params);
             return -1;
         }
-    }
+  }
 
   g_free (resources_get.filter);
   g_free (resources_get.type);

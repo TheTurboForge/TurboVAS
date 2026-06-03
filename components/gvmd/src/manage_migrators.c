@@ -4073,6 +4073,156 @@ migrate_275_to_276 ()
   return 0;
 }
 
+/**
+ * @brief Migrate the database from version 276 to version 277.
+ *
+ * Remove inherited note, ticket, policy, audit, and audit report schema/state.
+ *
+ * @return 0 success, -1 error.
+ */
+int
+migrate_276_to_277 ()
+{
+  sql_begin_immediate ();
+
+  /* Ensure that the database is currently version 276. */
+  if (manage_db_version () != 276)
+    {
+      sql_rollback ();
+      return -1;
+    }
+
+  if (sql_int ("SELECT count(*) FROM tasks"
+               " WHERE usage_type = 'audit'"
+               " AND run_status IN (%u, %u, %u, %u, %u, %u, %u, %u, %u, %u);",
+               TASK_STATUS_DELETE_REQUESTED,
+               TASK_STATUS_REQUESTED,
+               TASK_STATUS_RUNNING,
+               TASK_STATUS_STOP_REQUESTED,
+               TASK_STATUS_STOP_WAITING,
+               TASK_STATUS_DELETE_ULTIMATE_REQUESTED,
+               TASK_STATUS_DELETE_WAITING,
+               TASK_STATUS_DELETE_ULTIMATE_WAITING,
+               TASK_STATUS_QUEUED,
+               TASK_STATUS_PROCESSING))
+    {
+      g_warning ("Refusing to remove audit support while audit tasks are active");
+      sql_rollback ();
+      return -1;
+    }
+
+  sql ("CREATE TEMP TABLE removed_audit_tasks AS"
+       " SELECT id FROM tasks"
+       " WHERE usage_type = 'audit';");
+  sql ("CREATE TEMP TABLE removed_audit_reports AS"
+       " SELECT id FROM reports"
+       " WHERE task IN (SELECT id FROM removed_audit_tasks);");
+  sql ("CREATE TEMP TABLE removed_audit_results AS"
+       " SELECT id FROM results"
+       " WHERE task IN (SELECT id FROM removed_audit_tasks)"
+       " OR report IN (SELECT id FROM removed_audit_reports);");
+  sql ("CREATE TEMP TABLE removed_policy_configs AS"
+       " SELECT id, nvt_selector FROM configs"
+       " WHERE usage_type = 'policy';");
+
+  sql ("DELETE FROM report_host_details WHERE report_host IN"
+       " (SELECT id FROM report_hosts"
+       "  WHERE report IN (SELECT id FROM removed_audit_reports));");
+  sql ("DELETE FROM report_hosts"
+       " WHERE report IN (SELECT id FROM removed_audit_reports);");
+  sql ("DELETE FROM report_counts"
+       " WHERE report IN (SELECT id FROM removed_audit_reports);");
+  sql ("DELETE FROM result_nvt_reports"
+       " WHERE report IN (SELECT id FROM removed_audit_reports);");
+  sql ("DELETE FROM results_trash"
+       " WHERE task IN (SELECT id FROM removed_audit_tasks)"
+       " OR report IN (SELECT id FROM removed_audit_reports);");
+  sql ("DELETE FROM results"
+       " WHERE id IN (SELECT id FROM removed_audit_results);");
+  sql ("DELETE FROM reports"
+       " WHERE id IN (SELECT id FROM removed_audit_reports);");
+  sql ("DELETE FROM task_alerts"
+       " WHERE task IN (SELECT id FROM removed_audit_tasks);");
+  sql ("DELETE FROM task_files"
+       " WHERE task IN (SELECT id FROM removed_audit_tasks);");
+  sql ("DELETE FROM task_preferences"
+       " WHERE task IN (SELECT id FROM removed_audit_tasks);");
+  sql ("DELETE FROM permissions_get_tasks"
+       " WHERE task IN (SELECT id FROM removed_audit_tasks);");
+  sql ("DELETE FROM tasks"
+       " WHERE id IN (SELECT id FROM removed_audit_tasks);");
+
+  sql ("DELETE FROM config_preferences"
+       " WHERE config IN (SELECT id FROM removed_policy_configs);");
+  sql ("DELETE FROM nvt_selectors"
+       " WHERE name IN (SELECT nvt_selector FROM removed_policy_configs)"
+       " AND name <> '" MANAGE_NVT_SELECTOR_UUID_ALL "';");
+  sql ("DELETE FROM configs"
+       " WHERE id IN (SELECT id FROM removed_policy_configs);");
+  sql ("UPDATE configs SET usage_type = 'scan'"
+       " WHERE usage_type IS NULL OR usage_type <> 'scan';");
+
+  sql ("DELETE FROM tag_resources"
+       " WHERE resource_type IN"
+       " ('note', 'ticket', 'policy', 'audit', 'audit_report')"
+       " OR (resource_type = 'result'"
+       "     AND resource IN (SELECT id FROM removed_audit_results))"
+       " OR (resource_type = 'report'"
+       "     AND resource IN (SELECT id FROM removed_audit_reports))"
+       " OR (resource_type = 'task'"
+       "     AND resource IN (SELECT id FROM removed_audit_tasks))"
+       " OR (resource_type = 'config'"
+       "     AND resource IN (SELECT id FROM removed_policy_configs));");
+  sql ("DELETE FROM tag_resources_trash"
+       " WHERE resource_type IN"
+       " ('note', 'ticket', 'policy', 'audit', 'audit_report')"
+       " OR (resource_type = 'result'"
+       "     AND resource IN (SELECT id FROM removed_audit_results))"
+       " OR (resource_type = 'report'"
+       "     AND resource IN (SELECT id FROM removed_audit_reports))"
+       " OR (resource_type = 'task'"
+       "     AND resource IN (SELECT id FROM removed_audit_tasks))"
+       " OR (resource_type = 'config'"
+       "     AND resource IN (SELECT id FROM removed_policy_configs));");
+  sql ("DELETE FROM permissions"
+       " WHERE resource_type IN"
+       " ('note', 'ticket', 'policy', 'audit', 'audit_report')"
+       " OR (resource_type = 'report'"
+       "     AND resource IN (SELECT id FROM removed_audit_reports))"
+       " OR (resource_type = 'task'"
+       "     AND resource IN (SELECT id FROM removed_audit_tasks))"
+       " OR (resource_type = 'config'"
+       "     AND resource IN (SELECT id FROM removed_policy_configs));");
+  sql ("DELETE FROM permissions_trash"
+       " WHERE resource_type IN"
+       " ('note', 'ticket', 'policy', 'audit', 'audit_report')"
+       " OR (resource_type = 'report'"
+       "     AND resource IN (SELECT id FROM removed_audit_reports))"
+       " OR (resource_type = 'task'"
+       "     AND resource IN (SELECT id FROM removed_audit_tasks))"
+       " OR (resource_type = 'config'"
+       "     AND resource IN (SELECT id FROM removed_policy_configs));");
+  sql ("DELETE FROM filters"
+       " WHERE type IN"
+       " ('note', 'ticket', 'policy', 'audit', 'audit_report');");
+  sql ("DELETE FROM filters_trash"
+       " WHERE type IN"
+       " ('note', 'ticket', 'policy', 'audit', 'audit_report');");
+
+  sql ("DROP TABLE IF EXISTS ticket_results_trash CASCADE;");
+  sql ("DROP TABLE IF EXISTS tickets_trash CASCADE;");
+  sql ("DROP TABLE IF EXISTS ticket_results CASCADE;");
+  sql ("DROP TABLE IF EXISTS tickets CASCADE;");
+  sql ("DROP TABLE IF EXISTS notes_trash CASCADE;");
+  sql ("DROP TABLE IF EXISTS notes CASCADE;");
+
+  set_db_version (277);
+
+  sql_commit ();
+
+  return 0;
+}
+
 #undef UPDATE_DASHBOARD_SETTINGS
 
 /**
@@ -4155,6 +4305,7 @@ static migrator_t database_migrators[] = {
   {274, migrate_273_to_274},
   {275, migrate_274_to_275},
   {276, migrate_275_to_276},
+  {277, migrate_276_to_277},
   /* End marker. */
   {-1, NULL}};
 

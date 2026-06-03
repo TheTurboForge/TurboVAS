@@ -180,7 +180,6 @@ struct report_aux {
  */
 struct print_report_context
 {
- gchar *compliance_levels;   ///< Compliance levels.
  int count_filtered;         ///< Whether to count filtered results.
  report_t delta;             ///< Report to compare with.
  int filtered_result_count;  ///< Filtered result count.
@@ -189,7 +188,7 @@ struct print_report_context
  gchar *zone;                ///< Zone.
  char *old_tz_override;      ///< Old TZ.
  report_t report;            ///< Report.
- gchar *tsk_usage_type;      ///< Usage type of task, like "audit"
+ gchar *tsk_usage_type;      ///< Usage type of task.
  // Counts.
  int criticals;              ///< Number of criticals.
  int holes;                  ///< Number of holes.
@@ -207,11 +206,6 @@ struct print_report_context
  GHashTable *f_host_ports;           ///< Ports per host.
  GHashTable *f_host_warnings;        ///< Warnings per hosts.
  GHashTable *f_host_max_severity;    ///< Max severity per host.
- // Filtered counts: audit.
- GHashTable *f_host_compliant;       ///< Compliants per host.
- GHashTable *f_host_incomplete;      ///< Incompletes per host.
- GHashTable *f_host_notcompliant;    ///< Notcompliants per host.
- GHashTable *f_host_undefined;       ///< Undefineds per host.
 };
 
 /**

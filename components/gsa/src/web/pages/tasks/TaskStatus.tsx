@@ -4,14 +4,13 @@
  */
 
 import styled from 'styled-components';
-import type Audit from 'gmp/models/audit';
-import {type default as Task, TASK_STATUS, USAGE_TYPE} from 'gmp/models/task';
+import {type default as Task, TASK_STATUS} from 'gmp/models/task';
 import {isDefined} from 'gmp/utils/identity';
 import StatusBar from 'web/components/bar/StatusBar';
 import DetailsLink from 'web/components/link/DetailsLink';
 
 interface TaskStatusProps {
-  task: Task | Audit;
+  task: Task;
   links?: boolean;
 }
 
@@ -20,9 +19,6 @@ const StyledDetailsLink = styled(DetailsLink)`
     text-decoration: none;
   }
 `;
-
-const isTask = (taskOrAudit: Task | Audit): taskOrAudit is Task =>
-  (taskOrAudit as Task).usageType === USAGE_TYPE.scan;
 
 const TaskStatus = ({task, links = true}: TaskStatusProps) => {
   let report_id: string | undefined;
@@ -39,7 +35,7 @@ const TaskStatus = ({task, links = true}: TaskStatusProps) => {
     <StyledDetailsLink
       id={report_id}
       textOnly={!links}
-      type={isTask(task) ? 'report' : 'auditreport'}
+      type="report"
     >
       <StatusBar
         progress={task.progress}

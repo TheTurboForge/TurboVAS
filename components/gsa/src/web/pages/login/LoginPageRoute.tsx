@@ -23,7 +23,7 @@ const LoginPageRoute = () => {
   }
 
   if (isLoggedIn) {
-    let redirectPath = '/dashboards';
+    let redirectPath = '/tasks';
     if (username) {
       const lastVisited = getLastVisitedPage(username);
       if (lastVisited && lastVisited !== '/login') {

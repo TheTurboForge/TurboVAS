@@ -171,7 +171,6 @@ set(
   manage_http_scanner.c
   manage_integration_configs.c
   manage_license.c
-  manage_notes.c
   manage_openvas.c
   manage_openvasd.c
   manage_osp.c
@@ -239,7 +238,6 @@ set(
   manage_sql_filters.c
   manage_sql_groups.c
   manage_sql_integration_configs.c
-  manage_sql_notes.c
   manage_sql_nvts.c
   manage_sql_secinfo.c
   manage_sql_overrides.c
@@ -263,7 +261,6 @@ set(
   manage_sql_settings.c
   manage_sql_tags.c
   manage_sql_targets.c
-  manage_sql_tickets.c
   manage_sql_tls_certificates.c
   manage_sql_users.c
   manage_sql_nvts_osp.c
@@ -308,7 +305,6 @@ set(
   gmp_report_ports.c
   gmp_report_tls_certificates.c
   gmp_report_vulns.c
-  gmp_tickets.c
   gmp_tls_certificates.c
 )
 
@@ -476,8 +472,6 @@ set(
   $<TARGET_OBJECTS:all-misc-obj>
   $<TARGET_OBJECTS:all-sql-obj>
 )
-add_unit_test(gmp-tickets "${ALL_OBJECTS}" "${ALL_GMP_SRC}")
-
 set(
   ALL_OBJECTS
   $<TARGET_OBJECTS:all-manage-obj>

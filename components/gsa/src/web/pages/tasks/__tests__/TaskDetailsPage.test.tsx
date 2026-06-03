@@ -220,9 +220,6 @@ const createGmp = ({
   reportformats: {
     get: getEntities,
   },
-  notes: {
-    get: getEntities,
-  },
   overrides: {
     get: getEntities,
   },

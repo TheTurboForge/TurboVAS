@@ -22,7 +22,6 @@ import EmptyResultsReport from 'web/pages/reports/details/EmptyResultsReport';
 import ResultsTable from 'web/pages/results/ResultsTable';
 
 interface ResultsTabWrapperProps {
-  audit?: boolean;
   hasTarget: boolean;
   progress: number;
   reportFilter: Filter;
@@ -38,7 +37,6 @@ interface ResultsTabWrapperProps {
 }
 
 const ResultsTabWrapper = ({
-  audit = false,
   hasTarget,
   progress,
   reportFilter,
@@ -145,7 +143,6 @@ const ResultsTabWrapper = ({
 
   return (
     <ResultsTable
-      audit={audit}
       delta={false}
       entities={results}
       entitiesCounts={resultsCounts}

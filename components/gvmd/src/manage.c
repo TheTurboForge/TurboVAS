@@ -59,7 +59,6 @@
 #include "manage_sql_resources.h"
 #include "manage_sql_secinfo.h"
 #include "manage_sql_targets.h"
-#include "manage_sql_tickets.h"
 #include "manage_sql_tls_certificates.h"
 #include "manage_tags.h"
 #include "sql.h"
@@ -6902,8 +6901,6 @@ delete_resource (const char *type, const char *resource_id, int ultimate)
 {
   if (strcasecmp (type, "report_config") == 0)
     return delete_report_config (resource_id, ultimate);
-  if (strcasecmp (type, "ticket") == 0)
-    return delete_ticket (resource_id, ultimate);
 #if ENABLE_AGENTS
   if (strcasecmp (type, "agent_group") == 0)
     return delete_agent_group (resource_id, ultimate);

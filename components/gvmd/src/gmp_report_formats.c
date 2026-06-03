@@ -180,8 +180,7 @@ parse_report_format_entity (entity_t report_format,
 
   if (*report_type == NULL)
     *report_type = "all";
-  else if (strcmp (*report_type, "scan") && strcmp (*report_type, "audit")
-           && strcmp (*report_type, "all"))
+  else if (strcmp (*report_type, "scan") && strcmp (*report_type, "all"))
     {
       g_warning ("report_type for report format %s is invalid.",
                  *report_format_id);

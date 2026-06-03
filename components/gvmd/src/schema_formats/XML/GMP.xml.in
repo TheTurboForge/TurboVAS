@@ -194,13 +194,6 @@ SPDX-License-Identifier: AGPL-3.0-or-later
     </pattern>
   </type>
   <type>
-    <name>ticket_status</name>
-    <summary>A ticket status</summary>
-    <pattern>
-      xsd:token { pattern = "Open|Fixed|Fix Verified|Closed" }
-    </pattern>
-  </type>
-  <type>
     <name>threat</name>
     <summary>A threat level</summary>
     <description>
@@ -817,235 +810,6 @@ SPDX-License-Identifier: AGPL-3.0-or-later
     </ele>
   </element>
   <element>
-    <name>note</name>
-    <summary>A note</summary>
-    <pattern>
-      <attrib>
-        <name>id</name>
-        <type>uuid</type>
-        <required>1</required>
-      </attrib>
-      <e>permissions</e>
-      <e>owner</e>
-      <e>nvt</e>
-      <e>text</e>
-      <e>creation_time</e>
-      <e>modification_time</e>
-      <e>writable</e>
-      <e>in_use</e>
-      <e>active</e>
-      <e>orphan</e>
-      <o><e>user_tags</e></o>
-      <o>
-        <g>
-          <e>hosts</e>
-          <e>port</e>
-          <e>severity</e>
-          <e>task</e>
-          <e>end_time</e>
-          <o><e>result</e></o>
-        </g>
-      </o>
-    </pattern>
-    <ele>
-      <name>permissions</name>
-      <summary>Permissions that the current user has on the note</summary>
-      <pattern>
-        <any><e>permission</e></any>
-      </pattern>
-      <ele>
-        <name>permission</name>
-        <pattern>
-          <e>name</e>
-        </pattern>
-        <ele>
-          <name>name</name>
-          <summary>The name of the permission</summary>
-          <pattern><t>name</t></pattern>
-        </ele>
-      </ele>
-    </ele>
-    <ele>
-      <name>owner</name>
-      <summary>Owner of the note</summary>
-      <pattern>
-        <e>name</e>
-      </pattern>
-      <ele>
-        <name>name</name>
-        <summary>The name of the owner</summary>
-        <pattern><t>name</t></pattern>
-      </ele>
-    </ele>
-    <ele>
-      <name>nvt</name>
-      <pattern>
-        <attrib>
-          <name>oid</name>
-          <type>oid</type>
-          <required>1</required>
-        </attrib>
-        <e>name</e>
-        <e>type</e>
-      </pattern>
-      <ele>
-        <name>name</name>
-        <pattern><t>name</t></pattern>
-      </ele>
-      <ele>
-        <name>type</name>
-        <summary>The type of the NVT: nvt, cve, ...</summary>
-        <pattern>text</pattern>
-      </ele>
-    </ele>
-    <ele>
-      <name>creation_time</name>
-      <summary>Date and time the note was created</summary>
-      <pattern><t>iso_time</t></pattern>
-    </ele>
-    <ele>
-      <name>modification_time</name>
-      <summary>Date and time the note was last modified</summary>
-      <pattern><t>iso_time</t></pattern>
-    </ele>
-    <ele>
-      <name>writable</name>
-      <pattern><t>boolean</t></pattern>
-    </ele>
-    <ele>
-      <name>in_use</name>
-      <pattern><t>boolean</t></pattern>
-    </ele>
-    <ele>
-      <name>active</name>
-      <summary>Whether the note is active</summary>
-      <pattern><t>boolean</t></pattern>
-    </ele>
-    <ele>
-      <name>text</name>
-      <summary>The text of the note</summary>
-      <pattern>
-        <attrib>
-          <name>excerpt</name>
-          <summary>Whether the content is an excerpt of the full text</summary>
-          <type>boolean</type>
-          <required>1</required>
-        </attrib>
-        text
-      </pattern>
-    </ele>
-    <ele>
-      <name>orphan</name>
-      <summary>Whether the note is an orphan</summary>
-      <pattern><t>boolean</t></pattern>
-    </ele>
-    <ele>
-      <name>user_tags</name>
-      <summary>Info on tags attached to the note</summary>
-      <pattern>
-        <e>count</e>
-        <any><e>tag</e></any>
-      </pattern>
-      <ele>
-        <name>count</name>
-        <summary>Number of attached tags</summary>
-        <pattern><t>integer</t></pattern>
-      </ele>
-      <ele>
-        <name>tag</name>
-        <summary>
-          Short info on an individual tag
-          (only if details were requested)
-        </summary>
-        <pattern>
-          <attrib>
-            <name>id</name>
-            <type>uuid</type>
-            <summary>UUID of the tag</summary>
-            <required>1</required>
-          </attrib>
-          <e>name</e>
-          <e>value</e>
-          <e>comment</e>
-        </pattern>
-        <ele>
-          <name>name</name>
-          <summary>Name of the tag (usually namespace:predicate)</summary>
-          <pattern>text</pattern>
-        </ele>
-        <ele>
-          <name>value</name>
-          <summary>Value of the tag</summary>
-          <pattern>text</pattern>
-        </ele>
-        <ele>
-          <name>comment</name>
-          <summary>Comment for the tag</summary>
-          <pattern>text</pattern>
-        </ele>
-      </ele>
-    </ele>
-    <ele>
-      <name>hosts</name>
-      <summary>A comma-separated list of hosts</summary>
-      <pattern>
-        text
-      </pattern>
-    </ele>
-    <ele>
-      <name>port</name>
-      <summary>Port (location) to which note applies</summary>
-      <pattern>
-        text
-      </pattern>
-    </ele>
-    <ele>
-      <name>severity</name>
-      <summary>Severity to which note applies</summary>
-      <pattern>
-        <t>severity</t>
-      </pattern>
-    </ele>
-    <ele>
-      <name>task</name>
-      <summary>Task to which note applies</summary>
-      <pattern>
-        <attrib>
-          <name>id</name>
-          <type>uuid</type>
-          <required>1</required>
-        </attrib>
-        <e>name</e>
-        <e>trash</e>
-      </pattern>
-      <ele>
-        <name>name</name>
-        <summary>Task name</summary>
-        <pattern>text</pattern>
-      </ele>
-      <ele>
-        <name>trash</name>
-        <summary>Whether the task is in the trashcan</summary>
-        <type>boolean</type>
-      </ele>
-    </ele>
-    <ele>
-      <name>active</name>
-      <summary>Whether the note is active</summary>
-      <pattern><t>integer</t></pattern>
-    </ele>
-    <ele>
-      <name>end_time</name>
-      <summary>End time of the note in case of limit, else empty</summary>
-      <pattern>text</pattern>
-    </ele>
-    <ele>
-      <name>result</name>
-      <summary>Result to which note applies</summary>
-      <type>result</type>
-    </ele>
-  </element>
-  <element>
     <name>override</name>
     <summary>An override</summary>
     <pattern>
@@ -1330,9 +1094,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
       <e>description</e>
       <o><e>delta</e></o>
       <o><e>detection</e></o>
-      <o><e>notes</e></o>
       <o><e>overrides</e></o>
-      <o><e>tickets</e></o>
     </pattern>
     <ele>
       <name>name</name>
@@ -1726,7 +1488,6 @@ SPDX-License-Identifier: AGPL-3.0-or-later
       <pattern>
         <o><e>result</e></o>
         <o><e>diff</e></o>
-        <o><e>notes</e></o>
         <o><e>overrides</e></o>
         text
       </pattern>
@@ -1739,17 +1500,6 @@ SPDX-License-Identifier: AGPL-3.0-or-later
         <name>diff</name>
         <summary>Comparison between descriptions</summary>
         <type>text</type>
-      </ele>
-      <ele>
-        <name>notes</name>
-        <summary>List of notes on the result</summary>
-        <pattern>
-          <any><e>note</e></any>
-        </pattern>
-        <ele>
-          <name>note</name>
-          <type>note</type>
-        </ele>
       </ele>
       <ele>
         <name>overrides</name>
@@ -1807,17 +1557,6 @@ SPDX-License-Identifier: AGPL-3.0-or-later
       </ele>
     </ele>
     <ele>
-      <name>notes</name>
-      <summary>List of notes on the result</summary>
-      <pattern>
-        <any><e>note</e></any>
-      </pattern>
-      <ele>
-        <name>note</name>
-        <type>note</type>
-      </ele>
-    </ele>
-    <ele>
       <name>overrides</name>
       <summary>List of overrides on the result</summary>
       <pattern>
@@ -1826,23 +1565,6 @@ SPDX-License-Identifier: AGPL-3.0-or-later
       <ele>
         <name>override</name>
         <type>override</type>
-      </ele>
-    </ele>
-    <ele>
-      <name>tickets</name>
-      <summary>List of tickets on the result</summary>
-      <pattern>
-        <any><e>ticket</e></any>
-      </pattern>
-      <ele>
-        <name>ticket</name>
-        <pattern>
-          <attrib>
-            <name>id</name>
-            <type>uuid</type>
-            <required>1</required>
-          </attrib>
-        </pattern>
       </ele>
     </ele>
   </element>
@@ -2166,7 +1888,6 @@ SPDX-License-Identifier: AGPL-3.0-or-later
           <t>levels</t>
           <e>term</e>
           <e>phrase</e>
-          <e>notes</e>
           <e>overrides</e>
           <e>apply_overrides</e>
           <e>result_hosts_only</e>
@@ -2186,13 +1907,6 @@ SPDX-License-Identifier: AGPL-3.0-or-later
           <summary>Search phrase</summary>
           <pattern>
             <t>text</t>
-          </pattern>
-        </ele>
-        <ele>
-          <name>notes</name>
-          <summary>Whether notes are included</summary>
-          <pattern>
-            <alts><alt>0</alt><alt>1</alt></alts>
           </pattern>
         </ele>
         <ele>
@@ -2532,114 +2246,6 @@ SPDX-License-Identifier: AGPL-3.0-or-later
           <name>medium</name>
           <summary>
             Number of "medium" results (threat level Medium)
-          </summary>
-          <pattern>
-            <e>full</e>
-            <e>filtered</e>
-          </pattern>
-          <ele>
-            <name>full</name>
-            <summary>Total number of results</summary>
-            <pattern><t>integer</t></pattern>
-          </ele>
-          <ele>
-            <name>filtered</name>
-            <summary>Number of results after filtering</summary>
-            <pattern><t>integer</t></pattern>
-          </ele>
-        </ele>
-      </ele>
-      <ele>
-        <name>compliance_count</name>
-        <summary>Counts of compliance results. Only for reports of an audit task.</summary>
-        <description>
-          <p>
-            The text contains the full count. The total number of compliance results.
-          </p>
-        </description>
-        <pattern>
-          text
-          <e>full</e>
-          <e>filtered</e>
-          <e>yes</e>
-          <e>no</e>
-          <e>incomplete</e>
-          <e>undefined</e>
-        </pattern>
-        <ele>
-          <name>full</name>
-          <summary>Total number of compliance results</summary>
-          <pattern><t>integer</t></pattern>
-        </ele>
-        <ele>
-          <name>filtered</name>
-          <summary>Number of compliance results after filtering</summary>
-          <pattern><t>integer</t></pattern>
-        </ele>
-        <ele>
-          <name>yes</name>
-          <summary>
-            Number of "yes" results (compliant)
-          </summary>
-          <pattern>
-            <e>full</e>
-            <e>filtered</e>
-          </pattern>
-          <ele>
-            <name>full</name>
-            <summary>Total number of results</summary>
-            <pattern><t>integer</t></pattern>
-          </ele>
-          <ele>
-            <name>filtered</name>
-            <summary>Number of results after filtering</summary>
-            <pattern><t>integer</t></pattern>
-          </ele>
-        </ele>
-        <ele>
-          <name>no</name>
-          <summary>
-            Number of "no" results (not compliant)
-          </summary>
-          <pattern>
-            <e>full</e>
-            <e>filtered</e>
-          </pattern>
-          <ele>
-            <name>full</name>
-            <summary>Total number of results</summary>
-            <pattern><t>integer</t></pattern>
-          </ele>
-          <ele>
-            <name>filtered</name>
-            <summary>Number of results after filtering</summary>
-            <pattern><t>integer</t></pattern>
-          </ele>
-        </ele>
-        <ele>
-          <name>incomplete</name>
-          <summary>
-            Number of "incomplete" results (incomplete compliance)
-          </summary>
-          <pattern>
-            <e>full</e>
-            <e>filtered</e>
-          </pattern>
-          <ele>
-            <name>full</name>
-            <summary>Total number of results</summary>
-            <pattern><t>integer</t></pattern>
-          </ele>
-          <ele>
-            <name>filtered</name>
-            <summary>Number of results after filtering</summary>
-            <pattern><t>integer</t></pattern>
-          </ele>
-        </ele>
-        <ele>
-          <name>undefined</name>
-          <summary>
-            Number of "undefined" results (undefined compliance)
           </summary>
           <pattern>
             <e>full</e>
@@ -3151,75 +2757,6 @@ SPDX-License-Identifier: AGPL-3.0-or-later
               <pattern><t>integer</t></pattern>
             </ele>
           </ele>
-        </ele>
-        <ele>
-          <name>compliance_count</name>
-          <summary>Only for audit reports</summary>
-          <pattern>
-            <e>page</e>
-            <e>yes</e>
-            <e>no</e>
-            <e>incomplete</e>
-            <e>undefined</e>
-          </pattern>
-          <ele>
-            <name>page</name>
-            <summary>Total number of results for current host on current page</summary>
-            <pattern><t>integer</t></pattern>
-          </ele>
-          <ele>
-            <name>yes</name>
-            <summary>Number of "yes" results (compliant)</summary>
-            <pattern>
-              <e>page</e>
-            </pattern>
-            <ele>
-              <name>page</name>
-              <summary>Number of results on current page</summary>
-              <pattern><t>integer</t></pattern>
-            </ele>
-          </ele>
-          <ele>
-            <name>no</name>
-            <summary>Number of "no" results (not compliant)</summary>
-            <pattern>
-              <e>page</e>
-            </pattern>
-            <ele>
-              <name>page</name>
-              <summary>Number of results on current page</summary>
-              <pattern><t>integer</t></pattern>
-            </ele>
-          </ele>
-          <ele>
-            <name>incomplete</name>
-            <summary>Number of "incomplete" results (incomplete compliance)</summary>
-            <pattern>
-              <e>page</e>
-            </pattern>
-            <ele>
-              <name>page</name>
-              <summary>Number of results on current page</summary>
-              <pattern><t>integer</t></pattern>
-            </ele>
-          </ele>
-          <ele>
-            <name>undefined</name>
-            <summary>Number of "undefined" results (undefined compliance)</summary>
-            <pattern>
-              <e>page</e>
-            </pattern>
-            <ele>
-              <name>page</name>
-              <summary>Number of results on current page</summary>
-              <pattern><t>integer</t></pattern>
-            </ele>
-          </ele>          
-        </ele>
-        <ele>
-          <name>host_compliance</name>
-          <summary>Only for audit reports. Host compliance</summary>
-          <pattern><t>compliance_status</t></pattern>
         </ele>
         <ele>
           <name>detail</name>
@@ -4218,11 +3755,10 @@ SPDX-License-Identifier: AGPL-3.0-or-later
     </ele>
     <ele>
       <name>usage_type</name>
-      <summary>Usage type (scan or policy) for the config. Can overwrite the one in get_configs_response</summary>
+      <summary>Usage type for the config. Only scan configs are supported.</summary>
       <pattern>
         <alts>
           <alt>scan</alt>
-          <alt>policy</alt>
         </alts>
       </pattern>
     </ele>
@@ -4753,144 +4289,6 @@ SPDX-License-Identifier: AGPL-3.0-or-later
                                status_text="OK, resource created"
                                id="d94211b6-ba40-11e3-bcb1-406186ea4fc5">
         </create_group_response>
-      </response>
-    </example>
-  </command>
-  <command>
-    <name>create_note</name>
-    <summary>Create a note</summary>
-    <description>
-      <p>
-        The client uses the create_note command to create a new note.
-      </p>
-    </description>
-    <pattern>
-      <e>text</e>
-      <e>nvt</e>
-      <o><e>active</e></o>
-      <o><e>copy</e></o>
-      <o><e>hosts</e></o>
-      <o><e>port</e></o>
-      <o><e>result</e></o>
-      <o><e>severity</e></o>
-      <o><e>task</e></o>
-      <o><e>threat</e></o>
-    </pattern>
-    <ele>
-      <name>text</name>
-      <summary>The text of the note</summary>
-      <pattern>
-        text
-      </pattern>
-    </ele>
-    <ele>
-      <name>nvt</name>
-      <summary>NVT to which note applies</summary>
-      <pattern>
-        <attrib>
-          <name>oid</name>
-          <type>oid</type>
-          <required>1</required>
-        </attrib>
-      </pattern>
-    </ele>
-    <ele>
-      <name>active</name>
-      <summary>Days note will be active. -1 on always, 0 off</summary>
-      <pattern><t>integer</t></pattern>
-    </ele>
-    <ele>
-      <name>copy</name>
-      <summary>The UUID of an existing note</summary>
-      <pattern>
-        <t>uuid</t>
-      </pattern>
-    </ele>
-    <ele>
-      <name>hosts</name>
-      <summary>A comma-separated list of hosts</summary>
-      <pattern>
-        text
-      </pattern>
-    </ele>
-    <ele>
-      <name>port</name>
-      <summary>Port (location) to which note applies</summary>
-      <pattern>
-        text
-      </pattern>
-    </ele>
-    <ele>
-      <name>result</name>
-      <summary>Result to which note applies</summary>
-      <pattern>
-        <attrib>
-          <name>id</name>
-          <type>uuid</type>
-          <required>1</required>
-        </attrib>
-      </pattern>
-    </ele>
-    <ele>
-      <name>severity</name>
-      <summary>Severity to which note applies</summary>
-      <pattern>
-        <t>severity</t>
-      </pattern>
-    </ele>
-    <ele>
-      <name>task</name>
-      <summary>Task to which note applies</summary>
-      <pattern>
-        <attrib>
-          <name>id</name>
-          <type>uuid</type>
-          <required>1</required>
-        </attrib>
-      </pattern>
-    </ele>
-    <ele>
-      <name>threat</name>
-      <summary>
-        Threat level to which note applies. Will be converted to severity
-      </summary>
-      <pattern>
-        <t>threat</t>
-      </pattern>
-    </ele>
-    <response>
-      <pattern>
-        <attrib>
-          <name>status</name>
-          <type>status</type>
-          <required>1</required>
-        </attrib>
-        <attrib>
-          <name>status_text</name>
-          <type>text</type>
-          <required>1</required>
-        </attrib>
-        <attrib>
-          <name>id</name>
-          <type>uuid</type>
-          <required>1</required>
-        </attrib>
-      </pattern>
-    </response>
-    <example>
-      <summary>Create a note</summary>
-      <request>
-        <create_note>
-          <text>This issue should be resolved after the upgrade.</text>
-          <nvt oid="1.3.6.1.4.1.25623.1.0.10330"></nvt>
-          <result>254cd3ef-bbe1-4d58-859d-21b8d0c046c6</result>
-        </create_note>
-      </request>
-      <response>
-        <create_note_response status="202"
-                              status_text="OK, resource created"
-                              id="254cd3ef-bbe1-4d58-859d-21b8d0c046c6">
-        </create_note_response>
       </response>
     </example>
   </command>
@@ -6405,11 +5803,10 @@ END:VCALENDAR
     </ele>
     <ele>
       <name>usage_type</name>
-      <summary>Usage type for the task (scan or audit), defaulting to scan</summary>
+      <summary>Usage type for the task. Only scan tasks are supported.</summary>
       <pattern>
         <alts>
           <alt>scan</alt>
-          <alt>audit</alt>
         </alts>
       </pattern>
     </ele>
@@ -6606,108 +6003,6 @@ END:VCALENDAR
     </example>
     @ENDIF_ENABLE_AGENTS@
 </command>
-  <command>
-    <name>create_ticket</name>
-    <summary>Create a ticket</summary>
-    <description>
-      <p>
-        The client uses the create_ticket command to create a new ticket.
-      </p>
-    </description>
-    <pattern>
-      <o><e>comment</e></o>
-      <o><e>copy</e></o>
-      <e>result</e>
-      <e>assigned_to</e>
-      <e>open_note</e>
-    </pattern>
-    <ele>
-      <name>comment</name>
-      <summary>A comment on the ticket</summary>
-      <pattern>
-        text
-      </pattern>
-    </ele>
-    <ele>
-      <name>copy</name>
-      <summary>The UUID of an existing ticket</summary>
-      <pattern>
-        <t>uuid</t>
-      </pattern>
-    </ele>
-    <ele>
-      <name>result</name>
-      <summary>The result the ticket applies to</summary>
-      <pattern>
-        <attrib>
-          <name>id</name>
-          <type>uuid</type>
-          <required>1</required>
-        </attrib>
-      </pattern>
-    </ele>
-    <ele>
-      <name>assigned_to</name>
-      <pattern>
-        <e>user</e>
-      </pattern>
-      <ele>
-        <name>user</name>
-        <summary>The user the ticket is assigned to</summary>
-        <pattern>
-          <attrib>
-            <name>id</name>
-            <type>uuid</type>
-            <required>1</required>
-          </attrib>
-        </pattern>
-      </ele>
-    </ele>
-    <ele>
-      <name>open_note</name>
-      <summary>A note about opening the ticket</summary>
-      <pattern>
-        text
-      </pattern>
-    </ele>
-    <response>
-      <pattern>
-        <attrib>
-          <name>status</name>
-          <type>status</type>
-          <required>1</required>
-        </attrib>
-        <attrib>
-          <name>status_text</name>
-          <type>text</type>
-          <required>1</required>
-        </attrib>
-        <attrib>
-          <name>id</name>
-          <type>uuid</type>
-          <required>1</required>
-        </attrib>
-      </pattern>
-    </response>
-    <example>
-      <summary>Create a ticket</summary>
-      <request>
-        <create_ticket>
-          <result id="138c1216-4acb-4ded-bef3-7fab80eac8c7"/>
-          <assigned_to>
-            <user id="33e92d3e-a379-4c46-a4cf-88c8201ab710"/>
-          </assigned_to>
-          <open_note>Please fix today.</open_note>
-        </create_ticket>
-      </request>
-      <response>
-        <create_ticket_response status="201"
-                                status_text="OK, resource created"
-                                id="254cd3ef-bbe1-4d58-859d-21b8d0c046c6">
-        </create_ticket_response>
-      </response>
-    </example>
-  </command>
   <command>
     <name>create_tls_certificate</name>
     <summary>Create a TLS certificate</summary>
@@ -7381,57 +6676,6 @@ END:VCALENDAR
       </response>
     </example>
   </command>
-  <command>
-    <name>delete_note</name>
-    <summary>Delete a note</summary>
-    <description>
-      <p>
-        The client uses the delete_note command to delete an existing note.
-      </p>
-      <p>
-        Since this is a destructive command, the client is advised to ask
-        for confirmation from the user before sending this command to the
-        Manager.
-      </p>
-    </description>
-    <pattern>
-      <attrib>
-        <name>note_id</name>
-        <type>uuid</type>
-        <required>1</required>
-      </attrib>
-      <attrib>
-        <name>ultimate</name>
-        <summary>Whether to remove entirely, or to the trashcan</summary>
-        <type>boolean</type>
-        <required>1</required>
-      </attrib>
-    </pattern>
-    <response>
-      <pattern>
-        <attrib>
-          <name>status</name>
-          <type>status</type>
-          <required>1</required>
-        </attrib>
-        <attrib>
-          <name>status_text</name>
-          <type>text</type>
-          <required>1</required>
-        </attrib>
-      </pattern>
-    </response>
-    <example>
-      <summary>Delete a note</summary>
-      <request>
-        <delete_note note_id="267a3405-e84a-47da-97b2-5fa0d2e8995e">
-        </delete_note>
-      </request>
-      <response>
-        <delete_note_response status="200" status_text="OK"/>
-      </response>
-    </example>
-  </command>
 <command>
     <name>delete_override</name>
     <summary>Delete an override</summary>
@@ -8086,57 +7330,6 @@ END:VCALENDAR
       </request>
       <response>
         <delete_task_response status="200" status_text="OK"/>
-      </response>
-    </example>
-  </command>
-  <command>
-    <name>delete_ticket</name>
-    <summary>Delete a ticket</summary>
-    <description>
-      <p>
-        The client uses the delete_ticket command to delete an existing ticket.
-      </p>
-      <p>
-        Since this is a destructive command, the client is advised to ask
-        for confirmation from the user before sending this command to the
-        Manager.
-      </p>
-    </description>
-    <pattern>
-      <attrib>
-        <name>ticket_id</name>
-        <type>uuid</type>
-        <required>1</required>
-      </attrib>
-      <attrib>
-        <name>ultimate</name>
-        <summary>Whether to remove entirely, or to the trashcan</summary>
-        <type>boolean</type>
-        <required>1</required>
-      </attrib>
-    </pattern>
-    <response>
-      <pattern>
-        <attrib>
-          <name>status</name>
-          <type>status</type>
-          <required>1</required>
-        </attrib>
-        <attrib>
-          <name>status_text</name>
-          <type>text</type>
-          <required>1</required>
-        </attrib>
-      </pattern>
-    </response>
-    <example>
-      <summary>Delete a ticket</summary>
-      <request>
-        <delete_ticket ticket_id="267a3405-e84a-47da-97b2-5fa0d2e8995e">
-        </delete_ticket>
-      </request>
-      <response>
-        <delete_ticket_response status="200" status_text="OK"/>
       </response>
     </example>
   </command>
@@ -9802,8 +8995,6 @@ END:VCALENDAR
         <summary>Optional usage type to limit configs and tasks to</summary>
         <type>
           <alts>
-            <alt>audit</alt>
-            <alt>policy</alt>
             <alt>scan</alt>
             <alt></alt>
           </alts>
@@ -11927,7 +11118,6 @@ END:VCALENDAR
             <type>
               <alts>
                 <alt>scan</alt>
-                <alt>policy</alt>
               </alts>
             </type>
             <summary>Usage type</summary>
@@ -11974,7 +11164,6 @@ END:VCALENDAR
         <summary>Optional usage type to limit the configs to. Affects total count unlike filter</summary>
         <type>
           <alts>
-            <alt>policy</alt>
             <alt>scan</alt>
             <alt></alt>
           </alts>
@@ -12105,11 +11294,10 @@ END:VCALENDAR
         </ele>
         <ele>
           <name>usage_type</name>
-          <summary>The usage type of the config (scan or policy)</summary>
+          <summary>The usage type of the config. Only scan configs are supported.</summary>
           <pattern>
             <alts>
               <alt>scan</alt>
-              <alt>policy</alt>
             </alts>
           </pattern>
         </ele>
@@ -16747,370 +15935,6 @@ END:VCALENDAR
     </example>
   </command>
   <command>
-    <name>get_notes</name>
-    <summary>Get one or many notes</summary>
-    <description>
-      The client uses the get_notes command to get note information.
-      If the command sent by the client was valid, the manager will
-      reply with a list of notes to the client.
-    </description>
-    <pattern>
-      <attrib>
-        <name>note_id</name>
-        <summary>ID of single note to get</summary>
-        <type>uuid</type>
-      </attrib>
-      <attrib>
-        <name>filter</name>
-        <summary>Filter term to use to filter query</summary>
-        <type>text</type>
-        <filter_keywords>
-          <option>
-            <name>first</name>
-            <type>integer</type>
-            <summary>
-              Index of the first item returned, starting at 1 (e.g. first=5
-              starts at the 5th item)
-            </summary>
-          </option>
-          <option>
-            <name>rows</name>
-            <type>integer</type>
-            <summary>Number of items to return</summary>
-          </option>
-          <option>
-            <name>sort</name>
-            <type>text</type>
-            <summary>Column to sort by in ascending order</summary>
-          </option>
-          <option>
-            <name>sort-reverse</name>
-            <type>text</type>
-            <summary>Column to sort by in descending order</summary>
-          </option>
-          <option>
-            <name>task_id</name>
-            <type>uuid</type>
-            <summary>UUID of the Task the Note applies to</summary>
-          </option>
-          <column>
-            <name>tag</name>
-            <type>text</type>
-            <summary>
-              Name and optional "=" separted value of an attached tag
-              (e.g. "mytag" or "mytag=myvalue")
-            </summary>
-          </column>
-          <column>
-            <name>tag_id</name>
-            <type>UUID</type>
-            <summary>
-              UUID of an attached tag
-            </summary>
-          </column>
-          <column>
-            <name>uuid</name>
-            <type>uuid</type>
-            <summary>Unique ID</summary>
-          </column>
-          <column>
-            <name>name</name>
-            <type>name</type>
-            <summary>Name</summary>
-          </column>
-          <column>
-            <name>created</name>
-            <type>iso_time</type>
-            <summary>Creation time</summary>
-          </column>
-          <column>
-            <name>modified</name>
-            <type>iso_time</type>
-            <summary>Modification time</summary>
-          </column>
-          <column>
-            <name>owner</name>
-            <type>name</type>
-            <summary>Name of the owner</summary>
-          </column>
-          <column>
-            <name>nvt</name>
-            <type>text</type>
-            <summary>Name of the NVT the Note applies to</summary>
-          </column>
-          <column>
-            <name>text</name>
-            <type>text</type>
-            <summary>Text of the Note</summary>
-          </column>
-          <column>
-            <name>nvt_id</name>
-            <type>oid</type>
-            <summary>OID of the NVT the Note applies to</summary>
-          </column>
-          <column>
-            <name>task_name</name>
-            <type>text</type>
-            <summary>Name of the Task the Note applies to</summary>
-          </column>
-          <column>
-            <name>hosts</name>
-            <type>text</type>
-            <summary>Hosts the Note applies to</summary>
-          </column>
-          <column>
-            <name>port</name>
-            <type>text</type>
-            <summary>Port (location) the Note applies to</summary>
-          </column>
-          <column>
-            <name>active</name>
-            <type>boolean</type>
-            <summary>Whether the Note is active</summary>
-          </column>
-          <column>
-            <name>result</name>
-            <type>uuid</type>
-            <summary>UUID of the result the Note applies to</summary>
-          </column>
-          <column>
-            <name>severity</name>
-            <type>severity</type>
-            <summary>Minimum severity of results the Note applies to</summary>
-          </column>
-        </filter_keywords>
-      </attrib>
-      <attrib>
-        <name>filt_id</name>
-        <summary>ID of filter to use to filter query</summary>
-        <type>uuid</type>
-      </attrib>
-      <attrib>
-        <name>nvt_oid</name>
-        <type>oid</type>
-      </attrib>
-      <attrib>
-        <name>task_id</name>
-        <type>uuid</type>
-      </attrib>
-      <attrib>
-        <name>details</name>
-        <summary>Whether to include full details</summary>
-        <type>boolean</type>
-      </attrib>
-      <attrib>
-        <name>result</name>
-        <type>boolean</type>
-        <summary>Whether to include the associated result</summary>
-        <description>Requires "details" to be true.</description>
-      </attrib>
-    </pattern>
-    <response>
-      <pattern>
-        <attrib>
-          <name>status</name>
-          <type>status</type>
-          <required>1</required>
-        </attrib>
-        <attrib>
-          <name>status_text</name>
-          <type>text</type>
-          <required>1</required>
-        </attrib>
-        <any><e>note</e></any>
-        <e>filters</e>
-        <e>sort</e>
-        <e>notes</e>
-        <e>note_count</e>
-      </pattern>
-      <ele>
-        <name>filters</name>
-        <pattern>
-          <attrib>
-            <name>id</name>
-            <summary>UUID of filter if any, else 0</summary>
-            <type>uuid</type>
-            <required>1</required>
-          </attrib>
-          <e>term</e>
-          <o><e>name</e></o>
-          <e>keywords</e>
-        </pattern>
-        <ele>
-          <name>term</name>
-          <summary>Filter term</summary>
-          <pattern>text</pattern>
-        </ele>
-        <ele>
-          <name>name</name>
-          <summary>Filter name, if applicable</summary>
-          <pattern>text</pattern>
-        </ele>
-        <ele>
-          <name>keywords</name>
-          <summary>Filter broken down into keywords</summary>
-          <pattern><any><e>keyword</e></any></pattern>
-          <ele>
-            <name>keyword</name>
-            <pattern>
-              <e>column</e>
-              <e>relation</e>
-              <e>value</e>
-            </pattern>
-            <ele>
-              <name>column</name>
-              <summary>Column prefix</summary>
-              <pattern>text</pattern>
-            </ele>
-            <ele>
-              <name>relation</name>
-              <summary>Relation operator</summary>
-              <pattern>
-                <alts>
-                  <alt>=</alt>
-                  <alt>:</alt>
-                  <alt>~</alt>
-                  <alt>&gt;</alt>
-                  <alt>&lt;</alt>
-                </alts>
-              </pattern>
-            </ele>
-            <ele>
-              <name>value</name>
-              <summary>The filter text</summary>
-              <pattern>text</pattern>
-            </ele>
-          </ele>
-        </ele>
-      </ele>
-      <ele>
-        <name>sort</name>
-        <pattern>
-          text
-          <e>field</e>
-        </pattern>
-        <ele>
-          <name>field</name>
-          <pattern>
-            <e>order</e>
-          </pattern>
-          <ele>
-            <name>order</name>
-            <pattern>
-              <alts>
-                <alt>ascending</alt>
-                <alt>descending</alt>
-              </alts>
-            </pattern>
-          </ele>
-        </ele>
-      </ele>
-      <ele>
-        <name>notes</name>
-        <pattern>
-          <attrib>
-            <name>start</name>
-            <summary>First note</summary>
-            <type>integer</type>
-            <required>1</required>
-          </attrib>
-          <attrib>
-            <name>max</name>
-            <summary>Maximum number of notes</summary>
-            <type>integer</type>
-            <required>1</required>
-          </attrib>
-        </pattern>
-      </ele>
-      <ele>
-        <name>note_count</name>
-        <pattern>
-          <e>filtered</e>
-          <e>page</e>
-        </pattern>
-        <ele>
-          <name>filtered</name>
-          <summary>Number of notes after filtering</summary>
-          <pattern><t>integer</t></pattern>
-        </ele>
-        <ele>
-          <name>page</name>
-          <summary>Number of notes on current page</summary>
-          <pattern><t>integer</t></pattern>
-        </ele>
-      </ele>
-      <ele>
-        <name>note</name>
-        <type>note</type>
-      </ele>
-    </response>
-    <example>
-      <summary>Get one or many notes</summary>
-      <request>
-        <get_notes></get_notes>
-      </request>
-      <response>
-        <get_notes_response status="200" status_text="OK">
-          <note id="b76b81a7-9df8-42df-afff-baa9d4620128">
-            <nvt oid="1.3.6.1.4.1.25623.1.0.75">
-              <name>Test NVT: long lines</name>
-            </nvt>
-            <creation_time>2013-01-09T09:47:41+01:00</creation_time>
-            <modification_time>2013-01-09T09:47:41+01:00</modification_time>
-            <writable>1</writable>
-            <in_use>0</in_use>
-            <active>1</active>
-            <orphan>1</orphan>
-            <text excerpt="0">This is the full text of the note.</text>
-          </note>
-          <truncated>...</truncated>
-        </get_notes_response>
-      </response>
-    </example>
-    <example>
-      <summary>Get details of a single note and result to which it applies</summary>
-      <request>
-        <get_notes note_id="7f618bbb-4664-419e-9bbf-367d93954cb0" details="1" result="1">
-        </get_notes>
-      </request>
-      <response>
-        <get_notes_response status="200" status_text="OK">
-          <note id="7f618bbb-4664-419e-9bbf-367d93954cb0">
-            <nvt oid="1.3.6.1.4.1.25623.1.0.77">
-              <name>Test NVT: control chars in report result</name>
-            </nvt>
-            <creation_time>2015-07-15T15:05:55Z</creation_time>
-            <modification_time>2015-07-15T15:05:55Z</modification_time>
-            <writable>1</writable>
-            <in_use>0</in_use>
-            <active>1</active>
-            <end_time></end_time>
-            <text>note fixed to result</text>
-            <hosts>127.0.0.1</hosts>
-            <port>general/tcp</port>
-            <task id="40b236a9-2b0f-4813-b8c7-bc2b98d9d7e4">
-              <name>test</name>
-            </task>
-            <orphan>0</orphan>
-            <result id="0c95e6b3-1100-4dfd-88f1-4bed1fad29de">
-              <host>127.0.0.1</host>
-              <port>general/tcp</port>
-              <nvt oid="1.3.6.1.4.1.25623.1.0.77">
-                <name>Test NVT: control chars in report result</name>
-                <cvss_base>5</cvss_base>
-                <severities score="50"/>
-                <cve></cve>
-              </nvt>
-              <threat>Medium</threat>
-              <description>Warning with control char between fullstops: . .</description>
-            </result>
-          </note>
-          <truncated>...</truncated>
-        </get_notes_response>
-      </response>
-    </example>
-  </command>
-  <command>
     <name>get_nvt_families</name>
     <summary>Get a list of all NVT families</summary>
     <description>
@@ -21567,7 +20391,6 @@ END:VCALENDAR
             <type>
               <alts>
                 <alt>scan</alt>
-                <alt>audit</alt>
                 <alt>all</alt>
               </alts>
             </type>
@@ -21978,7 +20801,6 @@ END:VCALENDAR
           <pattern>
             <alts>
               <alt>scan</alt>
-              <alt>audit</alt>
               <alt>all</alt>
             </alts>
           </pattern>
@@ -24082,11 +22904,6 @@ END:VCALENDAR
             <summary>Whether to apply Overrides</summary>
           </option>
           <option>
-            <name>compliance_levels</name>
-            <type>compliance_levels</type>
-            <summary>Compliance levels to select</summary>
-          </option>
-          <option>
             <name>delta_states</name>
             <type>delta_states</type>
             <summary>States to select in a delta report</summary>
@@ -24100,11 +22917,6 @@ END:VCALENDAR
             <name>min_qod</name>
             <type>integer</type>
             <summary>Minimum QoD of the results</summary>
-          </option>
-          <option>
-            <name>notes</name>
-            <type>boolean</type>
-            <summary>Whether to include Notes in the report</summary>
           </option>
           <option>
             <name>overrides</name>
@@ -24155,18 +22967,6 @@ END:VCALENDAR
             <name>owner</name>
             <type>name</type>
             <summary>Name of the owner</summary>
-          </column>
-          <column>
-            <name>compliant</name>
-            <type>
-              <alts>
-                <alt>yes</alt>
-                <alt>no</alt>
-                <alt>incomplete</alt>
-                <alt>undefined</alt>
-              </alts>
-            </type>
-            <summary>Compliance status</summary>
           </column>
           <column>
             <name>host</name>
@@ -24323,11 +23123,6 @@ END:VCALENDAR
             <type>integer</type>
             <summary>Minimum QoD of the results</summary>
           </option>
-          <option>
-            <name>report_compliance_levels</name>
-            <type>compliance_levels</type>
-            <summary>report compliance level to select</summary>
-          </option>
           <column>
             <name>tag</name>
             <type>text</type>
@@ -24483,26 +23278,6 @@ END:VCALENDAR
             <type>iso_time</type>
             <summary>Scan end time</summary>
           </column>
-          <column>
-            <name>compliance_yes</name>
-            <type>integer</type>
-            <summary>Number of compliance yes results</summary>
-          </column>
-          <column>
-            <name>compliance_no</name>
-            <type>integer</type>
-            <summary>Number of compliance no results</summary>
-          </column>
-          <column>
-            <name>compliance_incomplete</name>
-            <type>integer</type>
-            <summary>Number of compliance incomplete results</summary>
-          </column>
-          <column>
-            <name>compliant</name>
-            <type>compliance_status</type>
-            <summary>Compliance state of the report. Can be yes, no, incomplete or undefined</summary>
-          </column>
         </filter_keywords>
       </attrib>
       <attrib>
@@ -24545,11 +23320,6 @@ END:VCALENDAR
         <type>boolean</type>
       </attrib>
       <attrib>
-        <name>notes_details</name>
-        <summary>If notes are included, whether to include note details</summary>
-        <type>boolean</type>
-      </attrib>
-      <attrib>
         <name>overrides_details</name>
         <summary>If overrides are included, whether to include override details</summary>
         <type>boolean</type>
@@ -24578,7 +23348,6 @@ END:VCALENDAR
         <type>
           <alts>
             <alt>scan</alt>
-            <alt>audit</alt>
             <alt></alt>
           </alts>
         </type>
@@ -25242,8 +24011,8 @@ END:VCALENDAR
         The client uses the get_results command to get result information.
       </p>
       <p>
-        If the request includes a notes flag, an overrides flag or an
-        apply_overrides flag and any of these is true, then the request
+        If the request includes an overrides flag or an
+        apply_overrides flag and either is true, then the request
         must also include a task ID.
       </p>
     </description>
@@ -25287,11 +24056,6 @@ END:VCALENDAR
             <summary>Whether to apply Overrides</summary>
           </option>
           <option>
-            <name>compliance_levels</name>
-            <type>compliance_levels</type>
-            <summary>Compliance levels to select</summary>
-          </option>
-          <option>
             <name>levels</name>
             <type>levels</type>
             <summary>Severity levels to select</summary>
@@ -25300,11 +24064,6 @@ END:VCALENDAR
             <name>min_qod</name>
             <type>integer</type>
             <summary>Minimum QoD of the results</summary>
-          </option>
-          <option>
-            <name>notes</name>
-            <type>boolean</type>
-            <summary>Whether to include Notes in the report</summary>
           </option>
           <option>
             <name>overrides</name>
@@ -25350,18 +24109,6 @@ END:VCALENDAR
             <name>owner</name>
             <type>name</type>
             <summary>Name of the owner</summary>
-          </column>
-          <column>
-            <name>compliant</name>
-            <type>
-              <alts>
-                <alt>yes</alt>
-                <alt>no</alt>
-                <alt>incomplete</alt>
-                <alt>undefined</alt>
-              </alts>
-            </type>
-            <summary>Compliance status</summary>
           </column>
           <column>
             <name>host</name>
@@ -25484,11 +24231,6 @@ END:VCALENDAR
         <name>task_id</name>
         <summary>ID of task for note and override handling</summary>
         <type>uuid</type>
-      </attrib>
-      <attrib>
-        <name>notes_details</name>
-        <summary>If notes are included, whether to include note details</summary>
-        <type>boolean</type>
       </attrib>
       <attrib>
         <name>overrides_details</name>
@@ -25705,11 +24447,11 @@ END:VCALENDAR
       </response>
     </example>
     <example>
-      <summary>Get a result, including notes and overrides</summary>
+      <summary>Get a result, including overrides</summary>
       <request>
         <get_results result_id="cac9e7c8-c726-49fd-a710-5f99079ab93e"
                      task_id="40b236a9-2b0f-4813-b8c7-bc2b98d9d7e4"
-                     filter="notes=1 overrides=1">
+                     filter="overrides=1">
         </get_results>
       </request>
       <response>
@@ -25739,7 +24481,6 @@ END:VCALENDAR
             <threat>High</threat>
             <description>Test with very long warning.</description>
             <original_threat>Medium</original_threat>
-            <notes></notes>
             <overrides>
               <override id="b0832812-75f1-45eb-b676-99c6e6bf2b24">
                 <nvt oid="1.3.6.1.4.1.25623.1.0.75">
@@ -26625,7 +25366,6 @@ END:VCALENDAR
               <pattern>
                 <alts>
                   <alt>scan</alt>
-                  <alt>policy</alt>
                 </alts>
               </pattern>
             </ele>
@@ -29323,7 +28063,6 @@ END:VCALENDAR
             <type>
               <alts>
                 <alt>scan</alt>
-                <alt>audit</alt>
               </alts>
             </type>
             <summary>Usage type</summary>
@@ -29364,7 +28103,6 @@ END:VCALENDAR
         <type>
           <alts>
             <alt>scan</alt>
-            <alt>audit</alt>
             <alt></alt>
           </alts>
         </type>
@@ -29570,11 +28308,10 @@ END:VCALENDAR
         </ele>
         <ele>
           <name>usage_type</name>
-          <summary>The usage type of the task (scan or audit)</summary>
+          <summary>The usage type of the task. Only scan tasks are supported.</summary>
           <pattern>
             <alts>
               <alt>scan</alt>
-              <alt>audit</alt>
             </alts>
           </pattern>
         </ele>
@@ -29939,32 +28676,6 @@ END:VCALENDAR
               <name>severity</name>
               <pattern><t>severity</t></pattern>
               <summary>Maximum severity of the report</summary>
-            </ele>
-            <ele>
-              <name>compliance_count</name>
-              <summary>Complaince counts. Only for audit tasks</summary>
-              <pattern>
-                <e>yes</e>
-                <e>no</e>
-                <e>incomplete</e>
-                <e>undefined</e>
-              </pattern>
-              <ele>
-                <name>yes</name>
-                <pattern><t>integer</t></pattern>
-              </ele>
-              <ele>
-                <name>no</name>
-                <pattern><t>integer</t></pattern>
-              </ele>
-              <ele>
-                <name>incomplete</name>
-                <pattern><t>integer</t></pattern>
-              </ele>
-              <ele>
-                <name>undefined</name>
-                <pattern><t>integer</t></pattern>
-              </ele>
             </ele>
           </ele>
         </ele>
@@ -30425,651 +29136,6 @@ END:VCALENDAR
             <page>1</page>
           </task_count>
         </get_tasks_response>
-      </response>
-    </example>
-  </command>
-  <command>
-    <name>get_tickets</name>
-    <summary>Get one or many tickets</summary>
-    <description>
-      The client uses the get_tickets command to get ticket information.
-    </description>
-    <pattern>
-      <attrib>
-        <name>ticket_id</name>
-        <summary>ID of single ticket to get</summary>
-        <type>uuid</type>
-      </attrib>
-      <attrib>
-        <name>filter</name>
-        <summary>Filter term to use to filter query</summary>
-        <type>text</type>
-        <filter_keywords>
-          <option>
-            <name>first</name>
-            <type>integer</type>
-            <summary>
-              Index of the first item returned, starting at 1 (e.g. first=5
-              starts at the 5th item)
-            </summary>
-          </option>
-          <option>
-            <name>rows</name>
-            <type>integer</type>
-            <summary>Number of items to return</summary>
-          </option>
-          <option>
-            <name>sort</name>
-            <type>text</type>
-            <summary>Column to sort by in ascending order</summary>
-          </option>
-          <option>
-            <name>sort-reverse</name>
-            <type>text</type>
-            <summary>Column to sort by in descending order</summary>
-          </option>
-          <column>
-            <name>tag</name>
-            <type>text</type>
-            <summary>
-              Name and optional "=" separted value of an attached tag
-              (e.g. "mytag" or "mytag=myvalue")
-            </summary>
-          </column>
-          <column>
-            <name>tag_id</name>
-            <type>UUID</type>
-            <summary>
-              UUID of an attached tag
-            </summary>
-          </column>
-          <column>
-            <name>uuid</name>
-            <type>uuid</type>
-            <summary>Unique ID</summary>
-          </column>
-          <column>
-            <name>name</name>
-            <type>name</type>
-            <summary>Name</summary>
-          </column>
-          <column>
-            <name>comment</name>
-            <type>text</type>
-            <summary>Comment text</summary>
-          </column>
-          <column>
-            <name>created</name>
-            <type>iso_time</type>
-            <summary>Creation time</summary>
-          </column>
-          <column>
-            <name>modified</name>
-            <type>iso_time</type>
-            <summary>Modification time</summary>
-          </column>
-          <column>
-            <name>owner</name>
-            <type>name</type>
-            <summary>Name of the owner</summary>
-          </column>
-          <column>
-            <name>severity</name>
-            <type>severity</type>
-            <summary>Severity of the ticket result</summary>
-          </column>
-          <column>
-            <name>host</name>
-            <type>text</type>
-            <summary>Host of the ticket result</summary>
-          </column>
-          <column>
-            <name>location</name>
-            <type>text</type>
-            <summary>Location of the ticket result</summary>
-          </column>
-          <column>
-            <name>solution_type</name>
-            <type>text</type>
-            <summary>Solution type of the ticket result</summary>
-          </column>
-          <column>
-            <name>status</name>
-            <type>ticket_status</type>
-            <summary>Ticket status</summary>
-          </column>
-          <column>
-            <name>opened</name>
-            <type>iso_time</type>
-            <summary>Time ticket was opened</summary>
-          </column>
-          <column>
-            <name>fixed</name>
-            <type>iso_time</type>
-            <summary>Time ticket was fixed</summary>
-          </column>
-          <column>
-            <name>closed</name>
-            <type>iso_time</type>
-            <summary>Time ticket was closed</summary>
-          </column>
-          <column>
-            <name>orphan</name>
-            <type>boolean</type>
-            <summary>Whether the ticket is missing a task or report</summary>
-          </column>
-          <column>
-            <name>result_id</name>
-            <type>uuid</type>
-            <summary>UUID of the result referenced by the ticket</summary>
-          </column>
-        </filter_keywords>
-      </attrib>
-      <attrib>
-        <name>filt_id</name>
-        <summary>ID of filter to use to filter query</summary>
-        <type>uuid</type>
-      </attrib>
-      <attrib>
-        <name>trash</name>
-        <summary>Whether to get the trashcan tickets instead</summary>
-        <type>boolean</type>
-      </attrib>
-    </pattern>
-    <response>
-      <pattern>
-        <attrib>
-          <name>status</name>
-          <type>status</type>
-          <required>1</required>
-        </attrib>
-        <attrib>
-          <name>status_text</name>
-          <type>text</type>
-          <required>1</required>
-        </attrib>
-        <any><e>ticket</e></any>
-        <e>filters</e>
-        <e>sort</e>
-        <e>tickets</e>
-        <e>ticket_count</e>
-      </pattern>
-      <ele>
-        <name>ticket</name>
-        <pattern>
-          <attrib>
-            <name>id</name>
-            <type>uuid</type>
-            <required>1</required>
-          </attrib>
-          <e>owner</e>
-          <e>name</e>
-          <e>comment</e>
-          <e>creation_time</e>
-          <e>modification_time</e>
-          <e>writable</e>
-          <e>in_use</e>
-          <e>permissions</e>
-          <o><e>user_tags</e></o>
-          <e>nvt</e>
-          <o><e>result</e></o>
-          <e>assigned_to</e>
-          <o><e>task</e></o>
-          <o><e>report</e></o>
-          <e>severity</e>
-          <e>host</e>
-          <e>location</e>
-          <e>solution_type</e>
-          <e>status</e>
-          <e>open_time</e>
-          <e>open_note</e>
-          <o><e>fixed_time</e></o>
-          <o><e>fixed_note</e></o>
-          <o><e>closed_time</e></o>
-          <o><e>closed_note</e></o>
-          <o><e>fix_verified_time</e></o>
-          <o><e>fix_verified_report</e></o>
-          <e>orphan</e>
-        </pattern>
-        <ele>
-          <name>owner</name>
-          <summary>Owner of the ticket</summary>
-          <pattern>
-            <e>name</e>
-          </pattern>
-          <ele>
-            <name>name</name>
-            <summary>The name of the owner</summary>
-            <pattern><t>name</t></pattern>
-          </ele>
-        </ele>
-        <ele>
-          <name>name</name>
-          <summary>The name of ticket result's NVT</summary>
-          <pattern><t>name</t></pattern>
-        </ele>
-        <ele>
-          <name>comment</name>
-          <summary>The comment on the ticket</summary>
-          <pattern>text</pattern>
-        </ele>
-        <ele>
-          <name>creation_time</name>
-          <summary>Date and time the ticket was created</summary>
-          <pattern><t>iso_time</t></pattern>
-        </ele>
-        <ele>
-          <name>modification_time</name>
-          <summary>Date and time the ticket was last modified</summary>
-          <pattern><t>iso_time</t></pattern>
-        </ele>
-        <ele>
-          <name>writable</name>
-          <summary>Whether the ticket is writable</summary>
-          <pattern><t>boolean</t></pattern>
-        </ele>
-        <ele>
-          <name>in_use</name>
-          <summary>Whether the ticket is in use</summary>
-          <pattern><t>boolean</t></pattern>
-        </ele>
-        <ele>
-          <name>permissions</name>
-          <summary>
-            Permissions that the current user has on the ticket
-          </summary>
-          <pattern>
-            <any><e>permission</e></any>
-          </pattern>
-          <ele>
-            <name>permission</name>
-            <pattern>
-              <e>name</e>
-            </pattern>
-            <ele>
-              <name>name</name>
-              <summary>The name of the permission</summary>
-              <pattern><t>name</t></pattern>
-            </ele>
-          </ele>
-        </ele>
-        <ele>
-          <name>user_tags</name>
-          <summary>Info on tags attached to the ticket</summary>
-          <pattern>
-            <e>count</e>
-            <any><e>tag</e></any>
-          </pattern>
-          <ele>
-            <name>count</name>
-            <summary>Number of attached tags</summary>
-            <pattern><t>integer</t></pattern>
-          </ele>
-          <ele>
-            <name>tag</name>
-            <summary>
-              Short info on an individual tag
-              (only if details were requested)
-            </summary>
-            <pattern>
-              <attrib>
-                <name>id</name>
-                <type>uuid</type>
-                <summary>UUID of the tag</summary>
-                <required>1</required>
-              </attrib>
-              <e>name</e>
-              <e>value</e>
-              <e>comment</e>
-            </pattern>
-            <ele>
-              <name>name</name>
-              <summary>Name of the tag (usually namespace:predicate)</summary>
-              <pattern>text</pattern>
-            </ele>
-            <ele>
-              <name>value</name>
-              <summary>Value of the tag</summary>
-              <pattern>text</pattern>
-            </ele>
-            <ele>
-              <name>comment</name>
-              <summary>Comment for the tag</summary>
-              <pattern>text</pattern>
-            </ele>
-          </ele>
-        </ele>
-        <ele>
-          <name>nvt</name>
-          <summary>The NVT the ticket refers to</summary>
-          <pattern>
-            <attrib>
-              <name>oid</name>
-              <type>oid</type>
-              <required>1</required>
-              <summary>OID of the NVT</summary>
-            </attrib>
-          </pattern>
-        </ele>
-        <ele>
-          <name>result</name>
-          <summary>The ticket's result</summary>
-          <pattern>
-            <attrib>
-              <name>id</name>
-              <type>uuid</type>
-              <required>1</required>
-            </attrib>
-          </pattern>
-        </ele>
-        <ele>
-          <name>assigned_to</name>
-          <pattern>
-            <e>user</e>
-          </pattern>
-          <ele>
-            <name>user</name>
-            <summary>The user the ticket is assigned to</summary>
-            <pattern>
-              <attrib>
-                <name>id</name>
-                <type>uuid</type>
-                <required>1</required>
-              </attrib>
-            </pattern>
-          </ele>
-        </ele>
-        <ele>
-          <name>task</name>
-          <summary>The ticket's task</summary>
-          <pattern>
-            <attrib>
-              <name>id</name>
-              <type>uuid</type>
-              <required>1</required>
-            </attrib>
-          </pattern>
-        </ele>
-        <ele>
-          <name>report</name>
-          <summary>The ticket's report</summary>
-          <pattern>
-            <attrib>
-              <name>id</name>
-              <type>uuid</type>
-              <required>1</required>
-            </attrib>
-          </pattern>
-        </ele>
-        <ele>
-          <name>severity</name>
-          <summary>The ticket result's severity</summary>
-          <pattern>
-            <t>severity</t>
-          </pattern>
-        </ele>
-        <ele>
-          <name>host</name>
-          <summary>The ticket result's host</summary>
-          <pattern>
-            text
-          </pattern>
-        </ele>
-        <ele>
-          <name>location</name>
-          <summary>The ticket result's location</summary>
-          <pattern>
-            text
-          </pattern>
-        </ele>
-        <ele>
-          <name>solution_type</name>
-          <summary>The ticket result's solution_type</summary>
-          <pattern>
-            text
-          </pattern>
-        </ele>
-        <ele>
-          <name>status</name>
-          <summary>The ticket's status</summary>
-          <pattern><t>ticket_status</t></pattern>
-        </ele>
-        <ele>
-          <name>open_time</name>
-          <summary>Date and time the ticket was opened</summary>
-          <pattern><t>iso_time</t></pattern>
-        </ele>
-        <ele>
-          <name>open_note</name>
-          <summary>A note on the Closed status</summary>
-          <pattern>text</pattern>
-        </ele>
-        <ele>
-          <name>fixed_time</name>
-          <summary>Date and time the ticket was set to fixed</summary>
-          <pattern><t>iso_time</t></pattern>
-        </ele>
-        <ele>
-          <name>fixed_note</name>
-          <summary>The note on the Fixed status</summary>
-          <pattern>text</pattern>
-        </ele>
-        <ele>
-          <name>closed_time</name>
-          <summary>Date and time the ticket was closed</summary>
-          <pattern><t>iso_time</t></pattern>
-        </ele>
-        <ele>
-          <name>closed_note</name>
-          <summary>The note on the Closed status</summary>
-          <pattern>text</pattern>
-        </ele>
-        <ele>
-          <name>fix_verified_time</name>
-          <summary>Date and time the ticket was verified</summary>
-          <pattern><t>iso_time</t></pattern>
-        </ele>
-        <ele>
-          <name>fix_verified_report</name>
-          <summary>The report that verified the ticket</summary>
-          <pattern>
-            <attrib>
-              <name>id</name>
-              <type>uuid</type>
-              <required>1</required>
-            </attrib>
-          </pattern>
-        </ele>
-        <ele>
-          <name>orphan</name>
-          <summary>Whether the ticket is an orphan</summary>
-          <pattern><t>boolean</t></pattern>
-        </ele>
-      </ele>
-      <ele>
-        <name>filters</name>
-        <pattern>
-          <attrib>
-            <name>id</name>
-            <summary>UUID of filter if any, else 0</summary>
-            <type>uuid</type>
-            <required>1</required>
-          </attrib>
-          <e>term</e>
-          <o><e>name</e></o>
-          <e>keywords</e>
-        </pattern>
-        <ele>
-          <name>term</name>
-          <summary>Filter term</summary>
-          <pattern>text</pattern>
-        </ele>
-        <ele>
-          <name>name</name>
-          <summary>Filter name, if applicable</summary>
-          <pattern>text</pattern>
-        </ele>
-        <ele>
-          <name>keywords</name>
-          <summary>Filter broken down into keywords</summary>
-          <pattern><any><e>keyword</e></any></pattern>
-          <ele>
-            <name>keyword</name>
-            <pattern>
-              <e>column</e>
-              <e>relation</e>
-              <e>value</e>
-            </pattern>
-            <ele>
-              <name>column</name>
-              <summary>Column prefix</summary>
-              <pattern>text</pattern>
-            </ele>
-            <ele>
-              <name>relation</name>
-              <summary>Relation operator</summary>
-              <pattern>
-                <alts>
-                  <alt>=</alt>
-                  <alt>:</alt>
-                  <alt>~</alt>
-                  <alt>&gt;</alt>
-                  <alt>&lt;</alt>
-                </alts>
-              </pattern>
-            </ele>
-            <ele>
-              <name>value</name>
-              <summary>The filter text</summary>
-              <pattern>text</pattern>
-            </ele>
-          </ele>
-        </ele>
-      </ele>
-      <ele>
-        <name>sort</name>
-        <pattern>
-          text
-          <e>field</e>
-        </pattern>
-        <ele>
-          <name>field</name>
-          <pattern>
-            <e>order</e>
-          </pattern>
-          <ele>
-            <name>order</name>
-            <pattern>
-              <alts>
-                <alt>ascending</alt>
-                <alt>descending</alt>
-              </alts>
-            </pattern>
-          </ele>
-        </ele>
-      </ele>
-      <ele>
-        <name>tickets</name>
-        <pattern>
-          <attrib>
-            <name>start</name>
-            <summary>First ticket</summary>
-            <type>integer</type>
-            <required>1</required>
-          </attrib>
-          <attrib>
-            <name>max</name>
-            <summary>Maximum number of tickets</summary>
-            <type>integer</type>
-            <required>1</required>
-          </attrib>
-        </pattern>
-      </ele>
-      <ele>
-        <name>ticket_count</name>
-        <pattern>
-          <e>filtered</e>
-          <e>page</e>
-        </pattern>
-        <ele>
-          <name>filtered</name>
-          <summary>Number of tickets after filtering</summary>
-          <pattern><t>integer</t></pattern>
-        </ele>
-        <ele>
-          <name>page</name>
-          <summary>Number of tickets on current page</summary>
-          <pattern><t>integer</t></pattern>
-        </ele>
-      </ele>
-    </response>
-    <example>
-      <summary>Get all tickets</summary>
-      <request>
-        <get_tickets></get_tickets>
-      </request>
-      <response>
-        <get_tickets_response status_text="OK" status="200">
-          <ticket id="93cd2f71-48c3-4cf2-b542-5b256f59cae0">
-            <owner>
-              <name>joe</name>
-            </owner>
-            <name>OpenSSH Denial of Service Vulnerability - Jan16</name>
-            <comment></comment>
-            <creation_time>2018-11-29T16:18:56Z</creation_time>
-            <modification_time>2018-11-29T16:18:56Z</modification_time>
-            <writable>1</writable>
-            <in_use>0</in_use>
-            <permissions>
-              <permission>
-                <name>Everything</name>
-              </permission>
-            </permissions>
-            <assigned_to>
-              <user id="33e92d3e-a379-4c46-a4cf-88c8201ab710"></user>
-            </assigned_to>
-            <task id="6f559abf-23ca-4dc8-a90a-3acba021f4ff"></task>
-            <report id="f0f063cd-07e4-470a-8c66-b5d095d190cd"></report>
-            <severity>5.0</severity>
-            <host>127.0.0.1</host>
-            <location>1111/tcp</location>
-            <solution_type>VendorFix</solution_type>
-            <status>Open</status>
-            <open_time>2018-11-29T16:18:56Z</open_time>
-            <open_note>Probably the new version fixes this</open_note>
-            <result id="138c1216-4acb-4ded-bef3-7fab80eac8c7"></result>
-          </ticket>
-          <filters id="">
-            <term>first=1 rows=1000 sort=name</term>
-            <keywords>
-              <keyword>
-                <column>first</column>
-                <relation>=</relation>
-                <value>1</value>
-              </keyword>
-              <keyword>
-                <column>rows</column>
-                <relation>=</relation>
-                <value>1000</value>
-              </keyword>
-              <keyword>
-                <column>sort</column>
-                <relation>=</relation>
-                <value>name</value>
-              </keyword>
-            </keywords>
-          </filters>
-          <sort>
-            <field>name
-              <order>ascending</order>
-            </field>
-          </sort>
-          <tickets max="1000" start="1"></tickets>
-          <ticket_count>2
-            <filtered>2</filtered>
-            <page>2</page>
-          </ticket_count>
-        </get_tickets_response>
       </response>
     </example>
   </command>
@@ -34440,128 +32506,6 @@ END:VCALENDAR
       </response>
     </example>
   </command>
-  <command>
-    <name>modify_note</name>
-    <summary>Modify an existing note</summary>
-    <description>
-      <p>
-        The client uses the modify_note command to change an existing note.
-      </p>
-      <p>
-        If an optional element is left out, the existing value will be
-        cleared, generalising that constraint.
-      </p>
-    </description>
-    <pattern>
-      <attrib>
-        <name>note_id</name>
-        <summary>ID of note to modify</summary>
-        <type>uuid</type>
-        <required>1</required>
-      </attrib>
-      <o><e>active</e></o>
-      <o><e>nvt</e></o>
-      <o><e>hosts</e></o>
-      <o><e>port</e></o>
-      <o><e>result</e></o>
-      <o><e>severity</e></o>
-      <o><e>task</e></o>
-      <e>text</e>
-    </pattern>
-    <ele>
-      <name>active</name>
-      <summary>Days note will be active. -1 on always, 0 off</summary>
-      <pattern><t>integer</t></pattern>
-    </ele>
-    <ele>
-      <name>nvt</name>
-      <summary>NVT to which note applies</summary>
-      <pattern>
-        <attrib>
-          <name>oid</name>
-          <type>oid</type>
-          <required>1</required>
-        </attrib>
-      </pattern>
-    </ele>
-    <ele>
-      <name>hosts</name>
-      <summary>A comma-separated list of hosts</summary>
-      <pattern>
-        text
-      </pattern>
-    </ele>
-    <ele>
-      <name>port</name>
-      <summary>Port (location) to which note applies</summary>
-      <pattern>
-        text
-      </pattern>
-    </ele>
-    <ele>
-      <name>severity</name>
-      <summary>Severity to which note applies</summary>
-      <pattern>
-        <t>severity</t>
-      </pattern>
-    </ele>
-    <ele>
-      <name>text</name>
-      <summary>The text of the note</summary>
-      <pattern>
-        text
-      </pattern>
-    </ele>
-    <ele>
-      <name>task</name>
-      <summary>Task to which note applies</summary>
-      <pattern>
-        <attrib>
-          <name>id</name>
-          <type>uuid</type>
-          <required>1</required>
-        </attrib>
-      </pattern>
-    </ele>
-    <ele>
-      <name>result</name>
-      <summary>Result to which note applies</summary>
-      <pattern>
-        <attrib>
-          <name>id</name>
-          <type>uuid</type>
-          <required>1</required>
-        </attrib>
-      </pattern>
-    </ele>
-    <response>
-      <pattern>
-        <attrib>
-          <name>status</name>
-          <type>status</type>
-          <required>1</required>
-        </attrib>
-        <attrib>
-          <name>status_text</name>
-          <type>text</type>
-          <required>1</required>
-        </attrib>
-      </pattern>
-    </response>
-    <example>
-      <summary>Modify the text and result of a note</summary>
-      <request>
-        <modify_note note_id="254cd3ef-bbe1-4d58-859d-21b8d0c046c6">
-          <text>This issue should be resolved after the upgrade.</text>
-          <result result_id="254cd3ef-bbe1-4d58-859d-21b8d0c046c"/>
-        </modify_note>
-      </request>
-      <response>
-        <modify_note_response status="200" status_text="OK">
-        </modify_note_response>
-      </response>
-    </example>
-  </command>
 <command>
     <name>modify_override</name>
     <summary>Modify an existing override</summary>
@@ -35898,98 +33842,6 @@ END:VCALENDAR
     </example>
   </command>
   <command>
-    <name>modify_ticket</name>
-    <summary>Modify an existing ticket</summary>
-    <description>
-      <p>
-        The client uses the modify_ticket command to change an existing ticket.
-      </p>
-    </description>
-    <pattern>
-      <attrib>
-        <name>ticket_id</name>
-        <summary>ID of ticket to modify</summary>
-        <type>uuid</type>
-        <required>1</required>
-      </attrib>
-      <o><e>comment</e></o>
-      <o><e>status</e></o>
-      <o><e>open_note</e></o>
-      <o><e>fixed_note</e></o>
-      <o><e>closed_note</e></o>
-      <o><e>assigned_to</e></o>
-    </pattern>
-    <ele>
-      <name>comment</name>
-      <summary>Comment on ticket</summary>
-      <pattern>text</pattern>
-    </ele>
-    <ele>
-      <name>status</name>
-      <summary>Ticket status</summary>
-      <pattern><t>ticket_status</t></pattern>
-    </ele>
-    <ele>
-      <name>open_note</name>
-      <summary>Note, required when status is Open</summary>
-      <pattern>text</pattern>
-    </ele>
-    <ele>
-      <name>fixed_note</name>
-      <summary>Note, required when status is Fixed</summary>
-      <pattern>text</pattern>
-    </ele>
-    <ele>
-      <name>closed_note</name>
-      <summary>Note, required when status is Closed</summary>
-      <pattern>text</pattern>
-    </ele>
-    <ele>
-      <name>assigned_to</name>
-      <pattern>
-        <e>user</e>
-      </pattern>
-      <ele>
-        <name>user</name>
-        <summary>The user the ticket is assigned to</summary>
-        <pattern>
-          <attrib>
-            <name>id</name>
-            <type>uuid</type>
-            <required>1</required>
-          </attrib>
-        </pattern>
-      </ele>
-    </ele>
-    <response>
-      <pattern>
-        <attrib>
-          <name>status</name>
-          <type>status</type>
-          <required>1</required>
-        </attrib>
-        <attrib>
-          <name>status_text</name>
-          <type>text</type>
-          <required>1</required>
-        </attrib>
-      </pattern>
-    </response>
-    <example>
-      <summary>Modify the status of a ticket</summary>
-      <request>
-        <modify_ticket ticket_id="254cd3ef-bbe1-4d58-859d-21b8d0c046c6">
-          <status>Closed</status>
-          <closed_note>Resolved with January update</closed_note>
-        </modify_ticket>
-      </request>
-      <response>
-        <modify_ticket_response status="200" status_text="OK">
-        </modify_ticket_response>
-      </response>
-    </example>
-  </command>
-  <command>
     <name>modify_tls_certificate</name>
     <summary>Create a TLS certificate</summary>
     <description>
@@ -36749,42 +34601,12 @@ END:VCALENDAR
 
   <!-- Compatibility changes between versions. -->
   <change>
-    <command>GET_REPORTS</command>
-    <summary>Attribute &quot;usage_type&quot; is added</summary>
-    <description>
-      <p>
-        Attribute &quot;usage_type&quot; is added to differentiate between
-        scan and audit reports. If omitted the default value is "scan".
-      </p>
-      <p>
-        For audit reports, the elements &quot;result_count&quot;
-        and &quot;severity&quot; are replaced by &quot;compliance_count&quot;
-        and &quot;compliance&quot;.
-      </p>
-      <p>
-        New options/columns for the attribute &quot;report_filter&quot;
-        term are added for audit reports.
-      </p>
-    </description>
-    <version>22.6</version>
-  </change>
-  <change>
     <command>GET_RESULTS</command>
     <summary>New element &quot;compliance&quot; in &quot;get_results&quot; response</summary>
     <description>
       <p>
         New element &quot;compliance&quot; is added to specify the compliance state
         for a result.
-      </p>
-    </description>
-    <version>22.6</version>
-  </change>
-  <change>
-    <command>CREATE_TAG,MODIFY_TAG,CREATE_FILTER,MODIFY_FILTER</command>
-    <summary>&quot;type&quot; can take new values</summary>
-    <description>
-      <p>
-        &quot;type&quot; can be an &quot;audit_report&quot;, &quot;audit&quot; or &quot;policy&quot;
       </p>
     </description>
     <version>22.6</version>
@@ -36958,19 +34780,6 @@ END:VCALENDAR
     </description>
     <version>21.4</version>
   </change>
-  <change>
-    <command>GET_NOTES</command>
-    <summary>Element THREAT has been removed</summary>
-    <description>
-      <p>
-        The element "THREAT" of element "NOTE" is removed.
-      </p>
-      <p>
-        This information is redundant with the element "SEVERITY".
-      </p>
-    </description>
-    <version>21.4</version>
-  </change>
 
   <change>
     <command>CREATE_TARGET, RUN_WIZARD</command>
@@ -37015,19 +34824,6 @@ END:VCALENDAR
         To be precise, it is no longer possible for the element to be included
         in reports, as it was only sent for OTP scanners, and OTP scanners were
         removed in an earlier version.
-      </p>
-    </description>
-    <version>20.08</version>
-  </change>
-  <change>
-    <command>GET_SETTINGS, MODIFY_SETTING</command>
-    <summary>Setting UUID extended</summary>
-    <description>
-      <p>
-        The UUID of setting 'Notes Top Dashboard Configuration' was changed
-        to a valid UUID.  The UUID was extended by one character from
-        'ce7b121-c609-47b0-ab57-fd020a0336f4'
-        to 'ce7b121-c609-47b0-ab57-fd020a0336f4a'.
       </p>
     </description>
     <version>20.08</version>
@@ -37297,18 +35093,6 @@ END:VCALENDAR
     <version>8.0</version>
   </change>
   <change>
-    <command>Most GET_... Commands</command>
-    <summary>USER_TAGS, NOTES, OVERRIDES hidden when empty</summary>
-    <description>
-      <p>
-        The USER_TAGS element in various GET_... commands and the NOTES and
-        OVERRIDES one in results is only included if there are tags etc.
-        for the result or other resource.
-      </p>
-    </description>
-    <version>8.0</version>
-  </change>
-  <change>
     <command>CREATE_TAG, GET_TAGS, MODIFY_TAG</command>
     <summary>RESOURCE replaced with RESOURCES, removed filter keywords</summary>
     <description>
@@ -37546,48 +35330,6 @@ END:VCALENDAR
     <version>7.0</version>
   </change>
   <change>
-    <command>GET_RESULTS</command>
-    <summary>Redundant filtering attributes removed</summary>
-    <description>
-      <p>
-        The command attributes "apply_overrides", "autofp", "notes" and
-        "overrides" were removed.
-        Equivalent functionality is available using filters
-        (with the filter and filt_id attributes).
-      </p>
-    </description>
-    <version>7.0</version>
-  </change>
-  <change>
-    <command>GET_REPORTS</command>
-    <summary>Redundant filtering attributes removed</summary>
-    <description>
-      <p>
-        The command attributes "first_result", "max_results", "sort_order",
-        "sort_field", "apply_overrides", "levels", "search_phrase",
-        "min_cvss_base", "min_qod", "notes", "overrides", "delta_states",
-        "autofp", "result_hosts_only" and "timezone" were removed.
-        Equivalent functionality is available using filters
-        (with the filter and filt_id attributes).
-      </p>
-    </description>
-    <version>7.0</version>
-  </change>
-  <change>
-    <command>GET_REPORTS</command>
-    <summary>Filter keywords in response changed to common format</summary>
-    <description>
-      <p>
-        The elements "phrase", "autofp", "notes", "overrides",
-        "apply_overrides", "result_hosts_only", "min_cvss_base",
-        "min_qod", "timezone" were removed from the "filters" element in the
-        report and replaced with a "keywords" element using the same
-        syntax as other GET_... commands.
-      </p>
-    </description>
-    <version>7.0</version>
-  </change>
-  <change>
     <command>GET_CREDENTIALS</command>
     <summary>Credential types renamed</summary>
     <description>
@@ -37652,18 +35394,6 @@ END:VCALENDAR
       <p>
         The task pausing feature has been removed and thus, the PAUSE_TASK and
         RESUME_PAUSED_TASK commands don't exist anymore.
-      </p>
-    </description>
-    <version>6.0</version>
-  </change>
-  <change>
-    <command>GET_NOTES, GET_OVERRIDES, GET_REPORTS, GET_RESULTS</command>
-    <summary>Element RISK_FACTOR removed from element NVT</summary>
-    <description>
-      <p>
-        Risk factors have been replaced by CVSS scores in all NVTs, so the
-        RISK_FACTOR element has been removed from the NVT elements in
-        various commands.
       </p>
     </description>
     <version>6.0</version>

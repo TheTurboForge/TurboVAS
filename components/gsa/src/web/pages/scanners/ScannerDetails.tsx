@@ -107,7 +107,7 @@ const ScannerDetails = ({
                     <span key={task.id}>
                       <DetailsLink
                         id={task.id as string}
-                        type={task.usageType === 'audit' ? 'audit' : 'task'}
+                        type="task"
                       >
                         {task.name}
                       </DetailsLink>

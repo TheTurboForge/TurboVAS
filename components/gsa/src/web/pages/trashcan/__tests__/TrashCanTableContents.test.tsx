@@ -8,14 +8,11 @@ import {screen, rendererWithTable, within} from 'web/testing';
 import {type TrashCanGetData} from 'gmp/commands/trashcan';
 import AgentGroup from 'gmp/models/agent-group';
 import Alert from 'gmp/models/alert';
-import Audit from 'gmp/models/audit';
 import Credential from 'gmp/models/credential';
 import Filter from 'gmp/models/filter';
 import Group from 'gmp/models/group';
-import Note from 'gmp/models/note';
 import Override from 'gmp/models/override';
 import Permission from 'gmp/models/permission';
-import Policy from 'gmp/models/policy';
 import PortList from 'gmp/models/port-list';
 import ReportConfig from 'gmp/models/report-config';
 import ReportFormat from 'gmp/models/report-format';
@@ -26,20 +23,16 @@ import Schedule from 'gmp/models/schedule';
 import Tag from 'gmp/models/tag';
 import Target from 'gmp/models/target';
 import Task from 'gmp/models/task';
-import Ticket from 'gmp/models/ticket';
 import TrashCanTableContents from 'web/pages/trashcan/TrashCanTableContents';
 
 describe('TrashCanTableContents tests', () => {
   const mockTrashData: TrashCanGetData = {
     alerts: [new Alert({id: '1'})],
-    audits: [],
     credentials: [new Credential({id: '2'}), new Credential({id: '3'})],
     filters: [],
     groups: [],
-    notes: [],
     overrides: [],
     permissions: [],
-    policies: [],
     portLists: [],
     reportConfigs: [],
     reportFormats: [],
@@ -50,7 +43,6 @@ describe('TrashCanTableContents tests', () => {
     tags: [],
     targets: [],
     tasks: [],
-    tickets: [],
     agentGroups: [],
   };
 
@@ -84,14 +76,11 @@ describe('TrashCanTableContents tests', () => {
   test('should render all categories', () => {
     const mockAllTrashData: TrashCanGetData = {
       alerts: [new Alert({id: 'alert1'})],
-      audits: [new Audit({id: 'audit1'})],
       credentials: [new Credential({id: 'credential1'})],
       filters: [new Filter({id: 'filter1'})],
       groups: [new Group({id: 'group1'})],
-      notes: [new Note({id: 'note1'})],
       overrides: [new Override({id: 'override1'})],
       permissions: [new Permission({id: 'permission1'})],
-      policies: [new Policy({id: 'policy1'})],
       portLists: [new PortList({id: 'portlist1'})],
       reportConfigs: [new ReportConfig({id: 'reportconfig1'})],
       reportFormats: [new ReportFormat({id: 'reportformat1'})],
@@ -102,7 +91,6 @@ describe('TrashCanTableContents tests', () => {
       tags: [new Tag({id: 'tag1'})],
       targets: [new Target({id: 'target1'})],
       tasks: [new Task({id: 'task1'})],
-      tickets: [new Ticket({id: 'ticket1'})],
       agentGroups: [new AgentGroup({id: 'agentgroup1'})],
     };
     const {render} = rendererWithTable();
@@ -110,13 +98,10 @@ describe('TrashCanTableContents tests', () => {
 
     expect(screen.queryByText('Alerts')).toBeInTheDocument();
     expect(screen.queryByText('Credentials')).toBeInTheDocument();
-    expect(screen.queryByText('Audits')).toBeInTheDocument();
     expect(screen.queryByText('Filters')).toBeInTheDocument();
     expect(screen.queryByText('Groups')).toBeInTheDocument();
-    expect(screen.queryByText('Notes')).toBeInTheDocument();
     expect(screen.queryByText('Overrides')).toBeInTheDocument();
     expect(screen.queryByText('Permissions')).toBeInTheDocument();
-    expect(screen.queryByText('Policies')).toBeInTheDocument();
     expect(screen.queryByText('Port Lists')).toBeInTheDocument();
     expect(screen.queryByText('Report Configs')).toBeInTheDocument();
     expect(screen.queryByText('Report Formats')).toBeInTheDocument();
@@ -127,7 +112,6 @@ describe('TrashCanTableContents tests', () => {
     expect(screen.queryByText('Tags')).toBeInTheDocument();
     expect(screen.queryByText('Targets')).toBeInTheDocument();
     expect(screen.queryByText('Tasks')).toBeInTheDocument();
-    expect(screen.queryByText('Tickets')).toBeInTheDocument();
     expect(screen.queryByText('Agent Groups')).toBeInTheDocument();
   });
 

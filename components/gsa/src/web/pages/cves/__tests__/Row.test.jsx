@@ -51,13 +51,7 @@ describe('CVEv2 Row tests', () => {
     expect(baseElement).toHaveTextContent('CVE-2020-9992');
 
     // CVSS Base Vector
-    const links = baseElement.querySelectorAll('a');
-
-    expect(links[0]).toHaveAttribute(
-      'href',
-      '/cvsscalculator?cvssVector=AV%3AN%2FAC%3AM%2FAu%3AN%2FC%3AC%2FI%3AC%2FA%3AC',
-    );
-    expect(links[0]).toHaveTextContent('AV:N/AC:M/Au:N/C:C/I:C/A:C');
+    expect(baseElement).toHaveTextContent('AV:N/AC:M/Au:N/C:C/I:C/A:C');
 
     // Published
     expect(baseElement).toHaveTextContent(
@@ -132,13 +126,7 @@ describe('CVEv3 Row tests', () => {
     expect(baseElement).toHaveTextContent('CVE-2020-9992');
 
     // CVSS Base Vector
-    const links = baseElement.querySelectorAll('a');
-
-    expect(links[0]).toHaveAttribute(
-      'href',
-      '/cvsscalculator?cvssVector=CVSS%3A3.1%2FAV%3AL%2FAC%3AL%2FPR%3AN%2FUI%3AR%2FS%3AU%2FC%3AN%2FI%3AH%2FA%3AH',
-    );
-    expect(links[0]).toHaveTextContent(
+    expect(baseElement).toHaveTextContent(
       'CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:U/C:N/I:H/A:H',
     );
 

@@ -204,6 +204,6 @@ manage_check_alerts (GSList *, const db_conn_info_t *);
 
 int
 trigger (alert_t, task_t, report_t, event_t, const void *, alert_method_t,
-         alert_condition_t, const get_data_t *, int, int, gchar **);
+         alert_condition_t, const get_data_t *, int, gchar **);
 
 #endif /* not _GVMD_MANAGE_ALERTS_H */

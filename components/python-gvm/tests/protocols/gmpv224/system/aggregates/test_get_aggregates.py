@@ -53,12 +53,6 @@ class GmpGetAggregatesTestMixin:
             b'<get_aggregates type="host"/>'
         )
 
-        self.gmp.get_aggregates(EntityType.NOTE)
-
-        self.connection.send.has_been_called_with(
-            b'<get_aggregates type="note"/>'
-        )
-
         self.gmp.get_aggregates(EntityType.NVT)
 
         self.connection.send.has_been_called_with(

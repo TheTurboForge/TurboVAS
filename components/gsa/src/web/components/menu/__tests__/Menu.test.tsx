@@ -35,14 +35,11 @@ const renderMenuWith = ({
 
 describe('Menu rendering', () => {
   test.each([
-    'Dashboards',
     'Scans',
     'Assets',
-    'Resilience',
     'Security Information',
     'Configuration',
     'Administration',
-    'Help',
   ])('should render top-level menu: %s', async label => {
     renderMenuWith({
       capabilities: new EverythingCapabilities(),
@@ -60,26 +57,20 @@ describe('Menu rendering', () => {
   test.each([
     'Alerts',
     'CERT-Bund Advisories',
-    'Compliance Audit Reports',
-    'Compliance Audits',
-    'Compliance Policies',
     'CPEs',
     'Credentials',
     'CVEs',
-    'CVSS Calculator',
     'DFN-CERT Advisories',
     'Feed Status',
     'Filters',
     'Groups',
     'LDAP',
-    'Notes',
     'NVTs',
     'Overrides',
     'Performance',
     'Permissions',
     'Port Lists',
     'RADIUS',
-    'Remediation Tickets',
     'Report Configs',
     'Report Formats',
     'Reports',
@@ -137,7 +128,7 @@ describe('Menu rendering', () => {
     },
   );
 
-  test.each(['Remediation Tickets', 'Configuration', 'Agent', 'Agent Group'])(
+  test.each(['Configuration', 'Agent', 'Agent Group'])(
     'should not render %s when mayAccess returns false',
     async text => {
       renderMenuWith({

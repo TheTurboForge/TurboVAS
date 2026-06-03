@@ -20,7 +20,6 @@ import TabsContainer from 'web/components/tab/TabsContainer';
 import DetailsBlock from 'web/entity/DetailsBlock';
 import EntitiesTab from 'web/entity/EntitiesTab';
 import EntityPage from 'web/entity/EntityPage';
-import Note from 'web/entity/NoteBox';
 import Override from 'web/entity/OverrideBox';
 import EntityTags from 'web/entity/Tags';
 import withEntityContainer from 'web/entity/withEntityContainer';
@@ -29,10 +28,6 @@ import NvtComponent from 'web/pages/nvts/Component';
 import NvtDetails from 'web/pages/nvts/NvtDetails';
 import NvtDetailsPageToolBarIcons from 'web/pages/nvts/NvtDetailsPageToolBarIcons';
 import NvtPreferences from 'web/pages/nvts/NvtPreferences';
-import {
-  selector as notesSelector,
-  loadEntities as loadNotes,
-} from 'web/store/entities/notes';
 import {selector as nvtsSelector, loadEntity} from 'web/store/entities/nvts';
 import {
   selector as overridesSelector,
@@ -40,10 +35,9 @@ import {
 } from 'web/store/entities/overrides';
 import PropTypes from 'web/utils/PropTypes';
 
-const Details = ({entity, notes = [], overrides = []}) => {
+const Details = ({entity, overrides = []}) => {
   const [_] = useTranslation();
   overrides = overrides.filter(override => override.isActive());
-  notes = notes.filter(note => note.isActive());
 
   return (
     <Layout flex="column">
@@ -57,22 +51,12 @@ const Details = ({entity, notes = [], overrides = []}) => {
           </Divider>
         </DetailsBlock>
       )}
-      {notes.length > 0 && (
-        <DetailsBlock id="notes" title={_('Notes')}>
-          <Divider wrap align={['start', 'stretch']} width="15px">
-            {notes.map(note => {
-              return <Note key={note.id} note={note} />;
-            })}
-          </Divider>
-        </DetailsBlock>
-      )}
     </Layout>
   );
 };
 
 Details.propTypes = {
   entity: PropTypes.model.isRequired,
-  notes: PropTypes.array,
   overrides: PropTypes.array,
 };
 
@@ -86,7 +70,6 @@ const open_dialog = (nvt, func) => {
 
 const Page = ({
   entity,
-  notes,
   overrides,
   onChanged,
   onDownloaded,
@@ -106,7 +89,7 @@ const Page = ({
       onDownloadError={onError}
       onDownloaded={onDownloaded}
     >
-      {({notecreate, overridecreate, download}) => (
+      {({overridecreate, download}) => (
         <EntityPage
           {...props}
           entity={entity}
@@ -114,7 +97,6 @@ const Page = ({
           title={_('NVT')}
           toolBarIcons={NvtDetailsPageToolBarIcons}
           onChanged={onChanged}
-          onNoteCreateClick={nvt => open_dialog(nvt, notecreate)}
           onNvtDownloadClick={download}
           onOverrideCreateClick={nvt => open_dialog(nvt, overridecreate)}
         >
@@ -138,11 +120,7 @@ const Page = ({
                   <Tabs>
                     <TabPanels>
                       <TabPanel>
-                        <Details
-                          entity={entity}
-                          notes={notes}
-                          overrides={overrides}
-                        />
+                        <Details entity={entity} overrides={overrides} />
                       </TabPanel>
                       <TabPanel>
                         <NvtPreferences
@@ -171,7 +149,6 @@ const Page = ({
 
 Page.propTypes = {
   entity: PropTypes.model,
-  notes: PropTypes.array,
   overrides: PropTypes.array,
   onChanged: PropTypes.func.isRequired,
   onDownloaded: PropTypes.func.isRequired,
@@ -181,22 +158,18 @@ Page.propTypes = {
 const nvtIdFilter = id => Filter.fromString('nvt_id=' + id).all();
 
 const mapStateToProps = (rootState, {id}) => {
-  const notesSel = notesSelector(rootState);
   const overridesSel = overridesSelector(rootState);
   return {
-    notes: notesSel.getEntities(nvtIdFilter(id)),
     overrides: overridesSel.getEntities(nvtIdFilter(id)),
   };
 };
 
 const load = gmp => {
   const loadEntityFunc = loadEntity(gmp);
-  const loadNotesFunc = loadNotes(gmp);
   const loadOverridesFunc = loadOverrides(gmp);
   return id => dispatch =>
     Promise.all([
       dispatch(loadEntityFunc(id)),
-      dispatch(loadNotesFunc(nvtIdFilter(id))),
       dispatch(loadOverridesFunc(nvtIdFilter(id))),
     ]);
 };

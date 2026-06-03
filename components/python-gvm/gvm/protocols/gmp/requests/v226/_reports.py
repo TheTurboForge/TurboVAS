@@ -91,7 +91,6 @@ class Reports:
         *,
         filter_string: str | None = None,
         filter_id: EntityID | None = None,
-        note_details: bool | None = None,
         override_details: bool | None = None,
         ignore_pagination: bool | None = None,
         details: bool | None = None,
@@ -101,7 +100,6 @@ class Reports:
         Args:
             filter_string: Filter term to use for the query
             filter_id: UUID of an existing filter to use for the query
-            note_details: If notes are included, whether to include note details
             override_details: If overrides are included, whether to include
                 override details
             ignore_pagination: Whether to ignore the filter terms "first" and
@@ -116,9 +114,6 @@ class Reports:
 
         if filter_id:
             cmd.set_attribute("report_filt_id", str(filter_id))
-
-        if note_details is not None:
-            cmd.set_attribute("note_details", to_bool(note_details))
 
         if override_details is not None:
             cmd.set_attribute("override_details", to_bool(override_details))

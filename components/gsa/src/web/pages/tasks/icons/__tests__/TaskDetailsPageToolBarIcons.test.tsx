@@ -121,7 +121,6 @@ describe('Task ToolBarIcons tests', () => {
     const {element} = render(
       <TaskDetailsPageToolBarIcons
         entity={task}
-        notesCount={2}
         overridesCount={3}
         onImportTaskCreateClick={handleImportTaskCreate}
         onReportImportClick={handleReportImport}
@@ -259,10 +258,6 @@ describe('Task ToolBarIcons tests', () => {
       '0',
     );
 
-    const totalNotes = screen.getByTitle('Notes for Task foo');
-    expect(totalNotes).toHaveAttribute('href', '/notes?filter=task_id%3D12345');
-    expect(within(totalNotes).getByTestId('badge-icon')).toHaveTextContent('0');
-
     const totalOverrides = screen.getByTitle('Overrides for Task foo');
     expect(totalOverrides).toHaveAttribute(
       'href',
@@ -387,10 +382,6 @@ describe('Task ToolBarIcons tests', () => {
     expect(within(totalResults).getByTestId('badge-icon')).toHaveTextContent(
       '0',
     );
-
-    const totalNotes = screen.getByTitle('Notes for Task foo');
-    expect(totalNotes).toHaveAttribute('href', '/notes?filter=task_id%3D12345');
-    expect(within(totalNotes).getByTestId('badge-icon')).toHaveTextContent('0');
 
     const totalOverrides = screen.getByTitle('Overrides for Task foo');
     expect(totalOverrides).toHaveAttribute(
@@ -518,10 +509,6 @@ describe('Task ToolBarIcons tests', () => {
       '10',
     );
 
-    const totalNotes = screen.getByTitle('Notes for Task foo');
-    expect(totalNotes).toHaveAttribute('href', '/notes?filter=task_id%3D12345');
-    expect(within(totalNotes).getByTestId('badge-icon')).toHaveTextContent('0');
-
     const totalOverrides = screen.getByTitle('Overrides for Task foo');
     expect(totalOverrides).toHaveAttribute(
       'href',
@@ -572,7 +559,6 @@ describe('Task ToolBarIcons tests', () => {
     render(
       <TaskDetailsPageToolBarIcons
         entity={task}
-        notesCount={2}
         overridesCount={3}
         onImportTaskCreateClick={handleImportTaskCreate}
         onReportImportClick={handleReportImport}
@@ -647,10 +633,6 @@ describe('Task ToolBarIcons tests', () => {
     expect(within(totalResults).getByTestId('badge-icon')).toHaveTextContent(
       '1',
     );
-
-    const totalNotes = screen.getByTitle('Notes for Task foo');
-    expect(totalNotes).toHaveAttribute('href', '/notes?filter=task_id%3D12345');
-    expect(within(totalNotes).getByTestId('badge-icon')).toHaveTextContent('2');
 
     const totalOverrides = screen.getByTitle('Overrides for Task foo');
     expect(totalOverrides).toHaveAttribute(
@@ -777,10 +759,6 @@ describe('Task ToolBarIcons tests', () => {
     expect(within(totalResults).getByTestId('badge-icon')).toHaveTextContent(
       '1',
     );
-
-    const totalNotes = screen.getByTitle('Notes for Task foo');
-    expect(totalNotes).toHaveAttribute('href', '/notes?filter=task_id%3D12345');
-    expect(within(totalNotes).getByTestId('badge-icon')).toHaveTextContent('0');
 
     const totalOverrides = screen.getByTitle('Overrides for Task foo');
     expect(totalOverrides).toHaveAttribute(
@@ -966,10 +944,6 @@ describe('Task ToolBarIcons tests', () => {
     expect(within(totalResults).getByTestId('badge-icon')).toHaveTextContent(
       '1',
     );
-
-    const totalNotes = screen.getByTitle('Notes for Task foo');
-    expect(totalNotes).toHaveAttribute('href', '/notes?filter=task_id%3D12345');
-    expect(within(totalNotes).getByTestId('badge-icon')).toHaveTextContent('0');
 
     const totalOverrides = screen.getByTitle('Overrides for Task foo');
     expect(totalOverrides).toHaveAttribute(

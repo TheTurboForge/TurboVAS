@@ -19,12 +19,10 @@ import {
   CirclePlus,
   CircleX,
   CircleOff,
-  ClipboardCheck,
   Clock3,
   Diff,
   Download,
   Equal,
-  FileCog,
   FileOutput,
   FilePenLine,
   Filter,
@@ -81,7 +79,6 @@ import Clone from 'web/components/icon/svg/clone.svg?react';
 import Config from 'web/components/icon/svg/config.svg?react';
 import Cpe from 'web/components/icon/svg/cpe.svg?react';
 import Cve from 'web/components/icon/svg/cve.svg?react';
-import CvssCalculator from 'web/components/icon/svg/cvss_calculator.svg?react';
 import Delta from 'web/components/icon/svg/delta.svg?react';
 import DeltaSecond from 'web/components/icon/svg/delta_second.svg?react';
 import DfnCertAdv from 'web/components/icon/svg/dfn_cert_adv.svg?react';
@@ -95,10 +92,7 @@ import Host from 'web/components/icon/svg/host.svg?react';
 import Ldap from 'web/components/icon/svg/ldap.svg?react';
 import Legend from 'web/components/icon/svg/legend.svg?react';
 import New from 'web/components/icon/svg/new.svg?react';
-import NewNote from 'web/components/icon/svg/new_note.svg?react';
 import NewOverride from 'web/components/icon/svg/new_override.svg?react';
-import NewTicket from 'web/components/icon/svg/new_ticket.svg?react';
-import Note from 'web/components/icon/svg/note.svg?react';
 import Nvt from 'web/components/icon/svg/nvt.svg?react';
 import Os from 'web/components/icon/svg/os.svg?react';
 import Override from 'web/components/icon/svg/override.svg?react';
@@ -121,7 +115,6 @@ import StWillnotfix from 'web/components/icon/svg/st_willnotfix.svg?react';
 import StWorkaround from 'web/components/icon/svg/st_workaround.svg?react';
 import Target from 'web/components/icon/svg/target.svg?react';
 import Task from 'web/components/icon/svg/task.svg?react';
-import Ticket from 'web/components/icon/svg/ticket.svg?react';
 import Tlscertificate from 'web/components/icon/svg/tlscertificate.svg?react';
 import Toggle3d from 'web/components/icon/svg/toggle3d.svg?react';
 import TrendDown from 'web/components/icon/svg/trend_down.svg?react';
@@ -198,7 +191,6 @@ const getIcons = (): Record<string, IconComponent> => {
     CircleX: createIcon(CircleX, 'delete-icon', 'Delete Icon'),
     RefreshCcw: createIcon(RefreshCcw, 'refresh-ccw-icon', 'Refresh CCW Icon'),
     Megaphone: createIcon(Megaphone, 'alert-icon', 'Alert Icon'),
-    Audit: createIcon(ClipboardCheck, 'audit-icon', 'Audit Icon'),
     ArrowDown: createIcon(ArrowDown, 'arrow-down-icon', 'Arrow Down Icon'),
     ArrowUpDown: createIcon(
       ArrowUpDown,
@@ -231,7 +223,6 @@ const getIcons = (): Record<string, IconComponent> => {
     ChevronRight: createIcon(ChevronRight, 'next-icon', 'Next Icon'),
     Gauge: createIcon(Gauge, 'performance-icon', 'Performance Icon'),
     UserCheck: createIcon(UserCheck, 'permission-icon', 'Permission Icon'),
-    FileCog: createIcon(FileCog, 'policy-icon', 'Policy Icon'),
     ChevronLeft: createIcon(ChevronLeft, 'previous-icon', 'Previous Icon'),
     RotateCcw: createIcon(RotateCcw, 'reset-icon', 'Reset Icon'),
     StepForward: createIcon(StepForward, 'resume-icon', 'Resume Icon'),
@@ -281,7 +272,6 @@ const getIcons = (): Record<string, IconComponent> => {
     ),
     CpeLogo: createIcon(Cpe, 'cpe-logo-icon', 'CPE Logo Icon', false),
     Cve: createIcon(Cve, 'cve-icon', 'CVE Icon', false),
-    CvssCalculator: createIcon(CvssCalculator, 'cvss-icon', 'CVSS Icon', false),
     Delta: createIcon(Delta, 'delta-icon', 'Delta Icon', false),
     DeltaSecond: createIcon(
       DeltaSecond,
@@ -311,20 +301,12 @@ const getIcons = (): Record<string, IconComponent> => {
     Ldap: createIcon(Ldap, 'ldap-icon', 'LDAP Icon', false),
     Legend: createIcon(Legend, 'legend-icon', 'Legend Icon', false),
     New: createIcon(New, 'new-icon', 'New Icon', false),
-    NewNote: createIcon(NewNote, 'new-note-icon', 'New Note Icon', false),
-    NewTicket: createIcon(
-      NewTicket,
-      'new-ticket-icon',
-      'New Ticket Icon',
-      false,
-    ),
     NewOverride: createIcon(
       NewOverride,
       'new-override-icon',
       'New Override Icon',
       false,
     ),
-    Note: createIcon(Note, 'note-icon', 'Note Icon', false),
     Nvt: createIcon(Nvt, 'nvt-icon', 'NVT Icon', false),
     Os: createIcon(Os, 'os-svg-icon', 'OS Icon', false),
     Override: createIcon(Override, 'override-icon', 'Override Icon', false),
@@ -398,7 +380,6 @@ const getIcons = (): Record<string, IconComponent> => {
     ),
     Target: createIcon(Target, 'target-icon', 'Target Icon', false),
     Task: createIcon(Task, 'task-icon', 'Task Icon', false),
-    Ticket: createIcon(Ticket, 'ticket-icon', 'Ticket Icon', false),
     Tlscertificate: createIcon(
       Tlscertificate,
       'tls-certificate-icon',
@@ -450,7 +431,6 @@ export const AlterableIcon = getIcons().Alterable;
 export const ArrowDownIcon = getIcons().ArrowDown;
 export const ArrowUpIcon = getIcons().ArrowUp;
 export const ArrowUpDownIcon = getIcons().ArrowUpDown;
-export const AuditIcon = getIcons().Audit;
 export const DashboardIcon = getIcons().BarChart3;
 export const CalendarIcon = getIcons().Calendar;
 export const CertBundAdvIcon = getIcons().CertBundAdv;
@@ -466,7 +446,6 @@ export const CloneIcon = getIcons().Clone;
 export const ConfigIcon = getIcons().ScanConfig;
 export const CpeLogoIcon = getIcons().CpeLogo;
 export const CveIcon = getIcons().Cve;
-export const CvssIcon = getIcons().CvssCalculator;
 export const DeltaIcon = getIcons().Delta;
 export const DeltaDifferenceIcon = getIcons().DeltaDifference;
 export const DeltaSecondIcon = getIcons().DeltaSecond;
@@ -481,7 +460,6 @@ export const DownloadRpmIcon = getIcons().DlRpm;
 export const DownloadSvgIcon = getIcons().DlSvg;
 export const DownloadIcon = getIcons().Download;
 export const EqualIcon = getIcons().Equal;
-export const PolicyIcon = getIcons().FileCog;
 export const FileOutputIcon = getIcons().FileOutput;
 export const FilterIcon = getIcons().Filter;
 export const FingerprintIcon = getIcons().Fingerprint;
@@ -503,10 +481,7 @@ export const LogoutIcon = getIcons().LogOut;
 export const AlertIcon = getIcons().Megaphone;
 export const MinusIcon = getIcons().Minus;
 export const NewIcon = getIcons().New;
-export const NewNoteIcon = getIcons().NewNote;
 export const NewOverrideIcon = getIcons().NewOverride;
-export const NewTicketIcon = getIcons().NewTicket;
-export const NoteIcon = getIcons().Note;
 export const NvtIcon = getIcons().Nvt;
 export const OsSvgIcon = getIcons().Os;
 export const OverrideIcon = getIcons().Override;
@@ -550,7 +525,6 @@ export const TagIcon = getIcons().Tag;
 export const TagsIcon = getIcons().Tags;
 export const TargetIcon = getIcons().Target;
 export const TaskIcon = getIcons().Task;
-export const TicketIcon = getIcons().Ticket;
 export const TlsCertificateIcon = getIcons().Tlscertificate;
 export const Toggle3dIcon = getIcons().Toggle3d;
 export const TrashcanIcon = getIcons().Trash2;

@@ -55,7 +55,7 @@ class AlertActions extends React.Component {
   handleTriggerAlert(state) {
     const {_} = this.props;
 
-    const {alertId, includeNotes, includeOverrides, storeAsDefault} = state;
+    const {alertId, includeOverrides, storeAsDefault} = state;
     const {
       filter,
       gmp,
@@ -66,14 +66,12 @@ class AlertActions extends React.Component {
     } = this.props;
 
     const newFilter = filter.copy();
-    newFilter.set('notes', includeNotes);
     newFilter.set('overrides', includeOverrides);
 
     if (storeAsDefault) {
       this.props.saveReportComposerDefaults({
         ...reportComposerDefaults,
         defaultAlertId: alertId,
-        includeNotes,
         includeOverrides,
       });
     }
@@ -125,7 +123,6 @@ class AlertActions extends React.Component {
 
     const {
       alerts,
-      audit = false,
       capabilities,
       reportComposerDefaults,
       filter,
@@ -151,10 +148,8 @@ class AlertActions extends React.Component {
               <TriggerAlertDialog
                 alertId={alertId}
                 alerts={alerts}
-                audit={audit}
                 defaultAlertId={reportComposerDefaults.defaultAlertId}
                 filter={filter}
-                includeNotes={reportComposerDefaults.includeNotes}
                 includeOverrides={reportComposerDefaults.includeOverrides}
                 showThresholdMessage={showThresholdMessage}
                 storeAsDefault={storeAsDefault}
@@ -174,7 +169,6 @@ class AlertActions extends React.Component {
 
 AlertActions.propTypes = {
   alerts: PropTypes.array,
-  audit: PropTypes.bool,
   capabilities: PropTypes.capabilities.isRequired,
   filter: PropTypes.filter,
   gmp: PropTypes.gmp.isRequired,

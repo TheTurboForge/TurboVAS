@@ -51,10 +51,6 @@ class AggregatesTestCase(unittest.TestCase):
 
         self.assertEqual(bytes(request), b'<get_aggregates type="host"/>')
 
-        request = Aggregates.get_aggregates(EntityType.NOTE)
-
-        self.assertEqual(bytes(request), b'<get_aggregates type="note"/>')
-
         request = Aggregates.get_aggregates(EntityType.NVT)
 
         self.assertEqual(bytes(request), b'<get_aggregates type="nvt"/>')

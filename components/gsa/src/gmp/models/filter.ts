@@ -830,9 +830,6 @@ export const AGENT_INSTALLERS_FILTER_FILTER = Filter.fromString(
   'type=agent_installer',
 );
 export const ALERTS_FILTER_FILTER = Filter.fromString('type=alert');
-export const AUDITS_FILTER_FILTER = Filter.fromString('type=task');
-export const AUDIT_REPORTS_FILTER_FILTER =
-  Filter.fromString('type=audit_report');
 export const CERTBUND_FILTER_FILTER = Filter.fromString('type=info');
 export const CPES_FILTER_FILTER = Filter.fromString('type=info');
 export const CREDENTIALS_FILTER_FILTER = Filter.fromString('type=credential');
@@ -841,12 +838,10 @@ export const DFNCERT_FILTER_FILTER = Filter.fromString('type=info');
 export const FILTERS_FILTER_FILTER = Filter.fromString('type=filter');
 export const GROUPS_FILTER_FILTER = Filter.fromString('type=group');
 export const HOSTS_FILTER_FILTER = Filter.fromString('type=host');
-export const NOTES_FILTER_FILTER = Filter.fromString('type=note');
 export const NVTS_FILTER_FILTER = Filter.fromString('type=info');
 export const OS_FILTER_FILTER = Filter.fromString('type=os');
 export const OVERRIDES_FILTER_FILTER = Filter.fromString('type=override');
 export const PORTLISTS_FILTER_FILTER = Filter.fromString('type=port_list');
-export const POLICIES_FILTER_FILTER = Filter.fromString('type=config');
 export const PERMISSIONS_FILTER_FILTER = Filter.fromString('type=permission');
 export const REPORT_CONFIGS_FILTER_FILTER =
   Filter.fromString('type=report_config');
@@ -862,7 +857,6 @@ export const SECINFO_FILTER_FILTER = Filter.fromString('type=info');
 export const TARGETS_FILTER_FILTER = Filter.fromString('type=target');
 export const TASKS_FILTER_FILTER = Filter.fromString('type=task');
 export const TAGS_FILTER_FILTER = Filter.fromString('type=tag');
-export const TICKETS_FILTER_FILTER = Filter.fromString('type=ticket');
 export const TLS_CERTIFICATES_FILTER_FILTER = Filter.fromString(
   'type=tls_certificate',
 );

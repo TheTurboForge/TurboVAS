@@ -234,27 +234,6 @@ describe('Capabilities tests', () => {
     expect(i).toEqual(4);
   });
 
-  test('should support ticket capabilities', () => {
-    const caps = new Capabilities([
-      'get_tickets',
-      'create_ticket',
-      'delete_ticket',
-      'modify_ticket',
-    ]);
-
-    expect(caps.mayAccess('ticket')).toEqual(true);
-    // @ts-expect-error
-    expect(caps.mayAccess('tickets')).toEqual(true);
-
-    expect(caps.mayClone('ticket')).toEqual(true);
-    expect(caps.mayCreate('ticket')).toEqual(true);
-    expect(caps.mayDelete('ticket')).toEqual(true);
-    expect(caps.mayEdit('ticket')).toEqual(true);
-
-    // @ts-expect-error
-    expect(caps.mayAccess('other')).toEqual(false);
-  });
-
   test('should map capabilities to strings', () => {
     const caps = new Capabilities(['get_tasks', 'create_task']);
 

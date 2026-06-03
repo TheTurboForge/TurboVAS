@@ -103,13 +103,7 @@ class Permissions:
                 "resource", attrs={"id": resource_id}
             )
 
-            actual_resource_type = resource_type
-            if resource_type.value == EntityType.AUDIT.value:
-                actual_resource_type = EntityType.TASK
-            elif resource_type.value == EntityType.POLICY.value:
-                actual_resource_type = EntityType.SCAN_CONFIG
-
-            xml_resource.add_element("type", actual_resource_type.value)
+            xml_resource.add_element("type", resource_type.value)
 
         return cmd
 
@@ -233,12 +227,7 @@ class Permissions:
             xml_resource = cmd.add_element(
                 "resource", attrs={"id": str(resource_id)}
             )
-            actual_resource_type = resource_type
-            if resource_type.value == EntityType.AUDIT.value:
-                actual_resource_type = EntityType.TASK
-            elif resource_type.value == EntityType.POLICY.value:
-                actual_resource_type = EntityType.SCAN_CONFIG
-            xml_resource.add_element("type", actual_resource_type.value)
+            xml_resource.add_element("type", resource_type.value)
 
         if subject_id or subject_type:
             if not subject_id:

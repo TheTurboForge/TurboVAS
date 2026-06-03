@@ -6,7 +6,6 @@
 import {describe, test, expect, testing} from '@gsa/testing';
 import {screen, rendererWith, fireEvent} from 'web/testing';
 import Capabilities from 'gmp/capabilities/capabilities';
-import Audit, {AUDIT_STATUS} from 'gmp/models/audit';
 import Task, {TASK_STATUS} from 'gmp/models/task';
 import TaskStartIcon from 'web/pages/tasks/icons/TaskStartIcon';
 
@@ -57,34 +56,6 @@ describe('Task StartIcon component tests', () => {
 
     expect(clickHandler).not.toHaveBeenCalled();
     expect(element).toHaveAttribute('title', 'Permission to start task denied');
-    expect(element).toHaveAttribute('disabled');
-    expect(element).toHaveAttribute('data-disabled', 'true');
-  });
-
-  test('should render in inactive state if wrong command level permissions for audit are given', () => {
-    const caps = new Capabilities(['everything']);
-    const audit = Audit.fromElement({
-      status: AUDIT_STATUS.new,
-      target: {_id: '123'},
-      permissions: {permission: [{name: 'get_task'}]},
-      usage_type: 'audit',
-    });
-    const clickHandler = testing.fn();
-
-    const {render} = rendererWith({capabilities: caps});
-
-    const {element} = render(<TaskStartIcon task={audit} />);
-
-    expect(caps.mayOp('start_task')).toEqual(true);
-    expect(audit.userCapabilities.mayOp('start_task')).toEqual(false);
-
-    fireEvent.click(element);
-
-    expect(clickHandler).not.toHaveBeenCalled();
-    expect(element).toHaveAttribute(
-      'title',
-      'Permission to start audit denied',
-    );
     expect(element).toHaveAttribute('disabled');
     expect(element).toHaveAttribute('data-disabled', 'true');
   });

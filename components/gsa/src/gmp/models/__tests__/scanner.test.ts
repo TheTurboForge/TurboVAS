@@ -103,20 +103,14 @@ describe('Scanner model tests', () => {
   test('should parse tasks', () => {
     const scanner = Scanner.fromElement({
       tasks: {
-        task: [
-          {_id: '123', usage_type: 'scan'},
-          {_id: '456', name: 'foo', usage_type: 'audit'},
-        ],
+        task: [{_id: '123', usage_type: 'scan'}],
       },
     });
 
-    expect(scanner.tasks.length).toEqual(2);
+    expect(scanner.tasks.length).toEqual(1);
     expect(scanner.tasks[0].id).toEqual('123');
     expect(scanner.tasks[0].name).toBeUndefined();
     expect(scanner.tasks[0].usageType).toEqual('scan');
-    expect(scanner.tasks[1].id).toEqual('456');
-    expect(scanner.tasks[1].name).toEqual('foo');
-    expect(scanner.tasks[1].usageType).toEqual('audit');
   });
 
   test('should parse scan configs', () => {

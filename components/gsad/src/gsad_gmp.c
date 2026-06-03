@@ -177,10 +177,6 @@ get_credential (gvm_connection_t *, gsad_credentials_t *, params_t *,
                 const char *, gsad_command_response_data_t *);
 
 static char *
-get_note (gvm_connection_t *, gsad_credentials_t *, params_t *, const char *,
-          gsad_command_response_data_t *);
-
-static char *
 get_override (gvm_connection_t *, gsad_credentials_t *, params_t *,
               const char *, gsad_command_response_data_t *);
 
@@ -239,6 +235,7 @@ static gchar *
 action_result (gvm_connection_t *, gsad_credentials_t *, params_t *,
                gsad_command_response_data_t *, const char *action,
                const char *message, const char *details, const char *id);
+
 /* Helpers. */
 
 /**
@@ -5107,9 +5104,6 @@ get_alerts (gvm_connection_t *connection, gsad_credentials_t *, params_t *,
 #define EVENT_TYPE_NEW_SECINFO "New SecInfo arrived"
 #define EVENT_TYPE_UPDATED_SECINFO "Updated SecInfo arrived"
 #define EVENT_TYPE_TASK_RUN_STATUS_CHANGED "Task run status changed"
-#define EVENT_TYPE_TICKET_RECEIVED "Ticket received"
-#define EVENT_TYPE_ASSIGNED_TICKET_CHANGED "Assigned ticket changed"
-#define EVENT_TYPE_OWNED_TICKET_CHANGED "Owned ticket changed"
 
 /**
  * @brief Send event data for an alert.
@@ -5320,7 +5314,6 @@ append_alert_method_data (GString *xml, params_t *data, const char *method,
             || strcmp (name, "details_url") == 0
             || strcmp (name, "delta_type") == 0
             || strcmp (name, "delta_report_id") == 0
-            || strcmp (name, "composer_include_notes") == 0
             || strcmp (name, "composer_include_overrides") == 0
             || strcmp (name, "composer_ignore_pagination") == 0)
           {
@@ -6673,7 +6666,7 @@ create_tag_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
 }
 
 /**
- * @brief Delete note, get next page, envelope the result.
+ * @brief Delete tag, get next page, envelope the result.
  *
  * @param[in]  connection     Connection to manager.
  * @param[in]  credentials  Username and password for authentication.
@@ -8435,42 +8428,6 @@ export_configs_gmp (gvm_connection_t *connection,
 }
 
 /**
- * @brief Export a note.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]   credentials          Username and password for authentication.
- * @param[in]   params               Request parameters.
- * @param[out]  response_data        Extra data return for the HTTP response.
- *
- * @return Note XML on success.  Enveloped XML on error.
- */
-char *
-export_note_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
-                 params_t *params, gsad_command_response_data_t *response_data)
-{
-  return export_resource (connection, "note", credentials, params,
-                          response_data);
-}
-
-/**
- * @brief Export a list of notes.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]   credentials          Username and password for authentication.
- * @param[in]   params               Request parameters.
- * @param[out]  response_data        Extra data return for the HTTP response.
- *
- * @return Notes XML on success.  Enveloped XML
- *         on error.
- */
-char *
-export_notes_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
-                  params_t *params, gsad_command_response_data_t *response_data)
-{
-  return export_many (connection, "note", credentials, params, response_data);
-}
-
-/**
  * @brief Export an override.
  *
  * @param[in]  connection     Connection to manager.
@@ -10050,7 +10007,7 @@ report_alert_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
     filter = "first=1 rows=-1"
              "  result_hosts_only=0"
              "  apply_overrides=1"
-             "  notes=1 overrides=1"
+             "  overrides=1"
              "  sort-reverse=severity";
 
   ret = gvm_connection_sendf_xml (connection,
@@ -10378,66 +10335,6 @@ get_result_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
 }
 
 /**
- * @brief Get all notes, envelope the result.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-get_notes_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
-               params_t *params, gsad_command_response_data_t *response_data)
-{
-  return get_many (connection, "notes", credentials, params, NULL,
-                   response_data);
-}
-
-/**
- * @brief Get a note, envelope the result.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[in]  extra_xml    Extra XML to insert inside page element.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-static char *
-get_note (gvm_connection_t *connection, gsad_credentials_t *credentials,
-          params_t *params, const char *extra_xml,
-          gsad_command_response_data_t *response_data)
-{
-  gmp_arguments_t *arguments;
-  arguments = gmp_arguments_new ();
-
-  gmp_arguments_add (arguments, "result", "1");
-
-  return get_one (connection, "note", credentials, params, extra_xml, arguments,
-                  response_data);
-}
-
-/**
- * @brief Get a note, envelope the result.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-get_note_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
-              params_t *params, gsad_command_response_data_t *response_data)
-{
-  return get_note (connection, credentials, params, NULL, response_data);
-}
-
-/**
  * @brief Get a port from request params
  *
  * @param[in]  params  Request parameters.
@@ -10555,221 +10452,6 @@ get_result_id_from_params (params_t *params)
     }
 
   return result_id;
-}
-
-/**
- * @brief Create a note, get report, envelope the result.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-create_note_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
-                 params_t *params, gsad_command_response_data_t *response_data)
-{
-  char *ret;
-  gchar *response;
-  const char *oid, *severity, *port, *hosts;
-  const char *text, *task_id, *result_id;
-  /* For get_report. */
-  const char *active, *days;
-  entity_t entity;
-
-  oid = params_value (params, "oid");
-  CHECK_VARIABLE_INVALID (oid, "Create Note");
-
-  port = get_port_from_params (params);
-  hosts = get_hosts_from_params (params);
-  task_id = get_task_id_from_params (params);
-  severity = get_severity_from_params (params);
-  result_id = get_result_id_from_params (params);
-
-  CHECK_VARIABLE_INVALID (severity, "Create Note");
-  CHECK_VARIABLE_INVALID (hosts, "Create Note");
-
-  active = params_value (params, "active");
-  CHECK_VARIABLE_INVALID (active, "Create Note");
-
-  text = params_value (params, "text");
-  days = params_value (params, "days");
-
-  response = NULL;
-  entity = NULL;
-  switch (gmpf (connection, credentials, &response, &entity, response_data,
-                "<create_note>"
-                "<active>%s</active>"
-                "<nvt oid=\"%s\"/>"
-                "<hosts>%s</hosts>"
-                "<port>%s</port>"
-                "<severity>%s</severity>"
-                "<text>%s</text>"
-                "<task id=\"%s\"/>"
-                "<result id=\"%s\"/>"
-                "</create_note>",
-                strcmp (active, "1") ? active : (days ? days : "-1"), oid,
-                hosts ? hosts : "", port ? port : "", severity ? severity : "",
-                text ? text : "", task_id ? task_id : "",
-                result_id ? result_id : ""))
-    {
-    case 0:
-      break;
-    case 1:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while creating a new note. "
-        "No new note was created. "
-        "Diagnostics: Failure to send command to manager daemon.",
-        response_data);
-    case 2:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while creating a new note. "
-        "It is unclear whether the note has been created or not. "
-        "Diagnostics: Failure to receive response from manager daemon.",
-        response_data);
-    default:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while creating a new note. "
-        "It is unclear whether the note has been created or not. "
-        "Diagnostics: Internal Error.",
-        response_data);
-    }
-
-  if (entity_attribute (entity, "id"))
-    params_add (params, "note_id", entity_attribute (entity, "id"));
-  ret = response_from_entity (connection, credentials, params, entity,
-                              "Create Note", response_data);
-  free_entity (entity);
-  g_free (response);
-  return ret;
-}
-
-/**
- * @brief Delete note, get next page, envelope the result.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-delete_note_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
-                 params_t *params, gsad_command_response_data_t *response_data)
-{
-  return move_resource_to_trash (connection, "note", credentials, params,
-                                 response_data);
-}
-
-/**
- * @brief Save note, get next page, envelope the result.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials     Username and password for authentication.
- * @param[in]  params          Request parameters.
- * @param[out] response_data   Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-save_note_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
-               params_t *params, gsad_command_response_data_t *response_data)
-{
-  gchar *response;
-  entity_t entity;
-  const char *note_id, *text, *hosts, *port, *severity, *task_id;
-  const char *result_id, *active, *days, *oid;
-  char *ret;
-
-  note_id = params_value (params, "note_id");
-
-  oid = params_value (params, "oid");
-
-  text = params_value (params, "text");
-  if (text == NULL)
-    params_given (params, "text") || (text = "");
-
-  port = get_port_from_params (params);
-  hosts = get_hosts_from_params (params);
-  task_id = get_task_id_from_params (params);
-  severity = get_severity_from_params (params);
-  result_id = get_result_id_from_params (params);
-
-  active = params_value (params, "active");
-  days = params_value (params, "days");
-
-  CHECK_VARIABLE_INVALID (oid, "Save Note");
-  CHECK_VARIABLE_INVALID (active, "Save Note");
-  CHECK_VARIABLE_INVALID (note_id, "Save Note");
-  CHECK_VARIABLE_INVALID (days, "Save Note");
-
-  response = NULL;
-  entity = NULL;
-  switch (gmpf (connection, credentials, &response, &entity, response_data,
-                "<modify_note note_id=\"%s\">"
-                "<active>%s</active>"
-                "<hosts>%s</hosts>"
-                "<port>%s</port>"
-                "<severity>%s</severity>"
-                "<text>%s</text>"
-                "<task id=\"%s\"/>"
-                "<result id=\"%s\"/>"
-                "<nvt oid=\"%s\"/>"
-                "</modify_note>",
-                note_id, strcmp (active, "1") ? active : (days ? days : "-1"),
-                hosts ? hosts : "", port ? port : "", severity ? severity : "",
-                text ? text : "", task_id ? task_id : "",
-                result_id ? result_id : "", oid))
-    {
-    case 0:
-      break;
-    case 1:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while saving a note. "
-        "The note remains the same. "
-        "Diagnostics: Failure to send command to manager daemon.",
-        response_data);
-    case 2:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while saving a note. "
-        "It is unclear whether the note has been saved or not. "
-        "Diagnostics: Failure to receive response from manager daemon.",
-        response_data);
-    default:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while saving a note. "
-        "It is unclear whether the note has been saved or not. "
-        "Diagnostics: Internal Error.",
-        response_data);
-    }
-
-  ret = response_from_entity (connection, credentials, params, entity,
-                              "Save Note", response_data);
-
-  free_entity (entity);
-  g_free (response);
-  return ret;
 }
 
 /**
@@ -13022,24 +12704,6 @@ get_trash_groups_gmp (gvm_connection_t *connection,
  *
  * @return Enveloped XML object.
  */
-char *
-get_trash_notes_gmp (gvm_connection_t *connection,
-                     gsad_credentials_t *credentials, params_t *params,
-                     gsad_command_response_data_t *response_data)
-{
-  GString *xml;
-
-  xml = g_string_new ("<get_trash>");
-
-  GET_TRASH_RESOURCE ("GET_NOTES", "get_notes", "notes");
-
-  /* Cleanup, and return transformed XML. */
-
-  g_string_append (xml, "</get_trash>");
-  return envelope_gmp (connection, credentials, params,
-                       g_string_free (xml, FALSE), response_data);
-}
-
 /**
  * @brief Setup trash page XML, envelope the result.
  *
@@ -13360,24 +13024,6 @@ get_trash_tasks_gmp (gvm_connection_t *connection,
  *
  * @return Enveloped XML object.
  */
-char *
-get_trash_tickets_gmp (gvm_connection_t *connection,
-                       gsad_credentials_t *credentials, params_t *params,
-                       gsad_command_response_data_t *response_data)
-{
-  GString *xml;
-
-  xml = g_string_new ("<get_trash>");
-
-  GET_TRASH_RESOURCE ("GET_TICKETS", "get_tickets", "tickets");
-
-  /* Cleanup, and return transformed XML. */
-
-  g_string_append (xml, "</get_trash>");
-  return envelope_gmp (connection, credentials, params,
-                       g_string_free (xml, FALSE), response_data);
-}
-
 /**
  * @brief Setup trash page XML, envelope the result.
  *
@@ -17478,215 +17124,6 @@ save_asset_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
 }
 
 /**
- * @brief Get all tickets, envelope the result.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-get_tickets_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
-                 params_t *params, gsad_command_response_data_t *response_data)
-{
-  return get_many (connection, "tickets", credentials, params, NULL,
-                   response_data);
-}
-
-/**
- * @brief Get single tickets, envelope the result.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-get_ticket_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
-                params_t *params, gsad_command_response_data_t *response_data)
-{
-  return get_one (connection, "ticket", credentials, params, NULL, NULL,
-                  response_data);
-}
-
-/**
- * @brief Create a ticket
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials    Username and password for authentication.
- * @param[in]  params         Request parameters.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-create_ticket_gmp (gvm_connection_t *connection,
-                   gsad_credentials_t *credentials, params_t *params,
-                   gsad_command_response_data_t *response_data)
-{
-  entity_t entity = NULL;
-  const gchar *result_id, *user_id, *note;
-  char *ret;
-
-  result_id = params_value (params, "result_id");
-  user_id = params_value (params, "user_id");
-  note = params_value (params, "note");
-
-  CHECK_VARIABLE_INVALID (result_id, "Create Ticket");
-  CHECK_VARIABLE_INVALID (user_id, "Create Ticket");
-  CHECK_VARIABLE_INVALID (note, "Create Ticket")
-
-  switch (gmpf (connection, credentials, NULL, &entity, response_data,
-                "<create_ticket>"
-                "<result id=\"%s\"/>"
-                "<assigned_to>"
-                "<user id=\"%s\"/>"
-                "</assigned_to>"
-                "<open_note>%s</open_note>"
-                "</create_ticket>",
-                result_id, user_id, note ? note : ""))
-    {
-    case 0:
-      break;
-    case 1:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while creating a ticket. "
-        "Diagnostics: Failure to send command to manager daemon.",
-        response_data);
-    case 2:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while creating a ticket. "
-        "It is unclear whether the ticket has been created or not. "
-        "Diagnostics: Failure to receive response from manager daemon.",
-        response_data);
-    default:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while creating a ticket. "
-        "It is unclear whether the ticket has been created or not. "
-        "Diagnostics: Internal Error.",
-        response_data);
-    }
-
-  ret = response_from_entity (connection, credentials, params, entity,
-                              "Create Ticket", response_data);
-
-  free_entity (entity);
-  return ret;
-}
-
-/**
- * @brief Modify a ticket
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials    Username and password for authentication.
- * @param[in]  params         Request parameters.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-save_ticket_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
-                 params_t *params, gsad_command_response_data_t *response_data)
-{
-  entity_t entity = NULL;
-  const gchar *ticket_id, *status, *open_note, *fixed_note, *closed_note;
-  const gchar *user_id;
-  gchar *ret;
-
-  ticket_id = params_value (params, "ticket_id");
-  status = params_value (params, "ticket_status");
-  open_note = params_value (params, "open_note");
-  fixed_note = params_value (params, "fixed_note");
-  closed_note = params_value (params, "closed_note");
-  user_id = params_value (params, "user_id");
-
-  CHECK_VARIABLE_INVALID (ticket_id, "Save Ticket");
-  CHECK_VARIABLE_INVALID (status, "Save Ticket");
-  CHECK_VARIABLE_INVALID (user_id, "Save Ticket");
-  CHECK_VARIABLE_INVALID (open_note, "Save Ticket");
-  CHECK_VARIABLE_INVALID (fixed_note, "Save Ticket");
-  CHECK_VARIABLE_INVALID (closed_note, "Save Ticket");
-
-  switch (gmpf (connection, credentials, NULL, &entity, response_data,
-                "<modify_ticket ticket_id=\"%s\">"
-                "<assigned_to><user id=\"%s\"/></assigned_to>"
-                "<status>%s</status>"
-                "<open_note>%s</open_note>"
-                "<fixed_note>%s</fixed_note>"
-                "<closed_note>%s</closed_note>"
-                "</modify_ticket>",
-                ticket_id, user_id, status, open_note, fixed_note, closed_note))
-    {
-    case 0:
-      break;
-    case 1:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while saving a ticket. "
-        "Diagnostics: Failure to send command to manager daemon.",
-        response_data);
-    case 2:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while saving a ticket. "
-        "It is unclear whether the ticket has been saved or not. "
-        "Diagnostics: Failure to receive response from manager daemon.",
-        response_data);
-    default:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while saving a ticket. "
-        "It is unclear whether the ticket has been saved or not. "
-        "Diagnostics: Internal Error.",
-        response_data);
-    }
-
-  ret = response_from_entity (connection, credentials, params, entity,
-                              "Save Ticket", response_data);
-
-  free_entity (entity);
-  return ret;
-}
-
-/**
- * @brief Delete a ticket
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-delete_ticket_gmp (gvm_connection_t *connection,
-                   gsad_credentials_t *credentials, params_t *params,
-                   gsad_command_response_data_t *response_data)
-{
-  return move_resource_to_trash (connection, "ticket", credentials, params,
-                                 response_data);
-}
-
-/**
  * @brief Get all supported timezones, envelope the result.
  *
  * @param[in]  connection     Connection to manager.
@@ -19706,8 +19143,6 @@ exec_gmp_get (gsad_http_connection_t *con, gsad_connection_info_t *con_info,
   ELSE (export_filters)
   ELSE (export_group)
   ELSE (export_groups)
-  ELSE (export_note)
-  ELSE (export_notes)
   ELSE (export_override)
   ELSE (export_overrides)
   ELSE (export_permission)
@@ -19763,8 +19198,6 @@ exec_gmp_get (gsad_http_connection_t *con, gsad_connection_info_t *con_info,
   ELSE (get_groups)
   ELSE (get_info)
   ELSE (get_license)
-  ELSE (get_note)
-  ELSE (get_notes)
   ELSE (get_nvt_families)
   ELSE (get_override)
   ELSE (get_overrides)
@@ -19806,8 +19239,6 @@ exec_gmp_get (gsad_http_connection_t *con, gsad_connection_info_t *con_info,
   ELSE (get_targets)
   ELSE (get_task)
   ELSE (get_tasks)
-  ELSE (get_ticket)
-  ELSE (get_tickets)
   ELSE (get_timezones)
   ELSE (get_tls_certificate)
   ELSE (get_tls_certificates)
@@ -19817,7 +19248,6 @@ exec_gmp_get (gsad_http_connection_t *con, gsad_connection_info_t *con_info,
   ELSE (get_trash_credentials)
   ELSE (get_trash_filters)
   ELSE (get_trash_groups)
-  ELSE (get_trash_notes)
   ELSE (get_trash_overrides)
   ELSE (get_trash_permissions)
   ELSE (get_trash_port_lists)
@@ -19829,7 +19259,6 @@ exec_gmp_get (gsad_http_connection_t *con, gsad_connection_info_t *con_info,
   ELSE (get_trash_tags)
   ELSE (get_trash_targets)
   ELSE (get_trash_tasks)
-  ELSE (get_trash_tickets)
   ELSE (get_user)
   ELSE (get_users)
   ELSE (get_vulns)
@@ -20059,7 +19488,6 @@ exec_gmp_post (gsad_http_connection_t *con, gsad_connection_info_t *con_info,
   ELSE (create_filter)
   ELSE (create_group)
   ELSE (create_host)
-  ELSE (create_note)
   ELSE (create_override)
   ELSE (create_permission)
   ELSE (create_permissions)
@@ -20072,7 +19500,6 @@ exec_gmp_post (gsad_http_connection_t *con, gsad_connection_info_t *con_info,
   ELSE (create_task)
   ELSE (create_tag)
   ELSE (create_target)
-  ELSE (create_ticket)
   ELSE (create_tls_certificate)
   ELSE (create_user)
   ELSE (create_role)
@@ -20086,7 +19513,6 @@ exec_gmp_post (gsad_http_connection_t *con, gsad_connection_info_t *con_info,
   ELSE (delete_filter)
   ELSE (delete_from_trash)
   ELSE (delete_group)
-  ELSE (delete_note)
   ELSE (delete_override)
   ELSE (delete_permission)
   ELSE (delete_port_list)
@@ -20100,7 +19526,6 @@ exec_gmp_post (gsad_http_connection_t *con, gsad_connection_info_t *con_info,
   ELSE (delete_tag)
   ELSE (delete_target)
   ELSE (delete_task)
-  ELSE (delete_ticket)
   ELSE (delete_tls_certificate)
   ELSE (delete_user)
   ELSE (empty_trashcan)
@@ -20130,7 +19555,6 @@ exec_gmp_post (gsad_http_connection_t *con, gsad_connection_info_t *con_info,
   ELSE (save_filter)
   ELSE (save_group)
   ELSE (save_license)
-  ELSE (save_note)
   ELSE (save_override)
   ELSE (save_permission)
   ELSE (save_port_list)
@@ -20142,7 +19566,6 @@ exec_gmp_post (gsad_http_connection_t *con, gsad_connection_info_t *con_info,
   ELSE (save_tag)
   ELSE (save_target)
   ELSE (save_task)
-  ELSE (save_ticket)
   ELSE (save_import_task)
   ELSE (save_tls_certificate)
   ELSE (save_user)

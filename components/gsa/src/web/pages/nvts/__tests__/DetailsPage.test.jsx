@@ -7,7 +7,6 @@ import {describe, test, expect, testing} from '@gsa/testing';
 import {rendererWith, fireEvent, screen, wait, within} from 'web/testing';
 import CollectionCounts from 'gmp/collection/collection-counts';
 import Filter from 'gmp/models/filter';
-import Note from 'gmp/models/note';
 import NVT from 'gmp/models/nvt';
 import Override from 'gmp/models/override';
 import {createSession} from 'gmp/testing';
@@ -71,46 +70,6 @@ const nvt = NVT.fromElement({
       ],
     },
   },
-});
-
-const note1 = Note.fromElement({
-  _id: '5221d57f-3e62-4114-8e19-135a79b6b102',
-  active: 1,
-  creation_time: '2021-01-14T06:35:57Z',
-  hosts: '127.0.01.1',
-  in_use: 0,
-  end_time: '2021-02-13T07:35:20+01:00',
-  modification_time: '2021-01-14T06:35:57Z',
-  new_severity: -1,
-  timezone: 'UTC',
-  new_threat: 'False Positive',
-  nvt: {
-    _oid: '12345',
-    name: 'foo',
-    type: 'nvt',
-  },
-  orphan: 0,
-  owner: {
-    name: 'admin',
-  },
-  permissions: {
-    permission: {
-      name: 'everything',
-    },
-  },
-  port: '',
-  result: {
-    _id: '',
-  },
-  severity: '',
-  task: {
-    _id: '',
-    name: '',
-    trash: 0,
-  },
-  text: 'test_note',
-  threat: 'Internal Error',
-  writable: 1,
 });
 
 const override1 = Override.fromElement({
@@ -197,13 +156,6 @@ const createGmp = ({
   getNvt = testing.fn().mockResolvedValue({
     data: nvt,
   }),
-  getNotes = testing.fn().mockResolvedValue({
-    data: [note1],
-    meta: {
-      filter: Filter.fromString(),
-      counts: new CollectionCounts(),
-    },
-  }),
   getOverrides = testing.fn().mockResolvedValue({
     data: [override1, override2],
     meta: {
@@ -233,9 +185,6 @@ const createGmp = ({
   session: createSession({timezone: 'UTC'}),
   user: {
     currentSettings,
-  },
-  notes: {
-    get: getNotes,
   },
   overrides: {
     get: getOverrides,
@@ -393,18 +342,6 @@ describe('Nvt DetailsPage tests', () => {
     expect(overrideBox2).toHaveTextContent('Modified');
     expect(overrideBox2).toHaveTextContent(
       'Fri, Feb 14, 2020 6:35 AM Coordinated Universal Time',
-    );
-
-    expect(screen.getByRole('heading', {name: /^notes$/i})).toBeInTheDocument();
-    const noteBox = screen.getByLabelText(/^Note/);
-    expect(noteBox).toHaveTextContent('test_note');
-    expect(noteBox).toHaveTextContent('Active until');
-    expect(noteBox).toHaveTextContent(
-      'Sat, Feb 13, 2021 6:35 AM Coordinated Universal Time',
-    );
-    expect(noteBox).toHaveTextContent('Modified');
-    expect(noteBox).toHaveTextContent(
-      'Thu, Jan 14, 2021 6:35 AM Coordinated Universal Time',
     );
   });
 

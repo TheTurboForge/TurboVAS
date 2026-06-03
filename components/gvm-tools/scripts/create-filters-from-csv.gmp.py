@@ -114,8 +114,6 @@ def create_filters(
                     resource_type = gmp.types.FilterType.HOST
                 elif filterType.upper() == "SECINFO":
                     resource_type = gmp.types.FilterType.ALL_SECINFO
-                elif filterType.upper() == "NOTE":
-                    resource_type = gmp.types.FilterType.NOTE
                 elif filterType.upper() == "OS":
                     resource_type = gmp.types.FilterType.OPERATING_SYSTEM
                 elif filterType.upper() == "OVERRIDE":
@@ -140,8 +138,6 @@ def create_filters(
                     resource_type = gmp.types.FilterType.TARGET
                 elif filterType.upper() == "TASK":
                     resource_type = gmp.types.FilterType.TASK
-                elif filterType.upper() == "TICKET":
-                    resource_type = gmp.types.FilterType.TICKET
                 elif filterType.upper() == "TLS_CERTIFICATE":
                     resource_type = gmp.types.FilterType.TLS_CERTIFICATE
                 elif filterType.upper() == "USER":

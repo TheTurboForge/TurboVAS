@@ -19,7 +19,6 @@
 #include "manage_sql_schedules.h"
 #include "manage_sql_settings.h"
 #include "manage_sql_targets.h"
-#include "manage_sql_tickets.h"
 #include "manage_sql_tls_certificates.h"
 #include "sql.h"
 
@@ -1189,10 +1188,6 @@ delete_user (const char *user_id_arg, const char *name_arg,
            inheritor, user);
       sql ("UPDATE filters_trash SET owner = %llu WHERE owner = %llu;",
            inheritor, user);
-      sql ("UPDATE notes SET owner = %llu WHERE owner = %llu;",
-           inheritor, user);
-      sql ("UPDATE notes_trash SET owner = %llu WHERE owner = %llu;",
-           inheritor, user);
       sql ("UPDATE oss SET owner = %llu WHERE owner = %llu;",
            inheritor, user);
       sql ("UPDATE permissions SET owner = %llu WHERE owner = %llu",
@@ -1245,7 +1240,6 @@ delete_user (const char *user_id_arg, const char *name_arg,
       sql ("UPDATE tasks SET owner = %llu WHERE owner = %llu;",
            inheritor, user);
 
-      inherit_tickets (user, inheritor);
       inherit_tls_certificates (user, inheritor);
 
       sql ("UPDATE groups SET owner = %llu WHERE owner = %llu;",
@@ -1307,10 +1301,6 @@ delete_user (const char *user_id_arg, const char *name_arg,
 
   /* Delete data modifiers (not directly referenced) */
 
-  /* Notes. */
-  sql ("DELETE FROM notes WHERE owner = %llu;", user);
-  sql ("DELETE FROM notes_trash WHERE owner = %llu;", user);
-
   /* Overrides. */
   sql ("DELETE FROM overrides WHERE owner = %llu;", user);
   sql ("DELETE FROM overrides_trash WHERE owner = %llu;", user);
@@ -1330,8 +1320,6 @@ delete_user (const char *user_id_arg, const char *name_arg,
        " WHERE tag IN (SELECT id FROM tags_trash WHERE owner = %llu);",
        user);
   sql ("DELETE FROM tags_trash WHERE owner = %llu;", user);
-
-  delete_tickets_user (user);
 
   delete_tls_certificates_user (user);
 
@@ -1390,7 +1378,6 @@ delete_user (const char *user_id_arg, const char *name_arg,
       sql_rollback ();
       return 9;
     }
-  tickets_remove_tasks_user (user);
   sql ("DELETE FROM task_alerts"
        " WHERE task IN (SELECT id FROM tasks WHERE owner = %llu);",
        user);

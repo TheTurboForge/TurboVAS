@@ -29,7 +29,6 @@ typedef resource_t filter_t;
 typedef resource_t group_t;
 typedef resource_t host_t;
 typedef resource_t integration_config_t;
-typedef resource_t note_t;
 typedef resource_t nvt_t;
 typedef resource_t override_t;
 typedef resource_t permission_t;
@@ -49,7 +48,6 @@ typedef resource_t setting_t;
 typedef resource_t tag_t;
 typedef resource_t target_t;
 typedef resource_t task_t;
-typedef resource_t ticket_t;
 typedef resource_t tls_certificate_t;
 typedef resource_t user_t;
 

@@ -20,10 +20,6 @@ class GetEntityTypeFromStringTestCase(unittest.TestCase):
         ct = EntityType.from_string("")
         self.assertIsNone(ct)
 
-    def test_audit(self):
-        ct = EntityType.from_string("audit")
-        self.assertEqual(ct, EntityType.AUDIT)
-
     def test_alert(self):
         ct = EntityType.from_string("alert")
         self.assertEqual(ct, EntityType.ALERT)
@@ -64,10 +60,6 @@ class GetEntityTypeFromStringTestCase(unittest.TestCase):
         ct = EntityType.from_string("info")
         self.assertEqual(ct, EntityType.INFO)
 
-    def test_note(self):
-        ct = EntityType.from_string("note")
-        self.assertEqual(ct, EntityType.NOTE)
-
     def test_nvt(self):
         ct = EntityType.from_string("nvt")
         self.assertEqual(ct, EntityType.NVT)
@@ -90,10 +82,6 @@ class GetEntityTypeFromStringTestCase(unittest.TestCase):
     def test_permission(self):
         ct = EntityType.from_string("permission")
         self.assertEqual(ct, EntityType.PERMISSION)
-
-    def test_policy(self):
-        ct = EntityType.from_string("policy")
-        self.assertEqual(ct, EntityType.POLICY)
 
     def test_port_list(self):
         ct = EntityType.from_string("port_list")
@@ -141,10 +129,6 @@ class GetEntityTypeFromStringTestCase(unittest.TestCase):
     def test_task(self):
         ct = EntityType.from_string("task")
         self.assertEqual(ct, EntityType.TASK)
-
-    def test_ticket(self):
-        ct = EntityType.from_string("ticket")
-        self.assertEqual(ct, EntityType.TICKET)
 
     def test_tls_certificate(self):
         ft = EntityType.from_string("tls_certificate")

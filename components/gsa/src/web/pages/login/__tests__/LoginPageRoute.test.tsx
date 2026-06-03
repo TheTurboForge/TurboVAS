@@ -47,12 +47,12 @@ describe('LoginPageRoute tests', () => {
     sessionStorage.clear();
   });
 
-  test('should redirect to /dashboards when logged in with no saved page', async () => {
+  test('should redirect to /tasks when logged in with no saved page', async () => {
     const gmp = createGmp();
     renderWithDataRouter(gmp);
 
     expect(await screen.findByTestId('location-pathname')).toHaveTextContent(
-      '/dashboards',
+      '/tasks',
     );
   });
 
@@ -79,14 +79,14 @@ describe('LoginPageRoute tests', () => {
     expect(sessionStorage.getItem('gsa_last_visited_page_foo')).toBeNull();
   });
 
-  test('should redirect to /dashboards when saved page is /login', async () => {
+  test('should redirect to /tasks when saved page is /login', async () => {
     sessionStorage.setItem('gsa_last_visited_page_foo', '/login');
 
     const gmp = createGmp();
     renderWithDataRouter(gmp);
 
     expect(await screen.findByTestId('location-pathname')).toHaveTextContent(
-      '/dashboards',
+      '/tasks',
     );
   });
 
@@ -97,7 +97,7 @@ describe('LoginPageRoute tests', () => {
     renderWithDataRouter(gmp);
 
     expect(await screen.findByTestId('location-pathname')).toHaveTextContent(
-      '/dashboards',
+      '/tasks',
     );
     expect(sessionStorage.getItem('gsa_last_visited_page_alice')).toBe(
       '/agents',

@@ -8,7 +8,6 @@ import SeverityClassLabel from 'web/components/label/SeverityClass';
 
 type EntityWithCounts = {
   result_counts?: Record<string, number>;
-  complianceCounts?: Record<string, number>;
 };
 
 export interface SeverityColumnConfig<T = EntityWithCounts> {
@@ -102,39 +101,4 @@ export const getSeverityColumnsConfig = <
   );
 
   return columns;
-};
-
-/**
- * Get compliance column configurations for audit scan results
- * @param columnWidth - Optional width for each compliance column (default: '4.5%')
- * @returns Array of column configurations for compliance columns
- */
-export const getComplianceColumnsConfig = <
-  T extends EntityWithCounts = EntityWithCounts,
->(
-  columnWidth = '4.5%',
-): SeverityColumnConfig<T>[] => {
-  return [
-    {
-      key: 'complianceYes',
-      title: _('Yes'),
-      width: columnWidth,
-      sortBy: 'complianceYes',
-      render: (entity: T) => entity.complianceCounts?.yes,
-    },
-    {
-      key: 'complianceNo',
-      title: _('No'),
-      width: columnWidth,
-      sortBy: 'complianceNo',
-      render: (entity: T) => entity.complianceCounts?.no,
-    },
-    {
-      key: 'complianceIncomplete',
-      title: _('Incomplete'),
-      width: columnWidth,
-      sortBy: 'complianceIncomplete',
-      render: (entity: T) => entity.complianceCounts?.incomplete,
-    },
-  ];
 };

@@ -544,109 +544,61 @@ print_report_host_xml (print_report_context_t *ctx,
     PRINT (stream,
          "<asset asset_id=\"\"/>");
 
-  if (strcmp (usage_type, "audit") == 0)
-    {
-      int yes_count, no_count, incomplete_count, undefined_count;
+  int holes_count, warnings_count, infos_count;
+  int logs_count, false_positives_count;
+  int criticals_count = 0;
 
-      yes_count
-        = GPOINTER_TO_INT
-        (g_hash_table_lookup (ctx->f_host_compliant, current_host));
-      no_count
-        = GPOINTER_TO_INT
-        (g_hash_table_lookup (ctx->f_host_notcompliant, current_host));
-      incomplete_count
-        = GPOINTER_TO_INT
-        (g_hash_table_lookup (ctx->f_host_incomplete, current_host));
-      undefined_count
-        = GPOINTER_TO_INT
-        (g_hash_table_lookup (ctx->f_host_undefined, current_host));
+  criticals_count
+    = GPOINTER_TO_INT
+    (g_hash_table_lookup (ctx->f_host_criticals, current_host));
+  holes_count
+    = GPOINTER_TO_INT
+    (g_hash_table_lookup (ctx->f_host_holes, current_host));
+  warnings_count
+    = GPOINTER_TO_INT
+    (g_hash_table_lookup (ctx->f_host_warnings, current_host));
+  infos_count
+    = GPOINTER_TO_INT
+    (g_hash_table_lookup (ctx->f_host_infos, current_host));
+  logs_count
+    = GPOINTER_TO_INT
+    (g_hash_table_lookup (ctx->f_host_logs, current_host));
+  false_positives_count
+    = GPOINTER_TO_INT
+    (g_hash_table_lookup (ctx->f_host_false_positives, current_host));
 
-      PRINT (stream,
-             "<start>%s</start>"
-             "<end>%s</end>"
-             "<port_count><page>%d</page></port_count>"
-             "<compliance_count>"
-             "<page>%d</page>"
-             "<yes><page>%d</page></yes>"
-             "<no><page>%d</page></no>"
-             "<incomplete><page>%d</page></incomplete>"
-             "<undefined><page>%d</page></undefined>"
-             "</compliance_count>"
-             "<host_compliance>%s</host_compliance>",
-             host_iterator_start_time (hosts),
-             host_iterator_end_time (hosts)
-             ? host_iterator_end_time (hosts)
-             : "",
-             ports_count,
-             (yes_count + no_count + incomplete_count + undefined_count),
-             yes_count,
-             no_count,
-             incomplete_count,
-             undefined_count,
-             report_compliance_from_counts (&yes_count,
-               &no_count,
-               &incomplete_count,
-               &undefined_count));
-    }
-  else
-    {
-      int holes_count, warnings_count, infos_count;
-      int logs_count, false_positives_count;
-      int criticals_count = 0;
-
-      criticals_count
-        = GPOINTER_TO_INT
-        (g_hash_table_lookup (ctx->f_host_criticals, current_host));
-      holes_count
-        = GPOINTER_TO_INT
-        (g_hash_table_lookup (ctx->f_host_holes, current_host));
-      warnings_count
-        = GPOINTER_TO_INT
-        (g_hash_table_lookup (ctx->f_host_warnings, current_host));
-      infos_count
-        = GPOINTER_TO_INT
-        (g_hash_table_lookup (ctx->f_host_infos, current_host));
-      logs_count
-        = GPOINTER_TO_INT
-        (g_hash_table_lookup (ctx->f_host_logs, current_host));
-      false_positives_count
-        = GPOINTER_TO_INT
-        (g_hash_table_lookup (ctx->f_host_false_positives,
-          current_host));
-
-      PRINT (stream,
-             "<start>%s</start>"
-             "<end>%s</end>"
-             "<port_count><page>%d</page></port_count>"
-             "<result_count>"
-             "<page>%d</page>"
-             "<critical><page>%d</page></critical>"
-             "<hole deprecated='1'><page>%d</page></hole>"
-             "<high><page>%d</page></high>"
-             "<warning deprecated='1'><page>%d</page></warning>"
-             "<medium><page>%d</page></medium>"
-             "<info deprecated='1'><page>%d</page></info>"
-             "<low><page>%d</page></low>"
-             "<log><page>%d</page></log>"
-             "<false_positive><page>%d</page></false_positive>"
-             "</result_count>",
-             host_iterator_start_time (hosts),
-             host_iterator_end_time (hosts)
-             ? host_iterator_end_time (hosts)
-             : "",
-             ports_count,
-             (criticals_count + holes_count + warnings_count + infos_count
-               + logs_count + false_positives_count),
-             criticals_count,
-             holes_count,
-             holes_count,
-             warnings_count,
-             warnings_count,
-             infos_count,
-             infos_count,
-             logs_count,
-             false_positives_count);
-    }
+  PRINT (stream,
+         "<start>%s</start>"
+         "<end>%s</end>"
+         "<port_count><page>%d</page></port_count>"
+         "<result_count>"
+         "<page>%d</page>"
+         "<critical><page>%d</page></critical>"
+         "<hole deprecated='1'><page>%d</page></hole>"
+         "<high><page>%d</page></high>"
+         "<warning deprecated='1'><page>%d</page></warning>"
+         "<medium><page>%d</page></medium>"
+         "<info deprecated='1'><page>%d</page></info>"
+         "<low><page>%d</page></low>"
+         "<log><page>%d</page></log>"
+         "<false_positive><page>%d</page></false_positive>"
+         "</result_count>",
+         host_iterator_start_time (hosts),
+         host_iterator_end_time (hosts)
+         ? host_iterator_end_time (hosts)
+         : "",
+         ports_count,
+         (criticals_count + holes_count + warnings_count + infos_count
+           + logs_count + false_positives_count),
+         criticals_count,
+         holes_count,
+         holes_count,
+         warnings_count,
+         warnings_count,
+         infos_count,
+         infos_count,
+         logs_count,
+         false_positives_count);
 
   if (is_get_report_hosts)
     {

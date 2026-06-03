@@ -35,9 +35,6 @@ const getRestorableDeletableForEntityType = {
   group: entity => {
     return {restorable: true, deletable: !entity.isInUse()};
   },
-  note: () => {
-    return {restorable: true, deletable: true};
-  },
   override: () => {
     return {restorable: true, deletable: true};
   },
@@ -107,9 +104,6 @@ const getRestorableDeletableForEntityType = {
 
     const restorable = schedule && target && config && scanner && alerts;
     return {restorable, deletable: true};
-  },
-  ticket: () => {
-    return {restorable: true, deletable: true};
   },
   agentgroup: entity => {
     return {restorable: true, deletable: !entity.isInUse()};

@@ -43,14 +43,6 @@ const loggedInRoutes = [
     element: <LoggedInLayout />,
     HydrateFallback: Loading,
     children: [
-      // Dashboard
-      {
-        path: 'dashboards',
-        lazy: async () => ({
-          Component: (await import('web/pages/start/StartPage')).default,
-        }),
-      },
-
       // Agent routes
       {
         path: 'agent-installers',
@@ -86,55 +78,6 @@ const loggedInRoutes = [
         path: 'alert/:id',
         lazy: async () => ({
           Component: (await import('web/pages/alerts/DetailsPage')).default,
-        }),
-      },
-
-      // Audit routes
-      {
-        path: 'audits',
-        lazy: async () => ({
-          Component: (await import('web/pages/audits/ListPage')).default,
-        }),
-      },
-      {
-        path: 'audit/:id',
-        lazy: async () => ({
-          Component: (await import('web/pages/audits/DetailsPage')).default,
-        }),
-      },
-
-      {
-        path: 'auditreports',
-        loader: () => {
-          throw redirect('/audit-reports');
-        },
-      },
-      {
-        path: 'audit-reports',
-        lazy: async () => ({
-          Component: (await import('web/pages/reports/AuditReportsListPage'))
-            .default,
-        }),
-      },
-      {
-        path: 'audit-report/delta/:id/:deltaid',
-        lazy: async () => ({
-          Component: (
-            await import('web/pages/reports/AuditDeltaReportDetailsPage')
-          ).default,
-        }),
-      },
-      {
-        path: 'auditreport/:id',
-        loader: ({params}) => {
-          throw redirect(`/audit-report/${params.id}`);
-        },
-      },
-      {
-        path: 'audit-report/:id',
-        lazy: async () => ({
-          Component: (await import('web/pages/reports/AuditReportDetailsPage'))
-            .default,
         }),
       },
 
@@ -314,20 +257,6 @@ const loggedInRoutes = [
         }),
       },
 
-      // Note routes
-      {
-        path: 'notes',
-        lazy: async () => ({
-          Component: (await import('web/pages/notes/ListPage')).default,
-        }),
-      },
-      {
-        path: 'note/:id',
-        lazy: async () => ({
-          Component: (await import('web/pages/notes/DetailsPage')).default,
-        }),
-      },
-
       // NVT routes
       {
         path: 'nvts',
@@ -407,20 +336,6 @@ const loggedInRoutes = [
           Component: (
             await import('web/pages/permissions/PermissionDetailsPage')
           ).default,
-        }),
-      },
-
-      // Policy routes
-      {
-        path: 'policies',
-        lazy: async () => ({
-          Component: (await import('web/pages/policies/ListPage')).default,
-        }),
-      },
-      {
-        path: 'policy/:id',
-        lazy: async () => ({
-          Component: (await import('web/pages/policies/DetailsPage')).default,
         }),
       },
 
@@ -663,20 +578,6 @@ const loggedInRoutes = [
         }),
       },
 
-      // Ticket routes
-      {
-        path: 'tickets',
-        lazy: async () => ({
-          Component: (await import('web/pages/tickets/ListPage')).default,
-        }),
-      },
-      {
-        path: 'ticket/:id',
-        lazy: async () => ({
-          Component: (await import('web/pages/tickets/DetailsPage')).default,
-        }),
-      },
-
       // TLS Certificate routes
       {
         path: 'tlscertificates',
@@ -750,21 +651,6 @@ const loggedInRoutes = [
         }),
       },
 
-      // CVSS Calculator route
-      {
-        path: 'cvsscalculator',
-        loader: () => {
-          throw redirect('/cvss-calculator');
-        },
-      },
-      {
-        path: 'cvss-calculator',
-        lazy: async () => ({
-          Component: (await import('web/pages/extras/CvssCalculatorPage'))
-            .default,
-        }),
-      },
-
       // Special routes
       {
         path: 'notfound',
@@ -782,7 +668,7 @@ const loggedInRoutes = [
       // Root redirect for logged-in users
       {
         index: true,
-        element: <Navigate to="/dashboards" />,
+        element: <Navigate to="/tasks" />,
       },
 
       // Catch all for logged-in users
@@ -798,11 +684,7 @@ const loggedInRoutes = [
 
 const AuthRedirect = () => {
   const isLoggedIn = useUserIsLoggedIn();
-  return isLoggedIn ? (
-    <Navigate to="/dashboards" />
-  ) : (
-    <Navigate replace to="/login" />
-  );
+  return isLoggedIn ? <Navigate to="/tasks" /> : <Navigate replace to="/login" />;
 };
 
 const router = createBrowserRouter([

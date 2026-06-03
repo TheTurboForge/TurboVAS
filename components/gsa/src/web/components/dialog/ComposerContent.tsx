@@ -10,16 +10,13 @@ import useTranslation from 'web/hooks/useTranslation';
 import Theme from 'web/utils/Theme';
 
 interface ComposerContentProps {
-  audit: boolean;
   filterFieldTitle?: string;
   filterString: string;
-  includeNotes: boolean;
   includeOverrides: boolean;
   onValueChange?: (value: boolean, name?: string) => void;
 }
 
 export const COMPOSER_CONTENT_DEFAULTS = {
-  includeNotes: true,
   includeOverrides: true,
 };
 
@@ -36,10 +33,8 @@ const FilterField = styled.div`
 `;
 
 const ComposerContent = ({
-  audit = false,
   filterFieldTitle,
   filterString,
-  includeNotes,
   includeOverrides,
   onValueChange,
 }: ComposerContentProps) => {
@@ -56,25 +51,14 @@ const ComposerContent = ({
       </FormGroup>
       <FormGroup direction="row" title={_('Include')}>
         <CheckBox
-          checked={includeNotes}
+          checked={includeOverrides}
           checkedValue={true}
-          data-testid="includeNotes"
-          name="includeNotes"
-          title={_('Notes')}
+          data-testid="include-overrides"
+          name="includeOverrides"
+          title={_('Overrides')}
           unCheckedValue={false}
           onChange={onValueChange}
         />
-        {!audit && (
-          <CheckBox
-            checked={includeOverrides}
-            checkedValue={true}
-            data-testid="include-overrides"
-            name="includeOverrides"
-            title={_('Overrides')}
-            unCheckedValue={false}
-            onChange={onValueChange}
-          />
-        )}
         <CheckBox
           checked={true}
           checkedValue={true}

@@ -39,7 +39,6 @@
 #include "manage_sql_copy.h"
 #include "manage_sql_secinfo.h"
 #include "manage_sql_nvts.h"
-#include "manage_tickets.h"
 #include "manage_scan_queue.h"
 #include "manage_settings.h"
 #include "manage_sql_alerts.h"
@@ -47,7 +46,6 @@
 #include "manage_sql_configs.h"
 #include "manage_sql_filters.h"
 #include "manage_sql_groups.h"
-#include "manage_sql_notes.h"
 #include "manage_sql_overrides.h"
 #include "manage_sql_permissions.h"
 #include "manage_sql_permissions_cache.h"
@@ -62,7 +60,6 @@
 #include "manage_sql_settings.h"
 #include "manage_sql_tags.h"
 #include "manage_sql_targets.h"
-#include "manage_sql_tickets.h"
 #include "manage_sql_tls_certificates.h"
 #include "manage_sql_users.h"
 #include "manage_acl.h"
@@ -3574,9 +3571,9 @@ check_db_settings ()
     sql ("INSERT into settings (uuid, owner, name, comment, value)"
          " VALUES"
          " ('9246a0f6-c6ad-44bc-86c2-557a527c8fb3', NULL,"
-         "  'Note/Override Excerpt Size',"
-         "  'The maximum length of notes and override text shown in' ||"
-         "  ' reports without enabling note/override details.',"
+         "  'Override Excerpt Size',"
+         "  'The maximum length of override text shown in' ||"
+         "  ' reports without enabling override details.',"
          "  '%d');",
          EXCERPT_SIZE_DEFAULT);
 
@@ -5986,19 +5983,13 @@ task_usage_type (task_t task, char ** usage_type)
  * @brief Set the usage_type of a task.
  *
  * @param[in]  task       Task.
- * @param[in]  usage_type New usage type ("scan" or "audit").
+ * @param[in]  usage_type New usage type. Only "scan" is retained.
  */
 void
 set_task_usage_type (task_t task, const char *usage_type)
 {
-  const char *actual_usage_type;
-  if (usage_type && strcasecmp (usage_type, "audit") == 0)
-    actual_usage_type = "audit";
-  else
-    actual_usage_type = "scan";
-
-  sql ("UPDATE tasks SET usage_type = '%s', modification_time = m_now ()"
-       " WHERE id = %llu;", actual_usage_type, task);
+  sql ("UPDATE tasks SET usage_type = 'scan', modification_time = m_now ()"
+       " WHERE id = %llu;", task);
 }
 
 /**
@@ -10595,16 +10586,7 @@ where_qod (int min_qod)
       "             END)",                                                    \
       NULL,                                                                   \
       KEYWORD_TYPE_STRING },                                                  \
-    { "(SELECT CASE"                                                          \
-      "        WHEN EXISTS (SELECT * FROM notes"                              \
-      "                     WHERE (result = results.id"                       \
-      "                            OR (result = 0 AND nvt = results.nvt))"    \
-      "                     AND (task = 0 OR task = results.task))"           \
-      "        THEN 1"                                                        \
-      "        ELSE 0"                                                        \
-      "        END)",                                                         \
-      NULL,                                                                   \
-      KEYWORD_TYPE_INTEGER },                                                 \
+    { "0", NULL, KEYWORD_TYPE_INTEGER },                                  \
     { "(SELECT CASE"                                                          \
       "        WHEN EXISTS (SELECT * FROM overrides"                          \
       "                     WHERE (result = results.id"                       \
@@ -10615,9 +10597,7 @@ where_qod (int min_qod)
       "        END)",                                                         \
       NULL,                                                                   \
       KEYWORD_TYPE_INTEGER },                                                 \
-    { TICKET_SQL_RESULT_MAY_HAVE_TICKETS("results.id"),                       \
-      NULL,                                                                   \
-      KEYWORD_TYPE_INTEGER },                                                 \
+    { "0", NULL, KEYWORD_TYPE_INTEGER },                                  \
     { "(SELECT name FROM tasks WHERE tasks.id = task)",                       \
       "task",                                                                 \
       KEYWORD_TYPE_STRING },                                                  \
@@ -10751,16 +10731,7 @@ where_qod (int min_qod)
       "             END)",                                                    \
       NULL,                                                                   \
       KEYWORD_TYPE_STRING },                                                  \
-    { "(SELECT CASE"                                                          \
-      "        WHEN EXISTS (SELECT * FROM notes"                              \
-      "                     WHERE (result = results.id"                       \
-      "                            OR (result = 0 AND nvt = results.nvt))"    \
-      "                     AND (task = 0 OR task = results.task))"           \
-      "        THEN 1"                                                        \
-      "        ELSE 0"                                                        \
-      "        END)",                                                         \
-      NULL,                                                                   \
-      KEYWORD_TYPE_INTEGER },                                                 \
+    { "0", NULL, KEYWORD_TYPE_INTEGER },                                  \
     { "(SELECT CASE"                                                          \
       "        WHEN EXISTS (SELECT * FROM overrides"                          \
       "                     WHERE (result = results.id"                       \
@@ -10771,9 +10742,7 @@ where_qod (int min_qod)
       "        END)",                                                         \
       NULL,                                                                   \
       KEYWORD_TYPE_INTEGER },                                                 \
-    { TICKET_SQL_RESULT_MAY_HAVE_TICKETS("results.id"),                       \
-      NULL,                                                                   \
-      KEYWORD_TYPE_INTEGER },                                                 \
+    { "0", NULL, KEYWORD_TYPE_INTEGER },                                  \
     /* ^ 35 = 25 */                                                           \
     { "(SELECT name FROM tasks WHERE tasks.id = task)",                       \
       "task",                                                                 \
@@ -10894,16 +10863,7 @@ where_qod (int min_qod)
       KEYWORD_TYPE_STRING },                                                  \
     { "delta_nvt_version", NULL, KEYWORD_TYPE_STRING },                       \
     { "result2_id", NULL, KEYWORD_TYPE_INTEGER },                             \
-    { "(SELECT CASE"                                                          \
-      "        WHEN EXISTS (SELECT * FROM notes"                              \
-      "                     WHERE (result = result2_id"                       \
-      "                            OR (result = 0 AND nvt = results.nvt))"    \
-      "                     AND (task = 0 OR task = delta_task))"             \
-      "        THEN 1"                                                        \
-      "        ELSE 0"                                                        \
-      "        END)",                                                         \
-      NULL,                                                                   \
-      KEYWORD_TYPE_INTEGER },                                                 \
+    { "0", NULL, KEYWORD_TYPE_INTEGER },                                  \
     { "(SELECT CASE"                                                          \
       "        WHEN EXISTS (SELECT * FROM overrides"                          \
       "                     WHERE (result = result2_id"                       \
@@ -10914,9 +10874,7 @@ where_qod (int min_qod)
       "        END)",                                                         \
       NULL,                                                                   \
       KEYWORD_TYPE_INTEGER },                                                 \
-    { TICKET_SQL_RESULT_MAY_HAVE_TICKETS("result2_id"),                       \
-      NULL,                                                                   \
-      KEYWORD_TYPE_INTEGER },                                                 \
+    { "0", NULL, KEYWORD_TYPE_INTEGER },                                      \
     { "delta_hostname", NULL, KEYWORD_TYPE_STRING },                          \
     { "delta_new_severity", NULL, KEYWORD_TYPE_DOUBLE },                      \
     { "coalesce(lower(substring(comparison.delta_description,"                \
@@ -11968,20 +11926,6 @@ DEF_ACCESS (result_iterator_path, GET_ITERATOR_COLUMN_COUNT + 21);
 DEF_ACCESS (result_iterator_asset_host_id, GET_ITERATOR_COLUMN_COUNT + 22);
 
 /**
- * @brief Get whether notes may exist from a result iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return 1 if notes may exist, else 0.
- */
-int
-result_iterator_may_have_notes (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_int (iterator, GET_ITERATOR_COLUMN_COUNT + 23);
-}
-
-/**
  * @brief Get whether overrides may exist from a result iterator.
  *
  * @param[in]  iterator  Iterator.
@@ -11993,20 +11937,6 @@ result_iterator_may_have_overrides (iterator_t* iterator)
 {
   if (iterator->done) return 0;
   return iterator_int (iterator, GET_ITERATOR_COLUMN_COUNT + 24);
-}
-
-/**
- * @brief Get whether tickets may exist from a result iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return 1 if notes may exist, else 0.
- */
-int
-result_iterator_may_have_tickets (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_int (iterator, GET_ITERATOR_COLUMN_COUNT + 25);
 }
 
 /**
@@ -12533,20 +12463,6 @@ result_iterator_delta_result (iterator_t* iterator)
 }
 
 /**
- * @brief Get whether there are notes for the delta result from the iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return whether there are notes.
- */
-int
-result_iterator_delta_may_have_notes (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_int (iterator, RESULT_ITERATOR_DELTA_COLUMN_OFFSET + 15);
-}
-
-/**
  * @brief Get whether there are overrides for the delta result from the iterator.
  *
  * @param[in]  iterator  Iterator.
@@ -12558,20 +12474,6 @@ result_iterator_delta_may_have_overrides (iterator_t* iterator)
 {
   if (iterator->done) return 0;
   return iterator_int (iterator, RESULT_ITERATOR_DELTA_COLUMN_OFFSET + 16);
-}
-
-/**
- * @brief Get whether there are tickets for the delta result from the iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return whether there are tickets.
- */
-int
-result_iterator_delta_may_have_tickets (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_int (iterator, RESULT_ITERATOR_DELTA_COLUMN_OFFSET + 17);
 }
 
 /**
@@ -13569,7 +13471,6 @@ report_counts_id_full (report_t report,
                || strcasecmp (keyword->column, "rows") == 0
                || strcasecmp (keyword->column, "sort") == 0
                || strcasecmp (keyword->column, "sort-reverse") == 0
-               || strcasecmp (keyword->column, "notes") == 0
                || strcasecmp (keyword->column, "overrides") == 0)
         {
           // ignore
@@ -13680,117 +13581,6 @@ report_compliance_from_counts (const int* yes_count,
   return "undefined";
 }
 
-
-/**
- * @brief Get the compliance filtered counts for a report.
- *
- * @param[in]   report               Report.
- * @param[in]   get                  Get data.
- * @param[out]  f_compliance_yes     Compliant results count after filtering.
- * @param[out]  f_compliance_no      Incompliant results count after filtering.
- * @param[out]  f_compliance_incomplete  Incomplete results count
- *                                       after filtering.
- * @param[out]  f_compliance_undefined   Undefined results count
- *                                       after filtering.
- *
- * @return 0 on success, -1 on error.
- */
-static int
-report_compliance_f_counts (report_t report,
-                            const get_data_t* get,
-                            int* f_compliance_yes,
-                            int* f_compliance_no,
-                            int* f_compliance_incomplete,
-                            int* f_compliance_undefined)
-{
-  if (report == 0)
-    return -1;
-
-  get_data_t get_filtered;
-  iterator_t results;
-  int yes_count, no_count, incomplete_count, undefined_count;
-
-  yes_count = no_count = incomplete_count = undefined_count = 0;
-
-  memset (&get_filtered, 0, sizeof (get_data_t));
-  get_filtered.filt_id = get->filt_id;
-  get_filtered.filter = get->filter;
-  get_filtered.type = get->type;
-  get_filtered.ignore_pagination = 1;
-  get_filtered.ignore_max_rows_per_page = 1;
-
-  init_result_get_iterator (&results, &get_filtered, report, NULL,
-                            NULL);
-  while (next (&results))
-    {
-      const char* compliance;
-
-      compliance = result_iterator_compliance (&results);
-
-      if (strcasecmp (compliance, "yes") == 0)
-        {
-          yes_count++;
-        }
-      else if (strcasecmp (compliance, "no") == 0)
-        {
-          no_count++;
-        }
-      else if (strcasecmp (compliance, "incomplete") == 0)
-        {
-          incomplete_count++;
-        }
-      else if (strcasecmp (compliance, "undefined") == 0)
-        {
-          undefined_count++;
-        }
-
-    }
-
-  if (f_compliance_yes)
-      *f_compliance_yes = yes_count;
-  if (f_compliance_no)
-      *f_compliance_no = no_count;
-  if (f_compliance_incomplete)
-      *f_compliance_incomplete = incomplete_count;
-  if (f_compliance_undefined)
-      *f_compliance_undefined = undefined_count;
-
-  cleanup_iterator (&results);
-
-  return 0;
-}
-
-/**
- * @brief Get the compliance counts for a report.
- *
- * @param[in]   report    Report.
- * @param[in]   get       Get data.
- * @param[out]  compliance_yes          Compliant results count.
- * @param[out]  compliance_no           Incompliant results count.
- * @param[out]  compliance_incomplete   Incomplete results count.
- * @param[out]  compliance_undefined    Undefined results count.
- *
- * @return 0 on success, -1 on error.
- */
-static int
-report_compliance_counts (report_t report,
-                          const get_data_t* get,
-                          int* compliance_yes,
-                          int* compliance_no,
-                          int* compliance_incomplete,
-                          int* compliance_undefined)
-{
-  if (report == 0)
-    return -1;
-
-  report_compliance_by_uuid (report_uuid(report),
-                             compliance_yes,
-                             compliance_no,
-                             compliance_incomplete,
-                             compliance_undefined);
-
-  return 0;
-}
 
 /**
  * @brief Get only the filtered message counts for a report.
@@ -13949,7 +13739,6 @@ delete_report_internal (report_t report)
 
   permissions_set_orphans ("report", report, LOCATION_TABLE);
   tags_remove_resource ("report", report, LOCATION_TABLE);
-  tickets_remove_report (report);
 
   /* Update the task state. */
 
@@ -14131,8 +13920,8 @@ trim_partial_report (report_t report)
 
 /** @todo Defined in gmp.c! */
 void buffer_results_xml (GString *, iterator_t *, task_t, int, int, int,
-                         int, int, int, int, const char *, iterator_t *,
-                         int, int, int, int);
+                         int, int, const char *, iterator_t *, int, int, int,
+                         int);
 
 /**
  * @brief Write XML to a file or close stream and return.
@@ -14635,7 +14424,6 @@ free_f_host (GHashTable *table)
 void
 print_report_context_cleanup (print_report_context_t *ctx)
 {
-  g_free (ctx->compliance_levels);
   g_free (ctx->tsk_usage_type);
   g_free (ctx->tz);
   g_free (ctx->zone);
@@ -14648,12 +14436,7 @@ print_report_context_cleanup (print_report_context_t *ctx)
   free_f_host (ctx->f_host_ports);
   free_f_host (ctx->f_host_warnings);
   free_f_host (ctx->f_host_max_severity);
-  // Filtered counts: audit.
-  free_f_host (ctx->f_host_compliant);
   free_f_host (ctx->f_host_criticals);
-  free_f_host (ctx->f_host_incomplete);
-  free_f_host (ctx->f_host_notcompliant);
-  free_f_host (ctx->f_host_undefined);
 }
 
 /**
@@ -14664,33 +14447,19 @@ print_report_context_cleanup (print_report_context_t *ctx)
 void
 print_report_init_f_hosts (print_report_context_t *ctx)
 {
-  if (strcmp (ctx->tsk_usage_type, "audit") == 0)
-    {
-      ctx->f_host_compliant = g_hash_table_new_full (g_str_hash, g_str_equal,
-                                                     g_free, NULL);
-      ctx->f_host_notcompliant = g_hash_table_new_full (g_str_hash, g_str_equal,
-                                                        g_free, NULL);
-      ctx->f_host_incomplete = g_hash_table_new_full (g_str_hash, g_str_equal,
-                                                      g_free, NULL);
-      ctx->f_host_undefined = g_hash_table_new_full (g_str_hash, g_str_equal,
-                                                     g_free, NULL);
-    }
-  else
-    {
-      ctx->f_host_criticals = g_hash_table_new_full (g_str_hash, g_str_equal,
-                                                     g_free, NULL);
-      ctx->f_host_holes = g_hash_table_new_full (g_str_hash, g_str_equal,
+  ctx->f_host_criticals = g_hash_table_new_full (g_str_hash, g_str_equal,
                                                  g_free, NULL);
-      ctx->f_host_warnings = g_hash_table_new_full (g_str_hash, g_str_equal,
-                                                    g_free, NULL);
-      ctx->f_host_infos = g_hash_table_new_full (g_str_hash, g_str_equal,
-                                                 g_free, NULL);
-      ctx->f_host_logs = g_hash_table_new_full (g_str_hash, g_str_equal,
+  ctx->f_host_holes = g_hash_table_new_full (g_str_hash, g_str_equal,
+                                             g_free, NULL);
+  ctx->f_host_warnings = g_hash_table_new_full (g_str_hash, g_str_equal,
                                                 g_free, NULL);
-      ctx->f_host_false_positives = g_hash_table_new_full (g_str_hash,
-                                                           g_str_equal,
-                                                           g_free, NULL);
-    }
+  ctx->f_host_infos = g_hash_table_new_full (g_str_hash, g_str_equal,
+                                             g_free, NULL);
+  ctx->f_host_logs = g_hash_table_new_full (g_str_hash, g_str_equal,
+                                            g_free, NULL);
+  ctx->f_host_false_positives = g_hash_table_new_full (g_str_hash,
+                                                       g_str_equal,
+                                                       g_free, NULL);
 
   ctx->f_host_max_severity = g_hash_table_new_full (g_str_hash,
                                                     g_str_equal,
@@ -14964,8 +14733,6 @@ init_delta_iterator (report_t report, iterator_t *results, report_t delta,
  * @param[in]  first_result   First result.
  * @param[in]  max_results    Max results.
  * @param[in]  task           The task.
- * @param[in]  notes          Whether to include notes.
- * @param[in]  notes_details  Whether to include note details.
  * @param[in]  overrides          Whether to include overrides.
  * @param[in]  overrides_details  Whether to include override details.
  * @param[in]  sort_order         Sort order.
@@ -14998,8 +14765,7 @@ static int
 print_report_delta_xml (FILE *out, iterator_t *results,
                         const char *delta_states,
                         int first_result, int max_results, task_t task,
-                        int notes, int notes_details, int overrides,
-                        int overrides_details, int sort_order,
+                        int overrides, int overrides_details, int sort_order,
                         const char *sort_field, int result_hosts_only,
                         int *orig_filtered_result_count,
                         int *filtered_result_count,
@@ -15023,10 +14789,6 @@ print_report_delta_xml (FILE *out, iterator_t *results,
   *orig_f_warnings = *f_warnings;
   *orig_f_false_positives = *f_false_positives;
   *orig_filtered_result_count = *filtered_result_count;
-  gchar *usage_type = NULL;
-
-  if (task && task_usage_type(task, &usage_type))
-    return -1;
 
   ports = g_tree_new_full ((GCompareDataFunc) strcmp, NULL, g_free,
                            (GDestroyNotify) free_host_ports);
@@ -15037,72 +14799,45 @@ print_report_delta_xml (FILE *out, iterator_t *results,
 
     if (strchr (delta_states, state[0]) == NULL) continue;
 
-    if (strcmp (usage_type, "audit") == 0)
+    const char *level;
+    /* Increase the result count. */
+    level = result_iterator_level (results);
+    (*orig_filtered_result_count)++;
+    (*filtered_result_count)++;
+    if (strcmp (level, "Critical") == 0)
       {
-          const char* compliance;
-          compliance = result_iterator_compliance (results);
-          (*f_compliance_count)++;
-          if (strcasecmp (compliance, "yes") == 0)
-            {
-                (*f_compliance_yes)++;
-            }
-          else if (strcasecmp (compliance, "no") == 0)
-            {
-                (*f_compliance_no)++;
-            }
-          else if (strcasecmp (compliance, "incomplete") == 0)
-            {
-                (*f_compliance_incomplete)++;
-            }
-          else if (strcasecmp (compliance, "undefined") == 0)
-            {
-                (*f_compliance_undefined)++;
-            }
+        (*orig_f_criticals)++;
+        (*f_criticals)++;
       }
-    else
+    if (strcmp (level, "High") == 0)
       {
-        const char *level;
-        /* Increase the result count. */
-        level = result_iterator_level (results);
-        (*orig_filtered_result_count)++;
-        (*filtered_result_count)++;
-        if (strcmp (level, "Critical") == 0)
-          {
-            (*orig_f_criticals)++;
-            (*f_criticals)++;
-          }
-        if (strcmp (level, "High") == 0)
-          {
-            (*orig_f_holes)++;
-            (*f_holes)++;
-          }
-        else if (strcmp (level, "Medium") == 0)
-          {
-            (*orig_f_warnings)++;
-            (*f_warnings)++;
-          }
-        else if (strcmp (level, "Low") == 0)
-          {
-            (*orig_f_infos)++;
-            (*f_infos)++;
-          }
-        else if (strcmp (level, "Log") == 0)
-          {
-            (*orig_f_logs)++;
-            (*f_logs)++;
-          }
-        else if (strcmp (level, "False Positive") == 0)
-          {
-            (*orig_f_false_positives)++;
-            (*f_false_positives)++;
-          }
+        (*orig_f_holes)++;
+        (*f_holes)++;
+      }
+    else if (strcmp (level, "Medium") == 0)
+      {
+        (*orig_f_warnings)++;
+        (*f_warnings)++;
+      }
+    else if (strcmp (level, "Low") == 0)
+      {
+        (*orig_f_infos)++;
+        (*f_infos)++;
+      }
+    else if (strcmp (level, "Log") == 0)
+      {
+        (*orig_f_logs)++;
+        (*f_logs)++;
+      }
+    else if (strcmp (level, "False Positive") == 0)
+      {
+        (*orig_f_false_positives)++;
+        (*f_false_positives)++;
       }
 
     buffer_results_xml (buffer,
                         results,
                         task,
-                        notes,
-                        notes_details,
                         overrides,
                         overrides_details,
                         0,
@@ -15128,7 +14863,6 @@ print_report_delta_xml (FILE *out, iterator_t *results,
     g_string_truncate (buffer, 0);
   }
   g_string_free (buffer, TRUE);
-  g_free (usage_type);
 
   if (fprintf (out, "</results>") < 0)
     {
@@ -15278,47 +15012,45 @@ print_report_init_zone (print_report_context_t *ctx)
 static void
 print_report_get_totals (print_report_context_t *ctx)
 {
-  if (strcmp (ctx->tsk_usage_type, "audit"))
+  if (ctx->delta == 0)
     {
-      if (ctx->delta == 0)
-        {
-          int total_criticals = 0, total_holes, total_infos, total_logs;
-          int total_warnings, total_false_positives;
-          get_data_t *all_results_get;
+      int total_criticals = 0, total_holes, total_infos, total_logs;
+      int total_warnings, total_false_positives;
+      get_data_t *all_results_get;
 
-          all_results_get = report_results_get_data (1, -1, 0, 0);
+      all_results_get = report_results_get_data (1, -1, 0, 0);
 
-          report_counts_id (ctx->report, &total_criticals, &total_holes,
-                            &total_infos, &total_logs, &total_warnings,
-                            &total_false_positives, NULL, all_results_get,
-                            NULL);
+      report_counts_id (ctx->report, &total_criticals, &total_holes,
+                        &total_infos, &total_logs, &total_warnings,
+                        &total_false_positives, NULL, all_results_get, NULL);
 
-          ctx->total_result_count = total_criticals + total_holes
-                                    + total_infos + total_logs
-                                    + total_warnings + total_false_positives;
-          get_data_reset (all_results_get);
-          free (all_results_get);
-        }
+      ctx->total_result_count = total_criticals + total_holes
+                                + total_infos + total_logs
+                                + total_warnings + total_false_positives;
+      get_data_reset (all_results_get);
+      free (all_results_get);
+    }
 
-      /* Get total counts of filtered results. */
+  /* Get total counts of filtered results. */
 
-      if (ctx->count_filtered)
-        {
-          /* We're getting all the filtered results, so we can count them as we
-           * print them, to save time. */
-          ctx->filtered_result_count = 0;
-        }
-      else
-        {
-          /* Beware, we're using the full variables temporarily here, but
-           * report_counts_id counts the filtered results. */
-          report_counts_id (ctx->report, &ctx->criticals, &ctx->holes, &ctx->infos, &ctx->logs, &ctx->warnings,
-                            &ctx->false_positives, NULL, ctx->get, NULL);
+  if (ctx->count_filtered)
+    {
+      /* We're getting all the filtered results, so we can count them as we
+       * print them, to save time. */
+      ctx->filtered_result_count = 0;
+    }
+  else
+    {
+      /* Beware, we're using the full variables temporarily here, but
+       * report_counts_id counts the filtered results. */
+      report_counts_id (ctx->report, &ctx->criticals, &ctx->holes, &ctx->infos,
+                        &ctx->logs, &ctx->warnings, &ctx->false_positives,
+                        NULL, ctx->get, NULL);
 
-          ctx->filtered_result_count = ctx->criticals + ctx->holes + ctx->infos + ctx->logs
-                                       + ctx->warnings + ctx->false_positives;
+      ctx->filtered_result_count = ctx->criticals + ctx->holes + ctx->infos
+                                   + ctx->logs + ctx->warnings
+                                   + ctx->false_positives;
 
-        }
     }
 }
 
@@ -15330,7 +15062,6 @@ print_report_get_totals (print_report_context_t *ctx)
  * @param[in]  task        Task associated with report.
  * @param[in]  xml_start   File name.
  * @param[in]  get         GET command data.
- * @param[in]  notes_details      If notes, Whether to include details.
  * @param[in]  overrides_details  If overrides, Whether to include details.
  * @param[in]  result_tags        Whether to include tags in results.
  * @param[in]  ignore_pagination   Whether to ignore pagination data.
@@ -15344,13 +15075,13 @@ print_report_get_totals (print_report_context_t *ctx)
 static int
 print_report_xml_start (report_t report, report_t delta, task_t task,
                         gchar* xml_start, const get_data_t *get,
-                        int notes_details, int overrides_details,
-                        int result_tags, int ignore_pagination, int lean,
+                        int overrides_details, int result_tags,
+                        int ignore_pagination, int lean,
                         gchar **filter_term_return, gchar **zone_return,
                         gchar **host_summary)
 {
   int result_hosts_only;
-  int notes, overrides;
+  int overrides;
 
   int first_result, max_results, sort_order;
 
@@ -15431,11 +15162,10 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
                                                     &result_hosts_only,
                                                     &min_qod,
                                                     &levels,
-                                                    &ctx.compliance_levels,
+                                                    NULL,
                                                     &delta_states,
                                                     &search_phrase,
                                                     &search_phrase_exact,
-                                                    &notes,
                                                     &overrides,
                                                     &apply_overrides,
                                                     &ctx.zone);
@@ -15551,34 +15281,18 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
 
   filters_extra_buffer = g_string_new ("");
 
-  if (strcmp (ctx.tsk_usage_type, "audit") == 0)
-    {
-      ctx.compliance_levels = ctx.compliance_levels ? ctx.compliance_levels : g_strdup ("yniu");
-
-      if (strchr (ctx.compliance_levels, 'y'))
-        g_string_append (filters_extra_buffer, "<filter>Yes</filter>");
-      if (strchr (ctx.compliance_levels, 'n'))
-        g_string_append (filters_extra_buffer, "<filter>No</filter>");
-      if (strchr (ctx.compliance_levels, 'i'))
-        g_string_append (filters_extra_buffer, "<filter>Incomplete</filter>");
-      if (strchr (ctx.compliance_levels, 'u'))
-        g_string_append (filters_extra_buffer, "<filter>Undefined</filter>");
-    }
-  else
-    {
-      if (strchr (levels, 'c'))
-        g_string_append (filters_extra_buffer, "<filter>Critical</filter>");
-      if (strchr (levels, 'h'))
-        g_string_append (filters_extra_buffer, "<filter>High</filter>");
-      if (strchr (levels, 'm'))
-        g_string_append (filters_extra_buffer, "<filter>Medium</filter>");
-      if (strchr (levels, 'l'))
-        g_string_append (filters_extra_buffer, "<filter>Low</filter>");
-      if (strchr (levels, 'g'))
-        g_string_append (filters_extra_buffer, "<filter>Log</filter>");
-      if (strchr (levels, 'f'))
-        g_string_append (filters_extra_buffer, "<filter>False Positive</filter>");
-    }
+  if (strchr (levels, 'c'))
+    g_string_append (filters_extra_buffer, "<filter>Critical</filter>");
+  if (strchr (levels, 'h'))
+    g_string_append (filters_extra_buffer, "<filter>High</filter>");
+  if (strchr (levels, 'm'))
+    g_string_append (filters_extra_buffer, "<filter>Medium</filter>");
+  if (strchr (levels, 'l'))
+    g_string_append (filters_extra_buffer, "<filter>Low</filter>");
+  if (strchr (levels, 'g'))
+    g_string_append (filters_extra_buffer, "<filter>Log</filter>");
+  if (strchr (levels, 'f'))
+    g_string_append (filters_extra_buffer, "<filter>False Positive</filter>");
 
   if (delta)
     {
@@ -15609,10 +15323,7 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
 
   if (report)
     {
-      const char *report_type = (strcmp (ctx.tsk_usage_type, "audit") == 0)
-                                 ? "audit_report"
-                                 : "report";
-      int tag_count = resource_tag_count (report_type, report, 1);
+      int tag_count = resource_tag_count ("report", report, 1);
 
       if (tag_count)
         {
@@ -15625,7 +15336,7 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
             {
               iterator_t tags;
 
-              init_resource_tag_iterator (&tags, report_type, report, 1, NULL, 1);
+              init_resource_tag_iterator (&tags, "report", report, 1, NULL, 1);
 
               while (next (&tags))
                 {
@@ -15701,10 +15412,7 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
       gchar *progress_xml;
       iterator_t tags;
 
-      const char *task_type = (strcmp (ctx.tsk_usage_type, "audit") == 0)
-                               ? "audit"
-                               : "task";
-      int task_tag_count = resource_tag_count (task_type, task, 1);
+      int task_tag_count = resource_tag_count ("task", task, 1);
 
       tsk_name = task_name (task);
 
@@ -15900,59 +15608,25 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
     }
 
   /* Prepare result counts. */
-  int compliance_yes = 0, compliance_no = 0;
-  int compliance_incomplete = 0, compliance_undefined = 0;
-  int total_compliance_count = 0;
 
-  if (strcmp (ctx.tsk_usage_type, "audit") == 0)
+  if (ctx.count_filtered)
     {
-      report_compliance_counts (report, get, &compliance_yes, &compliance_no,
-                                &compliance_incomplete, &compliance_undefined);
+      /* We're getting all the filtered results, so we can count them as we
+       * print them, to save time. */
+      report_counts_id_full (report, &ctx.criticals, &ctx.holes, &ctx.infos,
+                             &ctx.logs, &ctx.warnings, &ctx.false_positives,
+                             &severity, get, NULL, NULL, NULL, NULL, NULL,
+                             NULL, NULL, NULL);
 
-      total_compliance_count = compliance_yes
-                              + compliance_no
-                              + compliance_incomplete
-                              + compliance_undefined;
-
-      f_compliance_yes = f_compliance_no = 0;
-      f_compliance_incomplete = f_compliance_undefined = 0;
-
-       if (ctx.count_filtered == 0)
-         {
-           report_compliance_f_counts (report,
-                                       get,
-                                       &f_compliance_yes,
-                                       &f_compliance_no,
-                                       &f_compliance_incomplete,
-                                       &f_compliance_undefined);
-
-           f_compliance_count = f_compliance_yes
-                               + f_compliance_no
-                               + f_compliance_incomplete
-                               + f_compliance_undefined;
-         }
+      f_criticals = f_holes = f_infos = f_logs = f_warnings = 0;
+      f_false_positives = f_severity = 0;
     }
   else
-    {
-      if (ctx.count_filtered)
-        {
-          /* We're getting all the filtered results, so we can count them as we
-          * print them, to save time. */
-          report_counts_id_full (report, &ctx.criticals, &ctx.holes, &ctx.infos, &ctx.logs,
-                                 &ctx.warnings, &ctx.false_positives, &severity,
-                                 get, NULL, NULL, NULL, NULL, NULL,
-                                 NULL, NULL, NULL);
-
-          f_criticals = f_holes = f_infos = f_logs = f_warnings = 0;
-          f_false_positives = f_severity = 0;
-        }
-    else
-      report_counts_id_full (report, &ctx.criticals, &ctx.holes, &ctx.infos, &ctx.logs,
-                             &ctx.warnings, &ctx.false_positives, &severity,
-                             get, NULL,
-                             &f_criticals, &f_holes, &f_infos, &f_logs,
-                             &f_warnings, &f_false_positives, &f_severity);
-    }
+    report_counts_id_full (report, &ctx.criticals, &ctx.holes, &ctx.infos,
+                           &ctx.logs, &ctx.warnings, &ctx.false_positives,
+                           &severity, get, NULL, &f_criticals, &f_holes,
+                           &f_infos, &f_logs, &f_warnings,
+                           &f_false_positives, &f_severity);
 
   /* Results. */
 
@@ -16005,9 +15679,8 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
       if (print_report_delta_xml (out, &results, delta_states,
                                   ignore_pagination ? 0 : first_result,
                                   ignore_pagination ? -1 : max_results,
-                                  task, notes,
-                                  notes_details, overrides,
-                                  overrides_details, sort_order,
+                                  task, overrides, overrides_details,
+                                  sort_order,
                                   sort_field, result_hosts_only,
                                   &orig_filtered_result_count,
                                   &ctx.filtered_result_count,
@@ -16041,8 +15714,6 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
           buffer_results_xml (buffer,
                               &results,
                               task,
-                              notes,
-                              notes_details,
                               overrides,
                               overrides_details,
                               result_tags,
@@ -16063,111 +15734,62 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
           if (result_hosts_only)
             array_add_new_string (result_hosts, host_key);
 
-          if (strcmp (ctx.tsk_usage_type, "audit") == 0)
+          double result_severity;
+          result_severity = result_iterator_severity_double (&results);
+          if (result_severity > f_severity)
+            f_severity = result_severity;
+
+          level = result_iterator_level (&results);
+
+          if (strcasecmp (level, "log") == 0)
             {
-              const char* compliance;
-              compliance = result_iterator_compliance (&results);
-
-              if (strcasecmp (compliance, "yes") == 0)
-                {
-                  f_host_result_counts = ctx.f_host_compliant;
-                  if (ctx.count_filtered)
-                    f_compliance_yes++;
-                }
-              else if (strcasecmp (compliance, "no") == 0)
-                {
-                  f_host_result_counts = ctx.f_host_notcompliant;
-                  if (ctx.count_filtered)
-                    f_compliance_no++;
-                }
-              else if (strcasecmp (compliance, "incomplete") == 0)
-                {
-                  f_host_result_counts = ctx.f_host_incomplete;
-                  if (ctx.count_filtered)
-                    f_compliance_incomplete++;
-                }
-              else if (strcasecmp (compliance, "undefined") == 0)
-                {
-                  f_host_result_counts = ctx.f_host_undefined;
-                  if (ctx.count_filtered)
-                    f_compliance_undefined++;
-                }
-              else
-                {
-                  f_host_result_counts = NULL;
-                }
-
-              if (f_host_result_counts)
-                {
-                  int result_count
-                        = GPOINTER_TO_INT
-                            (g_hash_table_lookup (f_host_result_counts,
-                                                  host_key));
-
-                  g_hash_table_replace (f_host_result_counts,
-                                        g_strdup (host_key),
-                                        GINT_TO_POINTER (result_count + 1));
-                }
+              f_host_result_counts = ctx.f_host_logs;
+              if (ctx.count_filtered)
+                f_logs++;
+            }
+          else if (strcasecmp (level, "critical") == 0)
+            {
+              f_host_result_counts = ctx.f_host_criticals;
+              if (ctx.count_filtered)
+                f_criticals++;
+            }
+          else if (strcasecmp (level, "high") == 0)
+            {
+              f_host_result_counts = ctx.f_host_holes;
+              if (ctx.count_filtered)
+                f_holes++;
+            }
+          else if (strcasecmp (level, "medium") == 0)
+            {
+              f_host_result_counts = ctx.f_host_warnings;
+              if (ctx.count_filtered)
+                f_warnings++;
+            }
+          else if (strcasecmp (level, "low") == 0)
+            {
+              f_host_result_counts = ctx.f_host_infos;
+              if (ctx.count_filtered)
+                f_infos++;
+            }
+          else if (strcasecmp (level, "false positive") == 0)
+            {
+              f_host_result_counts = ctx.f_host_false_positives;
+              if (ctx.count_filtered)
+                f_false_positives++;
             }
           else
+            f_host_result_counts = NULL;
+
+          if (f_host_result_counts)
             {
-              double result_severity;
-              result_severity = result_iterator_severity_double (&results);
-              if (result_severity > f_severity)
-                f_severity = result_severity;
+              int result_count
+                    = GPOINTER_TO_INT
+                        (g_hash_table_lookup (f_host_result_counts, host_key));
 
-              level = result_iterator_level (&results);
-
-              if (strcasecmp (level, "log") == 0)
-                {
-                  f_host_result_counts = ctx.f_host_logs;
-                  if (ctx.count_filtered)
-                    f_logs++;
-                }
-              else if (strcasecmp (level, "critical") == 0)
-                {
-                  f_host_result_counts = ctx.f_host_criticals;
-                  if (ctx.count_filtered)
-                    f_criticals++;
-                }
-              else if (strcasecmp (level, "high") == 0)
-                {
-                  f_host_result_counts = ctx.f_host_holes;
-                  if (ctx.count_filtered)
-                    f_holes++;
-                }
-              else if (strcasecmp (level, "medium") == 0)
-                {
-                  f_host_result_counts = ctx.f_host_warnings;
-                  if (ctx.count_filtered)
-                    f_warnings++;
-                }
-              else if (strcasecmp (level, "low") == 0)
-                {
-                  f_host_result_counts = ctx.f_host_infos;
-                  if (ctx.count_filtered)
-                    f_infos++;
-                }
-              else if (strcasecmp (level, "false positive") == 0)
-                {
-                  f_host_result_counts = ctx.f_host_false_positives;
-                  if (ctx.count_filtered)
-                    f_false_positives++;
-                }
-              else
-                f_host_result_counts = NULL;
-
-              if (f_host_result_counts)
-                {
-                  int result_count
-                        = GPOINTER_TO_INT
-                            (g_hash_table_lookup (f_host_result_counts, host_key));
-
-                  g_hash_table_replace (f_host_result_counts,
-                                        g_strdup (host_key),
-                                        GINT_TO_POINTER (result_count + 1));
-                }
-           }
+              g_hash_table_replace (f_host_result_counts,
+                                    g_strdup (host_key),
+                                    GINT_TO_POINTER (result_count + 1));
+            }
            g_free (host_key);
         }
       PRINT (out, "</results>");
@@ -16177,69 +15799,7 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
 
   /* Print result counts and severity. */
 
-  if (strcmp (ctx.tsk_usage_type, "audit") == 0)
-    {
-      if (delta)
-        PRINT (out,
-              "<compliance_count>"
-              "<filtered>%i</filtered>"
-              "<yes><filtered>%i</filtered></yes>"
-              "<no><filtered>%i</filtered></no>"
-              "<incomplete><filtered>%i</filtered></incomplete>"
-              "<undefined><filtered>%i</filtered></undefined>"
-              "</compliance_count>",
-              f_compliance_count,
-              (strchr (ctx.compliance_levels, 'y') ? f_compliance_yes : 0),
-              (strchr (ctx.compliance_levels, 'n') ? f_compliance_no : 0),
-              (strchr (ctx.compliance_levels, 'i') ? f_compliance_incomplete : 0),
-              (strchr (ctx.compliance_levels, 'u') ? f_compliance_undefined : 0));
-      else
-        {
-          if (ctx.count_filtered)
-            f_compliance_count = f_compliance_yes
-                                  + f_compliance_no
-                                  + f_compliance_incomplete
-                                  + f_compliance_undefined;
-          PRINT (out,
-              "<compliance_count>"
-              "%i"
-              "<full>%i</full>"
-              "<filtered>%i</filtered>"
-              "<yes><full>%i</full><filtered>%i</filtered></yes>"
-              "<no><full>%i</full><filtered>%i</filtered></no>"
-              "<incomplete><full>%i</full><filtered>%i</filtered></incomplete>"
-              "<undefined><full>%i</full><filtered>%i</filtered></undefined>"
-              "</compliance_count>",
-              total_compliance_count,
-              total_compliance_count,
-              f_compliance_count,
-              compliance_yes,
-              (strchr (ctx.compliance_levels, 'y') ? f_compliance_yes : 0),
-              compliance_no,
-              (strchr (ctx.compliance_levels, 'n') ? f_compliance_no : 0),
-              compliance_incomplete,
-              (strchr (ctx.compliance_levels, 'i') ? f_compliance_incomplete : 0),
-              compliance_undefined,
-              (strchr (ctx.compliance_levels, 'i') ? f_compliance_undefined : 0));
-
-          PRINT (out,
-                "<compliance>"
-                "<full>%s</full>"
-                "<filtered>%s</filtered>"
-                "</compliance>",
-                report_compliance_from_counts (&compliance_yes,
-                                                &compliance_no,
-                                                &compliance_incomplete,
-                                                &compliance_undefined),
-                report_compliance_from_counts (&f_compliance_yes,
-                                                &f_compliance_no,
-                                                &f_compliance_incomplete,
-                                                &f_compliance_undefined));
-        }
-    }
-  else
-    {
-      if (delta)
+  if (delta)
         /** @todo The f_holes, etc. vars are setup to give the page count. */
         PRINT (out,
               "<result_count>"
@@ -16323,7 +15883,6 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
                 severity,
                 f_severity);
         }
-    }
 
   if (host_summary)
     {
@@ -16425,7 +15984,6 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
  * @param[in]  get                GET data for report.
  * @param[in]  report_format      Report format.
  * @param[in]  report_config      Report config.
- * @param[in]  notes_details      If notes, Whether to include details.
  * @param[in]  overrides_details  If overrides, Whether to include details.
  * @param[out] output_length      NULL or location for length of return.
  * @param[out] extension          NULL or location for report format extension.
@@ -16442,8 +16000,8 @@ gchar *
 manage_report (report_t report, report_t delta_report, const get_data_t *get,
                const report_format_t report_format,
                const report_config_t report_config,
-               int notes_details, int overrides_details,
-               gsize *output_length, gchar **extension, gchar **content_type,
+               int overrides_details, gsize *output_length, gchar **extension,
+               gchar **content_type,
                gchar **filter_term_return, gchar **zone_return,
                gchar **host_summary)
 {
@@ -16475,8 +16033,7 @@ manage_report (report_t report, report_t delta_report, const get_data_t *get,
 
   xml_start = g_strdup_printf ("%s/report-start.xml", xml_dir);
   ret = print_report_xml_start (report, delta_report, task, xml_start, get,
-                                notes_details, overrides_details,
-                                1 /* result_tags */,
+                                overrides_details, 1 /* result_tags */,
                                 0 /* ignore_pagination */,
                                 0 /* lean */,
                                 filter_term_return, zone_return, host_summary);
@@ -16586,7 +16143,6 @@ manage_report (report_t report, report_t delta_report, const get_data_t *get,
  * @param[in]  report_format      Report format.
  * @param[in]  report_config      Report config.
  * @param[in]  get                GET command data.
- * @param[in]  notes_details      If notes, Whether to include details.
  * @param[in]  overrides_details  If overrides, Whether to include details.
  * @param[in]  result_tags        Whether to include tags in results.
  * @param[in]  ignore_pagination  Whether to ignore pagination.
@@ -16609,7 +16165,7 @@ manage_send_report (report_t report, report_t delta_report,
                     report_format_t report_format,
                     report_config_t report_config,
                     const get_data_t *get,
-                    int notes_details, int overrides_details, int result_tags,
+                    int overrides_details, int result_tags,
                     int ignore_pagination, int lean, int base64,
                     gboolean (*send) (const char *,
                                       int (*) (const char *, void*),
@@ -16651,7 +16207,7 @@ manage_send_report (report_t report, report_t delta_report,
 
       ret = trigger (alert, task, report, EVENT_TASK_RUN_STATUS_CHANGED,
                      (void*) TASK_STATUS_DONE, method, condition,
-                     get, notes_details, overrides_details, NULL);
+                     get, overrides_details, NULL);
       if (ret == -3)
         return -4;
       if (ret == -1)
@@ -16684,7 +16240,7 @@ manage_send_report (report_t report, report_t delta_report,
 
   xml_start = g_strdup_printf ("%s/report-start.xml", xml_dir);
   ret = print_report_xml_start (report, delta_report, task, xml_start, get,
-                                notes_details, overrides_details, result_tags,
+                                overrides_details, result_tags,
                                 ignore_pagination, lean, NULL, NULL, NULL);
   if (ret)
     {
@@ -17759,7 +17315,6 @@ request_delete_task_uuid (const char *task_id, int ultimate)
 
       permissions_set_orphans ("task", task, LOCATION_TRASH);
       tags_remove_resource ("task", task, LOCATION_TRASH);
-      tickets_remove_task (task);
 
       sql ("DELETE FROM results WHERE task = %llu;", task);
       sql ("DELETE FROM task_alerts WHERE task = %llu;", task);
@@ -17872,7 +17427,6 @@ delete_task (task_t task, int ultimate)
                             task_in_trash (task)
                               ? LOCATION_TRASH
                               : LOCATION_TABLE);
-      tickets_remove_task (task);
 
       sql ("DELETE FROM results_trash WHERE task = %llu;", task);
       sql ("DELETE FROM results WHERE task = %llu;", task);
@@ -17923,7 +17477,6 @@ delete_task (task_t task, int ultimate)
            " WHERE report IN (SELECT id FROM reports WHERE task = %llu);",
            task);
 
-      tickets_trash_task (task);
 
       sql ("DELETE FROM results"
            " WHERE report IN (SELECT id FROM reports WHERE task = %llu);",
@@ -17966,7 +17519,6 @@ delete_trash_tasks ()
           return -1;
         }
 
-      tickets_remove_task (task);
 
       sql ("DELETE FROM results WHERE task = %llu;", task);
       sql ("DELETE FROM task_alerts WHERE task = %llu;", task);
@@ -21554,10 +21106,10 @@ credential_scanner_iterator_readable (iterator_t* iterator)
 }
 
 
-/* Notes and Overrides. */
+/* Overrides. */
 
 /**
- * @brief Validate a single port, for use in override or note.
+ * @brief Validate a single port, for use in an override.
  *
  * @param[in]  port  A port.
  *
@@ -24225,12 +23777,6 @@ manage_restore (const char *id)
   if (ret != 2)
     return ret;
 
-  /* Ticket. */
-  ret = restore_ticket (id);
-  if (ret != 2)
-    return ret;
-
-
   /* Config. */
 
   if (find_trash ("config", id, &resource))
@@ -24581,35 +24127,6 @@ manage_restore (const char *id)
       return 0;
     }
 
-  /* Note. */
-
-  if (find_trash ("note", id, &resource))
-    {
-      sql_rollback ();
-      return -1;
-    }
-
-  if (resource)
-    {
-      sql ("INSERT INTO notes"
-           " (uuid, owner, nvt, creation_time, modification_time, text, hosts,"
-           "  port, severity, task, result, end_time)"
-           " SELECT uuid, owner, nvt, creation_time, modification_time, text,"
-           "        hosts, port, severity, task, result, end_time"
-           " FROM notes_trash WHERE id = %llu;",
-           resource);
-
-      permissions_set_locations ("note", resource,
-                                 sql_last_insert_id (),
-                                 LOCATION_TABLE);
-      tags_set_locations ("note", resource,
-                                 sql_last_insert_id (),
-                                 LOCATION_TABLE);
-
-      sql ("DELETE FROM notes_trash WHERE id = %llu;", resource);
-      sql_commit ();
-      return 0;
-    }
 
   /* Override. */
 
@@ -25126,7 +24643,6 @@ manage_restore (const char *id)
            " WHERE report IN (SELECT id FROM reports WHERE task = %llu);",
            resource);
 
-      tickets_restore_task (resource);
 
       sql ("DELETE FROM results_trash"
            " WHERE report IN (SELECT id FROM reports WHERE task = %llu);",
@@ -25189,7 +24705,6 @@ manage_empty_trashcan ()
        "                                 WHERE uuid = '%s'));",
        current_credentials.uuid);
   sql ("DELETE FROM configs_trash" WHERE_OWNER);
-  empty_trashcan_tickets ();
   sql ("DELETE FROM permissions"
        " WHERE subject_type = 'group'"
        " AND subject IN (SELECT id from groups_trash"
@@ -25226,7 +24741,6 @@ manage_empty_trashcan ()
        current_credentials.uuid);
   sql ("DELETE FROM credentials_trash" WHERE_OWNER);
   sql ("DELETE FROM filters_trash" WHERE_OWNER);
-  sql ("DELETE FROM notes_trash" WHERE_OWNER);
   sql ("DELETE FROM overrides_trash" WHERE_OWNER);
   sql ("DELETE FROM permissions_trash" WHERE_OWNER);
   empty_trashcan_port_lists ();
@@ -26118,7 +25632,6 @@ type_select_columns (const char *type)
   static column_t filter_columns[] = FILTER_ITERATOR_COLUMNS;
   static column_t group_columns[] = GROUP_ITERATOR_COLUMNS;
   static column_t host_columns[] = HOST_ITERATOR_COLUMNS;
-  static column_t note_columns[] = NOTE_ITERATOR_COLUMNS;
   static column_t nvt_columns[] = NVT_ITERATOR_COLUMNS;
   static column_t os_columns[] = OS_ITERATOR_COLUMNS;
   static column_t override_columns[] = OVERRIDE_ITERATOR_COLUMNS;
@@ -26165,8 +25678,6 @@ type_select_columns (const char *type)
     return group_columns;
   if (strcasecmp (type, "HOST") == 0)
     return host_columns;
-  if (strcasecmp (type, "NOTE") == 0)
-    return note_columns;
   if (strcasecmp (type, "NVT") == 0)
     return nvt_columns;
   if (strcasecmp (type, "OS") == 0)
@@ -26201,8 +25712,6 @@ type_select_columns (const char *type)
     return target_columns;
   if (strcasecmp (type, "TASK") == 0)
     return task_columns;
-  /* Tickets don't use this. */
-  assert (strcasecmp (type, "ticket"));
   if (strcasecmp (type, "TLS_CERTIFICATE") == 0)
     return tls_certificate_select_columns ();
   if (strcasecmp (type, "USER") == 0)
@@ -26319,11 +25828,6 @@ type_filter_columns (const char *type)
       static const char *ret[] = HOST_ITERATOR_FILTER_COLUMNS;
       return ret;
     }
-  if (strcasecmp (type, "NOTE") == 0)
-    {
-      static const char *ret[] = NOTE_ITERATOR_FILTER_COLUMNS;
-      return ret;
-    }
   if (strcasecmp (type, "NVT") == 0)
     {
       static const char *ret[] = NVT_INFO_ITERATOR_FILTER_COLUMNS;
@@ -26390,8 +25894,6 @@ type_filter_columns (const char *type)
       static const char *ret[] = TASK_ITERATOR_FILTER_COLUMNS;
       return ret;
     }
-  /* Tickets don't use this. */
-  assert (strcasecmp (type, "ticket"));
   if (strcasecmp (type, "TLS_CERTIFICATE") == 0)
     return tls_certificate_filter_columns ();
   if (strcasecmp (type, "USER") == 0)

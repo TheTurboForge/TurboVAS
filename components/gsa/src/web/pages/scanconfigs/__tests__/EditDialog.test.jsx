@@ -219,55 +219,6 @@ describe('EditScanConfigDialog component tests', () => {
     );
   });
 
-  test('should render dialog inline notification for policy in use', () => {
-    const handleClose = testing.fn();
-    const handleSave = testing.fn();
-    const handleOpenEditConfigFamilyDialog = testing.fn();
-    const handleOpenEditNvtDetailsDialog = testing.fn();
-
-    const {render} = rendererWith({capabilities: true});
-    render(
-      <EditScanConfigDialog
-        comment="bar"
-        configFamilies={configFamilies}
-        configId="c1"
-        configIsInUse={true}
-        editNvtDetailsTitle="Edit Policy NVT Details"
-        editNvtFamiliesTitle="Edit Policy Family'"
-        families={families}
-        isLoadingConfig={false}
-        isLoadingFamilies={false}
-        isLoadingScanners={false}
-        name="Policy"
-        nvtPreferences={nvtPreferences}
-        scannerPreferences={scannerPreferences}
-        scanners={scanners}
-        title="Edit Policy"
-        usageType="policy"
-        onClose={handleClose}
-        onEditConfigFamilyClick={handleOpenEditConfigFamilyDialog}
-        onEditNvtDetailsClick={handleOpenEditNvtDetailsDialog}
-        onSave={handleSave}
-      />,
-    );
-
-    expect(screen.queryDialogTitle()).toHaveTextContent('Edit Policy');
-
-    const content = screen.queryDialogContent();
-    expect(content).not.toHaveTextContent(
-      'Edit Network Vulnerability Test Families',
-    );
-    expect(content).not.toHaveTextContent('Edit Scanner Preferences');
-    expect(content).not.toHaveTextContent(
-      'Network Vulnerability Test Preferences',
-    );
-
-    const inUseNotification = screen.getByTestId('inline-notification');
-    expect(inUseNotification).toHaveTextContent(
-      'The policy is currently in use by one or more audits, therefore only name and comment can be modified.',
-    );
-  });
-
   test('should save data', () => {
     const handleClose = testing.fn();
     const handleSave = testing.fn();

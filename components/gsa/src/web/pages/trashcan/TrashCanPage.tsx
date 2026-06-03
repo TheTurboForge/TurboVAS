@@ -32,15 +32,12 @@ import useGmp from 'web/hooks/useGmp';
 import useTranslation from 'web/hooks/useTranslation';
 import AgentGroupsTable from 'web/pages/agent-groups/AgentGroupsTable';
 import AlertsTable from 'web/pages/alerts/Table';
-import AuditsTable from 'web/pages/audits/Table';
 import CredentialTable from 'web/pages/credentials/CredentialTable';
 import TrashActions from 'web/pages/extras/TrashActions';
 import FiltersTable from 'web/pages/filters/Table';
 import GroupsTable from 'web/pages/groups/Table';
-import NotesTable from 'web/pages/notes/Table';
 import OverridesTable from 'web/pages/overrides/Table';
 import PermissionsTable from 'web/pages/permissions/PermissionTable';
-import PoliciesTable from 'web/pages/policies/Table';
 import PortListTable from 'web/pages/portlists/PortListTable';
 import ReportConfigsTable from 'web/pages/reportconfigs/Table';
 import ReportFormatsTable from 'web/pages/reportformats/Table';
@@ -51,7 +48,6 @@ import SchedulesTable from 'web/pages/schedules/Table';
 import TagsTable from 'web/pages/tags/TagTable';
 import TargetsTable from 'web/pages/targets/TargetTable';
 import TasksTable from 'web/pages/tasks/TaskTable';
-import TicketsTable from 'web/pages/tickets/Table';
 import EmptyTrashButton from 'web/pages/trashcan/EmptyTrashButton';
 import TrashCanPageToolBarIcons from 'web/pages/trashcan/TrashCanPageToolBarIcons';
 import TrashCanTableContents from 'web/pages/trashcan/TrashCanTableContents';
@@ -251,13 +247,6 @@ const TrashCan = () => {
             <AlertsTable entities={trash.alerts} {...tableProps} />
           </span>
         )}
-        {hasEntities(trash?.audits) && (
-          <span>
-            <LinkTarget id="audit" />
-            <h1>{_('Audits')}</h1>
-            <AuditsTable entities={trash.audits} {...tableProps} />
-          </span>
-        )}
         {hasEntities(trash?.credentials) && (
           <span>
             <LinkTarget id="credential" />
@@ -280,13 +269,6 @@ const TrashCan = () => {
             <GroupsTable entities={trash.groups} {...tableProps} />
           </span>
         )}
-        {hasEntities(trash?.notes) && (
-          <span>
-            <LinkTarget id="note" />
-            <h1>{_('Notes')}</h1>
-            <NotesTable entities={trash.notes} {...tableProps} />
-          </span>
-        )}
         {hasEntities(trash?.overrides) && (
           <span>
             <LinkTarget id="override" />
@@ -301,13 +283,6 @@ const TrashCan = () => {
             <h1>{_('Permissions')}</h1>
             {/* @ts-expect-error */}
             <PermissionsTable entities={trash.permissions} {...tableProps} />
-          </span>
-        )}
-        {hasEntities(trash?.policies) && (
-          <span>
-            <LinkTarget id="policy" />
-            <h1>{_('Policies')}</h1>
-            <PoliciesTable entities={trash.policies} {...tableProps} />
           </span>
         )}
         {hasEntities(trash?.portLists) && (
@@ -389,13 +364,6 @@ const TrashCan = () => {
             <h1>{_('Tasks')}</h1>
             {/* @ts-expect-error */}
             <TasksTable entities={trash.tasks} {...tableProps} />
-          </span>
-        )}
-        {hasEntities(trash?.tickets) && (
-          <span>
-            <LinkTarget id="ticket" />
-            <h1>{_('Tickets')}</h1>
-            <TicketsTable entities={trash.tickets} {...tableProps} />
           </span>
         )}
         {hasEntities(trash?.agentGroups) && (

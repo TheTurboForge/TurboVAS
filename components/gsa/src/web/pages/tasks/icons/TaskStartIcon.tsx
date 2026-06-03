@@ -3,28 +3,24 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import {type default as Audit} from 'gmp/models/audit';
-import {type default as Task, USAGE_TYPE} from 'gmp/models/task';
+import type Task from 'gmp/models/task';
 import {isDefined} from 'gmp/utils/identity';
 import {capitalizeFirstLetter} from 'gmp/utils/string';
 import {StartIcon} from 'web/components/icon';
 import useCapabilities from 'web/hooks/useCapabilities';
 import useTranslation from 'web/hooks/useTranslation';
 
-interface TaskStartIconProps<TTask extends Audit | Task> {
+interface TaskStartIconProps<TTask extends Task> {
   task: TTask;
   onClick?: (task: TTask) => void | Promise<void>;
 }
 
-const isTask = (taskOrAudit: Task | Audit): taskOrAudit is Task =>
-  (taskOrAudit as Task).usageType === USAGE_TYPE.scan;
-
-const TaskStartIcon = <TTask extends Audit | Task>({
+const TaskStartIcon = <TTask extends Task>({
   task,
   onClick,
 }: TaskStartIconProps<TTask>) => {
   const [_] = useTranslation();
-  const type = isTask(task) ? _('task') : _('audit');
+  const type = _('task');
 
   const capabilities = useCapabilities();
 

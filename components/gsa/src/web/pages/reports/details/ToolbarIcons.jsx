@@ -25,7 +25,6 @@ import useTranslation from 'web/hooks/useTranslation';
 import AlertActions from 'web/pages/reports/details/AlertActions';
 import PropTypes from 'web/utils/PropTypes';
 const ToolBarIcons = ({
-  audit = false,
   delta = false,
   filter,
   isLoading,
@@ -46,40 +45,20 @@ const ToolBarIcons = ({
   return (
     <Divider margin="15px">
       <IconDivider>
-        {audit ? (
-          <>
-            <ManualIcon
-              anchor="using-and-managing-audit-reports"
-              page="compliance-and-special-scans"
-              title={_('Help: Audit Reports')}
-            />
-            <ListIcon page="auditreports" title={_('Audit Reports List')} />
-          </>
-        ) : (
-          <>
-            <ManualIcon
-              anchor="reading-a-report"
-              page="reports"
-              title={_('Help: Reading Reports')}
-            />
-            <ListIcon page="reports" title={_('Reports List')} />
-          </>
-        )}
+        <ManualIcon
+          anchor="reading-a-report"
+          page="reports"
+          title={_('Help: Reading Reports')}
+        />
+        <ListIcon page="reports" title={_('Reports List')} />
       </IconDivider>
       {!isLoading && (
         <React.Fragment>
           <IconDivider>
-            {audit ? (
-              <AddToAssetsIcon
-                title={_('Add to Assets with QoD >= 70%')}
-                onClick={onAddToAssetsClick}
-              />
-            ) : (
-              <AddToAssetsIcon
-                title={_('Add to Assets with QoD >= 70% and Overrides enabled')}
-                onClick={onAddToAssetsClick}
-              />
-            )}
+            <AddToAssetsIcon
+              title={_('Add to Assets with QoD >= 70% and Overrides enabled')}
+              onClick={onAddToAssetsClick}
+            />
             <RemoveFromAssetsIcon
               title={_('Remove from Assets')}
               onClick={onRemoveFromAssetsClick}
@@ -101,15 +80,13 @@ const ToolBarIcons = ({
             >
               <ResultIcon />
             </Link>
-            {!audit && (
-              <Link
-                filter={'report_id=' + reportId}
-                title={_('Corresponding Vulnerabilities')}
-                to="vulnerabilities"
-              >
-                <VulnerabilityIcon />
-              </Link>
-            )}
+            <Link
+              filter={'report_id=' + reportId}
+              title={_('Corresponding Vulnerabilities')}
+              to="vulnerabilities"
+            >
+              <VulnerabilityIcon />
+            </Link>
             {!delta && (
               <Link
                 filter={'report_id=' + reportId}
@@ -146,7 +123,6 @@ const ToolBarIcons = ({
             />
             {!delta && (
               <AlertActions
-                audit={audit}
                 filter={filter}
                 reportId={reportId}
                 showError={showError}
@@ -164,7 +140,6 @@ const ToolBarIcons = ({
 };
 
 ToolBarIcons.propTypes = {
-  audit: PropTypes.bool,
   delta: PropTypes.bool,
   filter: PropTypes.filter,
   isLoading: PropTypes.bool,

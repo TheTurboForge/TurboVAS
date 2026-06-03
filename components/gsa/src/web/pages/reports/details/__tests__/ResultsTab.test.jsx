@@ -147,19 +147,9 @@ const createGmp = ({
 });
 
 describe('Report Results Tab tests', () => {
-  test.each([
-    ['compliance information', true, 'Compliant', 'Yes', 'No', 'Incomplete'],
-    [
-      'severity information',
-      false,
-      'Severity',
-      '10.0 (Critical)',
-      '5.0 (Medium)',
-      '5.0 (Medium)',
-    ],
-  ])(
-    'should render Results Tab with %s',
-    async (_, audit, header2Text, row2Val, row3Val, row4Val) => {
+  test(
+    'should render Results Tab with severity information',
+    async () => {
       const onFilterAddLogLevelClick = testing.fn();
       const onFilterDecreaseMinQoDClick = testing.fn();
       const onFilterEditClick = testing.fn();
@@ -207,7 +197,6 @@ describe('Report Results Tab tests', () => {
 
       render(
         <ResultsTab
-          audit={audit}
           hasTarget={true}
           progress={100}
           reportFilter={filter}
@@ -229,7 +218,7 @@ describe('Report Results Tab tests', () => {
       const rows = screen.getAllByRole('row');
 
       expect(headers[0]).toHaveTextContent('Vulnerability');
-      expect(headers[2]).toHaveTextContent(header2Text);
+      expect(headers[2]).toHaveTextContent('Severity');
       expect(headers[3]).toHaveTextContent('QoD');
       expect(headers[4]).toHaveTextContent('Host');
       expect(headers[5]).toHaveTextContent('Location');
@@ -238,7 +227,7 @@ describe('Report Results Tab tests', () => {
       expect(headers[8]).toHaveTextContent('Name');
 
       expect(rows[2]).toHaveTextContent('Result 1');
-      expect(rows[2]).toHaveTextContent(row2Val);
+      expect(rows[2]).toHaveTextContent('10.0 (Critical)');
       expect(rows[2]).toHaveTextContent('80 %');
       expect(rows[2]).toHaveTextContent('123.456.78.910');
       expect(rows[2]).toHaveTextContent('foo');
@@ -248,7 +237,7 @@ describe('Report Results Tab tests', () => {
       );
 
       expect(rows[3]).toHaveTextContent('Result 2');
-      expect(rows[3]).toHaveTextContent(row3Val);
+      expect(rows[3]).toHaveTextContent('5.0 (Medium)');
       expect(rows[3]).toHaveTextContent('70 %');
       expect(rows[3]).toHaveTextContent('109.876.54.321');
       expect(rows[3]).toHaveTextContent('80/tcp');
@@ -257,7 +246,7 @@ describe('Report Results Tab tests', () => {
       );
 
       expect(rows[4]).toHaveTextContent('Result 3');
-      expect(rows[4]).toHaveTextContent(row4Val);
+      expect(rows[4]).toHaveTextContent('5.0 (Medium)');
       expect(rows[4]).toHaveTextContent('80 %');
       expect(rows[4]).toHaveTextContent('109.876.54.321');
       expect(rows[4]).toHaveTextContent('bar');

@@ -5,7 +5,6 @@
 
 import {_, _l} from 'gmp/locale/lang';
 import type ReportOperatingSystem from 'gmp/models/report/os';
-import ComplianceBar from 'web/components/bar/ComplianceBar';
 import OsIcon from 'web/components/icon/OsIcon';
 import IconDivider from 'web/components/layout/IconDivider';
 import Link from 'web/components/link/Link';
@@ -17,14 +16,13 @@ import createEntitiesTable from 'web/entities/createEntitiesTable';
 import {type SortDirectionType} from 'web/utils/sort-direction';
 
 interface HeaderProps {
-  audit?: boolean;
   currentSortBy?: string;
   currentSortDir?: SortDirectionType;
   sort?: boolean;
   onSortChange?: (sortBy: string) => void;
 }
 
-const getColumns = (audit = false) => [
+const getColumns = () => [
   {
     key: 'name',
     title: _('Operating System'),
@@ -70,30 +68,15 @@ const getColumns = (audit = false) => [
     render: (entity: ReportOperatingSystem) => entity.hosts?.count ?? 0,
     align: 'center',
   },
-  ...(audit
-    ? [
-        {
-          key: 'compliance',
-          title: _('Compliant'),
-          width: '10%',
-          sortBy: 'compliance',
-          render: (entity: ReportOperatingSystem) => (
-            <ComplianceBar compliance={entity.compliance} />
-          ),
-          align: 'center',
-        },
-      ]
-    : []),
 ];
 
 const Header = ({
-  audit = false,
   currentSortBy,
   currentSortDir,
   sort = true,
   onSortChange,
 }: HeaderProps) => {
-  const columns = getColumns(audit);
+  const columns = getColumns();
 
   return (
     <TableHeader>
@@ -114,8 +97,8 @@ const Header = ({
   );
 };
 
-const Row = ({entity, audit = false}) => {
-  const columns = getColumns(audit);
+const Row = ({entity}) => {
+  const columns = getColumns();
 
   return (
     <TableRow>

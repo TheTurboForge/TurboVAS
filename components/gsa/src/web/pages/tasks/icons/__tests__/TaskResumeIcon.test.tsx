@@ -6,7 +6,6 @@
 import {describe, test, expect, testing} from '@gsa/testing';
 import {screen, rendererWith, fireEvent} from 'web/testing';
 import Capabilities from 'gmp/capabilities/capabilities';
-import Audit, {AUDIT_STATUS} from 'gmp/models/audit';
 import Task, {TASK_STATUS} from 'gmp/models/task';
 import ResumeIcon from 'web/pages/tasks/icons/TaskResumeIcon';
 import Theme from 'web/utils/Theme';
@@ -82,34 +81,6 @@ describe('Task ResumeIcon component tests', () => {
 
     expect(clickHandler).not.toHaveBeenCalled();
     expect(element).toHaveAttribute('title', 'Task is not stopped');
-    expect(element).toHaveAttribute('disabled');
-    expect(element).toHaveAttribute('data-disabled', 'true');
-  });
-
-  test('should render in inactive state if wrong command level permissions are given for audit', () => {
-    const caps = new Capabilities(['everything']);
-    const audit = Audit.fromElement({
-      status: AUDIT_STATUS.stopped,
-      target: {_id: '123'},
-      permissions: {permission: [{name: 'get_task'}]},
-      usage_type: 'audit',
-    });
-    const clickHandler = testing.fn();
-
-    const {render} = rendererWith({capabilities: caps});
-
-    const {element} = render(<ResumeIcon task={audit} />);
-
-    expect(caps.mayOp('resume_task')).toEqual(true);
-    expect(audit.userCapabilities.mayOp('resume_task')).toEqual(false);
-
-    fireEvent.click(element);
-
-    expect(clickHandler).not.toHaveBeenCalled();
-    expect(element).toHaveAttribute(
-      'title',
-      'Permission to resume audit denied',
-    );
     expect(element).toHaveAttribute('disabled');
     expect(element).toHaveAttribute('data-disabled', 'true');
   });

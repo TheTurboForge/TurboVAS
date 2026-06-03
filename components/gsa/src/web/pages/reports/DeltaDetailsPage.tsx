@@ -402,7 +402,6 @@ const DeltaReportDetails = () => {
 
   const handleReportDownload = async state => {
     const {
-      includeNotes,
       includeOverrides,
       reportConfigId,
       reportFormatId: chosenFormatId,
@@ -412,7 +411,6 @@ const DeltaReportDetails = () => {
     const baseFilter = reportFilter ?? DEFAULT_FILTER;
     const newFilter = baseFilter.copy();
 
-    newFilter.set('notes', includeNotes);
     newFilter.set('overrides', includeOverrides);
 
     if (storeDefault) {
@@ -420,7 +418,6 @@ const DeltaReportDetails = () => {
         ...reportComposerDefaults,
         defaultReportConfigId: reportConfigId,
         defaultReportFormatId: chosenFormatId,
-        includeNotes,
         includeOverrides,
       };
       saveReportComposerDefaults(defaults);
@@ -574,7 +571,6 @@ const DeltaReportDetails = () => {
           defaultReportConfigId={reportComposerDefaults.defaultReportConfigId}
           defaultReportFormatId={reportComposerDefaults.defaultReportFormatId}
           filter={reportFilter ?? DEFAULT_FILTER}
-          includeNotes={reportComposerDefaults.includeNotes}
           includeOverrides={reportComposerDefaults.includeOverrides}
           reportConfigs={reportConfigs}
           reportFormats={reportFormats}

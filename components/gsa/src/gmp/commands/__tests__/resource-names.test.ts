@@ -93,15 +93,15 @@ describe('ResourceNamesCommand tests', () => {
   });
 
   test('should return no names', async () => {
-    const response = createResourceNamesResponse({type: 'note'});
+    const response = createResourceNamesResponse({type: 'task'});
     const fakeHttp = createHttp(response);
     const cmd = new ResourceNamesCommand(fakeHttp);
-    const resp = await cmd.getAll({resourceType: 'note'});
+    const resp = await cmd.getAll({resourceType: 'task'});
     expect(fakeHttp.request).toHaveBeenCalledWith('get', {
       args: {
         cmd: 'get_resource_names',
         filter: 'first=1 rows=-1',
-        resource_type: 'note',
+        resource_type: 'task',
       },
     });
     const {data} = resp;
@@ -109,8 +109,6 @@ describe('ResourceNamesCommand tests', () => {
   });
 
   test.each([
-    ['audit', 'audit'],
-    ['auditreport', 'audit_report'],
     ['certbund', 'cert_bund_adv'],
     ['cpe', 'cpe'],
     ['cve', 'cve'],
@@ -118,7 +116,6 @@ describe('ResourceNamesCommand tests', () => {
     ['operatingsystem', 'os'],
     ['host', 'host'],
     ['nvt', 'nvt'],
-    ['policy', 'policy'],
     ['scanconfig', 'config'],
   ])('should support resource type %s', async (entityType, resourceType) => {
     const response = createResourceNamesResponse({type: resourceType});

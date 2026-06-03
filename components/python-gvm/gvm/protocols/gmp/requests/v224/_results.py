@@ -38,7 +38,6 @@ class Results:
         filter_string: str | None = None,
         filter_id: str | None = None,
         task_id: str | None = None,
-        note_details: bool | None = None,
         override_details: bool | None = None,
         details: bool | None = None,
     ) -> Request:
@@ -47,8 +46,7 @@ class Results:
         Args:
             filter_string: Filter term to use for the query
             filter_id: UUID of an existing filter to use for the query
-            task_id: UUID of task for note and override handling
-            note_details: If notes are included, whether to include note details
+            task_id: UUID of task for override handling
             override_details: If overrides are included, whether to include
                 override details
             details: Whether to include additional details of the results
@@ -62,9 +60,6 @@ class Results:
 
         if details is not None:
             cmd.set_attribute("details", to_bool(details))
-
-        if note_details is not None:
-            cmd.set_attribute("note_details", to_bool(note_details))
 
         if override_details is not None:
             cmd.set_attribute("override_details", to_bool(override_details))

@@ -185,8 +185,6 @@ def generate_result_elem(
         )
         e.SubElement(result_elem, "description").text = description
 
-    e.SubElement(result_elem, "notes").text = "TestNotes"
-
     result_elem.append(elem)
 
     return result_elem, nvt["oid"], nvt["severity"]

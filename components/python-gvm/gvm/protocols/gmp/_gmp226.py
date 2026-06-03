@@ -11,7 +11,6 @@ from collections.abc import Sequence
 from .._protocol import T
 from ._gmp225 import GMPv225
 from .requests.v226 import (
-    AuditReports,
     EntityID,
     Filters,
     FilterType,
@@ -53,7 +52,7 @@ class GMPv226(GMPv225[T]):
         Arguments:
             resource_type: Type must be either ALERT, CERT_BUND_ADV,
                 CONFIG, CPE, CREDENTIAL, CVE, DFN_CERT_ADV, FILTER,
-                GROUP, HOST, NOTE, NVT, OS, OVERRIDE, PERMISSION,
+                GROUP, HOST, NVT, OS, OVERRIDE, PERMISSION,
                 PORT_LIST, REPORT_FORMAT, REPORT, REPORT_CONFIG, RESULT, ROLE,
                 SCANNER, SCHEDULE, TARGET, TASK, TLS_CERTIFICATE
                 or USER
@@ -76,7 +75,7 @@ class GMPv226(GMPv225[T]):
             resource_id: ID of an existing resource
             resource_type: Type must be either ALERT, CERT_BUND_ADV,
                 CONFIG, CPE, CREDENTIAL, CVE, DFN_CERT_ADV, FILTER,
-                GROUP, HOST, NOTE, NVT, OS, OVERRIDE, PERMISSION,
+                GROUP, HOST, NVT, OS, OVERRIDE, PERMISSION,
                 PORT_LIST, REPORT_FORMAT, REPORT, REPORT_CONFIG, RESULT, ROLE,
                 SCANNER, SCHEDULE, TARGET, TASK, TLS_CERTIFICATE
                 or USER
@@ -140,7 +139,6 @@ class GMPv226(GMPv225[T]):
         *,
         filter_string: str | None = None,
         filter_id: EntityID | None = None,
-        note_details: bool | None = None,
         override_details: bool | None = None,
         ignore_pagination: bool | None = None,
         details: bool | None = None,
@@ -150,7 +148,6 @@ class GMPv226(GMPv225[T]):
         Args:
             filter_string: Filter term to use for the query
             filter_id: UUID of an existing filter to use for the query
-            note_details: If notes are included, whether to include note details
             override_details: If overrides are included, whether to include
                 override details
             ignore_pagination: Whether to ignore the filter terms "first" and
@@ -158,13 +155,12 @@ class GMPv226(GMPv225[T]):
             details: Whether to exclude results
         """
         return self._send_request_and_transform_response(
-            Reports.get_reports(
-                filter_string=filter_string,
-                filter_id=filter_id,
-                note_details=note_details,
-                override_details=override_details,
-                ignore_pagination=ignore_pagination,
-                details=details,
+                Reports.get_reports(
+                    filter_string=filter_string,
+                    filter_id=filter_id,
+                    override_details=override_details,
+                    ignore_pagination=ignore_pagination,
+                    details=details,
             )
         )
 
@@ -185,86 +181,6 @@ class GMPv226(GMPv225[T]):
         """
         return self._send_request_and_transform_response(
             Reports.import_report(report, task_id, in_assets=in_assets)
-        )
-
-    def delete_audit_report(self, report_id: EntityID) -> T:
-        """Deletes an existing audit report
-
-        Args:
-            report_id: UUID of the report to be deleted.
-        """
-        return self._send_request_and_transform_response(
-            AuditReports.delete_report(report_id)
-        )
-
-    def get_audit_report(
-        self,
-        report_id: EntityID,
-        *,
-        filter_string: str | None = None,
-        filter_id: str | None = None,
-        delta_report_id: EntityID | None = None,
-        report_format_id: str | ReportFormatType | None = None,
-        ignore_pagination: bool | None = None,
-        details: bool | None = True,
-    ) -> T:
-        """Request a single audit report
-
-        Args:
-            report_id: UUID of an existing audit report
-            filter_string: Filter term to use to filter results in the report
-            filter_id: UUID of filter to use to filter results in the report
-            delta_report_id: UUID of an existing report to compare report to.
-            report_format_id: UUID of report format to use
-                              or ReportFormatType (enum)
-            ignore_pagination: Whether to ignore the filter terms "first" and
-                "rows".
-            details: Request additional report information details
-                     defaults to True
-        """
-        return self._send_request_and_transform_response(
-            AuditReports.get_report(
-                report_id,
-                filter_string=filter_string,
-                filter_id=filter_id,
-                delta_report_id=delta_report_id,
-                report_format_id=report_format_id,
-                ignore_pagination=ignore_pagination,
-                details=details,
-            )
-        )
-
-    def get_audit_reports(
-        self,
-        *,
-        filter_string: str | None = None,
-        filter_id: EntityID | None = None,
-        note_details: bool | None = None,
-        override_details: bool | None = None,
-        ignore_pagination: bool | None = None,
-        details: bool | None = None,
-    ) -> T:
-        """Request a list of audit reports
-
-        Args:
-            filter_string: Filter term to use for the query
-            filter_id: UUID of an existing filter to use for the query
-            note_details: If notes are included, whether to include note details
-            override_details: If overrides are included, whether to include
-                override details
-            ignore_pagination: Whether to ignore the filter terms "first" and
-                "rows".
-            details: Whether to exclude results
-        """
-        return self._send_request_and_transform_response(
-            AuditReports.get_reports(
-                filter_string=filter_string,
-                filter_id=filter_id,
-                note_details=note_details,
-                override_details=override_details,
-                ignore_pagination=ignore_pagination,
-                details=details,
-            )
         )
 
     def create_filter(

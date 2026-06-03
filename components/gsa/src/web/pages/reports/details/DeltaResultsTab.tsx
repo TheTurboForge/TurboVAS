@@ -21,7 +21,6 @@ import {
 } from 'web/utils/Sort';
 
 interface DeltaResultsTabProps {
-  audit?: boolean;
   counts: CollectionCounts;
   delta?: boolean;
   filter: Filter;
@@ -53,7 +52,6 @@ const resultsSortFunctions = {
     (entity: Result) => (entity.information as Nvt | undefined)?.solution?.type,
   ),
   vulnerability: makeCompareString('vulnerability'),
-  compliant: makeCompareString('compliance'),
   epss_score: makeCompareNumber(
     (entity: Result) => entity?.information?.epss?.maxEpss?.score,
     0,
@@ -65,7 +63,6 @@ const resultsSortFunctions = {
 };
 
 const DeltaResultsTab = ({
-  audit = false,
   counts,
   delta = false,
   filter,
@@ -128,7 +125,6 @@ const DeltaResultsTab = ({
         onPreviousClick,
       }) => (
         <ResultsTable
-          audit={audit}
           delta={delta}
           entities={entities}
           entitiesCounts={entitiesCounts}

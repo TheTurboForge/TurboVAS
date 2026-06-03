@@ -3,15 +3,14 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import React, {useEffect} from 'react';
+import React from 'react';
 import {useNavigate} from 'react-router';
 import type Gmp from 'gmp/gmp';
 import Filter from 'gmp/models/filter';
 import type Model from 'gmp/models/model';
-import type Note from 'gmp/models/note';
 import type Override from 'gmp/models/override';
 import type Permission from 'gmp/models/permission';
-import {type default as Task, USAGE_TYPE} from 'gmp/models/task';
+import type Task from 'gmp/models/task';
 import {isDefined} from 'gmp/utils/identity';
 import {TaskIcon} from 'web/components/icon';
 import Layout from 'web/components/layout/Layout';
@@ -52,10 +51,6 @@ import TaskComponent from 'web/pages/tasks/TaskComponent';
 import TaskDetails from 'web/pages/tasks/TaskDetails';
 import TaskStatus from 'web/pages/tasks/TaskStatus';
 import {
-  selector as notesSelector,
-  loadEntities as loadNotes,
-} from 'web/store/entities/notes';
-import {
   selector as overridesSelector,
   loadEntities as loadOverrides,
 } from 'web/store/entities/overrides';
@@ -78,7 +73,6 @@ interface DetailsProps {
 interface TaskDetailsPageProps {
   entity: Task;
   overrides?: Override[];
-  notes?: Note[];
   permissions?: Permission[];
   isLoading?: boolean;
   onChanged?: () => void;
@@ -143,7 +137,6 @@ const Details = ({entity, links}: DetailsProps) => {
 const TaskDetailsPage = ({
   entity,
   permissions = [],
-  notes = [],
   overrides = [],
   isLoading = false,
   onChanged,
@@ -153,12 +146,6 @@ const TaskDetailsPage = ({
 }: TaskDetailsPageProps) => {
   const navigate = useNavigate();
   const [_] = useTranslation();
-
-  useEffect(() => {
-    if (isDefined(entity) && entity.usageType !== USAGE_TYPE.scan) {
-      void navigate('/audit/' + entity.id, {replace: true});
-    }
-  }, [entity, navigate]);
 
   return (
     <TaskComponent
@@ -201,7 +188,6 @@ const TaskDetailsPage = ({
           toolBarIcons={
             <TaskDetailsPageToolBarIcons
               entity={entity}
-              notesCount={notes.length}
               overridesCount={overrides.length}
               onImportTaskCreateClick={createImportTask}
               onReportImportClick={reportImport}
@@ -308,10 +294,8 @@ const taskIdFilter = (id: string) => Filter.fromString('task_id=' + id).all();
 
 const mapStateToProps = (rootState: unknown, {id}: {id: string}) => {
   const permSel = permissionsSelector(rootState);
-  const notesSel = notesSelector(rootState);
   const overridesSel = overridesSelector(rootState);
   return {
-    notes: notesSel.getEntities(taskIdFilter(id)),
     overrides: overridesSel.getEntities(taskIdFilter(id)),
     permissions: permSel.getEntities(permissionsResourceFilter(id)),
   };
@@ -320,13 +304,11 @@ const mapStateToProps = (rootState: unknown, {id}: {id: string}) => {
 const load = (gmp: Gmp) => {
   const loadTaskFunc = loadTask(gmp);
   const loadPermissionsFunc = loadPermissions(gmp);
-  const loadNotesFunc = loadNotes(gmp);
   const loadOverridesFunc = loadOverrides(gmp);
   return (id: string) => dispatch =>
     Promise.all([
       dispatch(loadTaskFunc(id)),
       dispatch(loadPermissionsFunc(permissionsResourceFilter(id))),
-      dispatch(loadNotesFunc(taskIdFilter(id))),
       dispatch(loadOverridesFunc(taskIdFilter(id))),
     ]);
 };

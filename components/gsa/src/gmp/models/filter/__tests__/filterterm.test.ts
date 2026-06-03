@@ -105,9 +105,9 @@ describe('FilterTerm fromString', () => {
     expect(term1.value).toEqual(1);
     expect(term1.relation).toEqual('=');
 
-    const term2 = FilterTerm.fromString('notes>4');
+    const term2 = FilterTerm.fromString('overrides>4');
 
-    expect(term2.keyword).toEqual('notes');
+    expect(term2.keyword).toEqual('overrides');
     expect(term2.value).toEqual(1);
     expect(term2.relation).toEqual('>');
   });

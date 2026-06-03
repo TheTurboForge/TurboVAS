@@ -22,11 +22,9 @@ import {renderSelectItems} from 'web/utils/Render';
 const TriggerAlertDialog = ({
   alertId,
   alerts = [],
-  audit = false,
   applyOverrides = COMPOSER_CONTENT_DEFAULTS.applyOverrides,
   defaultAlertId,
   filter = {},
-  includeNotes = COMPOSER_CONTENT_DEFAULTS.includeNotes,
   includeOverrides = COMPOSER_CONTENT_DEFAULTS.includeOverrides,
   showThresholdMessage = false,
   storeAsDefault,
@@ -47,7 +45,6 @@ const TriggerAlertDialog = ({
 
   const unControlledValues = {
     applyOverrides,
-    includeNotes,
     includeOverrides,
     storeAsDefault,
   };
@@ -60,11 +57,7 @@ const TriggerAlertDialog = ({
     <SaveDialog
       buttonTitle={_('OK')}
       defaultValues={unControlledValues}
-      title={
-        audit
-          ? _('Trigger Alert for Compliance Report')
-          : _('Trigger Alert for Scan Report')
-      }
+      title={_('Trigger Alert for Scan Report')}
       values={controlledValues}
       onClose={onClose}
       onSave={onSave}
@@ -73,9 +66,7 @@ const TriggerAlertDialog = ({
         <>
           <ComposerContent
             applyOverrides={values.applyOverrides}
-            audit={audit}
             filterString={filterString}
-            includeNotes={values.includeNotes}
             includeOverrides={values.includeOverrides}
             onValueChange={onValueChange}
           />
@@ -110,11 +101,9 @@ const TriggerAlertDialog = ({
 TriggerAlertDialog.propTypes = {
   alertId: PropTypes.id,
   alerts: PropTypes.array,
-  audit: PropTypes.bool,
   applyOverrides: PropTypes.numberOrNumberString,
   defaultAlertId: PropTypes.id,
   filter: PropTypes.filter.isRequired,
-  includeNotes: PropTypes.bool,
   includeOverrides: PropTypes.bool,
   showThresholdMessage: PropTypes.bool,
   storeAsDefault: PropTypes.bool,

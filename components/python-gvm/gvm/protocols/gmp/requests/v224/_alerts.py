@@ -19,9 +19,6 @@ class AlertEvent(Enum):
     TASK_RUN_STATUS_CHANGED = "Task run status changed"
     UPDATED_SECINFO_ARRIVED = "Updated SecInfo arrived"
     NEW_SECINFO_ARRIVED = "New SecInfo arrived"
-    TICKET_RECEIVED = "Ticket received"
-    ASSIGNED_TICKET_CHANGED = "Assigned ticket changed"
-    OWNED_TICKET_CHANGED = "Owned ticket changed"
 
 
 class AlertCondition(Enum):
@@ -103,31 +100,6 @@ def _check_event(
             raise InvalidArgument(
                 f"Invalid method {method.name} for event {event.name}"
             )
-    elif event in (
-        AlertEvent.TICKET_RECEIVED,
-        AlertEvent.OWNED_TICKET_CHANGED,
-        AlertEvent.ASSIGNED_TICKET_CHANGED,
-    ):
-        if not condition:
-            raise RequiredArgument(
-                f"condition is required for event {event.name}"
-            )
-
-        if not method:
-            raise RequiredArgument(f"method is required for event {event.name}")
-        if condition != AlertCondition.ALWAYS:
-            raise InvalidArgument(
-                f"Invalid condition {condition.name} for event {event.name}"
-            )
-        if method not in (
-            AlertMethod.EMAIL,
-            AlertMethod.START_TASK,
-            AlertMethod.SYSLOG,
-        ):
-            raise InvalidArgument(
-                f"Invalid method {method.name} for event {event.name}"
-            )
-
 
 class Alerts:
     @classmethod

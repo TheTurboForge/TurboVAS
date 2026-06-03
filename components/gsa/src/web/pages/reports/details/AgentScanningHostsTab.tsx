@@ -16,7 +16,6 @@ import {
 } from 'web/utils/Sort';
 
 interface AgentScanningHostsTabProps {
-  audit?: boolean;
   counts?: CollectionCounts;
   hosts?: ReportHost[];
   filter: Filter;
@@ -44,17 +43,9 @@ const agentScanningHostsSortFunctions = {
   ),
   severity: makeCompareSeverity(),
   total: makeCompareNumber(entity => entity.result_counts.total),
-  complianceYes: makeCompareNumber(entity => entity.complianceCounts.yes),
-  complianceNo: makeCompareNumber(entity => entity.complianceCounts.no),
-  complianceIncomplete: makeCompareNumber(
-    entity => entity.complianceCounts.incomplete,
-  ),
-  complianceTotal: makeCompareNumber(entity => entity.complianceCounts.total),
-  compliant: makeCompareString('hostCompliance'),
 };
 
 const AgentScanningHostsTab = ({
-  audit = false,
   counts,
   hosts,
   filter,
@@ -83,7 +74,6 @@ const AgentScanningHostsTab = ({
         onPreviousClick,
       }) => (
         <AgentScanningHostsTable
-          audit={audit}
           // @ts-expect-error
           entities={entities}
           entitiesCounts={entitiesCounts}

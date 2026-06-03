@@ -114,24 +114,6 @@ describe('convert tests', () => {
     });
   });
 
-  test('should convert notes keyword', () => {
-    expect(convert('notes', '1', '=')).toEqual({
-      keyword: 'notes',
-      relation: '=',
-      value: 1,
-    });
-    expect(convert('notes', '0', '=')).toEqual({
-      keyword: 'notes',
-      relation: '=',
-      value: 0,
-    });
-    expect(convert('notes', '99', '=')).toEqual({
-      keyword: 'notes',
-      relation: '=',
-      value: 1,
-    });
-  });
-
   test('should convert overrides keyword', () => {
     expect(convert('overrides', '1', '=')).toEqual({
       keyword: 'overrides',

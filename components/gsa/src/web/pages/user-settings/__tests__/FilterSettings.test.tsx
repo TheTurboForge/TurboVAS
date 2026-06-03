@@ -29,7 +29,7 @@ describe('FilterSettings', () => {
     const {render} = rendererWith({capabilities, gmp, store: true});
     render(<FilterSettings />);
     const rows = screen.getAllByRole('row');
-    expect(rows.length).toBe(37);
+    expect(rows.length).toBe(32);
   });
 
   test('renders all filter settings rows and links', async () => {
@@ -47,18 +47,14 @@ describe('FilterSettings', () => {
       agentinstaller: 'Agent Installers',
       agent: 'Agents',
       alert: 'Alerts',
-      audit: 'Audits',
-      auditreport: 'Audit Reports',
       scanconfig: 'Configs',
       credential: 'Credentials',
       filter: 'Filters',
       group: 'Groups',
       host: 'Hosts',
-      note: 'Notes',
       operatingsystem: 'Operating Systems',
       override: 'Overrides',
       permission: 'Permissions',
-      policy: 'Policies',
       portlist: 'Port Lists',
       report: 'Reports',
       reportconfig: 'Report Configs',
@@ -70,7 +66,6 @@ describe('FilterSettings', () => {
       tag: 'Tags',
       target: 'Targets',
       task: 'Tasks',
-      ticket: 'Tickets',
       tlscertificate: 'TLS Certificates',
       user: 'Users',
       vulnerability: 'Vulnerabilities',

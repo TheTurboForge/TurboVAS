@@ -61,7 +61,6 @@ describe('pluralizeType function tests', () => {
 
   test('should pluralize special plural types', () => {
     expect(pluralizeType('vulnerability')).toEqual('vulns');
-    expect(pluralizeType('policy')).toEqual('policies');
   });
 });
 
@@ -86,8 +85,6 @@ describe('normalizeType function tests', () => {
     expect(normalizeType('agentgroup')).toEqual('agentgroup');
     expect(normalizeType('agentinstaller')).toEqual('agentinstaller');
     expect(normalizeType('asset')).toEqual('asset');
-    expect(normalizeType('audit')).toEqual('audit');
-    expect(normalizeType('auditreport')).toEqual('auditreport');
     expect(normalizeType('certbund')).toEqual('certbund');
     expect(normalizeType('cpe')).toEqual('cpe');
     expect(normalizeType('credential')).toEqual('credential');
@@ -99,9 +96,7 @@ describe('normalizeType function tests', () => {
     expect(normalizeType('info')).toEqual('info');
     expect(normalizeType('nvt')).toEqual('nvt');
     expect(normalizeType('operatingsystem')).toEqual('operatingsystem');
-    expect(normalizeType('note')).toEqual('note');
     expect(normalizeType('permission')).toEqual('permission');
-    expect(normalizeType('policy')).toEqual('policy');
     expect(normalizeType('portlist')).toEqual('portlist');
     expect(normalizeType('portrange')).toEqual('portrange');
     expect(normalizeType('report')).toEqual('report');
@@ -130,8 +125,6 @@ describe('apiType function tests', () => {
     expect(apiType('agent')).toEqual('agent');
     expect(apiType('agentgroup')).toEqual('agent_group');
     expect(apiType('agentinstaller')).toEqual('agent_installer');
-    expect(apiType('audit')).toEqual('task');
-    expect(apiType('auditreport')).toEqual('report');
     expect(apiType('certbund')).toEqual('info');
     expect(apiType('cpe')).toEqual('info');
     expect(apiType('cve')).toEqual('info');
@@ -139,7 +132,6 @@ describe('apiType function tests', () => {
     expect(apiType('host')).toEqual('asset');
     expect(apiType('nvt')).toEqual('info');
     expect(apiType('operatingsystem')).toEqual('asset');
-    expect(apiType('policy')).toEqual('config');
     expect(apiType('portlist')).toEqual('port_list');
     expect(apiType('portrange')).toEqual('port_range');
     expect(apiType('reportconfig')).toEqual('report_config');
@@ -191,9 +183,6 @@ describe('typeName function tests', () => {
     expect(typeName('agentinstaller')).toEqual('Agent Installer');
     expect(typeName('alert')).toEqual('Alert');
     expect(typeName('asset')).toEqual('Asset');
-    expect(typeName('audit_report')).toEqual('Audit Report');
-    expect(typeName('audit')).toEqual('Audit');
-    expect(typeName('auditreport')).toEqual('Audit Report');
     expect(typeName('cert_bund_adv')).toEqual('CERT-Bund Advisory');
     expect(typeName('certbund')).toEqual('CERT-Bund Advisory');
     expect(typeName('config')).toEqual('Scan Config');
@@ -209,10 +198,8 @@ describe('typeName function tests', () => {
     expect(typeName('operatingsystem')).toEqual('Operating System');
     expect(typeName('override')).toEqual('Override');
     expect(typeName('os')).toEqual('Operating System');
-    expect(typeName('note')).toEqual('Note');
     expect(typeName('nvt')).toEqual('NVT');
     expect(typeName('permission')).toEqual('Permission');
-    expect(typeName('policy')).toEqual('Policy');
     expect(typeName('port_list')).toEqual('Port List');
     expect(typeName('port_range')).toEqual('Port Range');
     expect(typeName('portlist')).toEqual('Port List');
@@ -230,7 +217,6 @@ describe('typeName function tests', () => {
     expect(typeName('tag')).toEqual('Tag');
     expect(typeName('target')).toEqual('Target');
     expect(typeName('task')).toEqual('Task');
-    expect(typeName('ticket')).toEqual('Ticket');
     expect(typeName('tls_certificate')).toEqual('TLS Certificate');
     expect(typeName('tlscertificate')).toEqual('TLS Certificate');
     expect(typeName('user')).toEqual('User');
@@ -247,8 +233,6 @@ describe('resourceType function tests', () => {
   });
 
   test('should return resource type for known types', () => {
-    expect(resourceType('audit')).toEqual('audit');
-    expect(resourceType('auditreport')).toEqual('audit_report');
     expect(resourceType('certbund')).toEqual('cert_bund_adv');
     expect(resourceType('cpe')).toEqual('cpe');
     expect(resourceType('cve')).toEqual('cve');
@@ -256,7 +240,6 @@ describe('resourceType function tests', () => {
     expect(resourceType('operatingsystem')).toEqual('os');
     expect(resourceType('host')).toEqual('host');
     expect(resourceType('nvt')).toEqual('nvt');
-    expect(resourceType('policy')).toEqual('policy');
     expect(resourceType('scanconfig')).toEqual('config');
   });
 
@@ -264,7 +247,6 @@ describe('resourceType function tests', () => {
     expect(resourceType('credential')).toEqual('credential');
     expect(resourceType('filter')).toEqual('filter');
     expect(resourceType('group')).toEqual('group');
-    expect(resourceType('note')).toEqual('note');
     expect(resourceType('permission')).toEqual('permission');
     expect(resourceType('portlist')).toEqual('port_list');
     expect(resourceType('report')).toEqual('report');
@@ -300,8 +282,6 @@ describe('entityURL function tests', () => {
     {type: 'agent', id: '1', expected: '/agent/1'},
     {type: 'agentgroup', id: '2', expected: '/agent-group/2'},
     {type: 'agentinstaller', id: '3', expected: '/agent-installer/3'},
-    {type: 'audit', id: '4', expected: '/audit/4'},
-    {type: 'auditreport', id: '5', expected: '/audit-report/5'},
     {type: 'certbund', id: '6', expected: '/cert-bund-advisory/6'},
     {type: 'cpe', id: '7', expected: '/cpe/7'},
     {type: 'cve', id: '8', expected: '/cve/8'},
@@ -309,7 +289,6 @@ describe('entityURL function tests', () => {
     {type: 'host', id: '10', expected: '/host/10'},
     {type: 'nvt', id: '11', expected: '/nvt/11'},
     {type: 'operatingsystem', id: '13', expected: '/operating-system/13'},
-    {type: 'policy', id: '14', expected: '/policy/14'},
     {type: 'portlist', id: '15', expected: '/port-list/15'},
     {type: 'portrange', id: '16', expected: '/port-range/16'},
     {type: 'reportconfig', id: '17', expected: '/report-config/17'},
@@ -323,7 +302,6 @@ describe('entityURL function tests', () => {
     {type: 'filter', id: '25', expected: '/filter/25'},
     {type: 'group', id: '26', expected: '/group/26'},
     {type: 'info', id: '27', expected: '/info/27'},
-    {type: 'note', id: '28', expected: '/note/28'},
     {type: 'override', id: '29', expected: '/override/29'},
     {type: 'permission', id: '30', expected: '/permission/30'},
     {type: 'report', id: '31', expected: '/report/31'},
@@ -334,7 +312,6 @@ describe('entityURL function tests', () => {
     {type: 'tag', id: '36', expected: '/tag/36'},
     {type: 'target', id: '37', expected: '/target/37'},
     {type: 'task', id: '38', expected: '/task/38'},
-    {type: 'ticket', id: '39', expected: '/ticket/39'},
     {type: 'user', id: '40', expected: '/user/40'},
   ])(
     'should return correct URL for $type with id $id',

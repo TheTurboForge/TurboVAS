@@ -18,7 +18,6 @@ import AgentScanningHostsTab from 'web/pages/reports/details/AgentScanningHostsT
 import HostsTab from 'web/pages/reports/details/HostsTab';
 
 export interface HostsTabContentProps {
-  audit?: boolean;
   reportId: string;
   status: TaskStatus;
   isAgentScanning?: boolean;
@@ -26,7 +25,6 @@ export interface HostsTabContentProps {
 }
 
 const HostsTabContent = ({
-  audit = false,
   reportId,
   status,
   isAgentScanning,
@@ -76,7 +74,6 @@ const HostsTabContent = ({
   if (isAgentScanning) {
     return (
       <AgentScanningHostsTab
-        audit={audit}
         counts={hosts.counts}
         filter={reportFilter}
         hosts={hosts.entities}
@@ -91,7 +88,6 @@ const HostsTabContent = ({
 
   return (
     <HostsTab
-      audit={audit}
       counts={hosts.counts}
       filter={reportFilter}
       hosts={hosts.entities}

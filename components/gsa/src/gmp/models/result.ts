@@ -5,7 +5,6 @@
 
 import {type ComplianceType} from 'gmp/models/compliance';
 import Model, {type ModelElement, type ModelProperties} from 'gmp/models/model';
-import Note, {type NoteElement} from 'gmp/models/note';
 import Nvt, {type NvtEpssElement} from 'gmp/models/nvt';
 import Override, {type OverrideElement} from 'gmp/models/override';
 import {
@@ -73,10 +72,6 @@ interface DeltaResult {
   severity?: number;
 }
 
-interface TicketElement {
-  _id?: string;
-}
-
 interface ResultDetectionDetailElement {
   name: string;
   value: string;
@@ -124,9 +119,6 @@ interface ResultElement extends ModelElement {
     };
     hostname?: string;
   };
-  notes?: {
-    note?: NoteElement | NoteElement[];
-  };
   nvt?: ResultNvtElement | ResultCveElement;
   original_severity?: number;
   original_threat?: string;
@@ -144,9 +136,6 @@ interface ResultElement extends ModelElement {
     name?: string;
   };
   threat?: string;
-  tickets?: {
-    ticket?: TicketElement | TicketElement[];
-  };
   qod?: QoDParams;
 }
 
@@ -172,7 +161,6 @@ interface ResultProperties extends ModelProperties {
   description?: string;
   host?: ResultHost;
   information?: Nvt | CveResult;
-  notes?: Note[];
   original_severity?: number;
   overrides?: Override[];
   port?: string;
@@ -181,7 +169,6 @@ interface ResultProperties extends ModelProperties {
   scan_nvt_version?: string;
   severity?: number;
   task?: Model;
-  tickets?: Model[];
   vulnerability?: string;
 }
 
@@ -261,7 +248,6 @@ class Result extends Model {
   readonly description?: string;
   readonly host?: ResultHost;
   readonly information?: Nvt | CveResult;
-  readonly notes?: Note[];
   readonly original_severity?: number;
   readonly overrides: Override[];
   readonly port?: string;
@@ -270,7 +256,6 @@ class Result extends Model {
   readonly scan_nvt_version?: string;
   readonly severity?: number;
   readonly task?: Model;
-  readonly tickets: Model[];
   readonly vulnerability?: string;
 
   constructor({
@@ -280,7 +265,6 @@ class Result extends Model {
     description,
     host,
     information,
-    notes = [],
     // eslint-disable-next-line @typescript-eslint/naming-convention
     original_severity,
     overrides = [],
@@ -291,7 +275,6 @@ class Result extends Model {
     scan_nvt_version,
     severity,
     task,
-    tickets = [],
     vulnerability,
     ...properties
   }: ResultProperties = {}) {
@@ -303,7 +286,6 @@ class Result extends Model {
     this.description = description;
     this.host = host;
     this.information = information;
-    this.notes = notes;
     this.original_severity = original_severity;
     this.overrides = overrides;
     this.port = port;
@@ -312,7 +294,6 @@ class Result extends Model {
     this.scan_nvt_version = scan_nvt_version;
     this.severity = severity;
     this.task = task;
-    this.tickets = tickets;
     this.vulnerability = vulnerability;
   }
 
@@ -329,7 +310,6 @@ class Result extends Model {
       detection,
       host,
       name,
-      notes,
       nvt: information,
       original_severity,
       overrides,
@@ -338,7 +318,6 @@ class Result extends Model {
       task,
       delta,
       qod,
-      tickets,
     } = element;
 
     if (isDefined(host)) {
@@ -396,14 +375,8 @@ class Result extends Model {
       ? parseSeverity(original_severity)
       : undefined;
     copy.qod = isDefined(qod) ? parseQod(qod) : undefined;
-    copy.notes = map(notes?.note, note => Note.fromElement(note));
     copy.overrides = map(overrides?.override, override =>
       Override.fromElement(override),
-    );
-
-    // parse tickets as models only. we don't have other data then the id here
-    copy.tickets = map(tickets?.ticket, ticket =>
-      Model.fromElement(ticket, 'ticket'),
     );
 
     return copy;

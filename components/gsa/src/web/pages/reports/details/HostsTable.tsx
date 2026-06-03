@@ -6,7 +6,6 @@
 import {_, _l} from 'gmp/locale/lang';
 import type ReportHost from 'gmp/models/report/host';
 import {isDefined} from 'gmp/utils/identity';
-import ComplianceBar from 'web/components/bar/ComplianceBar';
 import SeverityBar from 'web/components/bar/SeverityBar';
 import DateTime from 'web/components/date/DateTime';
 import {VerifyIcon, VerifyNoIcon} from 'web/components/icon';
@@ -15,7 +14,6 @@ import IconDivider from 'web/components/layout/IconDivider';
 import DetailsLink from 'web/components/link/DetailsLink';
 import Link from 'web/components/link/Link';
 import {
-  getComplianceColumnsConfig,
   getSeverityColumnsConfig,
   getSeverityLabel,
 } from 'web/components/table/SeverityColumns';
@@ -28,7 +26,6 @@ import useGmp from 'web/hooks/useGmp';
 import {type SortDirectionType} from 'web/utils/sort-direction';
 
 interface HeaderProps {
-  audit?: boolean;
   currentSortBy?: string;
   currentSortDir?: SortDirectionType;
   sort?: boolean;
@@ -75,7 +72,7 @@ const renderAuthIcons = authSuccess => {
   );
 };
 
-const getColumns = (audit = false, useCVSSv3 = false) => [
+const getColumns = (useCVSSv3 = false) => [
   {
     key: 'ip',
     title: _('IP Address'),
@@ -158,50 +155,26 @@ const getColumns = (audit = false, useCVSSv3 = false) => [
     sortBy: 'end',
     render: (entity: ReportHost) => <DateTime date={entity.end} />,
   },
-  ...(audit
-    ? getComplianceColumnsConfig()
-    : getSeverityColumnsConfig(useCVSSv3, '3%')),
-  ...(audit
-    ? [
-        {
-          key: 'complianceTotal',
-          title: _('Total'),
-          width: '4.5%',
-          sortBy: 'complianceTotal',
-          render: (entity: ReportHost) => entity.complianceCounts?.total,
-        },
-        {
-          key: 'compliant',
-          title: _('Compliant'),
-          width: '8%',
-          sortBy: 'compliant',
-          render: (entity: ReportHost) => (
-            <ComplianceBar compliance={entity.hostCompliance} />
-          ),
-        },
-      ]
-    : [
-        {
-          key: 'total',
-          title: _('Total'),
-          width: '3%',
-          sortBy: 'total',
-          render: (entity: ReportHost) => entity.result_counts?.total,
-        },
-        {
-          key: 'severity',
-          title: _('Severity'),
-          width: '8%',
-          sortBy: 'severity',
-          render: (entity: ReportHost) => (
-            <SeverityBar severity={entity.severity} />
-          ),
-        },
-      ]),
+  ...getSeverityColumnsConfig(useCVSSv3, '3%'),
+  {
+    key: 'total',
+    title: _('Total'),
+    width: '3%',
+    sortBy: 'total',
+    render: (entity: ReportHost) => entity.result_counts?.total,
+  },
+  {
+    key: 'severity',
+    title: _('Severity'),
+    width: '8%',
+    sortBy: 'severity',
+    render: (entity: ReportHost) => (
+      <SeverityBar severity={entity.severity} />
+    ),
+  },
 ];
 
 const Header = ({
-  audit = false,
   currentSortBy,
   currentSortDir,
   sort = true,
@@ -209,7 +182,7 @@ const Header = ({
 }: HeaderProps) => {
   const gmp = useGmp();
   const useCVSSv3 = gmp.settings.severityRating === 'CVSSv3';
-  const columns = getColumns(audit, useCVSSv3);
+  const columns = getColumns(useCVSSv3);
 
   return (
     <TableHeader>
@@ -236,10 +209,10 @@ const Header = ({
   );
 };
 
-const Row = ({entity, audit = false, links = true}) => {
+const Row = ({entity, links = true}) => {
   const gmp = useGmp();
   const useCVSSv3 = gmp.settings.severityRating === 'CVSSv3';
-  const columns = getColumns(audit, useCVSSv3);
+  const columns = getColumns(useCVSSv3);
 
   return (
     <TableRow>

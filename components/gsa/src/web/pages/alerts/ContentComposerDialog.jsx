@@ -21,7 +21,6 @@ const ContentComposerDialog = ({
   filterId = UNSET_VALUE,
   filters = [],
   ignorePagination = YES_VALUE,
-  includeNotes = COMPOSER_CONTENT_DEFAULTS.includeNotes,
   includeOverrides = COMPOSER_CONTENT_DEFAULTS.includeOverrides,
   storeAsDefault,
   onClose,
@@ -36,7 +35,6 @@ const ContentComposerDialog = ({
   const controlledValues = {
     filterId,
     ignorePagination,
-    includeNotes,
     includeOverrides,
     storeAsDefault,
   };
@@ -63,7 +61,6 @@ const ContentComposerDialog = ({
             ' from the dropdown menu.',
         )}
         filterString={isDefined(filter) ? filter.toFilterString() : ''}
-        includeNotes={includeNotes}
         includeOverrides={includeOverrides}
         onValueChange={onChange}
       />
@@ -95,7 +92,6 @@ ContentComposerDialog.propTypes = {
   filterString: PropTypes.string,
   filters: PropTypes.array,
   ignorePagination: PropTypes.number,
-  includeNotes: PropTypes.number,
   includeOverrides: PropTypes.number,
   reportFormatId: PropTypes.id,
   reportFormats: PropTypes.array,

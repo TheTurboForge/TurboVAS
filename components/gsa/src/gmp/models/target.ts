@@ -19,7 +19,7 @@ interface SSHCredentialElement extends ModelElement {
 }
 
 interface TargetTaskElement extends ModelElement {
-  usage_type?: 'scan' | 'audit';
+  usage_type?: 'scan';
 }
 
 interface TargetElement extends ModelElement {
@@ -250,9 +250,7 @@ class Target extends Model {
 
     if (isDefined(element.tasks)) {
       ret.tasks = map(element.tasks.task, task => {
-        // Use 'audit' entity type for audits, 'task' for scans
-        const entityType = task.usage_type === 'audit' ? 'audit' : 'task';
-        return Model.fromElement(task, entityType);
+        return Model.fromElement(task, 'task');
       });
     }
 

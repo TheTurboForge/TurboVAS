@@ -19,7 +19,6 @@ describe('Result model tests', () => {
     expect(result.description).toBeUndefined();
     expect(result.host).toBeUndefined();
     expect(result.information).toBeUndefined();
-    expect(result.notes).toEqual([]);
     expect(result.original_severity).toBeUndefined();
     expect(result.overrides).toEqual([]);
     expect(result.port).toBeUndefined();
@@ -28,7 +27,6 @@ describe('Result model tests', () => {
     expect(result.scan_nvt_version).toBeUndefined();
     expect(result.severity).toBeUndefined();
     expect(result.task).toBeUndefined();
-    expect(result.tickets).toEqual([]);
     expect(result.vulnerability).toBeUndefined();
   });
 
@@ -40,7 +38,6 @@ describe('Result model tests', () => {
     expect(result.description).toBeUndefined();
     expect(result.host).toBeUndefined();
     expect(result.information).toBeUndefined();
-    expect(result.notes).toEqual([]);
     expect(result.original_severity).toBeUndefined();
     expect(result.overrides).toEqual([]);
     expect(result.port).toBeUndefined();
@@ -49,7 +46,6 @@ describe('Result model tests', () => {
     expect(result.scan_nvt_version).toBeUndefined();
     expect(result.severity).toBeUndefined();
     expect(result.task).toBeUndefined();
-    expect(result.tickets).toEqual([]);
     expect(result.vulnerability).toBeUndefined();
   });
 
@@ -285,37 +281,6 @@ describe('Result model tests', () => {
     expect(result.qod?.value).toEqual(42.5);
   });
 
-  test('should parse notes', () => {
-    const result = Result.fromElement({
-      notes: {
-        note: [
-          {
-            _id: 'foo',
-          },
-
-          {
-            _id: 'bar',
-          },
-        ],
-      },
-    });
-
-    expect(result.notes?.[0].entityType).toEqual('note');
-    expect(result.notes?.[0].id).toEqual('foo');
-    expect(result.notes?.[1].entityType).toEqual('note');
-    expect(result.notes?.[1].id).toEqual('bar');
-
-    const result2 = Result.fromElement({
-      notes: {
-        note: {
-          _id: 'baz',
-        },
-      },
-    });
-    expect(result2.notes?.[0].entityType).toEqual('note');
-    expect(result2.notes?.[0].id).toEqual('baz');
-  });
-
   test('should parse overrides', () => {
     const result = Result.fromElement({
       overrides: {
@@ -348,26 +313,6 @@ describe('Result model tests', () => {
       description: 'This is a test description',
     });
     expect(result.description).toEqual('This is a test description');
-  });
-
-  test('should parse tickets', () => {
-    const result = Result.fromElement({
-      tickets: {
-        ticket: [{_id: 'foo'}, {_id: 'bar'}],
-      },
-    });
-    expect(result.tickets[0].entityType).toEqual('ticket');
-    expect(result.tickets[0].id).toEqual('foo');
-    expect(result.tickets[1].entityType).toEqual('ticket');
-    expect(result.tickets[1].id).toEqual('bar');
-
-    const result2 = Result.fromElement({
-      tickets: {
-        ticket: {_id: 'baz'},
-      },
-    });
-    expect(result2.tickets[0].entityType).toEqual('ticket');
-    expect(result2.tickets[0].id).toEqual('baz');
   });
 
   test('should parse port', () => {

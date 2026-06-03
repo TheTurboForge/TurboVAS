@@ -734,10 +734,6 @@ modify_setting (const gchar *uuid, const gchar *name,
 #endif
       else if (strcmp (uuid, "0f040d06-abf9-43a2-8f94-9de178b0e978") == 0)
         setting_name = g_strdup ("Assets Filter");
-      else if (strcmp (uuid, "aaf1b63b-55a6-40ee-ae06-e8e50726f55a") == 0)
-        setting_name = g_strdup ("Audits Filter");
-      else if (strcmp (uuid, "45414da7-55f0-44c1-abbb-6b7d1126fbdf") == 0)
-        setting_name = g_strdup ("Audit Reports Filter");
       else if (strcmp (uuid, "1a9fbd91-0182-44cd-bc88-a13a9b3b1bef") == 0)
         setting_name = g_strdup ("Configs Filter");
       else if (strcmp (uuid, "186a5ac8-fe5a-4fb1-aa22-44031fb339f3") == 0)
@@ -748,16 +744,12 @@ modify_setting (const gchar *uuid, const gchar *name,
         setting_name = g_strdup ("Groups Filter");
       else if (strcmp (uuid, "37562dfe-1f7e-4cae-a7c0-fa95e6f194c5") == 0)
         setting_name = g_strdup ("Hosts Filter");
-      else if (strcmp (uuid, "96abcd5a-9b6d-456c-80b8-c3221bfa499d") == 0)
-        setting_name = g_strdup ("Notes Filter");
       else if (strcmp (uuid, "f608c3ec-ce73-4ff6-8e04-7532749783af") == 0)
         setting_name = g_strdup ("Operating Systems Filter");
       else if (strcmp (uuid, "eaaaebf1-01ef-4c49-b7bb-955461c78e0a") == 0)
         setting_name = g_strdup ("Overrides Filter");
       else if (strcmp (uuid, "ffb16b28-538c-11e3-b8f9-406186ea4fc5") == 0)
         setting_name = g_strdup ("Permissions Filter");
-      else if (strcmp (uuid, "7d52d575-baeb-4d98-bb68-e1730dbc6236") == 0)
-        setting_name = g_strdup ("Policies Filter");
       else if (strcmp (uuid, "a17e1497-b27d-4389-9860-2f3b01dff9b2") == 0)
         setting_name = g_strdup ("Port Lists Filter");
       else if (strcmp (uuid, "48ae588e-9085-41bc-abcb-3d6389cf7237") == 0)
@@ -780,8 +772,6 @@ modify_setting (const gchar *uuid, const gchar *name,
         setting_name = g_strdup ("Targets Filter");
       else if (strcmp (uuid, "1c981851-8244-466c-92c4-865ffe05e721") == 0)
         setting_name = g_strdup ("Tasks Filter");
-      else if (strcmp (uuid, "801544de-f06d-4377-bb77-bbb23369bad4") == 0)
-        setting_name = g_strdup ("Tickets Filter");
       else if (strcmp (uuid, "34a176c1-0278-4c29-b84d-3d72117b2169") == 0)
         setting_name = g_strdup ("TLS Certificates Filter");
       else if (strcmp (uuid, "a33635be-7263-4549-bd80-c04d2dba89b4") == 0)
@@ -798,8 +788,6 @@ modify_setting (const gchar *uuid, const gchar *name,
         setting_name = g_strdup ("CERT-Bund Filter");
       else if (strcmp (uuid, "312350ed-bc06-44f3-8b3f-ab9eb828b80b") == 0)
         setting_name = g_strdup ("DFN-CERT Filter");
-      else if (strcmp (uuid, "32b3d606-461b-4770-b3e1-b9ea3cf0f84c") == 0)
-        setting_name = g_strdup ("Notes Filter");
       else if (strcmp (uuid, "956d13bd-3baa-4404-a138-5e7eb8f9630e") == 0)
         setting_name = g_strdup ("Overrides Filter");
 
@@ -862,9 +850,6 @@ modify_setting (const gchar *uuid, const gchar *name,
       else if (strcmp (uuid, "e599bb6b-b95a-4bb2-a6bb-fe8ac69bc071") == 0)
         setting_name = g_strdup ("Reports Top Dashboard Configuration");
 
-      /* Audit Reports dashboard settings */
-      else if (strcmp (uuid, "8083d77b-05bb-4b17-ab39-c81175cb512c") == 0)
-        setting_name = g_strdup ("Audit Reports Top Dashboard Configuration");
       /* Results dashboard settings */
       else if (strcmp (uuid, "0b8ae70d-d8fc-4418-8a72-e65ac8d2828e") == 0)
         setting_name = g_strdup ("Results Top Dashboard Configuration");
@@ -872,10 +857,6 @@ modify_setting (const gchar *uuid, const gchar *name,
       /* Vulns dashboard settings */
       else if (strcmp (uuid, "43690dcb-3174-4d84-aa88-58c1936c7f5c") == 0)
         setting_name = g_strdup ("Vulnerabilities Top Dashboard Configuration");
-
-      /* Notes dashboard settings */
-      else if (strcmp (uuid, "ce7b121-c609-47b0-ab57-fd020a0336f4a") == 0)
-        setting_name = g_strdup ("Notes Top Dashboard Configuration");
 
       /* Overrides dashboard settings */
       else if (strcmp (uuid, "054862fe-0781-4527-b1aa-2113bcd16ce7") == 0)
@@ -931,13 +912,6 @@ modify_setting (const gchar *uuid, const gchar *name,
       else if (strcmp (uuid, "4c7b1ea7-b7e6-4d12-9791-eb9f72b6f864") == 0)
         setting_name = g_strdup ("All SecInfo Top Dashboard Configuration");
 
-      /*
-       * Resilience / Remediation dashboards
-       */
-
-      /* Tickets */
-      else if (strcmp (uuid, "70b0626f-a835-478e-8194-e09f97887a15") == 0)
-        setting_name = g_strdup ("Tickets Top Dashboard Configuration");
     }
 
   if (setting_name)

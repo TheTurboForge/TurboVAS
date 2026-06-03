@@ -55,20 +55,7 @@ const result = Result.fromElement({
   qod: {value: 80},
   task: {_id: '314', name: 'task 1'},
   report: {_id: '159'},
-  tickets: {
-    ticket: [{_id: '265'}],
-  },
   scan_nvt_version: '2019-02-14T07:33:50Z',
-  notes: {
-    note: [
-      {
-        _id: '358',
-        text: 'TestNote',
-        modification_time: '2021-03-11T13:00:32Z',
-        active: 1,
-      },
-    ],
-  },
   overrides: {
     override: [
       {
@@ -85,10 +72,8 @@ const result = Result.fromElement({
 
 describe('ResultDetailsPageToolBarIcons tests', () => {
   test('should render', () => {
-    const handleNoteCreateClick = testing.fn();
     const handleOverrideCreateClick = testing.fn();
     const handleResultDownloadClick = testing.fn();
-    const handleTicketCreateClick = testing.fn();
     const gmp = {settings: {manualUrl, enableEPSS}};
     const {render} = rendererWith({
       gmp,
@@ -99,10 +84,8 @@ describe('ResultDetailsPageToolBarIcons tests', () => {
     render(
       <ResultDetailsPageToolBarIcons
         entity={result}
-        onNoteCreateClick={handleNoteCreateClick}
         onOverrideCreateClick={handleOverrideCreateClick}
         onResultDownloadClick={handleResultDownloadClick}
-        onTicketCreateClick={handleTicketCreateClick}
       />,
     );
 
@@ -119,21 +102,16 @@ describe('ResultDetailsPageToolBarIcons tests', () => {
     );
 
     expect(screen.getByTitle('Export Result as XML')).toBeInTheDocument();
-    expect(screen.getByTitle('Add new Note')).toBeInTheDocument();
     expect(screen.getByTitle('Add new Override')).toBeInTheDocument();
-    expect(screen.getByTitle('Create new Ticket')).toBeInTheDocument();
     expect(
       screen.getByTitle('Corresponding Task (task 1)'),
     ).toBeInTheDocument();
     expect(screen.getByTitle('Corresponding Report')).toBeInTheDocument();
-    expect(screen.getByTitle('Corresponding Tickets')).toBeInTheDocument();
   });
 
   test('should call click handlers', () => {
-    const handleNoteCreateClick = testing.fn();
     const handleOverrideCreateClick = testing.fn();
     const handleResultDownloadClick = testing.fn();
-    const handleTicketCreateClick = testing.fn();
     const gmp = {settings: {manualUrl, enableEPSS}};
     const {render} = rendererWith({
       gmp,
@@ -144,10 +122,8 @@ describe('ResultDetailsPageToolBarIcons tests', () => {
     render(
       <ResultDetailsPageToolBarIcons
         entity={result}
-        onNoteCreateClick={handleNoteCreateClick}
         onOverrideCreateClick={handleOverrideCreateClick}
         onResultDownloadClick={handleResultDownloadClick}
-        onTicketCreateClick={handleTicketCreateClick}
       />,
     );
 
@@ -156,28 +132,17 @@ describe('ResultDetailsPageToolBarIcons tests', () => {
     fireEvent.click(exportIcon);
     expect(handleResultDownloadClick).toHaveBeenCalledWith(result);
 
-    const newNoteIcon = screen.getByTestId('new-note-icon');
-    expect(newNoteIcon).toHaveAttribute('title', 'Add new Note');
-    fireEvent.click(newNoteIcon);
-
     const newOverrideIcon = screen.getByTestId('new-override-icon');
     expect(newOverrideIcon).toHaveAttribute('title', 'Add new Override');
     fireEvent.click(newOverrideIcon);
     expect(handleOverrideCreateClick).toHaveBeenCalledWith(result);
-
-    const newTicketIcon = screen.getByTestId('new-ticket-icon');
-    expect(newTicketIcon).toHaveAttribute('title', 'Create new Ticket');
-    fireEvent.click(newTicketIcon);
-    expect(handleTicketCreateClick).toHaveBeenCalledWith(result);
   });
 
   test('should not show icons without permission', () => {
     const wrongCapabilities = new Capabilities(['get_results']);
 
-    const handleNoteCreateClick = testing.fn();
     const handleOverrideCreateClick = testing.fn();
     const handleResultDownloadClick = testing.fn();
-    const handleTicketCreateClick = testing.fn();
     const gmp = {settings: {manualUrl}};
     const {render} = rendererWith({
       gmp,
@@ -188,23 +153,16 @@ describe('ResultDetailsPageToolBarIcons tests', () => {
     render(
       <ResultDetailsPageToolBarIcons
         entity={result}
-        onNoteCreateClick={handleNoteCreateClick}
         onOverrideCreateClick={handleOverrideCreateClick}
         onResultDownloadClick={handleResultDownloadClick}
-        onTicketCreateClick={handleTicketCreateClick}
       />,
     );
 
     expect(screen.getByTitle('Export Result as XML')).toBeInTheDocument();
-    expect(screen.queryByTitle('Add new Note')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Add new Override')).not.toBeInTheDocument();
-    expect(screen.queryByTitle('Create new Ticket')).not.toBeInTheDocument();
     expect(
       screen.queryByTitle('Corresponding Task (task 1)'),
     ).not.toBeInTheDocument();
     expect(screen.queryByTitle('Corresponding Report')).not.toBeInTheDocument();
-    expect(
-      screen.queryByTitle('Corresponding Tickets'),
-    ).not.toBeInTheDocument();
   });
 });

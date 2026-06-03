@@ -33,14 +33,6 @@ describe('DownloadReportDialog', () => {
     ).toBeInTheDocument();
   });
 
-  test('should render the dialog with compliance report title when audit', () => {
-    render(<DownloadReportDialog {...defaultProps} audit={true} />);
-
-    expect(
-      screen.getByText('Compose Content for Compliance Report'),
-    ).toBeInTheDocument();
-  });
-
   test('should not show container scanning warning when not container scanning', () => {
     render(
       <DownloadReportDialog

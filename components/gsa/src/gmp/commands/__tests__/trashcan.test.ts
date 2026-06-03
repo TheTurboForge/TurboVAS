@@ -66,10 +66,7 @@ describe('TrashCanCommand tests', () => {
           alert: [{_id: 'alert1'}, {_id: 'alert2'}],
         },
         get_configs_response: {
-          config: [
-            {_id: 'config1', usage_type: 'scan'},
-            {_id: 'policy1', usage_type: 'audit'},
-          ],
+          config: [{_id: 'config1', usage_type: 'scan'}],
         },
         get_credentials_response: {
           credential: [{_id: 'cred1'}, {_id: 'cred2'}],
@@ -79,9 +76,6 @@ describe('TrashCanCommand tests', () => {
         },
         get_groups_response: {
           group: [{_id: 'group1'}, {_id: 'group2'}],
-        },
-        get_notes_response: {
-          note: [{_id: 'note1'}, {_id: 'note2'}],
         },
         get_overrides_response: {
           override: [{_id: 'override1'}, {_id: 'override2'}],
@@ -114,13 +108,7 @@ describe('TrashCanCommand tests', () => {
           target: [{_id: 'target1'}, {_id: 'target2'}],
         },
         get_tasks_response: {
-          task: [
-            {_id: 'task1', usage_type: 'scan'},
-            {_id: 'audit1', usage_type: 'audit'},
-          ],
-        },
-        get_tickets_response: {
-          ticket: [{_id: 'ticket1'}, {_id: 'ticket2'}],
+          task: [{_id: 'task1', usage_type: 'scan'}],
         },
       },
     });
@@ -128,15 +116,12 @@ describe('TrashCanCommand tests', () => {
     const cmd = new TrashCanCommand(fakeHttp);
     const data = await cmd.get();
     expect(data.data.alerts.length).toBe(2);
-    expect(data.data.audits.length).toBe(1);
     expect(data.data.credentials.length).toBe(2);
     expect(data.data.filters.length).toBe(2);
     expect(data.data.groups.length).toBe(2);
-    expect(data.data.notes.length).toBe(2);
     expect(data.data.overrides.length).toBe(2);
     expect(data.data.permissions.length).toBe(2);
     expect(data.data.portLists.length).toBe(1);
-    expect(data.data.policies.length).toBe(1);
     expect(data.data.reportConfigs.length).toBe(1);
     expect(data.data.reportFormats.length).toBe(2);
     expect(data.data.roles.length).toBe(2);
@@ -146,7 +131,6 @@ describe('TrashCanCommand tests', () => {
     expect(data.data.tags.length).toBe(2);
     expect(data.data.targets.length).toBe(2);
     expect(data.data.tasks.length).toBe(1);
-    expect(data.data.tickets.length).toBe(2);
     expect(data.data.agentGroups.length).toBe(0);
     expect(data.data.failedRequests).toBeUndefined();
   });
