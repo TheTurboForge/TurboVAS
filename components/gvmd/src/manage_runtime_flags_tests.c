@@ -23,7 +23,6 @@ Describe (manage_runtime_flags);
 BeforeEach (manage_runtime_flags)
 {
   unsetenv ("GVMD_ENABLE_AGENTS");
-  unsetenv ("GVMD_ENABLE_CONTAINER_SCANNING");
   unsetenv ("GVMD_ENABLE_OPENVASD");
   unsetenv ("GVMD_ENABLE_CREDENTIAL_STORES");
   unsetenv ("GVMD_ENABLE_VT_METADATA");
@@ -58,17 +57,6 @@ Ensure (manage_runtime_flags, default_flags_no_config_no_env)
   assert_that (feature_enabled (FEATURE_ID_AGENTS), is_equal_to (0));
 #endif
 
-#if ENABLE_CONTAINER_SCANNING
-  assert_that (feature_compiled_in (FEATURE_ID_CONTAINER_SCANNING),
-               is_equal_to (1));
-  assert_that (feature_enabled (FEATURE_ID_CONTAINER_SCANNING),
-               is_equal_to (0));
-#else
-  assert_that (feature_compiled_in (FEATURE_ID_CONTAINER_SCANNING),
-               is_equal_to (0));
-  assert_that (feature_enabled (FEATURE_ID_CONTAINER_SCANNING),
-               is_equal_to (0));
-#endif
 
 #if ENABLE_OPENVASD
   assert_that (feature_compiled_in (FEATURE_ID_OPENVASD_SCANNER),

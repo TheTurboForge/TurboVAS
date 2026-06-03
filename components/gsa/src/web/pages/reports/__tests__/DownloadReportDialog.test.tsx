@@ -7,7 +7,6 @@ import {describe, test, expect, testing} from '@gsa/testing';
 import {render, screen} from 'web/testing';
 import Filter from 'gmp/models/filter';
 import ReportFormat from 'gmp/models/report-format';
-import {CONTAINER_SCANNING_RESULTS_THRESHOLD} from 'gmp/settings';
 import DownloadReportDialog from 'web/pages/reports/DownloadReportDialog';
 
 const filter = Filter.fromString('rows=100');
@@ -46,7 +45,6 @@ describe('DownloadReportDialog', () => {
     render(
       <DownloadReportDialog
         {...defaultProps}
-        isContainerScanning={false}
         totalResultCount={20000}
       />,
     );
@@ -60,7 +58,6 @@ describe('DownloadReportDialog', () => {
     render(
       <DownloadReportDialog
         {...defaultProps}
-        isContainerScanning={false}
         showThresholdMessage={true}
         threshold={1000}
         totalResultCount={20000}
@@ -70,71 +67,4 @@ describe('DownloadReportDialog', () => {
     expect(screen.getByText(/threshold of 1000/)).toBeInTheDocument();
   });
 
-  describe('Container Scanning Threshold Warning', () => {
-    test('should not show container scanning warning when container scanning but results below threshold', () => {
-      render(
-        <DownloadReportDialog
-          {...defaultProps}
-          isContainerScanning={true}
-          totalResultCount={CONTAINER_SCANNING_RESULTS_THRESHOLD - 1}
-        />,
-      );
-
-      expect(
-        screen.queryByText(/Please be aware that the report has more results/),
-      ).not.toBeInTheDocument();
-    });
-
-    test('should not show container scanning warning when container scanning and results equal to threshold', () => {
-      render(
-        <DownloadReportDialog
-          {...defaultProps}
-          isContainerScanning={true}
-          totalResultCount={CONTAINER_SCANNING_RESULTS_THRESHOLD}
-        />,
-      );
-
-      expect(
-        screen.queryByText(/Please be aware that the report has more results/),
-      ).not.toBeInTheDocument();
-    });
-
-    test('should show container scanning warning when container scanning and results exceed threshold', () => {
-      render(
-        <DownloadReportDialog
-          {...defaultProps}
-          isContainerScanning={true}
-          totalResultCount={CONTAINER_SCANNING_RESULTS_THRESHOLD + 1}
-        />,
-      );
-
-      expect(
-        screen.getByText(
-          `WARNING: Please be aware that the report has more results than the threshold of ${CONTAINER_SCANNING_RESULTS_THRESHOLD}. Therefore, this action can take a really long time to finish. It might even exceed the session timeout!`,
-        ),
-      ).toBeInTheDocument();
-    });
-
-    test('should show container scanning warning instead of threshold message when both conditions met', () => {
-      render(
-        <DownloadReportDialog
-          {...defaultProps}
-          isContainerScanning={true}
-          showThresholdMessage={true}
-          threshold={1000}
-          totalResultCount={CONTAINER_SCANNING_RESULTS_THRESHOLD + 1000}
-        />,
-      );
-
-      // ContainerScanningThresholdMessage takes priority
-      expect(
-        screen.getByText(
-          `WARNING: Please be aware that the report has more results than the threshold of ${CONTAINER_SCANNING_RESULTS_THRESHOLD}. Therefore, this action can take a really long time to finish. It might even exceed the session timeout!`,
-        ),
-      ).toBeInTheDocument();
-
-      // ThresholdMessage should NOT be shown
-      expect(screen.queryByText(/threshold of 1000/)).not.toBeInTheDocument();
-    });
-  });
 });

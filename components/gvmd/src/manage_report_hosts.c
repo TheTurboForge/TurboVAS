@@ -29,7 +29,7 @@
  * @param[in]  report                        Report.
  * @param[in]  get                           GET command data.
  * @param[in]  usage_type                    Task usage type.
- * @param[in]  is_container_scanning_report  Whether this is a container scan report.
+ * @param[in]  include_result_hostname  Whether result hostnames should be included.
  * @param[in]  lean                          Whether to send lean host data.
  * @param[in]  send                          Function to write to client.
  * @param[in]  send_data_1                   Second argument to @p send.
@@ -41,7 +41,7 @@ int
 manage_send_report_hosts (report_t report,
                           const get_data_t *get,
                           const gchar *usage_type,
-                          gboolean is_container_scanning_report,
+                          gboolean include_result_hostname,
                           int lean,
                           gboolean (*send) (const char *,
                                             int (*) (const char *, void *),
@@ -132,7 +132,7 @@ manage_send_report_hosts (report_t report,
                                         get,
                                         report,
                                         &results,
-                                        is_container_scanning_report,
+                                        include_result_hostname,
                                         &ctx,
                                         TRUE);
       if (ret)
@@ -159,7 +159,7 @@ manage_send_report_hosts (report_t report,
                                 get,
                                 usage_type,
                                 lean,
-                                is_container_scanning_report,
+                                include_result_hostname,
                                 result_hosts_only,
                                 result_hosts,
                                 NULL,

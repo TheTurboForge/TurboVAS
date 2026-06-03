@@ -164,23 +164,7 @@ const loggedInRoutes = [
         }),
       },
 
-      // Container Image Target routes
-      {
-        path: 'ociimagetargets',
-        loader: () => {
-          throw redirect('/oci-image-targets');
-        },
-      },
-      {
-        path: 'oci-image-targets',
-        lazy: async () => ({
-          Component: (
-            await import('web/pages/container-image-targets/ContainerImageTargetsListPage')
-          ).default,
-        }),
-      },
 
-      // CPE routes
       {
         path: 'cpes',
         lazy: async () => ({

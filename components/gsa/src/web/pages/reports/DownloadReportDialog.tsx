@@ -7,7 +7,6 @@ import {useState} from 'react';
 import type Filter from 'gmp/models/filter';
 import type ReportConfig from 'gmp/models/report-config';
 import type ReportFormat from 'gmp/models/report-format';
-import {CONTAINER_SCANNING_RESULTS_THRESHOLD} from 'gmp/settings';
 import {selectSaveId} from 'gmp/utils/id';
 import {isDefined, isString} from 'gmp/utils/identity';
 import ComposerContent, {
@@ -18,7 +17,6 @@ import CheckBox from 'web/components/form/Checkbox';
 import FormGroup from 'web/components/form/FormGroup';
 import Select from 'web/components/form/Select';
 import useTranslation from 'web/hooks/useTranslation';
-import ContainerScanningThresholdMessage from 'web/pages/reports/ContainerScanningThresholdMessage';
 import ThresholdMessage from 'web/pages/reports/ThresholdMessage';
 import {renderSelectItems, type RenderSelectItemProps} from 'web/utils/Render';
 
@@ -29,7 +27,6 @@ interface DownloadReportDialogProps {
   filter: Filter | string;
   includeNotes?: boolean;
   includeOverrides?: boolean;
-  isContainerScanning?: boolean;
   reportConfigs?: ReportConfig[];
   reportFormats?: ReportFormat[];
   showThresholdMessage?: boolean;
@@ -47,7 +44,6 @@ const DownloadReportDialog = ({
   filter,
   includeNotes = COMPOSER_CONTENT_DEFAULTS.includeNotes,
   includeOverrides = COMPOSER_CONTENT_DEFAULTS.includeOverrides,
-  isContainerScanning = false,
   reportConfigs,
   reportFormats,
   showThresholdMessage = false,
@@ -97,10 +93,6 @@ const DownloadReportDialog = ({
       reportFormatId: reportFormatIdInState,
     });
   };
-
-  const showContainerScanningWarning =
-    isContainerScanning &&
-    totalResultCount > CONTAINER_SCANNING_RESULTS_THRESHOLD;
 
   const getFilteredReportFormats = () => {
     if (!isDefined(reportFormats)) {
@@ -184,11 +176,8 @@ const DownloadReportDialog = ({
               unCheckedValue={false}
               onChange={onValueChange}
             />
-            {showContainerScanningWarning ? (
-              <ContainerScanningThresholdMessage />
-            ) : (
-              showThresholdMessage &&
-              isDefined(threshold) && <ThresholdMessage threshold={threshold} />
+            {showThresholdMessage && isDefined(threshold) && (
+              <ThresholdMessage threshold={threshold} />
             )}
           </>
         );

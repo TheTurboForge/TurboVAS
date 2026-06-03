@@ -750,10 +750,6 @@ modify_setting (const gchar *uuid, const gchar *name,
         setting_name = g_strdup ("Hosts Filter");
       else if (strcmp (uuid, "96abcd5a-9b6d-456c-80b8-c3221bfa499d") == 0)
         setting_name = g_strdup ("Notes Filter");
-#if ENABLE_CONTAINER_SCANNING
-      else if (strcmp (uuid, "db61a364-de40-4552-b1bc-a518744f847a") == 0)
-        setting_name = g_strdup ("OCI Image Targets Filter");
-#endif
       else if (strcmp (uuid, "f608c3ec-ce73-4ff6-8e04-7532749783af") == 0)
         setting_name = g_strdup ("Operating Systems Filter");
       else if (strcmp (uuid, "eaaaebf1-01ef-4c49-b7bb-955461c78e0a") == 0)

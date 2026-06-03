@@ -248,7 +248,7 @@ mod tests {
 
     use std::sync::{Arc, RwLock};
 
-    use crate::container_image_scanner::endpoints::vts::VTEndpoints;
+    use crate::vts::Endpoints as VTEndpoints;
     use greenbone_scanner_framework::models::FeedState;
     use greenbone_scanner_framework::{GetVTsError, GetVts};
 

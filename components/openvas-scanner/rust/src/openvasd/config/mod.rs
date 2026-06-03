@@ -11,7 +11,6 @@ use std::{
     time::Duration,
 };
 
-use crate::container_image_scanner::config::{DBLocation, SqliteConfiguration};
 use clap::{ArgAction, builder::TypedValueParser};
 use logging::SerLevel;
 use scannerlib::{
@@ -20,6 +19,8 @@ use scannerlib::{
 };
 use serde::{Deserialize, Serialize};
 mod logging;
+mod sqlite;
+pub use sqlite::{DBLocation, SqliteConfiguration};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Feed {
@@ -330,8 +331,6 @@ pub struct Config {
     pub storage: StorageTypes,
     pub scheduler: Scheduler,
     pub scanner: Scanner,
-    #[serde(alias = "container-image-scanner")]
-    pub container_image_scanner: crate::container_image_scanner::Config,
     #[serde(skip)]
     pub version: bool,
 }
@@ -716,15 +715,6 @@ impl Config {
                 StorageType::InMemory | StorageType::Redis => SqliteConfiguration::default(),
                 StorageType::FileSystem => SqliteConfiguration::default_file_location("openvasd"),
             });
-
-            // although openvasd and container-image-scanner can be configured separately we just
-            // allow one configuration to net get the arguments even more cluttered.
-            config.container_image_scanner.database = match stype {
-                StorageType::InMemory | StorageType::Redis => SqliteConfiguration::default(),
-                StorageType::FileSystem => {
-                    SqliteConfiguration::default_file_location("container-image-scanner")
-                }
-            };
         }
         if let Some(path) = cmds.get_one::<PathBuf>("storage_path") {
             //TODO: check if dir
@@ -732,11 +722,6 @@ impl Config {
                 location: DBLocation::File(path.clone()),
                 ..Default::default()
             });
-            // TODO: add suffix
-            config.container_image_scanner.database = SqliteConfiguration {
-                location: DBLocation::File(path.clone()),
-                ..Default::default()
-            };
         }
         if let Some(mode) = cmds.get_one::<Mode>("mode") {
             config.mode = mode.clone();
@@ -791,7 +776,7 @@ impl Config {
 #[cfg(test)]
 mod tests {
 
-    use crate::{config::StorageTypes, container_image_scanner::config::ImageExtractionLocation};
+    use crate::config::StorageTypes;
     use insta::assert_toml_snapshot;
     use scannerlib::scanner::preferences::preference::ScanPrefValue;
 
@@ -825,11 +810,6 @@ mod tests {
             .scanner
             .preferences
             .insert("aaa".to_string(), ScanPrefValue::Bool(false));
-
-        // we hardcode that here, otherwise the test may fail on machines that have different
-        // XDG_PATHs set.
-        config.container_image_scanner.image.extract_to =
-            ImageExtractionLocation::File("/tmp/openvasd/cis".into());
 
         assert_toml_snapshot!(config);
     }

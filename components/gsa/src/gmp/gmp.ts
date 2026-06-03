@@ -49,8 +49,6 @@ import LoginCommand from 'gmp/commands/login';
 import NvtCommand from 'gmp/commands/nvt';
 import NvtFamiliesCommand from 'gmp/commands/nvt-families';
 import NvtsCommand from 'gmp/commands/nvts';
-import OciImageTargetCommand from 'gmp/commands/oci-image-target';
-import OciImageTargetsCommand from 'gmp/commands/oci-image-targets';
 import PerformanceCommand from 'gmp/commands/performance';
 import PermissionCommand from 'gmp/commands/permission';
 import PermissionsCommand from 'gmp/commands/permissions';
@@ -140,8 +138,6 @@ class Gmp {
   public readonly nvt: NvtCommand;
   public readonly nvtfamilies: NvtFamiliesCommand;
   public readonly nvts: NvtsCommand;
-  public readonly ociimagetarget: OciImageTargetCommand;
-  public readonly ociimagetargets: OciImageTargetsCommand;
   public readonly performance: PerformanceCommand;
   public readonly permission: PermissionCommand;
   public readonly permissions: PermissionsCommand;
@@ -236,8 +232,6 @@ class Gmp {
     this.nvt = new NvtCommand(this.http);
     this.nvtfamilies = new NvtFamiliesCommand(this.http);
     this.nvts = new NvtsCommand(this.http);
-    this.ociimagetarget = new OciImageTargetCommand(this.http);
-    this.ociimagetargets = new OciImageTargetsCommand(this.http);
     this.performance = new PerformanceCommand(this.http);
     this.permission = new PermissionCommand(this.http);
     this.permissions = new PermissionsCommand(this.http);

@@ -64,10 +64,6 @@ const TaskDetails = ({entity, links = true}: TaskDetailsProps) => {
   const features = useFeatures();
 
   const isCredentialStore = features.featureEnabled('ENABLE_CREDENTIAL_STORES');
-  const isContainerScanning = features.featureEnabled(
-    'ENABLE_CONTAINER_SCANNING',
-  );
-
   const scanConfig = useShallowEqualSelector<unknown, ScanConfig | undefined>(
     state => scanConfigSelector(state).getEntity(entity.config?.id),
   );
@@ -111,7 +107,6 @@ const TaskDetails = ({entity, links = true}: TaskDetailsProps) => {
     target,
     max_checks: maxChecks,
     max_hosts: maxHosts,
-    ociImageTarget,
   } = entity;
 
   const {scan_end: scanEnd, scan_start: scanStart} = lastReport ?? {};
@@ -143,13 +138,6 @@ const TaskDetails = ({entity, links = true}: TaskDetailsProps) => {
         </DetailsBlock>
       )}
 
-      {isContainerScanning && isDefined(ociImageTarget?.name) && (
-        <DetailsBlock title={_('Container Image Target')}>
-          <Link textOnly={!links} to="/ociimagetargets">
-            {ociImageTarget.name}
-          </Link>
-        </DetailsBlock>
-      )}
 
       {isDefined(alerts) && alerts.length > 0 && (
         <DetailsBlock title={_('Alerts')}>

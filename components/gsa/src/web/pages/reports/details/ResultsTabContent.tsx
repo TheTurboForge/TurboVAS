@@ -6,13 +6,11 @@
 import type CollectionCounts from 'gmp/collection/collection-counts';
 import type Filter from 'gmp/models/filter';
 import type {TaskStatus} from 'gmp/models/task';
-import ContainerScanningResultsTab from 'web/pages/reports/details/ContainerScanningResultsTab';
 import EmptyReport from 'web/pages/reports/details/EmptyReport';
 import EmptyResultsReport from 'web/pages/reports/details/EmptyResultsReport';
 import ResultsTab from 'web/pages/reports/details/ResultsTab';
 
 interface ResultsTabContentProps {
-  isContainerScanning: boolean;
   hasTarget: boolean;
   progress: number;
   reportFilter: Filter;
@@ -28,7 +26,6 @@ interface ResultsTabContentProps {
 }
 
 const ResultsTabContent = ({
-  isContainerScanning,
   hasTarget,
   progress,
   reportFilter,
@@ -42,9 +39,8 @@ const ResultsTabContent = ({
   onFilterRemoveSeverityClick,
   onTargetEditClick,
 }: ResultsTabContentProps) => {
-  // Container scanning: show empty report when no results at all
+  // Show empty report when no results are available.
   if (
-    isContainerScanning &&
     reportResultsCounts?.filtered === 0 &&
     reportResultsCounts.all === 0
   ) {
@@ -58,9 +54,8 @@ const ResultsTabContent = ({
     );
   }
 
-  // Container scanning: show empty results report when filtered out
+  // Show empty results report when all results are filtered out.
   if (
-    isContainerScanning &&
     reportResultsCounts?.filtered === 0 &&
     reportResultsCounts.all > 0
   ) {
@@ -77,18 +72,7 @@ const ResultsTabContent = ({
     );
   }
 
-  // Container scanning: show results table
-  if (isContainerScanning) {
-    return (
-      <ContainerScanningResultsTab
-        reportFilter={reportFilter}
-        reportId={reportId}
-        status={status}
-      />
-    );
-  }
 
-  // Default: regular scanning results table
   return (
     <ResultsTab
       hasTarget={hasTarget}

@@ -17,7 +17,8 @@ use scannerlib::{
 use crate::config::{Config, ScannerType};
 pub mod orchestrator;
 pub mod redis;
-pub use crate::container_image_scanner::endpoints::vts::VTEndpoints as Endpoints;
+mod endpoints;
+pub use endpoints::VTEndpoints as Endpoints;
 use crate::database::sqlite::DataBase;
 use crate::json_stream;
 use crate::vts::orchestrator::WorkerError;

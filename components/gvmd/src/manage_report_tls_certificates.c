@@ -30,7 +30,7 @@
  *
  * @param[in]  report                        Report.
  * @param[in]  get                           GET command data.
- * @param[in]  is_container_scanning_report  Whether this is a container scan report.
+ * @param[in]  include_result_hostname  Whether result hostnames should be included.
  * @param[in]  send                          Function to write to client.
  * @param[in]  send_data_1                   Second argument to @p send.
  * @param[in]  send_data_2                   Third argument to @p send.
@@ -40,7 +40,7 @@
 int
 manage_send_report_tls_certificates (report_t report,
                                      const get_data_t *get,
-                                     gboolean is_container_scanning_report,
+                                     gboolean include_result_hostname,
                                      gboolean (*send) (const char *,
                                        int (*) (const char *,
                                                 void *),
@@ -111,7 +111,7 @@ manage_send_report_tls_certificates (report_t report,
                                         get,
                                         report,
                                         &results,
-                                        is_container_scanning_report,
+                                        include_result_hostname,
                                         NULL,
                                         FALSE);
       if (ret)

@@ -3012,9 +3012,6 @@ gvmd (int argc, char** argv, char *env[])
 #if ENABLE_AGENTS == 1
       printf ("Agent scanning and management enabled\n");
 #endif
-#if ENABLE_CONTAINER_SCANNING == 1
-      printf ("Container scanning enabled\n");
-#endif
 #if ENABLE_CREDENTIAL_STORES == 1
       printf ("Credential stores are enabled\n");
 #endif
@@ -3644,10 +3641,6 @@ gvmd (int argc, char** argv, char *env[])
             type = SCANNER_TYPE_AGENT_CONTROLLER;
           else if (!strcasecmp (scanner_type, "agent-controller-sensor"))
             type = SCANNER_TYPE_AGENT_CONTROLLER_SENSOR;
-#endif
-#if ENABLE_CONTAINER_SCANNING
-          else if (!strcasecmp (scanner_type, "container-image"))
-            type = SCANNER_TYPE_CONTAINER_IMAGE;
 #endif
           else
             {

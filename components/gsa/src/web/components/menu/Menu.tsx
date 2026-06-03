@@ -145,12 +145,6 @@ const Menu = () => {
     agentInstallersMatch || agentInstallerMatch,
   );
 
-  const containerImageTargetsMatch = useMatch('/oci-image-targets');
-  const containerImageTargetMatch = useMatch('/oci-image-target/*');
-  const isContainerImageTargetsActive = Boolean(
-    containerImageTargetsMatch || containerImageTargetMatch,
-  );
-
   const schedulesMatch = useMatch('/schedules');
   const scheduleMatch = useMatch('/schedule/*');
   const isSchedulesActive = Boolean(schedulesMatch || scheduleMatch);
@@ -219,7 +213,6 @@ const Menu = () => {
     'agentgroup',
     'agentinstaller',
     'target',
-    'ociimagetarget',
     'portlist',
     'credential',
     'scanconfig',
@@ -419,7 +412,6 @@ const Menu = () => {
         key: 'configuration',
         defaultOpened: [
           isTargetsActive,
-          isContainerImageTargetsActive,
           isPortlistsActive,
           isCredentialsActive,
           isScanConfigsActive,
@@ -441,13 +433,6 @@ const Menu = () => {
             isPathMatch: Boolean(targetsMatch),
             active: isTargetsActive,
           },
-          capabilities.mayAccess('ociimagetarget') &&
-            features.featureEnabled('ENABLE_CONTAINER_SCANNING') && {
-              label: _('Container Image Targets'),
-              to: '/oci-image-targets',
-              isPathMatch: Boolean(containerImageTargetsMatch),
-              active: isContainerImageTargetsActive,
-            },
           capabilities.mayAccess('portlist') && {
             label: _('Port Lists'),
             to: '/port-lists',

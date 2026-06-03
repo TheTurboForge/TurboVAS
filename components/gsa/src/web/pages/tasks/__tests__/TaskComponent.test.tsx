@@ -8,7 +8,6 @@ import {fireEvent, rendererWith, screen, wait} from 'web/testing';
 import Features from 'gmp/capabilities/features';
 import {createActionResultResponse} from 'gmp/commands/testing';
 import Response from 'gmp/http/response';
-import {CONTAINER_IMAGE_SCANNER_TYPE} from 'gmp/models/scanner';
 import Setting from 'gmp/models/setting';
 import Task from 'gmp/models/task';
 import {createSession} from 'gmp/testing';
@@ -111,30 +110,9 @@ const createGmp = ({
           createActionResultResponse({id: 'saved-agent-group'}),
         ),
     },
-    ociImageTargets: {
-      getAll: testing.fn().mockResolvedValue(new Response([])),
-    },
-    ociimagetargets: {
-      get: testing.fn().mockResolvedValue({data: [], meta: {filter: {}}}),
-    },
-    ociimagetarget: {
-      create: testing
-        .fn()
-        .mockResolvedValue(createActionResultResponse({id: 'new-oci-id'})),
-      save: testing
-        .fn()
-        .mockResolvedValue(createActionResultResponse({id: 'saved-oci-id'})),
-      clone: testing
-        .fn()
-        .mockResolvedValue(createActionResultResponse({id: 'cloned-oci-id'})),
-      delete: testing.fn().mockResolvedValue(new Response({})),
-    },
     agentgroups: {
       get: testing.fn().mockResolvedValue({data: [], meta: {filter: {}}}),
       getAll: testing.fn().mockResolvedValue(new Response([])),
-    },
-    oci_image_targets: {
-      get: testing.fn().mockResolvedValue({data: [], meta: {filter: {}}}),
     },
   };
 };
@@ -151,44 +129,6 @@ describe('TaskComponent tests', () => {
     expect(screen.getByTestId('button')).toBeInTheDocument();
   });
 
-  test('should open correct dialog on edit for container image task', async () => {
-    const gmp = createGmp();
-    const {render} = rendererWith({gmp, capabilities: true});
-
-    const containerImageTask = Task.fromElement({
-      _id: 'container-task-id',
-      name: 'Container Image Task',
-      scanner: {
-        _id: 'scanner-id',
-        name: 'Container Image Scanner',
-        type: CONTAINER_IMAGE_SCANNER_TYPE,
-      },
-      oci_image_target: {
-        _id: 'oci-target-id',
-        name: 'OCI Target',
-      },
-    });
-
-    render(
-      <TaskComponent>
-        {({edit}) => (
-          <Button
-            data-testid="edit-container-task"
-            onClick={() => edit(containerImageTask)}
-          />
-        )}
-      </TaskComponent>,
-    );
-
-    const button = screen.getByTestId('edit-container-task');
-    fireEvent.click(button);
-
-    await wait();
-
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByTestId('dialog-test-id')).toBeInTheDocument();
-    expect(screen.getByText(/Container Image Task/i)).toBeInTheDocument();
-  });
 
   test('should open correct dialog on edit for import task', async () => {
     const gmp = createGmp();
@@ -315,38 +255,4 @@ describe('TaskComponent tests', () => {
     expect(screen.getByText(/New Task/i)).toBeInTheDocument();
   });
 
-  test('should handle edit task with container image scanner type correctly', async () => {
-    const gmp = createGmp();
-    const {render} = rendererWith({gmp, capabilities: true});
-
-    const taskWithContainerImageScanner = Task.fromElement({
-      _id: 'edge-case-task-id',
-      name: 'Edge Case Task',
-      scanner: {
-        _id: 'scanner-id',
-        name: 'Container Image Scanner',
-        type: CONTAINER_IMAGE_SCANNER_TYPE,
-      },
-    });
-
-    render(
-      <TaskComponent>
-        {({edit}) => (
-          <Button
-            data-testid="edit-edge-case-task"
-            onClick={() => edit(taskWithContainerImageScanner)}
-          />
-        )}
-      </TaskComponent>,
-    );
-
-    const button = screen.getByTestId('edit-edge-case-task');
-    fireEvent.click(button);
-
-    await wait();
-
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByTestId('dialog-test-id')).toBeInTheDocument();
-    expect(screen.getByText(/Container Image Task/i)).toBeInTheDocument();
-  });
 });

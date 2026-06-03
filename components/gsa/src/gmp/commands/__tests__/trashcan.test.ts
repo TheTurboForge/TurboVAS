@@ -148,7 +148,6 @@ describe('TrashCanCommand tests', () => {
     expect(data.data.tasks.length).toBe(1);
     expect(data.data.tickets.length).toBe(2);
     expect(data.data.agentGroups.length).toBe(0);
-    expect(data.data.ociImageTargets.length).toBe(0);
     expect(data.data.failedRequests).toBeUndefined();
   });
 
@@ -164,26 +163,8 @@ describe('TrashCanCommand tests', () => {
     const cmd = new TrashCanCommand(fakeHttp);
     const data = await cmd.get({agentGroups: true});
     expect(data.data.agentGroups.length).toBe(2);
-    expect(data.data.ociImageTargets.length).toBe(0);
   });
 
-  test('should allow to get the trashcan contents including oci image targets', async () => {
-    const response = createResponse({
-      get_trash: {
-        get_oci_image_targets_response: {
-          oci_image_target: [
-            {_id: 'ociimagetarget1'},
-            {_id: 'ociimagetarget2'},
-          ],
-        },
-      },
-    });
-    const fakeHttp = createHttp(response);
-    const cmd = new TrashCanCommand(fakeHttp);
-    const data = await cmd.get({ociImageTargets: true});
-    expect(data.data.agentGroups.length).toBe(0);
-    expect(data.data.ociImageTargets.length).toBe(2);
-  });
 
   test('should handle failed requests gracefully', async () => {
     const response = createResponse({

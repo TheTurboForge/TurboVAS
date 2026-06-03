@@ -115,26 +115,6 @@ Ensure (gsad_validator, validate_kdcs_name_and_value)
   assert_that (gvm_validate (validator, "kdcs:name", ""), is_equal_to (2));
 }
 
-Ensure (gsad_validator, validate_oci_image_references)
-{
-  validator_t validator = gsad_get_validator ();
-
-  assert_that (gvm_validate (validator, "image_references",
-                             "oci://myregistry.com/myrepo/myrepo2/myimage:tag"),
-               is_equal_to (0));
-  assert_that (
-    gvm_validate (validator, "image_references", "oci://192.168.0.4:12345"),
-    is_equal_to (0));
-  assert_that (gvm_validate (validator, "image_references",
-                             "oci://[0001:1:1:1::1]:12345/myregistry.com"),
-               is_equal_to (0));
-  assert_that (gvm_validate (validator, "image_references",
-                             "oci://[0001:1:1:1::1]/?myregistry.com"),
-               is_equal_to (2));
-  assert_that (gvm_validate (validator, "image_references", ""),
-               is_equal_to (2));
-}
-
 Ensure (gsad_validator, validate_ca_pub)
 {
   validator_t validator = gsad_get_validator ();
@@ -264,7 +244,6 @@ main (int argc, char **argv)
   add_test_with_context (suite, gsad_validator, validate_agent_installer_id);
   add_test_with_context (suite, gsad_validator, validate_agent_list_ids);
   add_test_with_context (suite, gsad_validator, validate_kdcs_name_and_value);
-  add_test_with_context (suite, gsad_validator, validate_oci_image_references);
   add_test_with_context (suite, gsad_validator, validate_ca_pub);
   add_test_with_context (suite, gsad_validator,
                          alias_boolean_accept_invalid_certs);

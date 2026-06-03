@@ -754,7 +754,7 @@ describe('TaskRow tests', () => {
     expect(handleTaskDownload).toHaveBeenCalledWith(task);
   });
 
-  test('should call click handlers for container task', () => {
+  test('should call click handlers for import task', () => {
     const task = Task.fromElement({
       _id: '314',
       owner: {name: 'username'},
@@ -830,7 +830,7 @@ describe('TaskRow tests', () => {
 
     // Severity
     expect(bars.length).toBe(1);
-    // because container tasks do not have a severity
+    // because import tasks do not have a severity
 
     // Actions
     const importIcon = screen.getByTestId('import-icon');

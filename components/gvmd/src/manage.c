@@ -49,7 +49,6 @@
 #include "manage_scan_queue.h"
 #include "manage_schedules.h"
 #include "manage_settings.h"
-#include "manage_oci_image_targets.h"
 #include "manage_http_scanner.h"
 #include "manage_openvasd.h"
 #include "manage_report_hosts.h"
@@ -820,13 +819,6 @@ check_scanner_feature (scanner_type_t scanner_type)
     {
       if (!feature_enabled (FEATURE_ID_AGENTS))
         return SCANNER_FEATURE_AGENTS_DISABLED;
-      return SCANNER_FEATURE_OK;
-    }
-
-  if (scanner_type == SCANNER_TYPE_CONTAINER_IMAGE)
-    {
-      if (!feature_enabled (FEATURE_ID_CONTAINER_SCANNING))
-        return SCANNER_FEATURE_CONTAINER_DISABLED;
       return SCANNER_FEATURE_OK;
     }
 
@@ -2691,10 +2683,6 @@ run_task (const char *task_id, char **report_id, int from)
     }
 #endif
 
-#if ENABLE_CONTAINER_SCANNING
-  if (scanner_type (scanner) == SCANNER_TYPE_CONTAINER_IMAGE)
-    return run_container_image_task (task, from, report_id);
-#endif
 
   return -1; // Unknown scanner type
 }
@@ -2862,10 +2850,6 @@ stop_task (const char *task_id)
     return stop_openvasd_task (task);
 #endif
 
-#if ENABLE_CONTAINER_SCANNING
-  if (scanner_type (task_scanner (task)) == SCANNER_TYPE_CONTAINER_IMAGE)
-    return stop_container_image_task (task);
-#endif
 
   return stop_task_internal (task);
 }
@@ -6916,10 +6900,6 @@ manage_run_wizard (const gchar *wizard_name,
 int
 delete_resource (const char *type, const char *resource_id, int ultimate)
 {
-#if ENABLE_CONTAINER_SCANNING
-  if (strcasecmp (type, "oci_image_target") == 0)
-    return delete_oci_image_target (resource_id, ultimate);
-#endif /* ENABLE_CONTAINER_SCANNING */
   if (strcasecmp (type, "report_config") == 0)
     return delete_report_config (resource_id, ultimate);
   if (strcasecmp (type, "ticket") == 0)

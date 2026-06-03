@@ -32,7 +32,6 @@ gsad_init_validator ()
                      "|(create_group)"
                      "|(create_host)"
                      "|(create_note)"
-                     "|(create_oci_image_target)"
                      "|(create_override)"
                      "|(create_permission)"
                      "|(create_permissions)"
@@ -52,7 +51,6 @@ gsad_init_validator ()
                      "|(create_user)"
                      "|(create_agent_group)"
                      "|(create_agent_group_task)"
-                     "|(create_oci_image_task)"
                      "|(cvss_calculator)"
                      "|(delete_agent)"
                      "|(delete_agent_group)"
@@ -64,7 +62,6 @@ gsad_init_validator ()
                      "|(delete_from_trash)"
                      "|(delete_group)"
                      "|(delete_note)"
-                     "|(delete_oci_image_target)"
                      "|(delete_override)"
                      "|(delete_permission)"
                      "|(delete_port_list)"
@@ -104,8 +101,6 @@ gsad_init_validator ()
                      "|(export_groups)"
                      "|(export_note)"
                      "|(export_notes)"
-                     "|(export_oci_image_target)"
-                     "|(export_oci_image_targets)"
                      "|(export_omp_doc)"
                      "|(export_override)"
                      "|(export_overrides)"
@@ -165,8 +160,6 @@ gsad_init_validator ()
                      "|(get_note)"
                      "|(get_notes)"
                      "|(get_nvt_families)"
-                     "|(get_oci_image_target)"
-                     "|(get_oci_image_targets)"
                      "|(get_override)"
                      "|(get_overrides)"
                      "|(get_permission)"
@@ -219,7 +212,6 @@ gsad_init_validator ()
                      "|(get_trash_filters)"
                      "|(get_trash_groups)"
                      "|(get_trash_notes)"
-                     "|(get_trash_oci_image_targets)"
                      "|(get_trash_overrides)"
                      "|(get_trash_permissions)"
                      "|(get_trash_port_lists)"
@@ -268,8 +260,6 @@ gsad_init_validator ()
                      "|(save_license)"
                      "|(save_my_settings)"
                      "|(save_note)"
-                     "|(save_oci_image_target)"
-                     "|(save_oci_image_task)"
                      "|(save_override)"
                      "|(save_permission)"
                      "|(save_port_list)"
@@ -444,8 +434,6 @@ gsad_init_validator ()
   gvm_validator_add (validator, "details", "^[0-1]$");
   /* Number is special cased in params_mhd_validate to remove the space. */
   gvm_validator_add (validator, "number", "^ *[0-9]+ *$");
-  gvm_validator_add (validator, "image_references",
-                     "^[-_@[:alnum:],: \\./\\[\\]]+$");
   gvm_validator_add (validator, "optional_number", "^[0-9]*$");
   gvm_validator_add (validator, "oid", "^([0-9.]{1,80}|CVE-[-0-9]{1,14})$");
   gvm_validator_add (validator, "page", "^[_[:alnum:] ]+$");
@@ -591,7 +579,6 @@ gsad_init_validator ()
   gvm_validator_alias (validator, "inheritor_id", "id");
   gvm_validator_alias (validator, "krb5_credential_id", "id");
   gvm_validator_alias (validator, "note_id", "id");
-  gvm_validator_alias (validator, "oci_image_target_id", "id");
   gvm_validator_alias (validator, "override_id", "id");
   gvm_validator_alias (validator, "permission_group_id", "id");
   gvm_validator_alias (validator, "permission_id", "id");
@@ -702,7 +689,6 @@ gsad_init_validator ()
   gvm_validator_alias (validator, "hosts_manual", "hosts");
   gvm_validator_alias (validator, "hosts_filter", "filter");
   gvm_validator_alias (validator, "exclude_hosts", "hosts_opt");
-  gvm_validator_alias (validator, "exclude_images", "image_references");
   gvm_validator_alias (validator, "in_assets", "boolean");
   gvm_validator_alias (validator, "in_use", "boolean");
   gvm_validator_alias (validator, "include_related", "number");

@@ -119,96 +119,6 @@ class Tasks:
         return cmd
 
     @classmethod
-    def create_container_image_task(
-        cls,
-        name: str,
-        oci_image_target_id: EntityID,
-        scanner_id: EntityID,
-        *,
-        comment: str | None = None,
-        alterable: bool | None = None,
-        schedule_id: EntityID | None = None,
-        alert_ids: Sequence[EntityID] | None = None,
-        schedule_periods: int | None = None,
-        observers: Sequence[str] | None = None,
-        preferences: Mapping[str, SupportsStr] | None = None,
-    ) -> Request:
-        """Create a new scan task using an OCI image target.
-
-        Args:
-            name: Name of the new task.
-            oci_image_target_id: UUID of the OCI Image target to be scanned.
-            scanner_id: UUID of scanner to use for scanning the agents.
-            comment: Optional comment for the task.
-            alterable: Whether the task should be alterable.
-            alert_ids: List of UUIDs for alerts to be applied to the task.
-            schedule_id: UUID of a schedule when the task should be run.
-            schedule_periods: Limit to number of scheduled runs, 0 for unlimited.
-            observers: List of usernames or IDs allowed to observe the task.
-            preferences: Scanner preferences as name/value pairs.
-        """
-        if not name:
-            raise RequiredArgument(
-                function=cls.create_container_image_task.__name__,
-                argument="name",
-            )
-
-        if not oci_image_target_id:
-            raise RequiredArgument(
-                function=cls.create_container_image_task.__name__,
-                argument="oci_image_target_id",
-            )
-
-        if not scanner_id:
-            raise RequiredArgument(
-                function=cls.create_container_image_task.__name__,
-                argument="scanner_id",
-            )
-
-        cmd = XmlCommand("create_task")
-        cmd.add_element("name", name)
-        cmd.add_element("usage_type", "scan")
-        cmd.add_element(
-            "oci_image_target", attrs={"id": str(oci_image_target_id)}
-        )
-        cmd.add_element("scanner", attrs={"id": str(scanner_id)})
-
-        if comment:
-            cmd.add_element("comment", comment)
-
-        if alterable is not None:
-            cmd.add_element("alterable", to_bool(alterable))
-
-        if alert_ids:
-            for alert in alert_ids:
-                cmd.add_element("alert", attrs={"id": str(alert)})
-
-        if schedule_id:
-            cmd.add_element("schedule", attrs={"id": str(schedule_id)})
-
-            if schedule_periods is not None:
-                if (
-                    not isinstance(schedule_periods, Integral)
-                    or schedule_periods < 0
-                ):
-                    raise InvalidArgument(
-                        "schedule_periods must be an integer greater or equal than 0"
-                    )
-                cmd.add_element("schedule_periods", str(schedule_periods))
-
-        if observers:
-            cmd.add_element("observers", to_comma_list(observers))
-
-        if preferences is not None:
-            xml_prefs = cmd.add_element("preferences")
-            for pref_name, pref_value in preferences.items():
-                xml_pref = xml_prefs.add_element("preference")
-                xml_pref.add_element("scanner_name", pref_name)
-                xml_pref.add_element("value", str(pref_value))
-
-        return cmd
-
-    @classmethod
     def create_import_task(
         cls, name: str, *, comment: str | None = None
     ) -> Request:
@@ -452,7 +362,6 @@ class Tasks:
         target_id: EntityID | None = None,
         scanner_id: EntityID | None = None,
         agent_group_id: EntityID | None = None,
-        oci_image_target_id: EntityID | None = None,
         alterable: bool | None = None,
         hosts_ordering: HostsOrdering | None = None,
         schedule_id: EntityID | None = None,
@@ -471,7 +380,6 @@ class Tasks:
             target_id: UUID of target to be scanned
             scanner_id: UUID of scanner to use for scanning the target
             agent_group_id: UUID of agent group to use for scanning
-            oci_image_target_id: UUID of the OCI Image target to be scanned.
             comment: The comment on the task.
             alert_ids: List of UUIDs for alerts to be applied to the task
             hosts_ordering: The order hosts are scanned in
@@ -493,15 +401,14 @@ class Tasks:
                 for entity_id in (
                     target_id,
                     agent_group_id,
-                    oci_image_target_id,
                 )
             )
             > 1
         ):
             raise InvalidArgument(
                 function=cls.modify_task.__name__,
-                argument="target_id/agent_group_id/oci_image_target_id",
-                message="Only one of target_id, agent_group_id or oci_image_target_id can be modified at a time",
+                argument="target_id/agent_group_id",
+                message="Only one of target_id or agent_group_id can be modified at a time",
             )
 
         cmd = XmlCommand("modify_task")
@@ -522,10 +429,6 @@ class Tasks:
         if agent_group_id:
             cmd.add_element("agent_group", attrs={"id": str(agent_group_id)})
 
-        if oci_image_target_id:
-            cmd.add_element(
-                "oci_image_target", attrs={"id": str(oci_image_target_id)}
-            )
 
         if alterable is not None:
             cmd.add_element("alterable", to_bool(alterable))

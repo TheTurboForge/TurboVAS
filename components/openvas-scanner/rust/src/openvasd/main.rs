@@ -7,7 +7,6 @@
 // but should eventually solve this.
 
 mod config;
-mod container_image_scanner;
 mod crypt;
 mod database;
 mod json_stream;
@@ -21,8 +20,7 @@ use std::{
     sync::Arc,
 };
 
-use config::{Config, StorageType};
-use container_image_scanner::config::{DBLocation, SqliteConfiguration};
+use config::{Config, DBLocation, SqliteConfiguration, StorageType};
 use greenbone_scanner_framework::{RuntimeBuilder, ServerCertificate};
 use notus::config_to_products;
 use scannerlib::models::FeedState;
@@ -101,20 +99,11 @@ async fn _main() -> Result<i32> {
         rb = rb.path_client_certs(client_certs);
     }
 
-    let (cis_scans, cis_vts) = container_image_scanner::init(
-        pool.clone(),
-        feed_snapshot,
-        products,
-        config.container_image_scanner,
-    )
-    .await?;
-
     rb.insert_scans(Arc::new(scan))
         .insert_get_vts(vts.clone())
         .max_concurrent_connections(config.storage.max_connections() * 10)
         .add_request_handler(get_notus)
         .add_request_handler(post_notus)
-        .insert_additional_scan_endpoints(Arc::new(cis_scans), Arc::new(cis_vts))
         .run_blocking()
         .await
 }

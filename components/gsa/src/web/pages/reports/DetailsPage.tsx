@@ -575,10 +575,6 @@ const ReportDetailsPage = () => {
           filter={reportFilter}
           includeNotes={reportComposerDefaults.includeNotes}
           includeOverrides={reportComposerDefaults.includeOverrides}
-          isContainerScanning={
-            isDefined(entity) &&
-            isDefined(entity.report?.task?.ociImageTarget?.id)
-          }
           reportConfigs={reportConfigs}
           reportFormats={reportFormats ?? []}
           showThresholdMessage={showThresholdMessage}

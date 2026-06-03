@@ -14,8 +14,7 @@
 typedef enum
 {
  ASSET_TYPE_TARGET = 0,
- ASSET_TYPE_AGENT = 1,
- ASSET_TYPE_CONTAINER_IMAGE = 2
+ ASSET_TYPE_AGENT = 1
 } asset_type_t;
 
 char*
@@ -161,9 +160,5 @@ void
 asset_snapshots_agent (report_t, task_t, agent_group_t);
 #endif
 
-#if ENABLE_CONTAINER_SCANNING
-void
-asset_snapshots_container_image (report_t report, task_t task);
-#endif
 
 #endif /* not _GVMD_MANAGE_ASSETS_H */

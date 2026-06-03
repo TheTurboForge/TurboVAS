@@ -18,7 +18,6 @@ from .requests.next import (
     CredentialStoreCredentialType,
     CredentialStores,
     IntegrationConfigs,
-    OCIImageTargets,
     ReportApplications,
     ReportClosedCVEs,
     ReportCVEs,
@@ -486,124 +485,6 @@ class GMPNext(GMPv227[T]):
             )
         )
 
-    def create_oci_image_target(
-        self,
-        name: str,
-        image_references: list[str],
-        *,
-        comment: str | None = None,
-        credential_id: EntityID | None = None,
-    ) -> T:
-        """Create a new OCI image target
-
-        Args:
-            name: Name of the OCI image target
-            image_references: List of OCI image URLs to scan
-            comment: Comment for the target
-            credential_id: UUID of a credential to use on target
-        """
-        return self._send_request_and_transform_response(
-            OCIImageTargets.create_oci_image_target(
-                name=name,
-                image_references=image_references,
-                comment=comment,
-                credential_id=credential_id,
-            )
-        )
-
-    def modify_oci_image_target(
-        self,
-        oci_image_target_id: EntityID,
-        *,
-        name: str | None = None,
-        comment: str | None = None,
-        image_references: list[str] | None = None,
-        credential_id: EntityID | None = None,
-    ) -> T:
-        """Modify an existing OCI image target.
-
-        Args:
-            oci_image_target_id: UUID of target to modify.
-            comment: Comment on target.
-            name: Name of target.
-            image_references: List of OCI image URLs to scan.
-            credential_id: UUID of credential to use on target.
-        """
-        return self._send_request_and_transform_response(
-            OCIImageTargets.modify_oci_image_target(
-                oci_image_target_id,
-                name=name,
-                comment=comment,
-                image_references=image_references,
-                credential_id=credential_id,
-            )
-        )
-
-    def clone_oci_image_target(self, oci_image_target_id: EntityID) -> T:
-        """Clone an existing OCI image target.
-
-        Args:
-            oci_image_target_id: UUID of an existing OCI image target to clone.
-        """
-        return self._send_request_and_transform_response(
-            OCIImageTargets.clone_oci_image_target(oci_image_target_id)
-        )
-
-    def delete_oci_image_target(
-        self, oci_image_target_id: EntityID, *, ultimate: bool | None = False
-    ) -> T:
-        """Delete an existing OCI image target.
-
-        Args:
-            oci_image_target_id: UUID of an existing OCI image target to delete.
-            ultimate: Whether to remove entirely or to the trashcan.
-        """
-        return self._send_request_and_transform_response(
-            OCIImageTargets.delete_oci_image_target(
-                oci_image_target_id, ultimate=ultimate
-            )
-        )
-
-    def get_oci_image_target(
-        self, oci_image_target_id: EntityID, *, tasks: bool | None = None
-    ) -> T:
-        """Request a single OCI image target.
-
-        Args:
-            oci_image_target_id: UUID of the OCI image target to request.
-            tasks: Whether to include list of tasks that use the target
-        """
-        return self._send_request_and_transform_response(
-            OCIImageTargets.get_oci_image_target(
-                oci_image_target_id, tasks=tasks
-            )
-        )
-
-    def get_oci_image_targets(
-        self,
-        *,
-        filter_string: str | None = None,
-        filter_id: EntityID | None = None,
-        trash: bool | None = None,
-        tasks: bool | None = None,
-    ) -> T:
-        """Request a list of OCI image targets.
-
-        Args:
-            filter_string: Filter term to use for the query.
-            filter_id: UUID of an existing filter to use for the query.
-            trash: Whether to include targets in the trashcan.
-            tasks: Whether to include list of tasks that use the target.
-        """
-        return self._send_request_and_transform_response(
-            OCIImageTargets.get_oci_image_targets(
-                filter_string=filter_string,
-                filter_id=filter_id,
-                trash=trash,
-                tasks=tasks,
-            )
-        )
-
     def clone_task(self, task_id: EntityID) -> T:
         """Clone an existing task
 
@@ -646,49 +527,6 @@ class GMPNext(GMPv227[T]):
             Tasks.create_agent_group_task(
                 name=name,
                 agent_group_id=agent_group_id,
-                scanner_id=scanner_id,
-                comment=comment,
-                alterable=alterable,
-                schedule_id=schedule_id,
-                alert_ids=alert_ids,
-                schedule_periods=schedule_periods,
-                observers=observers,
-                preferences=preferences,
-            )
-        )
-
-    def create_container_image_task(
-        self,
-        name: str,
-        oci_image_target_id: EntityID,
-        scanner_id: EntityID,
-        *,
-        comment: str | None = None,
-        alterable: bool | None = None,
-        schedule_id: EntityID | None = None,
-        alert_ids: Sequence[EntityID] | None = None,
-        schedule_periods: int | None = None,
-        observers: Sequence[str] | None = None,
-        preferences: Mapping[str, SupportsStr] | None = None,
-    ) -> T:
-        """Create a new scan task using an OCI image target.
-
-        Args:
-            name: Name of the new task.
-            oci_image_target_id: UUID of the OCI image target to be scanned.
-            scanner_id: UUID of scanner to use for scanning the agents.
-            comment: Optional comment for the task.
-            alterable: Whether the task should be alterable.
-            alert_ids: List of UUIDs for alerts to be applied to the task.
-            schedule_id: UUID of a schedule when the task should be run.
-            schedule_periods: Limit to number of scheduled runs, 0 for unlimited.
-            observers: List of usernames or IDs allowed to observe the task.
-            preferences: Scanner preferences as name/value pairs.
-        """
-        return self._send_request_and_transform_response(
-            Tasks.create_container_image_task(
-                name=name,
-                oci_image_target_id=oci_image_target_id,
                 scanner_id=scanner_id,
                 comment=comment,
                 alterable=alterable,
@@ -841,7 +679,6 @@ class GMPNext(GMPv227[T]):
         target_id: EntityID | None = None,
         scanner_id: EntityID | None = None,
         agent_group_id: EntityID | None = None,
-        oci_image_target_id: EntityID | None = None,
         alterable: bool | None = None,
         hosts_ordering: HostsOrdering | None = None,
         schedule_id: EntityID | None = None,
@@ -860,7 +697,6 @@ class GMPNext(GMPv227[T]):
             target_id: UUID of target to be scanned
             scanner_id: UUID of scanner to use for scanning the target
             agent_group_id: UUID of agent group to use for scanning
-            oci_image_target_id: UUID of the OCI Image target to be scanned.
             comment: The comment on the task.
             alert_ids: List of UUIDs for alerts to be applied to the task
             hosts_ordering: The order hosts are scanned in
@@ -879,7 +715,6 @@ class GMPNext(GMPv227[T]):
                 target_id=target_id,
                 scanner_id=scanner_id,
                 agent_group_id=agent_group_id,
-                oci_image_target_id=oci_image_target_id,
                 alterable=alterable,
                 hosts_ordering=hosts_ordering,
                 schedule_id=schedule_id,

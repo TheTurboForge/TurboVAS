@@ -22,7 +22,6 @@ import {isEmpty} from 'gmp/utils/string';
 export type ScannerType =
   (typeof SCANNER_TYPE_DEFINITIONS)[keyof typeof SCANNER_TYPE_DEFINITIONS]['value'];
 
-export type ContainerImageScannerType = typeof CONTAINER_IMAGE_SCANNER_TYPE;
 
 interface InfoElement {
   name?: string;
@@ -206,10 +205,6 @@ export const SCANNER_TYPE_DEFINITIONS = {
   OPENVASD_SENSOR_SCANNER_TYPE: {value: '8', name: _l('OpenVASD Sensor')},
   AGENT_CONTROLLER_SCANNER_TYPE: {value: '7', name: _l('Agent Controller')},
   AGENT_CONTROLLER_SENSOR_SCANNER_TYPE: {value: '9', name: _l('Agent Sensor')},
-  CONTAINER_IMAGE_SCANNER_TYPE: {
-    value: '10',
-    name: _l('Container Image Scanner'),
-  },
 } as const;
 
 // Extract individual constants
@@ -226,8 +221,6 @@ export const OPENVASD_SENSOR_SCANNER_TYPE =
   SCANNER_TYPE_DEFINITIONS.OPENVASD_SENSOR_SCANNER_TYPE.value;
 export const AGENT_CONTROLLER_SENSOR_SCANNER_TYPE =
   SCANNER_TYPE_DEFINITIONS.AGENT_CONTROLLER_SENSOR_SCANNER_TYPE.value;
-export const CONTAINER_IMAGE_SCANNER_TYPE =
-  SCANNER_TYPE_DEFINITIONS.CONTAINER_IMAGE_SCANNER_TYPE.value;
 
 // Mapping of scanner types to their display names (automatically generated)
 export const SCANNER_TYPE_NAMES = Object.fromEntries(
@@ -237,8 +230,6 @@ export const SCANNER_TYPE_NAMES = Object.fromEntries(
 export const OPENVAS_DEFAULT_SCANNER_ID =
   '08b69003-5fc2-4037-a479-93b440211c73';
 
-export const CONTAINER_IMAGE_DEFAULT_SCANNER_ID =
-  '1facb485-10e8-4520-9110-66f929d9ac2e';
 
 export const openVasScannersFilter = (config: {scannerType: ScannerType}) =>
   config.scannerType === OPENVAS_SCANNER_TYPE;

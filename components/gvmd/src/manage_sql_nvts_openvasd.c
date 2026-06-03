@@ -31,9 +31,6 @@
 #include "manage_sql_resources.h"
 #include "sql.h"
 
-#if ENABLE_CONTAINER_SCANNING
-#include "manage_container_image_scanner.h"
-#endif
 
 #include <gvm/util/jsonpull.h>
 #include <gvm/util/vtparser.h>
@@ -381,30 +378,6 @@ update_scanner_preferences_openvasd (scanner_t scan)
     }
 #endif
 
-#if ENABLE_CONTAINER_SCANNING
-
-  if (feature_enabled (FEATURE_ID_CONTAINER_SCANNING))
-    {
-      connector = container_image_scanner_connect (scan, NULL);
-      if (!connector)
-        {
-          g_warning (
-            "%s: failed to get preferences from container image scanner",
-            __func__);
-          return -1;
-        }
-
-      http_scanner_parsed_scans_preferences (connector, &scan_prefs);
-      g_debug ("There are %d scan preferences for container image scanner",
-               g_slist_length (scan_prefs));
-      http_scanner_connector_free (connector);
-    }
-  else
-    {
-      g_warning ("%s: container scanning runtime flag is disabled", __func__);
-    }
-
-#endif
 
   point = scan_prefs;
   first = 1;
@@ -445,7 +418,7 @@ update_scanner_preferences_openvasd (scanner_t scan)
 
   return 0;
 #else
-  g_debug ("%s: openvasd or container scanning feature is disabled.", __func__);
+  g_debug ("%s: openvasd feature is disabled.", __func__);
   return -1;
 #endif
 }

@@ -31,7 +31,6 @@ typedef resource_t host_t;
 typedef resource_t integration_config_t;
 typedef resource_t note_t;
 typedef resource_t nvt_t;
-typedef resource_t oci_image_target_t;
 typedef resource_t override_t;
 typedef resource_t permission_t;
 typedef resource_t port_list_t;

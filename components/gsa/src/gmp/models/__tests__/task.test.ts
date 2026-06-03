@@ -37,7 +37,6 @@ describe('Task Model parse tests', () => {
     expect(task.slave).toBeUndefined();
     expect(task.status).toEqual(TASK_STATUS.unknown);
     expect(task.target).toBeUndefined();
-    expect(task.ociImageTarget).toBeUndefined();
     expect(task.trend).toBeUndefined();
     expect(task.usageType).toEqual(USAGE_TYPE.scan);
     expect(task.acceptInvalidCerts).toBeUndefined();
@@ -71,7 +70,6 @@ describe('Task Model parse tests', () => {
     expect(task.slave).toBeUndefined();
     expect(task.status).toEqual(TASK_STATUS.unknown);
     expect(task.target).toBeUndefined();
-    expect(task.ociImageTarget).toBeUndefined();
     expect(task.trend).toBeUndefined();
     expect(task.usageType).toEqual(USAGE_TYPE.scan);
     expect(task.acceptInvalidCerts).toBeUndefined();
@@ -181,20 +179,6 @@ describe('Task Model parse tests', () => {
     expect(task.target?.entityType).toEqual('target');
   });
 
-  test('should parse oci_image_target', () => {
-    const task = Task.fromElement({
-      _id: 't1',
-      oci_image_target: {
-        _id: 'oci1',
-        name: 'Test OCI Target',
-        trash: 0,
-      },
-    });
-    expect(task.id).toEqual('t1');
-    expect(task.ociImageTarget?.id).toEqual('oci1');
-    expect(task.ociImageTarget?.entityType).toEqual('target');
-    expect(task.ociImageTarget?.name).toEqual('Test OCI Target');
-  });
 
   test('should parse alerts', () => {
     const task = Task.fromElement({
@@ -560,7 +544,7 @@ describe('Task Model parse tests', () => {
 });
 
 describe(`Task Model methods tests`, () => {
-  test('should be a container only if neither target nor agentGroup nor ociImageTarget is set', () => {
+  test('should be an import task only if neither target nor agentGroup is set', () => {
     const t1 = Task.fromElement({});
     const t2 = Task.fromElement({target: {_id: 'foo'}});
     const t3 = Task.fromElement({agent_group: {_id: 'ag1'}});
@@ -568,35 +552,12 @@ describe(`Task Model methods tests`, () => {
       target: {_id: 'foo'},
       agent_group: {_id: 'ag1'},
     });
-    const t5 = Task.fromElement({
-      oci_image_target: {_id: 'oci1'},
-    });
-
     expect(t1.isImport()).toEqual(true);
     expect(t2.isImport()).toEqual(false);
     expect(t3.isImport()).toEqual(false);
     expect(t4.isImport()).toEqual(false);
-    expect(t5.isImport()).toEqual(false);
   });
 
-  test('should be a container image if ociImageTarget is set', () => {
-    const t1 = Task.fromElement({});
-    const t2 = Task.fromElement({target: {_id: 'foo'}});
-    const t3 = Task.fromElement({agent_group: {_id: 'ag1'}});
-    const t4 = Task.fromElement({
-      oci_image_target: {_id: 'oci1'},
-    });
-    const t5 = Task.fromElement({
-      target: {_id: 'foo'},
-      oci_image_target: {_id: 'oci1'},
-    });
-
-    expect(t1.isContainerImage()).toEqual(false);
-    expect(t2.isContainerImage()).toEqual(false);
-    expect(t3.isContainerImage()).toEqual(false);
-    expect(t4.isContainerImage()).toEqual(true);
-    expect(t5.isContainerImage()).toEqual(true);
-  });
 
   test('should use status for isActive', () => {
     const statusList = {
@@ -733,21 +694,18 @@ describe(`Task Model methods tests`, () => {
     expect(task.agentGroup?.entityType).toEqual('agentgroup');
   });
 
-  test('container vs agent vs target vs container image parsing check', () => {
+  test('import vs agent vs target parsing check', () => {
     const t1 = Task.fromElement({});
     expect(t1.isImport()).toBe(true);
     expect(t1.isAgent()).toBe(false);
-    expect(t1.isContainerImage()).toBe(false);
 
     const t2 = Task.fromElement({target: {_id: 'tgt1'}});
     expect(t2.isImport()).toBe(false);
     expect(t2.isAgent()).toBe(false);
-    expect(t2.isContainerImage()).toBe(false);
 
     const t3 = Task.fromElement({agent_group: {_id: 'ag1'}});
     expect(t3.isImport()).toBe(false);
     expect(t3.isAgent()).toBe(true);
-    expect(t3.isContainerImage()).toBe(false);
 
     const t4 = Task.fromElement({
       target: {_id: 'tgt1'},
@@ -755,14 +713,6 @@ describe(`Task Model methods tests`, () => {
     });
     expect(t4.isImport()).toBe(false);
     expect(t4.isAgent()).toBe(true);
-    expect(t4.isContainerImage()).toBe(false);
-
-    const t5 = Task.fromElement({
-      oci_image_target: {_id: 'oci1'},
-    });
-    expect(t5.isImport()).toBe(false);
-    expect(t5.isAgent()).toBe(false);
-    expect(t5.isContainerImage()).toBe(true);
   });
 
   test('should be agent if agentGroup is set', () => {

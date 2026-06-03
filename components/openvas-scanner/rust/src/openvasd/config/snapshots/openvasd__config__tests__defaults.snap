@@ -38,16 +38,3 @@ type = 'ospd'
 socket = '/var/run/ospd/ospd-openvas.sock'
 [scanner.preferences]
 aaa = false
-
-[container_image_scanner]
-max_scans = 5
-[container_image_scanner.database]
-location = 'in-memory'
-busy_timeout = '10s'
-max_connections = 1
-[container_image_scanner.image]
-extract_to = '/tmp/openvasd/cis'
-max_scanning = 10
-scanning_retries = 3
-batch_size = 2
-retry_timeout = '1s'

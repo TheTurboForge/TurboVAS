@@ -8,7 +8,7 @@ import {changeInputValue, screen, render, fireEvent} from 'web/testing';
 import Task from 'gmp/models/task';
 import ImportTaskDialog from 'web/pages/tasks/ImportTaskDialog';
 
-describe('ContainerTaskDialog tests', () => {
+describe('ImportTaskDialog tests', () => {
   test('should render create dialog', () => {
     const handleClose = testing.fn();
     const handleSave = testing.fn();

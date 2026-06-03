@@ -63,13 +63,22 @@ describe('Report Summary tests', () => {
     expect(tableData[10]).toHaveTextContent('Hosts scanned');
     expect(tableData[11]).toHaveTextContent('2');
 
-    expect(tableData[12]).toHaveTextContent('Filter');
-    expect(tableData[13]).toHaveTextContent(
+    expect(tableData[12]).toHaveTextContent('Results');
+    expect(tableData[13]).toHaveTextContent('3');
+
+    expect(tableData[14]).toHaveTextContent('Vulnerabilities');
+    expect(tableData[15]).toHaveTextContent('0');
+
+    expect(tableData[16]).toHaveTextContent('CVEs');
+    expect(tableData[17]).toHaveTextContent('3');
+
+    expect(tableData[18]).toHaveTextContent('Filter');
+    expect(tableData[19]).toHaveTextContent(
       'apply_overrides=0 levels=hml min_qod=70',
     );
 
-    expect(tableData[14]).toHaveTextContent('Timezone');
-    expect(tableData[15]).toHaveTextContent('UTC (UTC)');
+    expect(tableData[20]).toHaveTextContent('Timezone');
+    expect(tableData[21]).toHaveTextContent('UTC (UTC)');
   });
 
   test('should render Delta Report Summary', () => {
@@ -133,13 +142,22 @@ describe('Report Summary tests', () => {
     expect(tableData[20]).toHaveTextContent('Hosts scanned');
     expect(tableData[21]).toHaveTextContent('2');
 
-    expect(tableData[22]).toHaveTextContent('Filter');
-    expect(tableData[23]).toHaveTextContent(
+    expect(tableData[22]).toHaveTextContent('Results');
+    expect(tableData[23]).toHaveTextContent('2');
+
+    expect(tableData[24]).toHaveTextContent('Vulnerabilities');
+    expect(tableData[25]).toHaveTextContent('0');
+
+    expect(tableData[26]).toHaveTextContent('CVEs');
+    expect(tableData[27]).toHaveTextContent('0');
+
+    expect(tableData[28]).toHaveTextContent('Filter');
+    expect(tableData[29]).toHaveTextContent(
       'apply_overrides=0 levels=hml min_qod=70',
     );
 
-    expect(tableData[24]).toHaveTextContent('Timezone');
-    expect(tableData[25]).toHaveTextContent('UTC (UTC)');
+    expect(tableData[30]).toHaveTextContent('Timezone');
+    expect(tableData[31]).toHaveTextContent('UTC (UTC)');
   });
 
   // TODO: should render report error

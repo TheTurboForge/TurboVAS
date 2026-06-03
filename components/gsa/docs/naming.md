@@ -22,7 +22,7 @@ New code added to GSA has to follow the rules defined in this document.
 ## Modules
 
 - TypeScript and JavaScript modules should use kebab-case naming.
-  For example `src/gmp/commands/oci-image-target.ts`
+  For example `src/gmp/commands/port-list.ts`
 - Exceptions are modules containing [React hooks](#react-hooks) or [React components](#react-components).
 - Modules for tests should use the same name as their tested module with a
   `.test.ts` or `.test.js` suffix and in a `__tests__` directory.

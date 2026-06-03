@@ -145,11 +145,6 @@ export interface TaskElement extends ModelElement {
     name?: string;
     trash?: YesNo;
   };
-  oci_image_target?: {
-    _id?: string;
-    name?: string;
-    trash?: YesNo;
-  };
   agent_group?: {
     _id?: string;
     name?: string;
@@ -222,7 +217,6 @@ export interface TaskProperties extends ModelProperties {
   slave?: TaskSlave;
   status?: TaskStatus;
   target?: Model;
-  ociImageTarget?: Model;
   agentGroup?: Model;
   trend?: TaskTrend;
   // from preferences
@@ -339,7 +333,6 @@ class Task extends Model {
   readonly slave?: TaskSlave;
   readonly status: TaskStatus;
   readonly target?: Model;
-  readonly ociImageTarget?: Model;
   readonly agentGroup?: Model;
   readonly trend?: TaskTrend;
   readonly usageType: TaskUsageType;
@@ -385,7 +378,6 @@ class Task extends Model {
     slave,
     status = TASK_STATUS.unknown,
     target,
-    ociImageTarget,
     agentGroup,
     trend,
     usageType = USAGE_TYPE.scan,
@@ -420,7 +412,6 @@ class Task extends Model {
     this.slave = slave;
     this.status = status;
     this.target = target;
-    this.ociImageTarget = ociImageTarget;
     this.trend = trend;
     this.agentGroup = agentGroup;
     this.usageType = usageType;
@@ -532,9 +523,6 @@ class Task extends Model {
     copy.target = isEmpty(element.target?._id)
       ? undefined
       : Model.fromElement(element.target, 'target');
-    copy.ociImageTarget = isEmpty(element.oci_image_target?._id)
-      ? undefined
-      : Model.fromElement(element.oci_image_target, 'target');
     copy.agentGroup = isEmpty(element.agent_group?._id)
       ? undefined
       : Model.fromElement(element.agent_group, 'agentgroup');
@@ -644,18 +632,10 @@ class Task extends Model {
   }
 
   /**
-   * Returns true if the task is an import task (formerly known as container task)
+   * Returns true if the task is an import task.
    */
   isImport() {
-    return (
-      !isDefined(this.target) &&
-      !isDefined(this.agentGroup) &&
-      !isDefined(this.ociImageTarget)
-    );
-  }
-
-  isContainerImage() {
-    return isDefined(this.ociImageTarget);
+    return !isDefined(this.target) && !isDefined(this.agentGroup);
   }
 
   isAgent() {

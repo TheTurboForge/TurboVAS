@@ -263,7 +263,6 @@ if(BUILD_TESTS AND NOT SKIP_SRC)
       APPEND TESTS
       openvasd-test
       http-scanner-test
-      container_image_scanner-test
       httputils-test
       vtparser-test
     )
@@ -339,7 +338,6 @@ if(NOT SKIP_SRC)
   if(ENABLE_OPENVASD)
     add_subdirectory(http_scanner)
     add_subdirectory(openvasd)
-    add_subdirectory(container_image_scanner)
   endif(ENABLE_OPENVASD)
 
   if(ENABLE_AGENTS)

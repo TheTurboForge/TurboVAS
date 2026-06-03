@@ -204,8 +204,6 @@ const PageContent = ({
   const hasReport = isDefined(entity);
   const report = entity?.report;
 
-  const isContainerScanning =
-    hasReport && isDefined(entity.report?.task?.ociImageTarget?.id);
   const isAgentScanning =
     hasReport && isDefined(entity.report?.task?.agentGroup?.id);
 
@@ -299,7 +297,6 @@ const PageContent = ({
       renderPanel: () => (
         <ResultsTabContent
           hasTarget={!isImport}
-          isContainerScanning={isContainerScanning}
           progress={progress}
           reportFilter={activeFilter}
           reportId={reportId}
@@ -324,8 +321,7 @@ const PageContent = ({
           thresholdConfig,
           <HostsTabContent
             isAgentScanning={isAgentScanning}
-            isContainerScanning={isContainerScanning}
-            reportFilter={activeFilter}
+              reportFilter={activeFilter}
             reportId={reportId}
             status={status}
           />,

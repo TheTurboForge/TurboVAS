@@ -201,10 +201,9 @@ const containerEntity = Report.fromElement({
     timezone_abbrev: 'UTC',
     task: {
       _id: '314',
-      name: 'Container Task',
+      name: 'Import Task',
       comment: '',
       target: {_id: '159'},
-      oci_image_target: {_id: 'oci-1'},
     },
     closed_cves: {count: 0},
     vulns: {count: 0},

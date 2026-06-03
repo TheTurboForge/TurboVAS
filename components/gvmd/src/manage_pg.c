@@ -1284,44 +1284,15 @@ manage_create_sql_functions ()
             "  WHERE report_hosts.report = $1;"
             "$$ LANGUAGE SQL;");
 
-      /* column hostname in table report_hosts was added in version 273 */
-      if (current_db_version >= 273)
-          {
-            sql ("CREATE OR REPLACE FUNCTION report_result_host_count (report integer,"
-                 "                                                     min_qod integer)"
-                 " RETURNS bigint AS $$"
-                 "  SELECT CASE"
-                 "         WHEN EXISTS (SELECT id"
-                 "                      FROM tasks"
-                 "                      WHERE id = (SELECT task"
-                 "                                  FROM reports WHERE id = $1)"
-                 "                        AND oci_image_target IS NOT NULL)"
-                 "         THEN (SELECT count (DISTINCT id) FROM report_hosts"
-                 "               WHERE report_hosts.report = $1"
-                 "               AND EXISTS (SELECT * FROM results"
-                 "                           WHERE results.host = report_hosts.host"
-                 "                             AND results.hostname = report_hosts.hostname"
-                 "                             AND results.qod >= $2))"
-                 "         ELSE (SELECT count (DISTINCT id) FROM report_hosts"
-                 "               WHERE report_hosts.report = $1"
-                 "               AND EXISTS (SELECT * FROM results"
-                 "                           WHERE results.host = report_hosts.host"
-                 "                             AND results.qod >= $2))"
-                 "         END;"
-                 "$$ LANGUAGE SQL;");
-          }
-      else
-          {
-            sql ("CREATE OR REPLACE FUNCTION report_result_host_count (report integer,"
-                 "                                                     min_qod integer)"
-                 " RETURNS bigint AS $$"
-                 "  SELECT count (DISTINCT id) FROM report_hosts"
-                 "  WHERE report_hosts.report = $1"
-                 "    AND EXISTS (SELECT * FROM results"
-                 "                WHERE results.host = report_hosts.host"
-                 "                  AND results.qod >= $2)"
-                 "$$ LANGUAGE SQL;");
-          }
+      sql ("CREATE OR REPLACE FUNCTION report_result_host_count (report integer,"
+           "                                                     min_qod integer)"
+           " RETURNS bigint AS $$"
+           "  SELECT count (DISTINCT id) FROM report_hosts"
+           "  WHERE report_hosts.report = $1"
+           "    AND EXISTS (SELECT * FROM results"
+           "                WHERE results.host = report_hosts.host"
+           "                  AND results.qod >= $2)"
+           "$$ LANGUAGE SQL;");
 
       sql ("CREATE OR REPLACE FUNCTION severity_class ()"
            " RETURNS text AS $$"
@@ -1435,8 +1406,6 @@ manage_create_sql_functions ()
                "$$ LANGUAGE SQL;",
                TASK_STATUS_DONE);
         }
-
-      /* column oci_image_target in table task was added in version 261 */
       /* column agent_group in table task was added in version 262 */
       if (current_db_version >= 262)
         {
@@ -1448,7 +1417,6 @@ manage_create_sql_functions ()
                "  SELECT CASE"
                "         WHEN (SELECT target = 0 "
                "               AND agent_group = 0 "
-               "               AND oci_image_target = 0 "
                "               FROM tasks WHERE id = $1)"
                "         THEN CAST (NULL AS double precision)"
                "         ELSE"
@@ -2661,30 +2629,6 @@ create_tables ()
        "  port INTEGER,"
        "  credential_location INTEGER);");
 
-  sql ("CREATE TABLE IF NOT EXISTS oci_image_targets"
-       " (id SERIAL PRIMARY KEY,"
-       "  uuid text UNIQUE NOT NULL,"
-       "  owner integer REFERENCES users (id) ON DELETE RESTRICT,"
-       "  name text NOT NULL,"
-       "  image_references text,"
-       "  exclude_images text,"
-       "  comment text,"
-       "  creation_time integer,"
-       "  modification_time integer,"
-       "  credential INTEGER REFERENCES credentials (id) ON DELETE RESTRICT);");
-
-  sql ("CREATE TABLE IF NOT EXISTS oci_image_targets_trash"
-       " (id SERIAL PRIMARY KEY,"
-       "  uuid text UNIQUE NOT NULL,"
-       "  owner integer REFERENCES users (id) ON DELETE RESTRICT,"
-       "  name text NOT NULL,"
-       "  image_references text,"
-       "  exclude_images text,"
-       "  comment text,"
-       "  creation_time integer,"
-       "  modification_time integer,"
-       "  credential INTEGER,"
-       "  credential_location integer);");
 
   sql ("CREATE TABLE IF NOT EXISTS tickets"
        " (id SERIAL PRIMARY KEY,"
@@ -3023,8 +2967,6 @@ create_tables ()
        "  target_location integer,"
        "  schedule_location integer,"
        "  scanner_location integer,"
-       "  oci_image_target integer,"
-       "  oci_image_target_location integer,"
        "  agent_group_location integer,"
        "  upload_result_count integer,"
        "  alterable integer,"

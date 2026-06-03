@@ -8,7 +8,6 @@ import type Credential from 'gmp/models/credential';
 import {
   AGENT_CONTROLLER_SCANNER_TYPE,
   AGENT_CONTROLLER_SENSOR_SCANNER_TYPE,
-  CONTAINER_IMAGE_SCANNER_TYPE,
   GREENBONE_SENSOR_SCANNER_TYPE,
   OPENVAS_SCANNER_TYPE,
   OPENVASD_SCANNER_TYPE,
@@ -81,8 +80,7 @@ const updatePort = (scannerType: ScannerType | undefined) => {
   }
   if (
     scannerType === OPENVASD_SCANNER_TYPE ||
-    scannerType === OPENVASD_SENSOR_SCANNER_TYPE ||
-    scannerType === CONTAINER_IMAGE_SCANNER_TYPE
+    scannerType === OPENVASD_SENSOR_SCANNER_TYPE
   ) {
     return 443;
   }
@@ -202,12 +200,6 @@ const ScannerDialog = ({
     scannerTypes.push(GREENBONE_SENSOR_SCANNER_TYPE);
   }
 
-  if (
-    scannerType === CONTAINER_IMAGE_SCANNER_TYPE ||
-    features.featureEnabled('ENABLE_CONTAINER_SCANNING')
-  ) {
-    scannerTypes.push(CONTAINER_IMAGE_SCANNER_TYPE);
-  }
 
   const handleCaCertificateChange = async (file?: File | null) => {
     if (file) {

@@ -61,10 +61,6 @@
 #include "manage_agents.h"
 #endif
 
-#if ENABLE_CONTAINER_SCANNING
-#include "manage_oci_image_targets.h"
-#include "manage_container_image_scanner.h"
-#endif
 
 /**
  * @brief OID of ping_host.nasl
@@ -363,7 +359,7 @@ typedef enum scanner_type
   SCANNER_TYPE_AGENT_CONTROLLER = 7,
   SCANNER_TYPE_OPENVASD_SENSOR = 8,
   SCANNER_TYPE_AGENT_CONTROLLER_SENSOR = 9,
-  SCANNER_TYPE_CONTAINER_IMAGE = 10,
+  /* 10 was removed. */
   SCANNER_TYPE_MAX = 11,
 } scanner_type_t;
 
@@ -647,21 +643,6 @@ int
 set_task_schedule_and_periods (task_t task, const gchar *schedule_id,
                                const gchar *schedule_periods);
 
-#if ENABLE_CONTAINER_SCANNING
-
-oci_image_target_t
-task_oci_image_target (task_t);
-
-int
-task_oci_image_target_in_trash (task_t);
-
-void
-set_task_oci_image_target (task_t, oci_image_target_t);
-
-void
-clear_task_asset_preferences (task_t);
-
-#endif /* ENABLE_CONTAINER_SCANNING */
 
 void
 set_task_scanner (task_t, scanner_t);
@@ -826,7 +807,7 @@ int
 modify_task (const gchar *, const gchar *, const gchar *, const gchar *,
              const gchar *, const gchar *, const gchar *, array_t *,
              const gchar *, array_t *, const gchar *, const gchar *, array_t *,
-             const gchar *, const gchar *, gchar **, gchar **);
+             const gchar *, gchar **, gchar **);
 
 void
 init_config_file_iterator (iterator_t*, const char*, const char*);
@@ -1024,9 +1005,6 @@ report_host_count (report_t);
 
 char *
 report_finished_hosts_str (report_t);
-
-char *
-report_finished_container_images_str (report_t);
 
 gboolean
 find_report_with_permission (const char *, report_t *, const char *);
@@ -1358,21 +1336,6 @@ result_iterator_dfn_certs (iterator_t*);
 
 const char *
 result_iterator_compliance (iterator_t*);
-
-const char *
-result_iterator_oci_image_name (iterator_t*);
-
-const char *
-result_iterator_oci_image_digest (iterator_t*);
-
-const char *
-result_iterator_oci_image_registry (iterator_t*);
-
-const char *
-result_iterator_oci_image_path (iterator_t*);
-
-const char *
-result_iterator_oci_image_short_name (iterator_t*);
 
 const char *
 result_iterator_delta_state (iterator_t*);
@@ -2017,19 +1980,6 @@ credential_target_iterator_name (iterator_t*);
 int
 credential_target_iterator_readable (iterator_t*);
 
-#if ENABLE_CONTAINER_SCANNING
-void
-init_credential_oci_image_target_iterator (iterator_t*, credential_t, int);
-
-const char*
-credential_oci_target_iterator_uuid (iterator_t*);
-
-const char*
-credential_oci_target_iterator_name (iterator_t*);
-
-int
-credential_oci_target_iterator_readable (iterator_t*);
-#endif /* ENABLE_CONTAINER_SCANNING */
 
 void
 init_credential_scanner_iterator (iterator_t*, credential_t, int);
@@ -2142,7 +2092,6 @@ typedef enum {
   CREATE_SCANNER_UNIX_SOCKET_UNSUPPORTED,     ///< Type doesn't support UNIX sockets
   CREATE_SCANNER_OPENVASD_DISABLED,           ///< openvasd feature is disabled
   CREATE_SCANNER_AGENT_DISABLED,              ///< Agent feature is disabled
-  CREATE_SCANNER_CONTAINER_SCANNING_DISABLED, ///< Container scanning feature is disabled
   CREATE_SCANNER_PERMISSION_DENIED = 99       ///< Permission denied
 } create_scanner_return_t;
 
@@ -2170,7 +2119,6 @@ typedef enum {
   MODIFY_SCANNER_UNIX_SOCKET_UNSUPPORTED,     ///< Type doesn't support UNIX sockets
   MODIFY_SCANNER_OPENVASD_DISABLED,           ///< openvasd feature is disabled
   MODIFY_SCANNER_AGENT_DISABLED,              ///< Agent feature is disabled
-  MODIFY_SCANNER_CONTAINER_SCANNING_DISABLED, ///< Container scanning feature is disabled
   MODIFY_SCANNER_PERMISSION_DENIED = 99       ///< Permission denied
 } modify_scanner_return_t;
 

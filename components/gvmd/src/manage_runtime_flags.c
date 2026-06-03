@@ -29,12 +29,6 @@
 #define ENABLE_AGENTS 0
 #endif
 
-#ifndef ENABLE_CONTAINER_SCANNING
-/**
- * @brief Whether to enable container scanning.
- */
-#define ENABLE_CONTAINER_SCANNING 0
-#endif
 
 #ifndef ENABLE_OPENVASD
 /**
@@ -56,11 +50,6 @@
 static feature_state_t feature_agents =
   {ENABLE_AGENTS, 0};
 
-/**
- * @brief State of a single feature.
- */
-static feature_state_t feature_container_scanning =
-  {ENABLE_CONTAINER_SCANNING, 0};
 
 /**
  * @brief State of a single feature.
@@ -99,9 +88,6 @@ struct conf_feature_flags
 {
   int has_agents;              ///< Whether flag is present.
   int agents;                  ///< Value of flag.
-
-  int has_container_scanning;  ///< Whether flag is present.
-  int container_scanning;      ///< Value of flag.
 
   int has_openvasd;            ///< Whether flag is present.
   int openvasd;                ///< Value of flag.
@@ -156,10 +142,6 @@ load_conf_file_feature_flags (struct conf_feature_flags *out)
   gvmd_config_get_boolean (kf, "features", "enable_agents",
                            &out->has_agents,
                            &out->agents);
-
-  gvmd_config_get_boolean (kf, "features", "enable_container_scanning",
-                           &out->has_container_scanning,
-                           &out->container_scanning);
 
   gvmd_config_get_boolean (kf, "features", "enable_credential_store",
                            &out->has_credential_store,
@@ -256,11 +238,6 @@ runtime_flags_init ()
                    conf_flags.has_agents,
                    conf_flags.agents);
 
-  resolve_feature (&feature_container_scanning,
-                   "GVMD_ENABLE_CONTAINER_SCANNING",
-                   conf_flags.has_container_scanning,
-                   conf_flags.container_scanning);
-
   resolve_feature (&feature_openvasd,
                    "GVMD_ENABLE_OPENVASD",
                    conf_flags.has_openvasd,
@@ -309,8 +286,6 @@ feature_enabled (feature_id_t t)
       return feature_agents.enabled;
     case FEATURE_ID_OPENVASD_SCANNER:
       return feature_openvasd.enabled;
-    case FEATURE_ID_CONTAINER_SCANNING:
-      return feature_container_scanning.enabled;
     case FEATURE_ID_CREDENTIAL_STORES:
       return feature_credential_stores.enabled;
     case FEATURE_ID_VT_METADATA:
@@ -340,8 +315,6 @@ feature_compiled_in (feature_id_t t)
       return feature_agents.compiled_in;
     case FEATURE_ID_OPENVASD_SCANNER:
       return feature_openvasd.compiled_in;
-    case FEATURE_ID_CONTAINER_SCANNING:
-      return feature_container_scanning.compiled_in;
     case FEATURE_ID_CREDENTIAL_STORES:
       return feature_credential_stores.compiled_in;
     case FEATURE_ID_VT_METADATA:
@@ -379,16 +352,6 @@ runtime_append_disabled_commands (GString *buf)
         "get_agent_installers,"
         "get_agent_installer_file,"
         "sync_agents");
-    }
-  /* CONTAINER_SCANNING */
-  if (!feature_enabled (FEATURE_ID_CONTAINER_SCANNING))
-    {
-      append_commands (
-        buf,
-        "get_oci_image_targets,"
-        "create_oci_image_target,"
-        "modify_oci_image_target,"
-        "delete_oci_image_target");
     }
 
   /* CREDENTIAL_STORES */

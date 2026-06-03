@@ -88,7 +88,7 @@ get_report_hosts_run (gmp_parser_t *gmp_parser, GError **error)
   report_t report;
   task_t task;
   gchar *usage_type;
-  gboolean is_container_scanning_report = FALSE;
+  gboolean include_result_hostname = FALSE;
   int ret, filtered, count;
 
   count = 0;
@@ -156,13 +156,6 @@ get_report_hosts_run (gmp_parser_t *gmp_parser, GError **error)
   if (usage_type == NULL)
     usage_type = g_strdup ("");
 
-#if ENABLE_CONTAINER_SCANNING
-  oci_image_target_t oci_image_target = task_oci_image_target (task);
-  if (oci_image_target)
-    {
-      is_container_scanning_report = TRUE;
-    }
-#endif
 
   SEND_GET_START ("report_host");
 
@@ -170,7 +163,7 @@ get_report_hosts_run (gmp_parser_t *gmp_parser, GError **error)
     report,
     &get_report_hosts_data.get,
     usage_type,
-    is_container_scanning_report,
+    include_result_hostname,
     get_report_hosts_data.lean,
     send_to_client,
     gmp_parser->client_writer,

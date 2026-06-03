@@ -12,10 +12,7 @@ import type AgentGroup from 'gmp/models/agent-group';
 import date, {type Date} from 'gmp/models/date';
 import {ALL_FILTER} from 'gmp/models/filter';
 import {FULL_AND_FAST_SCAN_CONFIG_ID} from 'gmp/models/scan-config';
-import {
-  CONTAINER_IMAGE_SCANNER_TYPE,
-  OPENVAS_DEFAULT_SCANNER_ID,
-} from 'gmp/models/scanner';
+import {OPENVAS_DEFAULT_SCANNER_ID} from 'gmp/models/scanner';
 import {type default as Task, type TaskAutoDelete} from 'gmp/models/task';
 import {NO_VALUE, YES_VALUE, type YesNo} from 'gmp/parser';
 import {DEFAULT_TIMEZONE} from 'gmp/time-zones';
@@ -38,7 +35,6 @@ import useTranslation from 'web/hooks/useTranslation';
 import useUserTimezone from 'web/hooks/useUserTimezone';
 import AgentGroupsComponent from 'web/pages/agent-groups/AgentGroupsComponent';
 import AlertComponent from 'web/pages/alerts/AlertComponent';
-import ContainerImageTargetsComponent from 'web/pages/container-image-targets/ContainerImageTargetsComponent';
 import ImportReportDialog, {
   type ReportImportDialogData,
 } from 'web/pages/reports/ReportImportDialog';
@@ -47,8 +43,6 @@ import TargetComponent from 'web/pages/targets/TargetComponent';
 import AgentTaskDialog, {
   type AgentTaskDialogData,
 } from 'web/pages/tasks/AgentTaskDialog';
-import ContainerImageTaskDialog from 'web/pages/tasks/ContainerImageTaskDialog';
-import {useContainerImageTaskDialog} from 'web/pages/tasks/hooks/useContainerImageTaskDialog';
 import ImportTaskDialog, {
   type ImportTaskDialogData,
 } from 'web/pages/tasks/ImportTaskDialog';
@@ -95,7 +89,6 @@ import TaskWizard from 'web/wizard/TaskWizard';
 interface TaskComponentRenderProps {
   create: () => void;
   createImportTask: () => void;
-  createContainerImage: () => void;
   clone: (task: Task) => void;
   delete: (task: Task) => void;
   download: (task: Task) => void;
@@ -108,7 +101,6 @@ interface TaskComponentRenderProps {
   modifyTaskWizard: () => void;
   taskWizard: () => void;
   onNewAgentTaskClick: () => void;
-  onNewContainerImageTaskClick: () => void;
 }
 
 interface TaskComponentProps {
@@ -190,36 +182,6 @@ const TaskComponent = ({
   const [taskDialogVisible, setTaskDialogVisible] = useState(false);
   const [taskWizardVisible, setTaskWizardVisible] = useState(false);
   const [agentTaskDialogVisible, setAgentTaskDialogVisible] = useState(false);
-
-  const {
-    containerImageTaskDialogVisible,
-    task: containerImageTask,
-    name: containerImageName,
-    comment: containerImageComment,
-    addTag: containerImageAddTag,
-    alterable: containerImageAlterable,
-    applyOverrides: containerImageApplyOverrides,
-    inAssets: containerImageInAssets,
-    schedulePeriods: containerImageSchedulePeriods,
-    scheduleId: containerImageScheduleId,
-    ociImageTargetId: containerImageOciImageTargetId,
-    scannerId: containerImageScannerId,
-    acceptInvalidCerts: containerImageAcceptInvalidCerts,
-    registryAllowInsecure: containerImageRegistryAllowInsecure,
-    title: containerImageTitle,
-    setOciImageTargetId,
-    openContainerImageTaskDialog,
-    closeContainerImageTaskDialog,
-    handleSaveContainerImageTask,
-    handleOciImageTargetChange,
-    handleScannerChange: handleContainerImageScannerChange,
-    handleScheduleChange: handleContainerImageScheduleChange,
-  } = useContainerImageTaskDialog({
-    onContainerCreated: onImportTaskCreated,
-    onContainerCreateError: onImportTaskCreateError,
-    onContainerSaved: onImportTaskSaved,
-    onContainerSaveError: onImportTaskSaveError,
-  });
 
   const [alertIds, setAlertIds] = useState<string[]>([]);
   const [alterable, setAlterable] = useState<YesNo | undefined>();
@@ -472,12 +434,6 @@ const TaskComponent = ({
     fetchTargets();
 
     setTargetId(data.id);
-  };
-
-  const handleOciImageTargetCreated = (resp: {data: {id?: string}}) => {
-    const {data} = resp;
-
-    setOciImageTargetId(data.id);
   };
 
   const openImportTaskDialog = (task?: Task) => {
@@ -939,22 +895,13 @@ const TaskComponent = ({
     await openAgentTaskDialog(task);
   };
 
-  const handleOpenContainerImageTaskDialog = (task?: Task) => {
-    fetchAlerts();
-    fetchSchedules();
-    openContainerImageTaskDialog(task);
-  };
 
   const handleCloseNewAgentTaskDialog = () => {
     closeAgentTaskDialog();
   };
 
   const handleEditTask = async (task: Task) => {
-    if (task.scanner?.scannerType === CONTAINER_IMAGE_SCANNER_TYPE) {
-      handleOpenContainerImageTaskDialog(task);
-    } else {
-      await openTaskDialog(task);
-    }
+    await openTaskDialog(task);
   };
 
   const handleEntityDownload = useEntityDownload<Task>(
@@ -990,7 +937,6 @@ const TaskComponent = ({
           download: handleEntityDownload,
           create: openTaskDialog,
           createImportTask: openImportTaskDialog,
-          createContainerImage: openContainerImageTaskDialog,
           edit: handleEditTask,
           start: handleTaskStart,
           stop: handleTaskStop,
@@ -1000,7 +946,6 @@ const TaskComponent = ({
           modifyTaskWizard: openModifyTaskWizard,
           taskWizard: openTaskWizard,
           onNewAgentTaskClick: handleOpenAgentTaskDialog,
-          onNewContainerImageTaskClick: handleOpenContainerImageTaskDialog,
         })}
 
       {taskDialogVisible && (
@@ -1074,56 +1019,6 @@ const TaskComponent = ({
         />
       )}
 
-      {containerImageTaskDialogVisible && (
-        // @ts-expect-error
-        <AlertComponent onCreated={handleAlertCreated}>
-          {({create: createAlert}) => (
-            <ScheduleComponent onCreated={handleScheduleCreated}>
-              {({create: createSchedule}) => (
-                <ContainerImageTargetsComponent
-                  onCreated={handleOciImageTargetCreated}
-                >
-                  {({create: createOciImageTarget}) => (
-                    <ContainerImageTaskDialog
-                      acceptInvalidCerts={containerImageAcceptInvalidCerts}
-                      addTag={containerImageAddTag}
-                      alertIds={alertIds}
-                      alerts={alerts as RenderSelectItemProps[]}
-                      alterable={containerImageAlterable}
-                      applyOverrides={containerImageApplyOverrides}
-                      comment={containerImageComment}
-                      inAssets={containerImageInAssets}
-                      isLoadingAlerts={isLoadingAlerts}
-                      isLoadingSchedules={isLoadingSchedules}
-                      name={containerImageName}
-                      ociImageTargetId={containerImageOciImageTargetId}
-                      registryAllowInsecure={
-                        containerImageRegistryAllowInsecure
-                      }
-                      scannerId={containerImageScannerId}
-                      scheduleId={containerImageScheduleId}
-                      schedulePeriods={containerImageSchedulePeriods}
-                      schedules={schedules as RenderSelectItemProps[]}
-                      task={containerImageTask}
-                      title={containerImageTitle}
-                      onAlertsChange={handleAlertsChange}
-                      onClose={closeContainerImageTaskDialog}
-                      onNewAlertClick={createAlert}
-                      onNewOciImageTargetClick={createOciImageTarget}
-                      onNewScheduleClick={createSchedule}
-                      onOciImageTargetChange={handleOciImageTargetChange}
-                      onSave={handleSaveContainerImageTask}
-                      onScannerChange={handleContainerImageScannerChange}
-                      onScheduleChange={handleContainerImageScheduleChange}
-                    />
-                  )}
-                </ContainerImageTargetsComponent>
-              )}
-            </ScheduleComponent>
-          )}
-        </AlertComponent>
-      )}
-
       {taskWizardVisible && (
         <TaskWizard
           hosts={hosts}
@@ -1168,7 +1063,7 @@ const TaskComponent = ({
 
       {reportImportDialogVisible && (
         <ImportReportDialog
-          newContainerTask={false}
+          allowCreateImportTask={false}
           task_id={taskId as string}
           tasks={tasks}
           onClose={handleCloseReportImportDialog}

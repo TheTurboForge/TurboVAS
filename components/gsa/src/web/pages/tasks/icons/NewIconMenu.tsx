@@ -14,14 +14,12 @@ interface NewIconMenuProps {
   onNewClick?: () => void;
   onNewImportTaskClick?: () => void;
   onNewAgentTaskClick?: () => void;
-  onNewContainerImageTaskClick?: () => void;
 }
 
 const NewIconMenu = ({
   onNewClick,
   onNewImportTaskClick,
   onNewAgentTaskClick,
-  onNewContainerImageTaskClick,
 }: NewIconMenuProps) => {
   const [_] = useTranslation();
   const capabilities = useCapabilities();
@@ -44,13 +42,6 @@ const NewIconMenu = ({
             data-testid="new-agent-task-menu"
             title={_('New Agent Task')}
             onClick={onNewAgentTaskClick}
-          />
-        )}
-        {features.featureEnabled('ENABLE_CONTAINER_SCANNING') && (
-          <MenuEntry
-            data-testid="new-container-image-menu"
-            title={_('New Container Image Task')}
-            onClick={onNewContainerImageTaskClick}
           />
         )}
       </IconMenu>

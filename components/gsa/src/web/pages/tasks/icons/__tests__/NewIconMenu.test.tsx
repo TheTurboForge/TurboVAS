@@ -46,10 +46,10 @@ describe('NewIconMenu tests', () => {
     expect(onNewClick).toHaveBeenCalled();
   });
 
-  test('calls onNewContainerClick when New Container Task is clicked', async () => {
-    const onNewContainerClick = testing.fn();
+  test('calls onNewImportTaskClick when New Import Task is clicked', async () => {
+    const onNewImportTaskClick = testing.fn();
     const {render} = rendererWith({capabilities: true});
-    render(<NewIconMenu onNewImportTaskClick={onNewContainerClick} />);
+    render(<NewIconMenu onNewImportTaskClick={onNewImportTaskClick} />);
 
     const button = screen.getByTitle('New Task Menu');
     expect(button).not.toBeNull();
@@ -57,22 +57,11 @@ describe('NewIconMenu tests', () => {
 
     const menuItem = await screen.findByTestId('new-import-task-menu');
     fireEvent.click(menuItem);
-    expect(onNewContainerClick).toHaveBeenCalled();
+    expect(onNewImportTaskClick).toHaveBeenCalled();
   });
 
   describe.each([
-    [
-      'ENABLE_CONTAINER_SCANNING' as
-        | 'ENABLE_CONTAINER_SCANNING'
-        | 'ENABLE_AGENTS',
-      'new-container-image-menu',
-      'onNewContainerImageTaskClick',
-    ],
-    [
-      'ENABLE_AGENTS' as 'ENABLE_CONTAINER_SCANNING' | 'ENABLE_AGENTS',
-      'new-agent-task-menu',
-      'onNewAgentTaskClick',
-    ],
+    ['ENABLE_AGENTS' as 'ENABLE_AGENTS', 'new-agent-task-menu', 'onNewAgentTaskClick'],
   ])('%s feature', (feature, menuTestId, callbackName) => {
     test('should show menu when the feature is enabled', async () => {
       const features = new Features([feature]);

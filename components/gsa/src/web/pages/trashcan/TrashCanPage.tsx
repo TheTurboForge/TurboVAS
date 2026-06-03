@@ -33,7 +33,6 @@ import useTranslation from 'web/hooks/useTranslation';
 import AgentGroupsTable from 'web/pages/agent-groups/AgentGroupsTable';
 import AlertsTable from 'web/pages/alerts/Table';
 import AuditsTable from 'web/pages/audits/Table';
-import ContainerImageTargetTable from 'web/pages/container-image-targets/ContainerImageTargetTable';
 import CredentialTable from 'web/pages/credentials/CredentialTable';
 import TrashActions from 'web/pages/extras/TrashActions';
 import FiltersTable from 'web/pages/filters/Table';
@@ -95,7 +94,6 @@ const TrashCan = () => {
     gmp.trashcan
       .get({
         agentGroups: features.featureEnabled('ENABLE_AGENTS'),
-        ociImageTargets: features.featureEnabled('ENABLE_CONTAINER_SCANNING'),
       })
       .then(
         response => {
@@ -406,17 +404,6 @@ const TrashCan = () => {
             <h1>{_('Agent Groups')}</h1>
             {/* @ts-expect-error */}
             <AgentGroupsTable entities={trash.agentGroups} {...tableProps} />
-          </span>
-        )}
-        {hasEntities(trash?.ociImageTargets) && (
-          <span>
-            <LinkTarget id="oci-image-target" />
-            <h1>{_('Container Image Targets')}</h1>
-            {/* @ts-expect-error */}
-            <ContainerImageTargetTable
-              entities={trash.ociImageTargets}
-              {...tableProps}
-            />
           </span>
         )}
       </Layout>

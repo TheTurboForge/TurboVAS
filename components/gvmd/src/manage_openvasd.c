@@ -541,7 +541,7 @@ handle_openvasd_scan_start (task_t task, target_t target, const char *scan_id,
                                                                  scan_id);
       if (connector == NULL)
         {
-          g_warning ("%s: Could not connect to container image scanner",
+          g_warning ("%s: Could not connect to openvasd scanner",
                      __func__);
           return -1;
         }

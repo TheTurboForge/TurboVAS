@@ -28,11 +28,11 @@ export type ReportImportDialogData = ReportImportDialogState &
 
 interface ReportImportDialogProps {
   in_assets?: YesNo;
-  newContainerTask?: boolean;
+  allowCreateImportTask?: boolean;
   task_id: string;
   tasks: Task[];
   onClose: () => void;
-  onNewContainerTaskClick?: () => void;
+  onNewImportTaskClick?: () => void;
   onSave: (values: ReportImportDialogData) => void;
   onTaskChange?: (taskId: string) => void;
 }
@@ -40,12 +40,12 @@ interface ReportImportDialogProps {
 const ReportImportDialog = ({
   // eslint-disable-next-line @typescript-eslint/naming-convention
   in_assets = YES_VALUE,
-  newContainerTask = true,
+  allowCreateImportTask = true,
   // eslint-disable-next-line @typescript-eslint/naming-convention
   task_id,
   tasks,
   onClose,
-  onNewContainerTaskClick,
+  onNewImportTaskClick,
   onSave,
   onTaskChange,
 }: ReportImportDialogProps) => {
@@ -77,11 +77,11 @@ const ReportImportDialog = ({
               value={values.task_id}
               onChange={onTaskChange}
             />
-            {newContainerTask && (
+            {allowCreateImportTask && (
               <NewIcon
                 data-testid="new-import-task"
                 title={_('Create new Import Task')}
-                onClick={onNewContainerTaskClick}
+                onClick={onNewImportTaskClick}
               />
             )}
           </FormGroup>

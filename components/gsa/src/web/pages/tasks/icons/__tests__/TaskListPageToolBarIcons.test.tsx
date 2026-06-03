@@ -114,36 +114,6 @@ describe('TaskListPageToolBarIcons test', () => {
     expect(handleImportTaskCreateClick).toHaveBeenCalled();
   });
 
-  test('should call onNewContainerImageTaskClick handler', async () => {
-    const handleNewContainerImageClick = testing.fn();
-
-    const gmp = {
-      settings: {manualUrl},
-    };
-
-    const {render} = rendererWith({
-      gmp,
-      capabilities: true,
-      features: new Features(['ENABLE_CONTAINER_SCANNING']),
-      router: true,
-    });
-
-    render(
-      <TaskToolBarIcons
-        onNewContainerImageTaskClick={handleNewContainerImageClick}
-      />,
-    );
-
-    const newButton = screen.getByTitle('New Task Menu');
-    fireEvent.click(newButton);
-
-    const newContainerImageMenu = await screen.findByTestId(
-      'new-container-image-menu',
-    );
-    expect(newContainerImageMenu).toHaveTextContent('New Container Image');
-    fireEvent.click(newContainerImageMenu);
-    expect(handleNewContainerImageClick).toHaveBeenCalled();
-  });
 
   test('should not show icons if user does not have the right permissions', () => {
     const handleAdvancedTaskWizardClick = testing.fn();
@@ -187,7 +157,7 @@ describe('TaskListPageToolBarIcons test', () => {
     const newTaskMenu = screen.queryByTestId('new-task-menu');
     expect(newTaskMenu).toBeNull();
 
-    const newImportTaskMenu = screen.queryByTestId('new-container-task-menu');
+    const newImportTaskMenu = screen.queryByTestId('new-import-task-menu');
     expect(newImportTaskMenu).toBeNull();
   });
 });

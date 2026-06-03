@@ -46,7 +46,6 @@ const TrashCanTableContents = ({trash}: TrashCanContentsTableProps) => {
   const hasTasks = hasItems(trash.tasks);
   const hasScanConfigs = hasItems(trash.scanConfigs);
   const hasAgentGroups = hasItems(trash.agentGroups);
-  const hasOciImageTargets = hasItems(trash.ociImageTargets);
 
   return (
     <TableBody>
@@ -195,13 +194,6 @@ const TrashCanTableContents = ({trash}: TrashCanContentsTableProps) => {
           count={trash.agentGroups.length}
           title={_('Agent Groups')}
           type="agent-group"
-        />
-      )}
-      {hasOciImageTargets && (
-        <TrashCanTableRow
-          count={trash.ociImageTargets.length}
-          title={_('Container Image Targets')}
-          type="oci-image-target"
         />
       )}
     </TableBody>

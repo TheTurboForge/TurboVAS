@@ -204,7 +204,7 @@ class Audit extends Model {
   }
 
   /**
-   * Returns true if the audit is an import audit (formerly known as container task)
+   * Returns true if the audit is an import audit (formerly treated as the import-only task path)
    */
   isImport() {
     return !isDefined(this.target);

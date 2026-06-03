@@ -42,15 +42,6 @@ if(ENABLE_CREDENTIAL_STORES)
 else(ENABLE_CREDENTIAL_STORES)
   message(STATUS "ENABLE_CREDENTIAL_STORES flag is not enabled")
 endif(ENABLE_CREDENTIAL_STORES)
-if(ENABLE_CONTAINER_SCANNING)
-  pkg_check_modules(
-    LIBGVM_CONTAINER_IMAGE_SCANNER
-    REQUIRED
-    libgvm_container_image_scanner>=22.35
-  )
-else(ENABLE_CONTAINER_SCANNING)
-  message(STATUS "ENABLE_CONTAINER_SCANNING flag is not enabled")
-endif(ENABLE_CONTAINER_SCANNING)
 
 if(ENABLE_JWT_AUTH)
   pkg_check_modules(LIBGVM_AUTH REQUIRED libgvm_auth>=0.1.3)
@@ -213,8 +204,6 @@ set(
   manage_scan_queue.c
   manage_scanner_relays.c
   manage_schedules.c
-  manage_oci_image_targets.c
-  manage_container_image_scanner.c
   manage_tags.c
   manage_targets.c
   manage_users.c
@@ -281,7 +270,6 @@ set(
   manage_sql_nvts_openvasd.c
   manage_sql_nvts_common.c
   manage_sql_scan_queue.c
-  manage_sql_oci_image_targets.c
   manage_sql_report_exports.c
 )
 
@@ -308,7 +296,6 @@ set(
   gmp_integration_configs.c
   gmp_license.c
   gmp_logout.c
-  gmp_oci_image_targets.c
   gmp_port_lists.c
   gmp_report_applications.c
   gmp_report_closed_cves.c
@@ -442,7 +429,6 @@ target_link_libraries(
   ${LIBGVM_HTTP_LDFLAGS}
   ${LIBGVM_HTTP_SCANNER_LDFLAGS}
   ${LIBGVM_CYBERARK_LDFLAGS}
-  ${LIBGVM_CONTAINER_IMAGE_SCANNER_LDFLAGS}
   ${LIBICAL_LDFLAGS}
   ${LINKER_HARDENING_FLAGS}
   ${OPT_THEIA_TGT}
@@ -532,16 +518,6 @@ set(
 )
 add_unit_test(manage-filter-utils "${ALL_OBJECTS}" "${ALL_MANAGE_SRC}")
 
-if(ENABLE_CONTAINER_SCANNING)
-  set(
-    ALL_OBJECTS
-    $<TARGET_OBJECTS:all-gmp-obj>
-    $<TARGET_OBJECTS:all-manage-sql-obj>
-    $<TARGET_OBJECTS:all-misc-obj>
-    $<TARGET_OBJECTS:all-sql-obj>
-  )
-  add_unit_test(manage-oci-image-targets "${ALL_OBJECTS}" "${ALL_MANAGE_SRC}")
-endif()
 
 set(
   ALL_OBJECTS

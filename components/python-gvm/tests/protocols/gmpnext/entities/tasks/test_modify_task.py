@@ -62,12 +62,6 @@ class GmpModifyTaskTestMixin:
             b'<modify_task task_id="t1"><agent_group id="ag1"/></modify_task>'
         )
 
-    def test_modify_task_with_oci_image_target_id(self):
-        self.gmp.modify_task(task_id="t1", oci_image_target_id="it1")
-
-        self.connection.send.has_been_called_with(
-            b'<modify_task task_id="t1"><oci_image_target id="it1"/></modify_task>'
-        )
 
     def test_modify_task_with_target_and_agent_group(self):
         with self.assertRaises(InvalidArgument):
@@ -75,17 +69,7 @@ class GmpModifyTaskTestMixin:
                 task_id="t1", target_id="t1", agent_group_id="ag1"
             )
 
-    def test_modify_task_with_target_and_oci_image_target(self):
-        with self.assertRaises(InvalidArgument):
-            self.gmp.modify_task(
-                task_id="t1", target_id="t1", oci_image_target_id="it1"
-            )
 
-    def test_modify_task_with_agent_group_and_oci_image_target(self):
-        with self.assertRaises(InvalidArgument):
-            self.gmp.modify_task(
-                task_id="t1", agent_group_id="ag1", oci_image_target_id="it1"
-            )
 
     def test_modify_task_with_schedule_id(self):
         self.gmp.modify_task(task_id="t1", schedule_id="s1")

@@ -49,7 +49,6 @@
 #include "manage_sql_groups.h"
 #include "manage_sql_notes.h"
 #include "manage_sql_overrides.h"
-#include "manage_sql_oci_image_targets.h"
 #include "manage_sql_permissions.h"
 #include "manage_sql_permissions_cache.h"
 #include "manage_sql_port_lists.h"
@@ -69,7 +68,6 @@
 #include "manage_acl.h"
 #include "manage_commands.h"
 #include "manage_authentication.h"
-#include "manage_oci_image_targets.h"
 #include "manage_users.h"
 #include "lsc_user.h"
 #include "sql.h"
@@ -2539,12 +2537,8 @@ append_to_task_string (task_t task, const char* field, const char* value)
 /**
  * @brief Query for TASK_SEV_CASE_GUARD.
  */
-#if ENABLE_AGENTS && ENABLE_CONTAINER_SCANNING
-  #define TASK_NO_TARGET_CTX "(target IS NULL AND agent_group IS NULL AND oci_image_target IS NULL)"
-#elif ENABLE_AGENTS && !ENABLE_CONTAINER_SCANNING
+#if ENABLE_AGENTS
   #define TASK_NO_TARGET_CTX "(target IS NULL AND agent_group IS NULL)"
-#elif !ENABLE_AGENTS && ENABLE_CONTAINER_SCANNING
-  #define TASK_NO_TARGET_CTX "(target IS NULL AND oci_image_target IS NULL)"
 #else
   #define TASK_NO_TARGET_CTX "(target IS NULL)"
 #endif
@@ -3431,19 +3425,6 @@ check_db_scanners ()
         }
     }
 
-#if ENABLE_CONTAINER_SCANNING
-  if (sql_int ("SELECT count(*) FROM scanners WHERE uuid = '%s';",
-                SCANNER_UUID_CONTAINER_IMAGE_DEFAULT) == 0)
-    {
-      sql ("INSERT INTO scanners"
-        " (uuid, owner, name, host, port, type, ca_pub, credential,"
-        "  creation_time, modification_time)"
-        " VALUES ('" SCANNER_UUID_CONTAINER_IMAGE_DEFAULT "', NULL, "
-        " 'Container Image Default', 'localhost', 3000, %d, NULL, NULL,"
-        " m_now (), m_now ());",
-        SCANNER_TYPE_CONTAINER_IMAGE);
-    }
-#endif
 
   if (sql_int ("SELECT count(*) FROM scanners WHERE uuid = '%s';",
                SCANNER_UUID_CVE) == 0)
@@ -5911,93 +5892,6 @@ task_agent_group_in_trash (task_t task)
 }
 #endif /*ENABLE_AGENTS*/
 
-#if ENABLE_CONTAINER_SCANNING
-/**
- * @brief Return the OCI image target of a task.
- *
- * @param[in]  task  Task.
- *
- * @return OCI image target of task.
- */
-oci_image_target_t
-task_oci_image_target (task_t task)
-{
-  oci_image_target_t oci_image_target = 0;
-  switch (sql_int64 (&oci_image_target,
-                     "SELECT oci_image_target FROM tasks WHERE id = %llu;",
-                     task))
-    {
-      case 0:
-        return oci_image_target;
-        break;
-      case 1:        /* Too few rows in result of query. */
-      default:       /* Programming error. */
-        assert (0);
-      case -1:
-        return 0;
-        break;
-    }
-}
-
-/**
- * @brief Return whether the OCI image target of a task is in the trashcan.
- *
- * @param[in]  task  Task.
- *
- * @return 1 if in trash, else 0.
- */
-int
-task_oci_image_target_in_trash (task_t task)
-{
-  return sql_int ("SELECT oci_image_target_location = "
-                  G_STRINGIFY (LOCATION_TRASH)
-                  " FROM tasks WHERE id = %llu;",
-                  task);
-}
-
-/**
- * @brief Set the OCI image target of a task.
- *
- * @param[in]  task    Task.
- * @param[in]  target  Target.
- */
-void
-set_task_oci_image_target (task_t task, oci_image_target_t oci_image_target)
-{
-  sql ("UPDATE tasks SET oci_image_target = %llu,"
-       " oci_image_target_location = 0,"
-       " modification_time = m_now ()"
-       " WHERE id = %llu;",
-       oci_image_target,
-       task);
-}
-
-/**
- * @brief Clear default asset preferences if set.
- *
- * @param[in]  task  Task.
- */
-void
-clear_task_asset_preferences (task_t task)
-{
-  if (sql_int ("SELECT COUNT(*) FROM task_preferences"
-                " WHERE task = %llu AND name = 'in_assets';",
-                task))
-    sql ("UPDATE task_preferences"
-          " SET value = 'no'"
-          " WHERE task = %llu AND name = 'in_assets';",
-          task);
-
-  if (sql_int ("SELECT COUNT(*) FROM task_preferences"
-                " WHERE task = %llu AND name = 'assets_apply_overrides';",
-                task))
-    sql ("UPDATE task_preferences"
-          " SET value = 'no'"
-          " WHERE task = %llu AND name = 'assets_apply_overrides';",
-          task);
-}
-
-#endif
 
 /**
  * @brief Return whether the target of a task is in the trashcan.
@@ -10614,8 +10508,7 @@ where_qod (int min_qod)
     "severity", "original_severity", "vulnerability", "date", "report_id",    \
     "solution_type", "qod", "qod_type", "task_id", "cve", "hostname",         \
     "path", "compliant", "epss_score", "epss_percentile", "max_epss_score",   \
-    "max_epss_percentile", "oci_image_name", "oci_image_digest",              \
-    "oci_image_registry", "oci_image_path", "oci_image_short_name", NULL }
+    "max_epss_percentile", NULL }
 
 // TODO Combine with RESULT_ITERATOR_COLUMNS.
 /**
@@ -10732,24 +10625,6 @@ where_qod (int min_qod)
       "         'undefined')",                                                \
       "compliant",                                                            \
       KEYWORD_TYPE_STRING },                                                  \
-    { "hostname", "oci_image_name", KEYWORD_TYPE_STRING },                    \
-    { "host", "oci_image_digest", KEYWORD_TYPE_STRING },                      \
-    { "coalesce((regexp_match(hostname,"                                      \
-      " '^oci:\\/\\/([^\\/]+)\\/([^.]+)\\/([^\\/]+)$'))[1],"                  \
-      "         (regexp_match(hostname,"                                      \
-      " '^oci:\\/\\/([^\\/]+)\\/([^\\/]+)$'))[1])",                           \
-      "oci_image_registry",                                                   \
-      KEYWORD_TYPE_STRING },                                                  \
-    { "(regexp_match(hostname,"                                               \
-      " '^oci:\\/\\/([^\\/]+)\\/([^.]+)\\/([^\\/]+)$'))[2]",                  \
-      "oci_image_path",                                                       \
-      KEYWORD_TYPE_STRING },                                                  \
-    { "coalesce((regexp_match(hostname,"                                      \
-      " '^oci:\\/\\/([^\\/]+)\\/([^.]+)\\/([^\\/]+)$'))[3],"                  \
-      "         (regexp_match(hostname,"                                      \
-      " '^oci:\\/\\/([^\\/]+)\\/([^\\/]+)$'))[2])",                           \
-      "oci_image_short_name",                                                 \
-      KEYWORD_TYPE_STRING },
 
 /**
  * @brief Result iterator columns.
@@ -10933,25 +10808,6 @@ where_qod (int min_qod)
       "compliant",                                                            \
       KEYWORD_TYPE_STRING },                                                  \
     /* ^ 45 = 35 */                                                           \
-    { "hostname", "oci_image_name", KEYWORD_TYPE_STRING },                    \
-    { "host", "oci_image_digest", KEYWORD_TYPE_STRING },                      \
-    { "coalesce((regexp_match(hostname,"                                      \
-      " '^oci:\\/\\/([^\\/]+)\\/([^.]+)\\/([^\\/]+)$'))[1],"                  \
-      "         (regexp_match(hostname,"                                      \
-      " '^oci:\\/\\/([^\\/]+)\\/([^\\/]+)$'))[1])",                           \
-      "oci_image_registry",                                                   \
-      KEYWORD_TYPE_STRING },                                                  \
-    { "(regexp_match(hostname,"                                               \
-      " '^oci:\\/\\/([^\\/]+)\\/([^.]+)\\/([^\\/]+)$'))[2]",                  \
-      "oci_image_path",                                                       \
-      KEYWORD_TYPE_STRING },                                                  \
-    { "coalesce((regexp_match(hostname,"                                      \
-      " '^oci:\\/\\/([^\\/]+)\\/([^.]+)\\/([^\\/]+)$'))[3],"                  \
-      "         (regexp_match(hostname,"                                      \
-      " '^oci:\\/\\/([^\\/]+)\\/([^\\/]+)$'))[2])",                           \
-      "oci_image_short_name",                                                 \
-      KEYWORD_TYPE_STRING },                                                  \
-    /* ^ 50 = 40 */                                                           \
     { "coalesce (result_vt_epss.epss_score, 0.0)",                            \
       "epss_score",                                                           \
       KEYWORD_TYPE_DOUBLE },                                                  \
@@ -12239,76 +12095,6 @@ result_iterator_compliance (iterator_t* iterator)
   return iterator_string (iterator, GET_ITERATOR_COLUMN_COUNT + 35);
 }
 
-/**
- * @brief Get container image name / full URL from a result iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return The container image name.
- */
-const char *
-result_iterator_oci_image_name (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_string (iterator, GET_ITERATOR_COLUMN_COUNT + 36);
-}
-
-/**
- * @brief Get container image digest from a result iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return The container image digest.
- */
-const char *
-result_iterator_oci_image_digest (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_string (iterator, GET_ITERATOR_COLUMN_COUNT + 37);
-}
-
-/**
- * @brief Get container image registry from a result iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return The container image registry.
- */
-const char *
-result_iterator_oci_image_registry (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_string (iterator, GET_ITERATOR_COLUMN_COUNT + 38);
-}
-
-/**
- * @brief Get container image path from a result iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return The container image path.
- */
-const char *
-result_iterator_oci_image_path (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_string (iterator, GET_ITERATOR_COLUMN_COUNT + 39);
-}
-
-/**
- * @brief Get container image short name (last part including tag)
- *        from a result iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return The container image short name.
- */
-const char *
-result_iterator_oci_image_short_name (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_string (iterator, GET_ITERATOR_COLUMN_COUNT + 40);
-}
 
 /**
  * @brief Get EPSS score of highest severity CVE from a result iterator.
@@ -12321,7 +12107,7 @@ double
 result_iterator_epss_score (iterator_t* iterator)
 {
   if (iterator->done) return 0.0;
-  return iterator_double (iterator, GET_ITERATOR_COLUMN_COUNT + 41);
+  return iterator_double (iterator, GET_ITERATOR_COLUMN_COUNT + 36);
 }
 
 /**
@@ -12335,7 +12121,7 @@ double
 result_iterator_epss_percentile (iterator_t* iterator)
 {
   if (iterator->done) return 0.0;
-  return iterator_double (iterator, GET_ITERATOR_COLUMN_COUNT + 42);
+  return iterator_double (iterator, GET_ITERATOR_COLUMN_COUNT + 37);
 }
 
 /**
@@ -12349,7 +12135,7 @@ const gchar *
 result_iterator_epss_cve (iterator_t* iterator)
 {
   if (iterator->done) return NULL;
-  return iterator_string (iterator, GET_ITERATOR_COLUMN_COUNT + 43);
+  return iterator_string (iterator, GET_ITERATOR_COLUMN_COUNT + 38);
 }
 
 /**
@@ -12363,7 +12149,7 @@ double
 result_iterator_epss_severity (iterator_t* iterator)
 {
   if (iterator->done) return 0.0;
-  return iterator_double (iterator, GET_ITERATOR_COLUMN_COUNT + 44);
+  return iterator_double (iterator, GET_ITERATOR_COLUMN_COUNT + 39);
 }
 
 /**
@@ -12377,7 +12163,7 @@ double
 result_iterator_max_epss_score (iterator_t* iterator)
 {
   if (iterator->done) return 0.0;
-  return iterator_double (iterator, GET_ITERATOR_COLUMN_COUNT + 45);
+  return iterator_double (iterator, GET_ITERATOR_COLUMN_COUNT + 40);
 }
 
 /**
@@ -12391,7 +12177,7 @@ double
 result_iterator_max_epss_percentile (iterator_t* iterator)
 {
   if (iterator->done) return 0.0;
-  return iterator_double (iterator, GET_ITERATOR_COLUMN_COUNT + 46);
+  return iterator_double (iterator, GET_ITERATOR_COLUMN_COUNT + 41);
 }
 
 /**
@@ -12405,7 +12191,7 @@ const gchar *
 result_iterator_max_epss_cve (iterator_t* iterator)
 {
   if (iterator->done) return NULL;
-  return iterator_string (iterator, GET_ITERATOR_COLUMN_COUNT + 47);
+  return iterator_string (iterator, GET_ITERATOR_COLUMN_COUNT + 42);
 }
 
 /**
@@ -12419,7 +12205,7 @@ double
 result_iterator_max_epss_severity (iterator_t* iterator)
 {
   if (iterator->done) return 0.0;
-  return iterator_double (iterator, GET_ITERATOR_COLUMN_COUNT + 48);
+  return iterator_double (iterator, GET_ITERATOR_COLUMN_COUNT + 43);
 }
 
 /**
@@ -12433,7 +12219,7 @@ gchar **
 result_iterator_cert_bunds (iterator_t* iterator)
 {
   if (iterator->done) return 0;
-  return iterator_array (iterator, GET_ITERATOR_COLUMN_COUNT + 49);
+  return iterator_array (iterator, GET_ITERATOR_COLUMN_COUNT + 44);
 }
 
 /**
@@ -12447,7 +12233,7 @@ gchar **
 result_iterator_dfn_certs (iterator_t* iterator)
 {
   if (iterator->done) return 0;
-  return iterator_array (iterator, GET_ITERATOR_COLUMN_COUNT + 50);
+  return iterator_array (iterator, GET_ITERATOR_COLUMN_COUNT + 45);
 }
 
 /**
@@ -14828,27 +14614,6 @@ report_finished_hosts_str (report_t report)
   return ret;
 }
 
-/**
- * @brief Get a list string of finished OCI container images in a report.
- *
- * @param[in]  report  The report to get the finished images from.
- *
- * @return String containing finished images as comma separated list.
- */
-char *
-report_finished_container_images_str (report_t report)
-{
-  char *ret;
-
-  ret = sql_string ("SELECT string_agg (DISTINCT r.hostname, ',' ORDER BY r.hostname)"
-                    " FROM results r"
-                    " JOIN report_hosts rh"
-                    " ON r.report = rh.report AND r.host = rh.host"
-                    " WHERE rh.report = %llu AND rh.end_time != 0;",
-                    report);
-
-  return ret;
-}
 
 /**
  * @brief Free f_hosts_ field for print_report_context_cleanup.
@@ -15610,7 +15375,7 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
   int f_compliance_count;
   print_report_context_t ctx = {0};
 
-  gboolean is_container_scanning_report = FALSE;
+  gboolean include_result_hostname = FALSE;
 
   /* Init some vars to prevent warnings from older compilers. */
   max_results = -1;
@@ -16034,46 +15799,6 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
         }
 #endif /* ENABLE_AGENTS */
 
-#if ENABLE_CONTAINER_SCANNING
-      oci_image_target_t oci_image_target = task_oci_image_target (task);
-      if (oci_image_target)
-        {
-          char *oci_uuid, *oci_name, *oci_comment;
-          int in_trash;
-
-          is_container_scanning_report = TRUE;
-
-          in_trash = task_oci_image_target_in_trash (task);
-
-          oci_uuid = in_trash
-                       ? trash_oci_image_target_uuid (oci_image_target)
-                       : oci_image_target_uuid (oci_image_target);
-          oci_name = in_trash
-                       ? trash_oci_image_target_name (oci_image_target)
-                       : oci_image_target_name (oci_image_target);
-          oci_comment = in_trash
-                          ? trash_oci_image_target_comment (oci_image_target)
-                          : oci_image_target_comment (oci_image_target);
-
-          PRINT (out,
-                 "<oci_image_target id=\"%s\">"
-                 "<trash>%i</trash>"
-                 "<name>%s</name>"
-                 "<comment>%s</comment>"
-                 "</oci_image_target>",
-                 oci_uuid ? oci_uuid : "",
-                 in_trash,
-                 oci_name ? oci_name : "",
-                 oci_comment ? oci_comment : "");
-
-          g_free (oci_uuid);
-          g_free (oci_name);
-          g_free (oci_comment);
-
-          g_free (progress_xml);
-          progress_xml = g_strdup_printf ("%i", report_progress (report));
-        }
-#endif /* ENABLE_CONTAINER_SCANNING */
       PRINT (out, "<progress>%s</progress>", progress_xml);
 
       g_free (progress_xml);
@@ -16333,13 +16058,6 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
           g_string_free (buffer, TRUE);
 
           gchar *host_key;
-#if ENABLE_CONTAINER_SCANNING
-          if (is_container_scanning_report)
-            host_key = create_host_key (result_iterator_host (&results),
-                                        result_iterator_hostname (&results),
-                                        CONTAINER_SCANNER_HOST_KEY_SEPARATOR);
-          else
-#endif
             host_key = g_strdup (result_iterator_host (&results));
 
           if (result_hosts_only)
@@ -16625,7 +16343,7 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
                                   get,
                                   ctx.tsk_usage_type,
                                   lean,
-                                  is_container_scanning_report,
+                                  include_result_hostname,
                                   result_hosts_only,
                                   result_hosts,
                                   host_summary_buffer,
@@ -17797,12 +17515,12 @@ copy_task (const char* name, const char* comment, const char *task_id,
   sql_begin_immediate ();
 
   ret = copy_resource_lock ("task", name, comment, task_id,
-                            "config, target, oci_image_target,"
+                            "config, target,"
                             " schedule, schedule_periods,"
                             " scanner, schedule_next_time,"
                             " config_location, target_location,"
                             " schedule_location, scanner_location,"
-                            " oci_image_target_location, usage_type,"
+                            " usage_type,"
                             " agent_group, agent_group_location,"
                             " alterable",
                             1, &new, &old);
@@ -18529,7 +18247,6 @@ manage_task_remove_file (const gchar *task_id, const char *name)
  * @param[in]  schedule_periods  Period of schedule.
  * @param[in]  preferences       Preferences.
  * @param[in]  agent_group_id    Agent group.
- * @param[in]  oci_image_target_id  OCI image target.
  * @param[out] fail_alert_id     Alert when failed to find alert.
  * @param[out] fail_group_id     Group when failed to find group.
  *
@@ -18542,9 +18259,6 @@ manage_task_remove_file (const gchar *task_id, const char *name)
  *         delete count out of range, 15 config and scanner types mismatch,
  *         16 status must be new to edit target, 17 for import tasks only
  *         certain fields may be edited, 18 failed to find agent group,
- *         19 failed to find OCI image target,
- *         20 cannot set asset preferences for container image task,
- *         21 target and scanner types mismatch,
  *         -1 error.
  */
 int
@@ -18557,7 +18271,6 @@ modify_task (const gchar *task_id, const gchar *name,
              const gchar *schedule_periods,
              array_t *preferences,
              const gchar *agent_group_id,
-             const gchar* oci_image_target_id,
              gchar **fail_alert_id,
              gchar **fail_group_id)
 {
@@ -18575,8 +18288,7 @@ modify_task (const gchar *task_id, const gchar *name,
 
 
   if ((task_target (task) == 0
-       && (agent_group_id == NULL)
-       && (oci_image_target_id == NULL))
+       && (agent_group_id == NULL))
       && (alerts->len || schedule_id))
     return 17;
 
@@ -18629,8 +18341,7 @@ modify_task (const gchar *task_id, const gchar *name,
     type_of_scanner = scanner_type (scanner);
 
   if (config_id
-      && (type_of_scanner != SCANNER_TYPE_CVE)
-      && (type_of_scanner != SCANNER_TYPE_CONTAINER_IMAGE))
+      && (type_of_scanner != SCANNER_TYPE_CVE))
     {
       config_t config;
 
@@ -18736,8 +18447,6 @@ modify_task (const gchar *task_id, const gchar *name,
       else if ((task_run_status (task) != TASK_STATUS_NEW)
                && (task_alterable (task) == 0))
         return 16;
-      else if (type_of_scanner == SCANNER_TYPE_CONTAINER_IMAGE)
-        return 21;
       else if (find_target_with_permission (target_id,
                                             &target,
                                             "get_targets"))
@@ -18768,24 +18477,6 @@ modify_task (const gchar *task_id, const gchar *name,
   }
 #endif
 
-#if ENABLE_CONTAINER_SCANNING
-  if (oci_image_target_id)
-    {
-      oci_image_target_t oci_image_target = 0;
-
-      if ((task_run_status (task) != TASK_STATUS_NEW)
-          && (task_alterable (task) == 0))
-        return 16;
-      else if (find_oci_image_target_with_permission (oci_image_target_id,
-                                                      &oci_image_target,
-                                                      "get_oci_image_targets"))
-        return -1;
-      else if (oci_image_target == 0)
-        return 19;
-      else
-        set_task_oci_image_target (task, oci_image_target);
-    }
-#endif /* ENABLE_CONTAINER_SCANNING */
 
   if (preferences)
     switch (set_task_preferences (task, preferences))
@@ -20420,15 +20111,6 @@ delete_credential (const char *credential_id, int ultimate)
            "   AND credential_location = " G_STRINGIFY (LOCATION_TABLE) ";",
            trash_credential,
            credential);
-#if ENABLE_CONTAINER_SCANNING
-      sql ("UPDATE oci_image_targets_trash"
-           " SET credential_location = " G_STRINGIFY (LOCATION_TRASH) ","
-           "     credential = %llu"
-           " WHERE credential = %llu"
-           "   AND credential_location = " G_STRINGIFY (LOCATION_TABLE) ";",
-           trash_credential,
-           credential);
-#endif /* ENABLE_CONTAINER_SCANNING */
 
       permissions_set_locations ("credential", credential,
                                  trash_credential,
@@ -20688,11 +20370,6 @@ credential_in_use (credential_t credential)
   ret = !!(sql_int ("SELECT count (*) FROM targets_login_data"
                     " WHERE credential = %llu;",
                     credential)
-#if ENABLE_CONTAINER_SCANNING
-           || sql_int ("SELECT count (*) FROM oci_image_targets"
-                       " WHERE credential = %llu;",
-                       credential)
-#endif /* ENABLE_CONTAINER_SCANNING */
            || sql_int ("SELECT count (*) FROM scanners"
                        " WHERE credential = %llu;",
                        credential)
@@ -20733,13 +20410,6 @@ trash_credential_in_use (credential_t credential)
                        " AND credential_location"
                        "      = " G_STRINGIFY (LOCATION_TRASH) ";",
                        credential)
-#if ENABLE_CONTAINER_SCANNING
-           || sql_int ("SELECT count (*) FROM oci_image_targets_trash"
-                       " WHERE credential = %llu"
-                       " AND credential_location"
-                       "      = " G_STRINGIFY (LOCATION_TRASH) ";",
-                       credential)
-#endif
            || sql_int ("SELECT count (*) FROM alert_method_data_trash"
                        " WHERE (name = 'recipient_credential'"
                        "        OR name = 'scp_credential'"
@@ -21807,82 +21477,6 @@ credential_target_iterator_readable (iterator_t* iterator)
   return iterator_int (iterator, 2);
 }
 
-#if ENABLE_CONTAINER_SCANNING
-/**
- * @brief Initialise a Credential OCI image target iterator.
- *
- * Iterates over all OCI image targets that use the credential.
- *
- * @param[in]  iterator        Iterator.
- * @param[in]  credential      Credential.
- * @param[in]  ascending       Whether to sort ascending or descending.
- */
-void
-init_credential_oci_image_target_iterator (iterator_t* iterator,
-                                           credential_t credential,
-                                           int ascending)
-{
-  gchar *available, *with_clause;
-  get_data_t get;
-  array_t *permissions;
-
-  assert (credential);
-
-  get.trash = 0;
-  permissions = make_array ();
-  array_add (permissions, g_strdup ("get_oci_image_targets"));
-  available = acl_where_owned ("oci_image_target", &get, 1, "any",
-                               0, permissions, 0, &with_clause);
-  array_free (permissions);
-
-  init_iterator (iterator,
-                 "%s"
-                 " SELECT uuid, name, %s FROM oci_image_targets"
-                 " WHERE credential = %llu"
-                 " ORDER BY name %s;",
-                 with_clause ? with_clause : "",
-                 available,
-                 credential,
-                 ascending ? "ASC" : "DESC");
-
-  g_free (with_clause);
-  g_free (available);
-}
-
-/**
- * @brief Get the uuid from an Credential OCI Image Target iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return Uuid, or NULL if iteration is complete.  Freed by
- *         cleanup_iterator.
- */
-DEF_ACCESS (credential_oci_target_iterator_uuid, 0);
-
-/**
- * @brief Get the name from an Credential OCI Image Target iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return Name, or NULL if iteration is complete.  Freed by
- *         cleanup_iterator.
- */
-DEF_ACCESS (credential_oci_target_iterator_name, 1);
-
-/**
- * @brief Get the read permission status from a GET iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return 1 if may read, else 0.
- */
-int
-credential_oci_target_iterator_readable (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_int (iterator, 2);
-}
-#endif /* ENABLE_CONTAINER_SCANNING */
 
 /**
  * @brief Initialise a Credential scanner iterator.
@@ -22273,11 +21867,6 @@ manage_create_scanner (GSList *log_config, const db_conn_info_t *database,
                  "Agent controller scanner type is not supported"
                  " because the Agents feature flag is disabled.\n");
         break;
-      case CREATE_SCANNER_CONTAINER_SCANNING_DISABLED:
-        fprintf (stderr,
-                 "Container image scanner type is not supported"
-                 " because the Container scanning feature flag is disabled.\n");
-        break;
       case CREATE_SCANNER_PERMISSION_DENIED:
         fprintf (stderr, "Permission denied.\n");
         break;
@@ -22609,11 +22198,6 @@ manage_modify_scanner (GSList *log_config, const db_conn_info_t *database,
                  "Agent controller scanner type is not supported"
                  " because the Agents feature flag is disabled.\n");
         break;
-      case MODIFY_SCANNER_CONTAINER_SCANNING_DISABLED:
-        fprintf (stderr,
-                 "Container image scanner type is not supported"
-                 " because the Container scanning feature flag is disabled.\n");
-        break;
       case MODIFY_SCANNER_PERMISSION_DENIED:
         fprintf (stderr, "Permission denied.\n");
         break;
@@ -22850,12 +22434,6 @@ create_scanner (const char* name, const char *comment, const char *host,
       sql_rollback ();
       return CREATE_SCANNER_AGENT_DISABLED;
     }
-  else if (feature_res == SCANNER_FEATURE_CONTAINER_DISABLED)
-    {
-      /* Container scanning feature disabled */
-      sql_rollback ();
-      return CREATE_SCANNER_CONTAINER_SCANNING_DISABLED;
-    }
   if (unix_socket)
     {
       ca_pub = NULL;
@@ -23088,12 +22666,6 @@ modify_scanner (const char *scanner_id, const char *name, const char *comment,
       /* Agent feature disabled */
       sql_rollback ();
       return MODIFY_SCANNER_AGENT_DISABLED;
-    }
-  else if (feature_res == SCANNER_FEATURE_CONTAINER_DISABLED)
-    {
-      /* Container scanning feature disabled */
-      sql_rollback ();
-      return MODIFY_SCANNER_CONTAINER_SCANNING_DISABLED;
     }
 
   if (port)
@@ -24295,18 +23867,6 @@ verify_scanner (const char *scanner_id, char **version)
       return 0;
     }
 #endif
-#if ENABLE_CONTAINER_SCANNING
-  else if (scanner_iterator_type (&scanner) == SCANNER_TYPE_CONTAINER_IMAGE)
-    {
-      // Once container scanner is availabe and has version endpoint, replace
-      // this
-      if (version)
-        *version = g_strdup ("TestVersion");
-
-      cleanup_iterator (&scanner);
-      return 0;
-    }
-#endif
   else if (scanner_iterator_type (&scanner) == SCANNER_TYPE_CVE)
     {
       if (version)
@@ -24376,9 +23936,6 @@ manage_get_scanners (GSList *log_config, const db_conn_info_t *database)
             break;
           case SCANNER_TYPE_AGENT_CONTROLLER_SENSOR:
             scanner_type_str = "agent-controller-sensor";
-            break;
-          case SCANNER_TYPE_CONTAINER_IMAGE:
-            scanner_type_str = "container-image";
             break;
           default:
             scanner_type_str = NULL;
@@ -24673,12 +24230,6 @@ manage_restore (const char *id)
   if (ret != 2)
     return ret;
 
-#if ENABLE_CONTAINER_SCANNING
-  /* OCI Image Targets. */
-  ret = restore_oci_image_target (id);
-  if (ret != 2)
-    return ret;
-#endif /* ENABLE_CONTAINER_SCANNING */
 
   /* Config. */
 
@@ -25017,15 +24568,6 @@ manage_restore (const char *id)
            " AND credential_location = " G_STRINGIFY (LOCATION_TRASH) ";",
            credential,
            resource);
-#if ENABLE_CONTAINER_SCANNING
-      sql ("UPDATE oci_image_targets_trash"
-           " SET credential_location = " G_STRINGIFY (LOCATION_TABLE) ","
-           "     credential = %llu"
-           " WHERE credential = %llu"
-           " AND credential_location = " G_STRINGIFY (LOCATION_TRASH) ";",
-           credential,
-           resource);
-#endif /* ENABLE_CONTAINER_SCANNING */
 
       permissions_set_locations ("credential", resource, credential,
                                  LOCATION_TABLE);
@@ -25685,9 +25227,6 @@ manage_empty_trashcan ()
   sql ("DELETE FROM credentials_trash" WHERE_OWNER);
   sql ("DELETE FROM filters_trash" WHERE_OWNER);
   sql ("DELETE FROM notes_trash" WHERE_OWNER);
-#if ENABLE_CONTAINER_SCANNING
-  sql ("DELETE FROM oci_image_targets_trash" WHERE_OWNER);
-#endif /* ENABLE_CONTAINER_SCANNING */
   sql ("DELETE FROM overrides_trash" WHERE_OWNER);
   sql ("DELETE FROM permissions_trash" WHERE_OWNER);
   empty_trashcan_port_lists ();
@@ -27842,7 +27381,6 @@ check_http_scanner_result_exists (report_t report,
           double severity_double = 0.0;
           int qod_int = get_http_scanner_nvti_qod (res->oid);
 
-          // ip_address for container scanning is an image digest
           host = extract_sha256_digest_if_found (res->ip_address);
           hostname = res->hostname;
           type = convert_http_scanner_type_to_osp_type(res->type);

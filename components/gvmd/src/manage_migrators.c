@@ -3336,11 +3336,6 @@ migrate_260_to_261 ()
 
   /* Update the database. */
 
-  // Add oci_image_target and oci_image_target_location fields to tasks
-
-  sql ("ALTER TABLE tasks ADD COLUMN oci_image_target integer;");
-  sql ("ALTER TABLE tasks ADD COLUMN oci_image_target_location integer;");
-
   /* Set the database version to 261. */
 
   set_db_version (261);
@@ -3469,11 +3464,6 @@ migrate_264_to_265 ()
     }
 
   /* Update the database. */
-
-  // Add exclude_images field to oci_image_targets
-
-  sql ("ALTER TABLE IF EXISTS oci_image_targets"
-       " ADD COLUMN IF NOT EXISTS exclude_images text;");
 
   /* Set the database version to 265. */
 
@@ -3697,11 +3687,6 @@ migrate_269_to_270 ()
 
   /* Update the database. */
 
-  // Add exclude_images field to oci_image_targets_trash
-
-  sql ("ALTER TABLE IF EXISTS oci_image_targets_trash"
-       " ADD COLUMN IF NOT EXISTS exclude_images text;");
-
   /* Set the database version to 270. */
 
   set_db_version (270);
@@ -3794,7 +3779,7 @@ migrate_272_to_273 ()
 
   /* Update the database. */
 
-  // Add hostname to report_hosts for container scanning
+  // Add hostname to report_hosts.
   sql ("ALTER TABLE IF EXISTS report_hosts"
        " ADD COLUMN IF NOT EXISTS hostname text DEFAULT '';");
 
@@ -3964,6 +3949,130 @@ migrate_274_to_275 ()
   return 0;
 }
 
+
+/**
+ * @brief Migrate the database from version 275 to version 276.
+ *
+ * Remove inherited OCI image scanning schema and local state.
+ *
+ * @return 0 success, -1 error.
+ */
+int
+migrate_275_to_276 ()
+{
+  sql_begin_immediate ();
+
+  /* Ensure that the database is currently version 275. */
+  if (manage_db_version () != 275)
+    {
+      sql_rollback ();
+      return -1;
+    }
+
+  if (sql_int ("SELECT count(*) FROM tasks"
+               " WHERE oci_image_target IS NOT NULL"
+               " AND oci_image_target <> 0"
+               " AND run_status IN (%u, %u, %u, %u, %u, %u, %u, %u, %u, %u);",
+               TASK_STATUS_DELETE_REQUESTED,
+               TASK_STATUS_REQUESTED,
+               TASK_STATUS_RUNNING,
+               TASK_STATUS_STOP_REQUESTED,
+               TASK_STATUS_STOP_WAITING,
+               TASK_STATUS_DELETE_ULTIMATE_REQUESTED,
+               TASK_STATUS_DELETE_WAITING,
+               TASK_STATUS_DELETE_ULTIMATE_WAITING,
+               TASK_STATUS_QUEUED,
+               TASK_STATUS_PROCESSING))
+    {
+      g_warning ("Refusing to remove OCI image scanning while OCI tasks are active");
+      sql_rollback ();
+      return -1;
+    }
+
+  sql ("CREATE TEMP TABLE oci_tasks_to_remove AS"
+       " SELECT id FROM tasks"
+       " WHERE oci_image_target IS NOT NULL"
+       " AND oci_image_target <> 0;");
+  sql ("CREATE TEMP TABLE oci_reports_to_remove AS"
+       " SELECT id FROM reports"
+       " WHERE task IN (SELECT id FROM oci_tasks_to_remove);");
+  sql ("CREATE TEMP TABLE oci_results_to_remove AS"
+       " SELECT id FROM results"
+       " WHERE task IN (SELECT id FROM oci_tasks_to_remove)"
+       " OR report IN (SELECT id FROM oci_reports_to_remove);");
+
+  sql ("DELETE FROM report_host_details WHERE report_host IN"
+       " (SELECT id FROM report_hosts"
+       "  WHERE report IN (SELECT id FROM oci_reports_to_remove));");
+  sql ("DELETE FROM report_hosts"
+       " WHERE report IN (SELECT id FROM oci_reports_to_remove);");
+  sql ("DELETE FROM tag_resources"
+       " WHERE (resource_type = 'result'"
+       "        AND resource IN (SELECT id FROM oci_results_to_remove))"
+       "    OR (resource_type = 'report'"
+       "        AND resource IN (SELECT id FROM oci_reports_to_remove))"
+       "    OR (resource_type = 'task'"
+       "        AND resource IN (SELECT id FROM oci_tasks_to_remove))"
+       "    OR resource_type = 'oci_image_target';");
+  sql ("DELETE FROM tag_resources_trash"
+       " WHERE (resource_type = 'result'"
+       "        AND resource IN (SELECT id FROM oci_results_to_remove))"
+       "    OR (resource_type = 'report'"
+       "        AND resource IN (SELECT id FROM oci_reports_to_remove))"
+       "    OR (resource_type = 'task'"
+       "        AND resource IN (SELECT id FROM oci_tasks_to_remove))"
+       "    OR resource_type = 'oci_image_target';");
+  sql ("DELETE FROM permissions"
+       " WHERE (resource_type = 'report'"
+       "        AND resource IN (SELECT id FROM oci_reports_to_remove))"
+       "    OR (resource_type = 'task'"
+       "        AND resource IN (SELECT id FROM oci_tasks_to_remove))"
+       "    OR resource_type = 'oci_image_target';");
+  sql ("DELETE FROM permissions_trash"
+       " WHERE (resource_type = 'report'"
+       "        AND resource IN (SELECT id FROM oci_reports_to_remove))"
+       "    OR (resource_type = 'task'"
+       "        AND resource IN (SELECT id FROM oci_tasks_to_remove))"
+       "    OR resource_type = 'oci_image_target';");
+  sql ("DELETE FROM report_counts"
+       " WHERE report IN (SELECT id FROM oci_reports_to_remove);");
+  sql ("DELETE FROM result_nvt_reports"
+       " WHERE report IN (SELECT id FROM oci_reports_to_remove);");
+  sql ("DELETE FROM results_trash"
+       " WHERE task IN (SELECT id FROM oci_tasks_to_remove)"
+       " OR report IN (SELECT id FROM oci_reports_to_remove);");
+  sql ("DELETE FROM results"
+       " WHERE id IN (SELECT id FROM oci_results_to_remove);");
+  sql ("DELETE FROM reports"
+       " WHERE id IN (SELECT id FROM oci_reports_to_remove);");
+  sql ("DELETE FROM task_alerts"
+       " WHERE task IN (SELECT id FROM oci_tasks_to_remove);");
+  sql ("DELETE FROM task_files"
+       " WHERE task IN (SELECT id FROM oci_tasks_to_remove);");
+  sql ("DELETE FROM task_preferences"
+       " WHERE task IN (SELECT id FROM oci_tasks_to_remove);");
+  sql ("DELETE FROM permissions_get_tasks"
+       " WHERE task IN (SELECT id FROM oci_tasks_to_remove);");
+  sql ("DELETE FROM tickets"
+       " WHERE task IN (SELECT id FROM oci_tasks_to_remove);");
+  sql ("DELETE FROM tasks"
+       " WHERE id IN (SELECT id FROM oci_tasks_to_remove);");
+  sql ("DELETE FROM scanners"
+       " WHERE type = 10"
+       " OR uuid = '1facb485-10e8-4520-9110-66f929d9ac2e';");
+
+  sql ("DROP TABLE IF EXISTS oci_image_targets_trash CASCADE;");
+  sql ("DROP TABLE IF EXISTS oci_image_targets CASCADE;");
+  sql ("ALTER TABLE tasks DROP COLUMN IF EXISTS oci_image_target_location;");
+  sql ("ALTER TABLE tasks DROP COLUMN IF EXISTS oci_image_target;");
+
+  set_db_version (276);
+
+  sql_commit ();
+
+  return 0;
+}
+
 #undef UPDATE_DASHBOARD_SETTINGS
 
 /**
@@ -4045,6 +4154,7 @@ static migrator_t database_migrators[] = {
   {273, migrate_272_to_273},
   {274, migrate_273_to_274},
   {275, migrate_274_to_275},
+  {276, migrate_275_to_276},
   /* End marker. */
   {-1, NULL}};
 

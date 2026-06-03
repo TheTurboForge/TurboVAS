@@ -404,7 +404,6 @@ const allowedSnakeCase = [
   'nvt_name',
   'nvt_preferences',
   'obj_url',
-  'oci_image',
   'old_login',
   'old_name',
   'old_password',

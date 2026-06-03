@@ -57,35 +57,14 @@ const createMockProps = (
 ): HostsTabContentProps => ({
   reportId,
   status: 'Done',
-  isContainerScanning: false,
   reportFilter: filter,
   ...overrides,
 });
 
 describe('HostsTabContent', () => {
-  test('should render ContainerScanningHostsTab when isContainerScanning is true', async () => {
+  test('should render HostsTab', async () => {
     const gmp = createGmp();
-    const props = createMockProps({
-      isContainerScanning: true,
-    });
-    const {render} = rendererWith({
-      gmp,
-      capabilities: true,
-      router: true,
-    });
-
-    render(<HostsTabContent {...props} />);
-
-    const table = await screen.findByRole('table');
-    expect(table).toBeInTheDocument();
-    expect(screen.getAllByText('1 - 2 of 2')).toHaveLength(2);
-  });
-
-  test('should render HostsTab when isContainerScanning is false', async () => {
-    const gmp = createGmp();
-    const props = createMockProps({
-      isContainerScanning: false,
-    });
+    const props = createMockProps();
     const {render} = rendererWith({
       gmp,
       capabilities: true,
@@ -99,28 +78,10 @@ describe('HostsTabContent', () => {
     expect(screen.getByText(/123\.456\.78\.910/)).toBeInTheDocument();
   });
 
-  test('should pass correct props to ContainerScanningHostsTab', async () => {
-    const gmp = createGmp();
-    const props = createMockProps({
-      isContainerScanning: true,
-    });
-    const {render} = rendererWith({
-      gmp,
-      capabilities: true,
-      router: true,
-    });
-
-    render(<HostsTabContent {...props} />);
-
-    await screen.findByRole('table');
-    expect(screen.getAllByTestId('progressbar-box')).toHaveLength(2);
-  });
 
   test('should pass correct props to HostsTab', async () => {
     const gmp = createGmp();
-    const props = createMockProps({
-      isContainerScanning: false,
-    });
+    const props = createMockProps();
     const {render} = rendererWith({
       gmp,
       capabilities: true,

@@ -72,7 +72,6 @@ describe('normalizeType function tests', () => {
     expect(normalizeType('cert_bund_adv')).toEqual('certbund');
     expect(normalizeType('config')).toEqual('scanconfig');
     expect(normalizeType('dfn_cert_adv')).toEqual('dfncert');
-    expect(normalizeType('oci_image_target')).toEqual('ociimagetarget');
     expect(normalizeType('os')).toEqual('operatingsystem');
     expect(normalizeType('port_list')).toEqual('portlist');
     expect(normalizeType('port_range')).toEqual('portrange');
@@ -99,7 +98,6 @@ describe('normalizeType function tests', () => {
     expect(normalizeType('host')).toEqual('host');
     expect(normalizeType('info')).toEqual('info');
     expect(normalizeType('nvt')).toEqual('nvt');
-    expect(normalizeType('ociimagetarget')).toEqual('ociimagetarget');
     expect(normalizeType('operatingsystem')).toEqual('operatingsystem');
     expect(normalizeType('note')).toEqual('note');
     expect(normalizeType('permission')).toEqual('permission');
@@ -140,7 +138,6 @@ describe('apiType function tests', () => {
     expect(apiType('dfncert')).toEqual('info');
     expect(apiType('host')).toEqual('asset');
     expect(apiType('nvt')).toEqual('info');
-    expect(apiType('ociimagetarget')).toEqual('oci_image_target');
     expect(apiType('operatingsystem')).toEqual('asset');
     expect(apiType('policy')).toEqual('config');
     expect(apiType('portlist')).toEqual('port_list');
@@ -159,7 +156,6 @@ describe('apiType function tests', () => {
     expect(apiType('asset')).toEqual('asset');
     expect(apiType('config')).toEqual('config');
     expect(apiType('info')).toEqual('info');
-    expect(apiType('oci_image_target')).toEqual('oci_image_target');
     expect(apiType('port_list')).toEqual('port_list');
     expect(apiType('port_range')).toEqual('port_range');
     expect(apiType('report_config')).toEqual('report_config');
@@ -210,8 +206,6 @@ describe('typeName function tests', () => {
     expect(typeName('group')).toEqual('Group');
     expect(typeName('host')).toEqual('Host');
     expect(typeName('info')).toEqual('Info');
-    expect(typeName('oci_image_target')).toEqual('OCI Image Target');
-    expect(typeName('ociimagetarget')).toEqual('OCI Image Target');
     expect(typeName('operatingsystem')).toEqual('Operating System');
     expect(typeName('override')).toEqual('Override');
     expect(typeName('os')).toEqual('Operating System');
@@ -289,7 +283,6 @@ describe('resourceType function tests', () => {
     expect(resourceType('agentinstaller')).toEqual('agent_installer');
     expect(resourceType('asset')).toEqual('asset');
     expect(resourceType('info')).toEqual('info');
-    expect(resourceType('ociimagetarget')).toEqual('oci_image_target');
     expect(resourceType('portrange')).toEqual('port_range');
     expect(resourceType('user')).toEqual('user');
   });
@@ -315,7 +308,6 @@ describe('entityURL function tests', () => {
     {type: 'dfncert', id: '9', expected: '/dfn-cert-advisory/9'},
     {type: 'host', id: '10', expected: '/host/10'},
     {type: 'nvt', id: '11', expected: '/nvt/11'},
-    {type: 'ociimagetarget', id: '12', expected: '/oci-image-target/12'},
     {type: 'operatingsystem', id: '13', expected: '/operating-system/13'},
     {type: 'policy', id: '14', expected: '/policy/14'},
     {type: 'portlist', id: '15', expected: '/port-list/15'},

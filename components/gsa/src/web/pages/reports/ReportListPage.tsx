@@ -49,7 +49,7 @@ interface ToolBarIconsProps {
 
 type ReportListPageProps = WithEntitiesContainerComponentProps<Report>;
 
-const CONTAINER_TASK_FILTER = Filter.fromString('target=""');
+const IMPORT_TASK_FILTER = Filter.fromString('target=""');
 
 const ToolBarIcons = ({onUploadReportClick}: ToolBarIconsProps) => {
   const [_] = useTranslation();
@@ -78,7 +78,7 @@ const ReportListPage = ({
   const [_] = useTranslation();
   const navigate = useNavigate();
   const [importDialogVisible, setImportDialogVisible] = useState(false);
-  const [containerTaskDialogVisible, setContainerTaskDialogVisible] =
+  const [createImportTaskDialogVisible, setCreateImportTaskDialogVisible] =
     useState(false);
   const [selectedDeltaReport, setSelectedDeltaReport] = useState<
     Report | undefined
@@ -89,11 +89,11 @@ const ReportListPage = ({
   >(undefined);
   const dispatch = useDispatch();
   const tasks = useShallowEqualSelector(state =>
-    tasksSelector(state).getAllEntities(CONTAINER_TASK_FILTER),
+    tasksSelector(state).getAllEntities(IMPORT_TASK_FILTER),
   );
   const loadTasks = () =>
     // @ts-expect-error
-    dispatch(loadAllTasks(gmp)(CONTAINER_TASK_FILTER)) as Promise<void>;
+    dispatch(loadAllTasks(gmp)(IMPORT_TASK_FILTER)) as Promise<void>;
 
   useEffect(() => {
     if (
@@ -107,7 +107,7 @@ const ReportListPage = ({
   }, [filter, selectedDeltaReport]);
 
   const openCreateTaskDialog = () => {
-    setContainerTaskDialogVisible(true);
+    setCreateImportTaskDialogVisible(true);
   };
 
   const openImportDialog = () => {
@@ -131,22 +131,22 @@ const ReportListPage = ({
       .then(() => closeImportDialog());
   };
 
-  const closeContainerTaskDialog = () => {
-    setContainerTaskDialogVisible(false);
+  const closeCreateImportTaskDialog = () => {
+    setCreateImportTaskDialogVisible(false);
   };
 
-  const handleCreateContainerTask = async (
+  const handleCreateImportTask = async (
     data: TaskCommandCreateImportTaskParams,
   ) => {
     const response = await gmp.task.createImportTask(data);
     const {data: task} = response;
     void loadTasks();
     setTaskId(task.id);
-    closeContainerTaskDialog();
+    closeCreateImportTaskDialog();
   };
 
-  const handleCloseContainerTask = () => {
-    closeContainerTaskDialog();
+  const handleCloseCreateImportTask = () => {
+    closeCreateImportTaskDialog();
   };
 
   const handleReportDeltaSelect = (report: Report) => {
@@ -218,15 +218,15 @@ const ReportListPage = ({
           task_id={taskId as string}
           tasks={tasks}
           onClose={handleCloseImportDialog}
-          onNewContainerTaskClick={openCreateTaskDialog}
+          onNewImportTaskClick={openCreateTaskDialog}
           onSave={handleImportReport}
           onTaskChange={handleTaskChange}
         />
       )}
-      {containerTaskDialogVisible && (
+      {createImportTaskDialogVisible && (
         <ImportTaskDialog
-          onClose={handleCloseContainerTask}
-          onSave={handleCreateContainerTask}
+          onClose={handleCloseCreateImportTask}
+          onSave={handleCreateImportTask}
         />
       )}
     </>

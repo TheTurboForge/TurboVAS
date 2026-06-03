@@ -85,7 +85,7 @@ get_report_tls_certificates_run (gmp_parser_t *gmp_parser, GError **error)
 {
   report_t report;
   task_t task;
-  gboolean is_container_scanning_report = FALSE;
+  gboolean include_result_hostname = FALSE;
   int ret, filtered, count;
 
   count = 0;
@@ -148,20 +148,13 @@ get_report_tls_certificates_run (gmp_parser_t *gmp_parser, GError **error)
       return;
     }
 
-#if ENABLE_CONTAINER_SCANNING
-  {
-    oci_image_target_t oci_image_target = task_oci_image_target (task);
-    if (oci_image_target)
-      is_container_scanning_report = TRUE;
-  }
-#endif
 
   SEND_GET_START ("report_tls_certificate");
 
   ret = manage_send_report_tls_certificates (
     report,
     &get_report_tls_certificates_data.get,
-    is_container_scanning_report,
+    include_result_hostname,
     send_to_client,
     gmp_parser->client_writer,
     gmp_parser->client_writer_data);

@@ -232,7 +232,7 @@ BUILD_META: dict[str, BuildMeta] = {
         pkg_config=("libcjson", "libgvm_base", "libgvm_util", "libgvm_osp", "libgvm_gmp", "gnutls", "glib-2.0", "libbsd", "libical", "gpgme"),
         programs=("cmake", "ninja", "pkg-config", "gcc", "pg_config", "xsltproc"),
         package_hints=("postgresql-server-dev-all", "postgresql-server-dev-16", "libical-dev", "xsltproc"),
-        cmake_args=("-DENABLE_AGENTS=0", "-DENABLE_CONTAINER_SCANNING=0", "-DENABLE_CREDENTIAL_STORES=0", "-DENABLE_JWT_AUTH=0", "-DENABLE_OPENVASD=0", "-DWITH_LIBTHEIA=0"),
+        cmake_args=("-DENABLE_AGENTS=0", "-DENABLE_CREDENTIAL_STORES=0", "-DENABLE_JWT_AUTH=0", "-DENABLE_OPENVASD=0", "-DWITH_LIBTHEIA=0"),
         install_for_dependents=True,
     ),
     "gsad": BuildMeta(

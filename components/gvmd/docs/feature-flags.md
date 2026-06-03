@@ -19,7 +19,6 @@ Inside this file, feature flags appear under the `[features]` section.
 ```
 [features]
 enable_agents = false
-enable_container_scanning = false
 enable_credential_store = false
 enable_openvasd = false
 enable_vt_metadata = false
@@ -37,7 +36,6 @@ If a line is missing, gvmd does not apply a value from the config file.
 | Feature                             | **Build-Time Flag** (decides if feature exists in binary) | **Runtime Environment Variable**            | **Config File Key** (inside `[features]`) |
 |-------------------------------------|-----------------------------------------------------------|---------------------------------------------|-------------------------------------------|
 | Agents                              | `ENABLE_AGENTS`                                           | `GVMD_ENABLE_AGENTS`                        | `enable_agents`                           |
-| Container Scanning                  | `ENABLE_CONTAINER_SCANNING`                               | `GVMD_ENABLE_CONTAINER_SCANNING`            | `enable_container_scanning`               |
 | OpenVASd Integration                | `ENABLE_OPENVASD`                                         | `GVMD_ENABLE_OPENVASD`                      | `enable_openvasd`                         |
 | Credential Stores                   | `ENABLE_CREDENTIAL_STORES`                                | `GVMD_ENABLE_CREDENTIAL_STORES`             | `enable_credential_store`                 |
 | VT Metadata Feed                    | Always exists in binary                                   | `GVMD_ENABLE_VT_METADATA`                   | `enable_vt_metadata`                      |
@@ -93,10 +91,6 @@ sync_agents
 ### Container scanning disabled - these commands are hidden
 
 ```
-get_oci_image_targets
-create_oci_image_target
-modify_oci_image_target
-delete_oci_image_target
 ```
 
 ### Credential store disabled - these commands are hidden
@@ -129,9 +123,6 @@ Exact example response:
 <get_features_response status="200" status_text="OK">
   <feature compiled_in="1" enabled="0">
   <name>ENABLE_OPENVASD</name>
-  </feature>
-  <feature compiled_in="1" enabled="0">
-  <name>ENABLE_CONTAINER_SCANNING</name>
   </feature>
   <feature compiled_in="1" enabled="0">
   <name>ENABLE_AGENTS</name>

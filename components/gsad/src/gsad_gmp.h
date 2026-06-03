@@ -729,11 +729,6 @@ get_trash_targets_gmp (gvm_connection_t *, gsad_credentials_t *,
                        params_t *params, gsad_command_response_data_t *);
 
 char *
-get_trash_oci_image_targets_gmp (gvm_connection_t *, gsad_credentials_t *,
-                                 params_t *params,
-                                 gsad_command_response_data_t *);
-
-char *
 get_trash_tasks_gmp (gvm_connection_t *, gsad_credentials_t *, params_t *params,
                      gsad_command_response_data_t *);
 char *
@@ -744,10 +739,6 @@ char *
 get_trash_agent_group_gmp (gvm_connection_t *connection,
                            gsad_credentials_t *credentials, params_t *params,
                            gsad_command_response_data_t *response_data);
-
-char *
-get_trash_oci_image_targets (gvm_connection_t *, gsad_credentials_t *,
-                             params_t *params, gsad_command_response_data_t *);
 
 char *
 restore_gmp (gvm_connection_t *, gsad_credentials_t *, params_t *,
@@ -914,36 +905,6 @@ create_agent_group_task_gmp (gvm_connection_t *, gsad_credentials_t *,
 char *
 save_agent_group_task_gmp (gvm_connection_t *, gsad_credentials_t *, params_t *,
                            gsad_command_response_data_t *);
-
-char *
-get_oci_image_target_gmp (gvm_connection_t *, gsad_credentials_t *, params_t *,
-                          gsad_command_response_data_t *);
-char *
-get_oci_image_targets_gmp (gvm_connection_t *, gsad_credentials_t *, params_t *,
-                           gsad_command_response_data_t *);
-char *
-export_oci_image_targets_gmp (gvm_connection_t *, gsad_credentials_t *,
-                              params_t *, gsad_command_response_data_t *);
-char *
-export_oci_image_target_gmp (gvm_connection_t *, gsad_credentials_t *,
-                             params_t *, gsad_command_response_data_t *);
-char *
-create_oci_image_target_gmp (gvm_connection_t *, gsad_credentials_t *,
-                             params_t *, gsad_command_response_data_t *);
-char *
-delete_oci_image_target_gmp (gvm_connection_t *, gsad_credentials_t *,
-                             params_t *, gsad_command_response_data_t *);
-char *
-save_oci_image_target_gmp (gvm_connection_t *, gsad_credentials_t *, params_t *,
-                           gsad_command_response_data_t *);
-
-char *
-create_oci_image_task_gmp (gvm_connection_t *, gsad_credentials_t *, params_t *,
-                           gsad_command_response_data_t *);
-
-char *
-save_oci_image_task_gmp (gvm_connection_t *, gsad_credentials_t *, params_t *,
-                         gsad_command_response_data_t *);
 
 char *
 renew_session_gmp (gvm_connection_t *, gsad_credentials_t *, params_t *,

@@ -10,9 +10,6 @@
 #if ENABLE_AGENTS
 #include "manage_sql_groups.h"
 #endif
-#if ENABLE_CONTAINER_SCANNING
-#include "manage_sql_oci_image_targets.h"
-#endif
 #include "manage_asset_keys.h"
 #include "manage_report_hosts.h"
 #include "manage_sql_permissions.h"
@@ -1985,189 +1982,6 @@ asset_snapshots_agent (report_t report, task_t task, agent_group_t group)
 }
 #endif /* ENABLE_AGENTS */
 
-#if ENABLE_CONTAINER_SCANNING
-/**
- * @brief Insert one asset snapshot per container digest from report hosts.
- *
- * @param[in] report  Report the snapshot belongs to.
- * @param[in] task    Task that produced the report.
- */
-static void
-asset_snapshots_insert_container_image (report_t report, task_t task)
-{
-  iterator_t hosts;
-
-  GHashTable *seen = g_hash_table_new_full (g_str_hash, g_str_equal, g_free,
-                                            NULL);
-  scanner_t scanner = task_scanner (task);
-
-  /* Iterate report hosts (host value contains digest for container-image scan) */
-  init_report_host_iterator (&hosts, report, NULL, 0);
-  while (next (&hosts))
-    {
-      const char *digest;
-      asset_snapshot_t asset_snapshot;
-
-      digest = host_iterator_host (&hosts);
-
-      if (!digest || !*digest)
-        continue;
-
-      if (g_hash_table_contains (seen, digest))
-        continue;
-
-      g_hash_table_add (seen, g_strdup (digest));
-
-      sql_begin_immediate ();
-
-      sql_ps ("INSERT INTO asset_snapshots"
-              " (uuid, task_id, report_id, asset_type,"
-              "  creation_time, modification_time, scanner)"
-              " VALUES"
-              " (make_uuid (), $1, $2, $3, m_now (), m_now (), $4);",
-              SQL_RESOURCE_PARAM (task),
-              SQL_RESOURCE_PARAM (report),
-              SQL_INT_PARAM (ASSET_TYPE_CONTAINER_IMAGE),
-              SQL_RESOURCE_PARAM (scanner),
-              NULL);
-
-      asset_snapshot = sql_last_insert_id ();
-
-      sql_ps ("INSERT INTO asset_snapshot_identifiers"
-              " (asset_snapshot, identifier_type, identifier_value,"
-              "  creation_time, modification_time)"
-              " VALUES"
-              " ($1, $2, $3, m_now (), m_now ())"
-              " ON CONFLICT (asset_snapshot, identifier_type, identifier_value)"
-              " DO NOTHING;",
-              SQL_RESOURCE_PARAM (asset_snapshot),
-              SQL_INT_PARAM (ASSET_IDENTIFIER_TYPE_CONTAINER_DIGEST),
-              SQL_STR_PARAM (digest),
-              NULL);
-
-      sql_commit ();
-    }
-
-  cleanup_iterator (&hosts);
-  g_hash_table_destroy (seen);
-}
-
-/**
- * @brief Lookup most recent asset_key for a given container digest.
- *
- * @param[in] digest  Container digest.
- *
- * @return Duplicated asset_key string or NULL if not found.
- */
-static gchar *
-get_asset_key_by_container_digest (const gchar *digest)
-{
-  if (!digest || !*digest)
-    return NULL;
-
-  return sql_string_ps (
-    "SELECT asset_snapshots.asset_key"
-    " FROM asset_snapshots"
-    " JOIN asset_snapshot_identifiers"
-    "   ON asset_snapshot_identifiers.asset_snapshot = asset_snapshots.id"
-    " WHERE asset_snapshot_identifiers.identifier_type = $1"
-    "   AND asset_snapshot_identifiers.identifier_value = $2"
-    "   AND asset_snapshots.asset_key IS NOT NULL"
-    " ORDER BY asset_snapshots.modification_time DESC"
-    " LIMIT 1;",
-    SQL_INT_PARAM (ASSET_IDENTIFIER_TYPE_CONTAINER_DIGEST),
-    SQL_STR_PARAM (digest),
-    NULL);
-}
-
-/**
- * @brief Lookup container digest identifier for an asset snapshot.
- *
- * @param[in] asset_snapshot  Asset snapshot row ID.
- *
- * @return Duplicated container digest string or NULL if not found.
- */
-static gchar *
-get_container_digest_by_asset_snapshot (asset_snapshot_t asset_snapshot)
-{
-  return sql_string_ps (
-    "SELECT identifier_value"
-    " FROM asset_snapshot_identifiers"
-    " WHERE asset_snapshot = $1"
-    "   AND identifier_type = $2"
-    " ORDER BY id"
-    " LIMIT 1;",
-    SQL_RESOURCE_PARAM (asset_snapshot),
-    SQL_INT_PARAM (ASSET_IDENTIFIER_TYPE_CONTAINER_DIGEST),
-    NULL);
-}
-
-/**
- * @brief Set asset_key for container-image asset_snapshots rows.
- *
- * @param[in] report  Report the snapshot rows belong to.
- * @param[in] task    Task the snapshot rows belong to.
- */
-static void
-asset_snapshots_set_asset_keys_container_image (report_t report, task_t task)
-{
-  iterator_t it;
-
-  init_asset_snapshot_iterator (&it, task, report, 0 /*any scanner */, TRUE);
-
-  while (next (&it))
-    {
-      asset_snapshot_t row_id = asset_snapshot_iterator_id (&it);
-
-      gchar *digest = NULL;
-      gchar *asset_key = NULL;
-
-      digest = get_container_digest_by_asset_snapshot (row_id);
-
-      if (digest && *digest)
-        asset_key = get_asset_key_by_container_digest (digest);
-
-      if (asset_key && *asset_key)
-        {
-          sql_ps ("UPDATE asset_snapshots"
-                  "   SET asset_key = $1,"
-                  "       modification_time = m_now()"
-                  " WHERE id = $2;",
-                  SQL_STR_PARAM (asset_key),
-                  SQL_RESOURCE_PARAM (row_id),
-                  NULL);
-        }
-      else
-        {
-          /* no match found anywhere, create new stable key */
-          sql_ps ("UPDATE asset_snapshots"
-                  "   SET asset_key = make_uuid(),"
-                  "       modification_time = m_now()"
-                  " WHERE id = $1;",
-                  SQL_RESOURCE_PARAM (row_id),
-                  NULL);
-        }
-
-      g_free (digest);
-      g_free (asset_key);
-    }
-
-  cleanup_iterator (&it);
-}
-
-/**
- * @brief Create container scanning asset snapshots for a completed report.
- *
- * @param[in]  report  Report the snapshot belongs to.
- * @param[in]  task    Task that produced the report.
- */
-void
-asset_snapshots_container_image (report_t report, task_t task)
-{
-  asset_snapshots_insert_container_image (report, task);
-  asset_snapshots_set_asset_keys_container_image (report, task);
-}
-#endif /* ENABLE_CONTAINER_SCANNING */
 
 /**
  * @brief Dump the string for Asset Snapshot counts to stdout.
@@ -2188,7 +2002,6 @@ manage_dump_asset_snapshot_counts (GSList *log_config,
   int total_count = 0;
   int target_count = 0;
   int agent_count = 0;
-  int container_image_count = 0;
 
   ret = manage_option_setup (log_config, database,
                              0 /* avoid_db_check_inserts */);
@@ -2210,12 +2023,6 @@ manage_dump_asset_snapshot_counts (GSList *log_config,
     SQL_INT_PARAM (ASSET_TYPE_AGENT),
     NULL);
 
-  container_image_count = sql_int_ps (
-    "SELECT COUNT(DISTINCT asset_key) FROM asset_snapshots"
-    " WHERE asset_type = $1;",
-    SQL_INT_PARAM (ASSET_TYPE_CONTAINER_IMAGE),
-    NULL);
-
   GString *out = g_string_new (NULL);
 
   g_string_append (out, "Asset Snapshot Counts (distinct asset_key)\n");
@@ -2227,9 +2034,6 @@ manage_dump_asset_snapshot_counts (GSList *log_config,
   g_string_append_printf (
     out, "  Agents  (type=%d):          %d\n",
     ASSET_TYPE_AGENT, agent_count);
-  g_string_append_printf (
-    out, "  Container images (type=%d): %d\n",
-    ASSET_TYPE_CONTAINER_IMAGE, container_image_count);
 
   printf ("%s", out->str);
 

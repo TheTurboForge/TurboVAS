@@ -13,7 +13,6 @@ from gvm.protocols.gmp.requests.next._credentials import (
 from gvm.protocols.gmp.requests.next._integration_configs import (
     IntegrationConfigs,
 )
-from gvm.protocols.gmp.requests.next._oci_image_targets import OCIImageTargets
 from gvm.protocols.gmp.requests.next._report_applications import (
     ReportApplications,
 )
@@ -151,7 +150,6 @@ __all__ = (
     "IntegrationConfigs",
     "Notes",
     "Nvts",
-    "OCIImageTargets",
     "OperatingSystems",
     "Overrides",
     "PermissionSubjectType",

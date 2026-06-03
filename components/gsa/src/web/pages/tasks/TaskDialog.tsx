@@ -11,7 +11,6 @@ import Scanner, {
   OPENVASD_SCANNER_TYPE,
   GREENBONE_SENSOR_SCANNER_TYPE,
   OPENVASD_SENSOR_SCANNER_TYPE,
-  CONTAINER_IMAGE_SCANNER_TYPE,
   type ScannerType,
 } from 'gmp/models/scanner';
 import {
@@ -159,9 +158,6 @@ const ScannerSelect = ({
   onChange,
 }: ScannerSelectProps) => {
   const [_] = useTranslation();
-  scanners = scanners?.filter(
-    scanner => scanner.scannerType !== CONTAINER_IMAGE_SCANNER_TYPE,
-  );
   return (
     <FormGroup title={_('Scanner')}>
       <Select
