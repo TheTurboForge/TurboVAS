@@ -13,6 +13,12 @@ Imported upstream components live under `components/`.
 
 See `UPSTREAMS.md` for source provenance and imported commit IDs. See `LICENSE_AUDIT.md` for the initial license and provenance audit notes.
 
+## Operating Model
+
+TurboVAS is an opinionated scanner for vulnerability management operators. It is
+designed around a specific operating model rather than arbitrary local process
+customization. See `docs/VULNERABILITY_MANAGEMENT_PRACTICE.md`.
+
 ## Development Commands
 
 TurboVAS provides a small root command surface for repository health checks:
