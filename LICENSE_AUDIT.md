@@ -7,6 +7,8 @@ This is the initial TurboVAS engineering license and provenance audit for the im
 
 The import preserves upstream component boundaries under `components/`. Upstream license files, copyright notices, package manifests, documentation, tests, and source files are retained as imported source material.
 
+TurboVAS is an independent project and is not affiliated with, sponsored by, or endorsed by Greenbone AG. Greenbone/OpenVAS component references in this audit are provenance records and do not imply Greenbone approval or support for TurboVAS.
+
 Original TurboVAS-created root tooling and public documentation use `GPL-3.0-or-later` as the provisional project default unless a more specific compatible license is selected for a component-local file.
 
 ## Component License Summary
@@ -38,7 +40,8 @@ Original TurboVAS-created root tooling and public documentation use `GPL-3.0-or-
 - Treat feed content terms separately from source code licensing.
 - Treat development feed caches and runtime feed copies as local, untracked runtime state; do not commit, bundle, package, or redistribute feed content without a separate feed-terms review.
 - Mark ambiguous cases for human/legal review before public release or distribution.
-- Run `just license-report` during license-sensitive work. The report checks expected component license files, TurboVAS modification notices on modified imported source files, SPDX headers on new TurboVAS-created files, and accidental tracking of runtime feed/cache content.
+- Run `just license-report` during license-sensitive work. The report checks expected component license files, TurboVAS modification notices on modified imported source files, SPDX headers on new TurboVAS-created files, explicit handling for modified imported files that cannot carry comments, accidental tracking of runtime feed/cache content, and public-release review gate state.
+- Run `just license-public-release-gate` before any public repository, release artifact, publication, packaging, or distribution step. The gate fails until public-release license review items are closed.
 
 ## Modification Notice Policy
 
@@ -65,9 +68,11 @@ Root-level TurboVAS-only tooling and public documentation currently use
 `GPL-3.0-or-later` as the provisional default.
 
 Some modified imported data or generated files do not safely support comments,
-for example JSON locale/package files or test snapshots. These are reviewed by
-path in `just license-report` instead of receiving syntactically invalid
-file-level comments.
+for example JSON locale/package files or test snapshots. These paths are tracked
+in the deterministic `just license-report` manifest instead of receiving
+syntactically invalid file-level comments. A new no-comment modified file fails
+the report until the file can receive a notice or the manifest records the
+reason it cannot.
 
 ## Review Items
 

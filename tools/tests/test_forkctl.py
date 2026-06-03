@@ -113,6 +113,22 @@ class TurboVASCtlTests(unittest.TestCase):
             self.assertEqual(missing, [])
             self.assertEqual(review, ["components/gsa/package.json"])
 
+    def test_no_comment_manifest_requires_current_documented_paths(self):
+        review = ["components/gsa/package.json", "components/gsa/public/locales/gsa-en.json", "components/gsa/new-data.json"]
+        manifest = {
+            "components/gsa/package.json": "JSON package manifest.",
+            "components/gsa/public/locales/gsa-en.json": "JSON locale catalog.",
+            "components/gsa/stale.json": "No longer modified.",
+        }
+        documented, undocumented, stale = turbovasctl.modified_imported_no_comment_manifest_gaps(review, manifest)
+        self.assertEqual(documented, ["components/gsa/package.json", "components/gsa/public/locales/gsa-en.json"])
+        self.assertEqual(undocumented, ["components/gsa/new-data.json"])
+        self.assertEqual(stale, ["components/gsa/stale.json"])
+
+    def test_public_readiness_gate_is_explicit(self):
+        self.assertEqual(turbovasctl.public_readiness_finding()["status"], "pass")
+        self.assertEqual(turbovasctl.public_readiness_finding(public_release=True)["status"], "fail")
+
     def test_license_helpers_require_spdx_for_new_turbovas_files(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

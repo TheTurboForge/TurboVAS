@@ -45,6 +45,15 @@ PUBLIC_READINESS_LICENSE_ITEMS = (
     "Greenbone Community Feed content terms before bundling or redistribution",
     "release-time secret scan, attribution review, and source-offer/publication checklist",
 )
+MODIFIED_IMPORTED_NO_COMMENT_FILES = {
+    "components/gsa/package-lock.json": "JSON dependency lockfile; comments would make the file invalid.",
+    "components/gsa/package.json": "JSON package manifest; comments would make the file invalid.",
+    "components/gsa/public/locales/gsa-de.json": "JSON locale catalog; comments would make the file invalid.",
+    "components/gsa/public/locales/gsa-en.json": "JSON locale catalog; comments would make the file invalid.",
+    "components/gsa/public/locales/gsa-zh_CN.json": "JSON locale catalog; comments would make the file invalid.",
+    "components/gsa/public/locales/gsa-zh_TW.json": "JSON locale catalog; comments would make the file invalid.",
+    "components/openvas-scanner/rust/src/openvasd/config/snapshots/openvasd__config__tests__defaults.snap": "Generated insta snapshot; changing contents would alter test fixture semantics.",
+}
 BASELINE_TOOLS = (
     "git",
     "rg",
@@ -1443,6 +1452,15 @@ def modified_imported_notice_gaps(repo_root: Path, rows: list[tuple[str, str]]) 
     return missing, review
 
 
+def modified_imported_no_comment_manifest_gaps(review_notices: list[str], manifest: dict[str, str] | None = None) -> tuple[list[str], list[str], list[str]]:
+    manifest_paths = set((manifest or MODIFIED_IMPORTED_NO_COMMENT_FILES).keys())
+    review_paths = set(review_notices)
+    documented = sorted(review_paths & manifest_paths)
+    undocumented = sorted(review_paths - manifest_paths)
+    stale = sorted(manifest_paths - review_paths)
+    return documented, undocumented, stale
+
+
 def added_turbovas_spdx_gaps(repo_root: Path, rows: list[tuple[str, str]]) -> list[str]:
     missing: list[str] = []
     for status, relative_path in rows:
@@ -1461,7 +1479,16 @@ def tracked_feed_content_paths(repo_root: Path) -> list[str] | None:
     return [path for path in tracked if any(path.startswith(prefix) for prefix in FEED_CONTENT_TRACKED_PREFIXES)]
 
 
-def command_license_report(repo_root: Path) -> dict[str, Any]:
+def public_readiness_finding(public_release: bool = False) -> dict[str, Any]:
+    return finding(
+        "fail" if public_release else "pass",
+        "license.public-readiness",
+        "Public-release license review items are still open; do not publish or distribute release artifacts until they are resolved." if public_release else "Public-release license review items are tracked separately; run with --public-release to enforce the release gate.",
+        details={"review_items": list(PUBLIC_READINESS_LICENSE_ITEMS), "release_gate": public_release},
+    )
+
+
+def command_license_report(repo_root: Path, public_release: bool = False) -> dict[str, Any]:
     findings: list[dict[str, Any]] = []
     for component in COMPONENTS:
         component_path = repo_root / component.path
@@ -1472,7 +1499,7 @@ def command_license_report(repo_root: Path) -> dict[str, Any]:
     all_rows = git_name_status(repo_root, IMPORT_BASELINE_COMMIT)
     rows = git_name_status(repo_root, IMPORT_BASELINE_COMMIT, ("components",))
     if rows is None:
-        findings.append(finding("warn", "license.git-history", f"Could not compare against import baseline {IMPORT_BASELINE_COMMIT}."))
+        findings.append(finding("fail", "license.git-history", f"Could not compare against import baseline {IMPORT_BASELINE_COMMIT}."))
     else:
         missing_notices, review_notices = modified_imported_notice_gaps(repo_root, rows)
         findings.append(
@@ -1483,17 +1510,18 @@ def command_license_report(repo_root: Path) -> dict[str, Any]:
                 details={"baseline": IMPORT_BASELINE_COMMIT, "missing": missing_notices},
             )
         )
+        documented_review, undocumented_review, stale_review = modified_imported_no_comment_manifest_gaps(review_notices)
         findings.append(
             finding(
-                "pass" if not review_notices else "warn",
-                "license.modified-imported-review",
-                "No modified imported no-comment data files need notice review." if not review_notices else "Modified imported data/generated files cannot safely receive comments; review explicitly.",
-                details={"paths": review_notices},
+                "pass" if not undocumented_review and not stale_review else "fail",
+                "license.modified-imported-no-comment-manifest",
+                "Modified imported no-comment files are explicitly recorded in the license manifest." if not undocumented_review and not stale_review else "Modified imported no-comment manifest is incomplete or stale.",
+                details={"documented": documented_review, "undocumented": undocumented_review, "stale": stale_review, "manifest": MODIFIED_IMPORTED_NO_COMMENT_FILES},
             )
         )
 
     if all_rows is None:
-        findings.append(finding("warn", "license.new-file-spdx", f"Could not compare new files against import baseline {IMPORT_BASELINE_COMMIT}."))
+        findings.append(finding("fail", "license.new-file-spdx", f"Could not compare new files against import baseline {IMPORT_BASELINE_COMMIT}."))
     else:
         missing_spdx = added_turbovas_spdx_gaps(repo_root, all_rows)
         findings.append(
@@ -1507,7 +1535,7 @@ def command_license_report(repo_root: Path) -> dict[str, Any]:
 
     tracked_feed = tracked_feed_content_paths(repo_root)
     if tracked_feed is None:
-        findings.append(finding("warn", "license.feed-content-tracking", "Could not list tracked files to verify feed content is untracked."))
+        findings.append(finding("fail", "license.feed-content-tracking", "Could not list tracked files to verify feed content is untracked."))
     else:
         findings.append(
             finding(
@@ -1518,7 +1546,7 @@ def command_license_report(repo_root: Path) -> dict[str, Any]:
             )
         )
 
-    findings.append(finding("warn", "license.public-readiness", "Public-release license review items remain open; this report is engineering hygiene, not legal advice.", details={"review_items": list(PUBLIC_READINESS_LICENSE_ITEMS)}))
+    findings.append(public_readiness_finding(public_release))
     return make_result("license-report", repo_root, "License/provenance checks completed.", findings)
 
 
@@ -2738,6 +2766,8 @@ def command_doctor(repo_root: Path) -> dict[str, Any]:
     findings.append(finding("fail" if nested else "pass", "component.nested_git", "Nested .git directories were found." if nested else "No nested .git directories found under components/.", details={"paths": nested} if nested else None))
     for tool in BASELINE_TOOLS:
         findings.append(finding("pass" if shutil.which(tool) else "warn", "tool.available", f"{tool} is available." if shutil.which(tool) else f"{tool} is not available on PATH."))
+    license_result = command_license_report(repo_root)
+    findings.append(finding(license_result["status"], "license.compliance", license_result["summary"], details={"status": license_result["status"], "findings": license_result["findings"]}))
     findings.append(finding("pass", "surface.available", "Build readiness surface is available.", details={"commands": ["just deps", "just configure", "just build", "just build-core-c", "just build-c-services", "just build-ui", "just build-python", "just build-baseline"]}))
     findings.append(finding("pass" if compose_file(repo_root).is_file() else "warn", "surface.available", "Runtime infrastructure command surface is available." if compose_file(repo_root).is_file() else "Runtime infrastructure command surface is not available.", details={"commands": ["just runtime-plan", "just up", "just down", "just logs", "just runtime-init", "just runtime-certs-init", "just runtime-manager-init", "just runtime-scanner-redis-init", "just runtime-gmp-smoke", "just runtime-scanner-register", "just runtime-scanner-capability-check", "just runtime-feed-keyring-init", "just runtime-feed-import-init", "just runtime-full-test-scan-preflight", "just runtime-full-test-scan-start", "just runtime-full-test-scan-status", "just runtime-report-summary", "just runtime-report-export", "just runtime-rbac-smoke", "just feed-state", "just feed-cache-sync", "just feed-copy-to-runtime", "just runtime-status", "just runtime-smoke", "just runtime-app-up", "just runtime-app-smoke", "just runtime-webui-smoke", "just runtime-app-down", "just gvmd-smoke"]}))
     findings.append(finding("warn", "surface.deferred", "Test command surface is deferred until component checks are mapped.", details={"command": "just test"}))
@@ -2772,7 +2802,8 @@ def build_parser() -> argparse.ArgumentParser:
     inventory = subparsers.add_parser("inventory", parents=[common], help="show expected component inventory")
     inventory.add_argument("--scope", help="limit inventory to a path under the repository")
     subparsers.add_parser("doctor", parents=[common], help="run structural and environment health checks")
-    subparsers.add_parser("license-report", parents=[common], help="check preserved license/provenance files")
+    license_report = subparsers.add_parser("license-report", parents=[common], help="check preserved license/provenance files")
+    license_report.add_argument("--public-release", action="store_true", help="fail while public-release license review items remain open")
     deps = subparsers.add_parser("deps", parents=[common], help="check dependency readiness")
     deps.add_argument("component", nargs="?", help="component name")
     configure = subparsers.add_parser("configure", parents=[common], help="configure a CMake component")
@@ -2836,7 +2867,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "doctor":
         result = command_doctor(repo_root)
     elif args.command == "license-report":
-        result = command_license_report(repo_root)
+        result = command_license_report(repo_root, public_release=args.public_release)
     elif args.command == "deps":
         result = command_deps(repo_root, args.component)
     elif args.command == "configure":

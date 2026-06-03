@@ -7,6 +7,10 @@ TurboVAS is an OpenVAS-derived monorepo for vulnerability scanner operators. It 
 
 This repository is currently in an early private development phase. The initial source snapshot preserves upstream component boundaries and provenance so future changes can be made with clear licensing and attribution context.
 
+## Relationship To Greenbone
+
+TurboVAS is an independent OpenVAS-derived project. It is not affiliated with, sponsored by, or endorsed by Greenbone AG. Greenbone remains the upstream source for the imported Greenbone/OpenVAS components listed in `UPSTREAMS.md`; organizations looking for official Greenbone/OpenVAS vulnerability-management products, support, or services should contact Greenbone directly at https://www.greenbone.net/.
+
 ## Components
 
 Imported upstream components live under `components/`.
@@ -27,6 +31,7 @@ TurboVAS provides a small root command surface for repository health checks:
 - `just inventory`: list the expected monorepo components.
 - `just doctor`: run structural and environment readiness checks.
 - `just license-report`: check preserved license and provenance files.
+- `just license-public-release-gate`: fail until public-release license review items are closed.
 - `just deps [component]`: check build dependency readiness.
 - `just configure <component>`: configure a CMake component into `build/<component>/`.
 - `just build <component>`: build a supported component with local artifacts under ignored paths.

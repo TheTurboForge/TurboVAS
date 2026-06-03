@@ -10,6 +10,8 @@ Import method: source snapshot from local upstream cache, excluding only upstrea
 
 `pg-gvm` was added on 2026-06-01 after identifying it as a required PostgreSQL extension for `gvmd` runtime work.
 
+TurboVAS is an independent project and is not affiliated with, sponsored by, or endorsed by Greenbone AG. The Greenbone/OpenVAS repositories listed below are upstream source references for the imported components. For official Greenbone/OpenVAS vulnerability-management products, support, or services, contact Greenbone directly at https://www.greenbone.net/.
+
 | Component | Path | Upstream repository | Imported commit | Role |
 | --- | --- | --- | --- | --- |
 | OpenVAS Scanner | `components/openvas-scanner` | https://github.com/greenbone/openvas-scanner | `f039649` | Scanner engine and NASL/VT execution core; includes C scanner and Rust/openvasd-related code. |
