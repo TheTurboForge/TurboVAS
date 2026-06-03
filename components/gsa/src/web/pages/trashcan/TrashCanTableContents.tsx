@@ -28,13 +28,10 @@ const TrashCanTableContents = ({trash}: TrashCanContentsTableProps) => {
   const hasAlerts = hasItems(trash.alerts);
   const hasCredentials = hasItems(trash.credentials);
   const hasFilters = hasItems(trash.filters);
-  const hasGroups = hasItems(trash.groups);
   const hasOverrides = hasItems(trash.overrides);
-  const hasPermissions = hasItems(trash.permissions);
   const hasPortLists = hasItems(trash.portLists);
   const hasReportConfigs = hasItems(trash.reportConfigs);
   const hasReportFormats = hasItems(trash.reportFormats);
-  const hasRoles = hasItems(trash.roles);
   const hasScanners = hasItems(trash.scanners);
   const hasSchedules = hasItems(trash.schedules);
   const hasTags = hasItems(trash.tags);
@@ -66,25 +63,11 @@ const TrashCanTableContents = ({trash}: TrashCanContentsTableProps) => {
           type="filter"
         />
       )}
-      {hasGroups && (
-        <TrashCanTableRow
-          count={trash.groups.length}
-          title={_('Groups')}
-          type="group"
-        />
-      )}
       {hasOverrides && (
         <TrashCanTableRow
           count={trash.overrides.length}
           title={_('Overrides')}
           type="override"
-        />
-      )}
-      {hasPermissions && (
-        <TrashCanTableRow
-          count={trash.permissions.length}
-          title={_('Permissions')}
-          type="permission"
         />
       )}
       {hasPortLists && (
@@ -106,13 +89,6 @@ const TrashCanTableContents = ({trash}: TrashCanContentsTableProps) => {
           count={trash.reportFormats.length}
           title={_('Report Formats')}
           type="report-format"
-        />
-      )}
-      {hasRoles && (
-        <TrashCanTableRow
-          count={trash.roles.length}
-          title={_('Roles')}
-          type="role"
         />
       )}
       {hasScanConfigs && (

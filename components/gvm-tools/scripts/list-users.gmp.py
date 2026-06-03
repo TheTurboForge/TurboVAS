@@ -14,7 +14,7 @@ def main(gmp: Gmp, args: Namespace) -> None:
     response_xml = gmp.get_users(filter_string="rows=-1")
     users_xml = response_xml.xpath("user")
 
-    heading = ["#", "Name", "Id", "Role", "Groups"]
+    heading = ["#", "Name", "Id"]
 
     rows = []
     numberRows = 0
@@ -29,10 +29,8 @@ def main(gmp: Gmp, args: Namespace) -> None:
 
         name = "".join(user.xpath("name/text()"))
         user_id = user.get("id")
-        user_role = "".join(user.xpath("role/name/text()"))
-        user_groups = "".join(user.xpath("groups/group/name/text()"))
 
-        rows.append([rowNumber, name, user_id, user_role, user_groups])
+        rows.append([rowNumber, name, user_id])
 
     print(Table(heading=heading, rows=rows))
 

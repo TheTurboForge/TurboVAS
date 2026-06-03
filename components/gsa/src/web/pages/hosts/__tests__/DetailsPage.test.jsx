@@ -239,13 +239,6 @@ describe('Host DetailsPage tests', () => {
     );
 
     // Tabs
-    expect(
-      screen.getByRole('tab', {name: /^information/i}),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('tab', {name: /^user tags/i})).toBeInTheDocument();
-    expect(
-      screen.getByRole('tab', {name: /^permissions/i}),
-    ).toBeInTheDocument();
 
     // Details
     expect(
@@ -310,23 +303,6 @@ describe('Host DetailsPage tests', () => {
     expect(container).toHaveTextContent('No user tags available');
   });
 
-  test('should render permissions tab', () => {
-    const gmp = createGmp();
-    const {render, store} = rendererWith({
-      capabilities: true,
-      gmp,
-      router: true,
-      store: true,
-    });
-
-    store.dispatch(entityLoadingActions.success('12345', host));
-
-    const {container} = render(<DetailsPage id="12345" />);
-
-    const permissionsTab = screen.getByRole('tab', {name: /^permissions/i});
-    fireEvent.click(permissionsTab);
-    expect(container).toHaveTextContent('No permissions available');
-  });
 
   test('should call commands', async () => {
     const gmp = createGmp();
@@ -487,14 +463,14 @@ describe('Host ToolBarIcons tests', () => {
     expect(handleHostCreateClick).toHaveBeenCalled();
 
     const editIcon = screen.getByTestId('edit-icon');
-    expect(editIcon).toHaveAttribute('title', 'Permission to edit Host denied');
+    expect(editIcon).toHaveAttribute('title', 'Edit Host command unavailable');
     fireEvent.click(editIcon);
     expect(handleHostEditClick).not.toHaveBeenCalled();
 
     const deleteIcon = screen.getAllByTestId('delete-icon')[0];
     expect(deleteIcon).toHaveAttribute(
       'title',
-      'Permission to delete Host denied',
+      'Delete Host command unavailable',
     );
     fireEvent.click(deleteIcon);
     expect(handleHostDeleteClick).not.toHaveBeenCalledWith(host);

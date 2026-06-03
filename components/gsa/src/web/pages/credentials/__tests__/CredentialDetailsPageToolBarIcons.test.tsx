@@ -190,13 +190,13 @@ describe('CredentialDetailsPageToolBarIcons tests', () => {
     fireEvent.click(cloneIcon);
     expect(handleCredentialCloneClick).toHaveBeenCalledWith(credential);
 
-    const editIcon = screen.getByTitle('Permission to edit Credential denied');
+    const editIcon = screen.getByTitle('Edit Credential command unavailable');
     expect(editIcon).toBeInTheDocument();
     fireEvent.click(editIcon);
     expect(handleCredentialEditClick).not.toHaveBeenCalled();
 
     const deleteIcon = screen.getByTitle(
-      'Permission to move Credential to trashcan denied',
+      'Move Credential to trashcan command unavailable',
     );
     expect(deleteIcon).toBeInTheDocument();
     fireEvent.click(deleteIcon);

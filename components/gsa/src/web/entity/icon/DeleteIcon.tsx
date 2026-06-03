@@ -64,7 +64,7 @@ const EntityDeleteIcon = <TEntity extends EntityDelete>({
     } else if (entity.isInUse()) {
       title = _('{{entity}} is still in use', {entity: displayName});
     } else if (!mayDelete) {
-      title = _('Permission to delete {{entity}} denied', {
+      title = _('Delete {{entity}} command unavailable', {
         entity: displayName,
       });
     } else {

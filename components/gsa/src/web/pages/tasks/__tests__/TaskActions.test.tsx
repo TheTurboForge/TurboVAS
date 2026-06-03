@@ -164,7 +164,7 @@ describe('TaskActions tests', () => {
     const startIcon = screen.getByTestId('start-icon');
     expect(startIcon).toHaveAttribute(
       'title',
-      'Permission to start task denied',
+      'Start task command unavailable',
     );
     fireEvent.click(startIcon);
     expect(handleTaskStart).not.toHaveBeenCalled();
@@ -177,20 +177,20 @@ describe('TaskActions tests', () => {
     const deleteIcon = screen.getByTestId('trashcan-icon');
     expect(deleteIcon).toHaveAttribute(
       'title',
-      'Permission to move Task to trashcan denied',
+      'Move Task to trashcan command unavailable',
     );
     fireEvent.click(deleteIcon);
     expect(handleTaskDelete).not.toHaveBeenCalled();
 
     const editIcon = screen.getByTestId('edit-icon');
-    expect(editIcon).toHaveAttribute('title', 'Permission to edit Task denied');
+    expect(editIcon).toHaveAttribute('title', 'Edit Task command unavailable');
     fireEvent.click(editIcon);
     expect(handleTaskEdit).not.toHaveBeenCalled();
 
     const cloneIcon = screen.getByTestId('clone-icon');
     expect(cloneIcon).toHaveAttribute(
       'title',
-      'Permission to clone Task denied',
+      'Clone Task command unavailable',
     );
     fireEvent.click(cloneIcon);
     expect(handleTaskClone).not.toHaveBeenCalled();
@@ -241,7 +241,7 @@ describe('TaskActions tests', () => {
     const startIcon = screen.getByTestId('start-icon');
     expect(startIcon).toHaveAttribute(
       'title',
-      'Permission to start task denied',
+      'Start task command unavailable',
     );
     fireEvent.click(startIcon);
     expect(handleTaskStart).not.toHaveBeenCalled();
@@ -249,7 +249,7 @@ describe('TaskActions tests', () => {
     const resumeIcon = screen.getByTestId('resume-icon');
     expect(resumeIcon).toHaveAttribute(
       'title',
-      'Permission to resume task denied',
+      'Resume task command unavailable',
     );
     fireEvent.click(resumeIcon);
     expect(handleTaskResume).not.toHaveBeenCalled();
@@ -257,20 +257,20 @@ describe('TaskActions tests', () => {
     const deleteIcon = screen.getByTestId('trashcan-icon');
     expect(deleteIcon).toHaveAttribute(
       'title',
-      'Permission to move Task to trashcan denied',
+      'Move Task to trashcan command unavailable',
     );
     fireEvent.click(deleteIcon);
     expect(handleTaskDelete).not.toHaveBeenCalled();
 
     const editIcon = screen.getByTestId('edit-icon');
-    expect(editIcon).toHaveAttribute('title', 'Permission to edit Task denied');
+    expect(editIcon).toHaveAttribute('title', 'Edit Task command unavailable');
     fireEvent.click(editIcon);
     expect(handleTaskEdit).not.toHaveBeenCalled();
 
     const cloneIcon = screen.getByTestId('clone-icon');
     expect(cloneIcon).toHaveAttribute(
       'title',
-      'Permission to clone Task denied',
+      'Clone Task command unavailable',
     );
     fireEvent.click(cloneIcon);
     expect(handleTaskClone).not.toHaveBeenCalled();
@@ -319,7 +319,7 @@ describe('TaskActions tests', () => {
     );
 
     const stopIcon = screen.getByTestId('stop-icon');
-    expect(stopIcon).toHaveAttribute('title', 'Permission to stop task denied');
+    expect(stopIcon).toHaveAttribute('title', 'Stop task command unavailable');
     fireEvent.click(stopIcon);
     expect(handleTaskStart).not.toHaveBeenCalled();
 
@@ -331,20 +331,20 @@ describe('TaskActions tests', () => {
     const deleteIcon = screen.getByTestId('trashcan-icon');
     expect(deleteIcon).toHaveAttribute(
       'title',
-      'Permission to move Task to trashcan denied',
+      'Move Task to trashcan command unavailable',
     );
     fireEvent.click(deleteIcon);
     expect(handleTaskDelete).not.toHaveBeenCalled();
 
     const editIcon = screen.getByTestId('edit-icon');
-    expect(editIcon).toHaveAttribute('title', 'Permission to edit Task denied');
+    expect(editIcon).toHaveAttribute('title', 'Edit Task command unavailable');
     fireEvent.click(editIcon);
     expect(handleTaskEdit).not.toHaveBeenCalled();
 
     const cloneIcon = screen.getByTestId('clone-icon');
     expect(cloneIcon).toHaveAttribute(
       'title',
-      'Permission to clone Task denied',
+      'Clone Task command unavailable',
     );
     fireEvent.click(cloneIcon);
     expect(handleTaskClone).not.toHaveBeenCalled();

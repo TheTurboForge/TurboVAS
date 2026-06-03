@@ -95,14 +95,6 @@ export interface TaskElement extends ModelElement {
       timestamp?: string;
     };
   };
-  observers?:
-    | string
-    | {
-        __text?: string;
-        user?: string | string[];
-        role?: {_id?: string; name: string}[];
-        group?: {_id?: string; name: string}[];
-      };
   preferences?: {
     preference?: TaskPreferenceElement | TaskPreferenceElement[];
   };
@@ -163,11 +155,6 @@ export interface TaskSlave {
   id?: string;
 }
 
-export interface TaskObservers {
-  user?: string[];
-  role?: string[];
-  group?: string[];
-}
 
 export interface TaskReport {
   entityType: 'report';
@@ -192,7 +179,6 @@ export interface TaskProperties extends ModelProperties {
   config?: Model;
   current_report?: TaskReport;
   last_report?: TaskReport;
-  observers?: TaskObservers;
   preferences?: TaskPreferences;
   progress?: number;
   report_count?: ReportCount;
@@ -307,7 +293,6 @@ class Task extends Model {
   readonly acceptInvalidCerts?: boolean;
   readonly registryAllowInsecure?: boolean;
   readonly csAllowFailedRetrieval?: boolean;
-  readonly observers?: TaskObservers;
   readonly preferences: TaskPreferences;
   readonly progress?: number;
   readonly report_count?: ReportCount;
@@ -349,7 +334,6 @@ class Task extends Model {
     acceptInvalidCerts,
     registryAllowInsecure,
     csAllowFailedRetrieval,
-    observers,
     preferences = {},
     progress,
     // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -386,7 +370,6 @@ class Task extends Model {
     this.acceptInvalidCerts = acceptInvalidCerts;
     this.registryAllowInsecure = registryAllowInsecure;
     this.csAllowFailedRetrieval = csAllowFailedRetrieval;
-    this.observers = observers;
     this.preferences = preferences;
     this.progress = progress;
     this.report_count = report_count;
@@ -426,29 +409,6 @@ class Task extends Model {
       };
     }
 
-    if (isDefined(element.observers)) {
-      copy.observers = {};
-      if (isString(element.observers)) {
-        copy.observers.user = isEmpty(element.observers)
-          ? undefined
-          : element.observers.split(' ');
-      } else {
-        if (isDefined(element.observers?.__text)) {
-          copy.observers.user = isEmpty(element.observers.__text)
-            ? undefined
-            : (parseToString(element.observers.__text) as string).split(' ');
-        }
-        if (isDefined(element.observers.role)) {
-          copy.observers.role = map(element.observers.role, role => role.name);
-        }
-        if (isDefined(element.observers.group)) {
-          copy.observers.group = map(
-            element.observers.group,
-            group => group.name,
-          );
-        }
-      }
-    }
 
     copy.alterable = isDefined(element.alterable)
       ? parseYesNo(element.alterable)

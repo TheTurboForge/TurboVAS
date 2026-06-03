@@ -74,14 +74,8 @@ describe('TrashCanCommand tests', () => {
         get_filters_response: {
           filter: [{_id: 'filter1'}, {_id: 'filter2'}],
         },
-        get_groups_response: {
-          group: [{_id: 'group1'}, {_id: 'group2'}],
-        },
         get_overrides_response: {
           override: [{_id: 'override1'}, {_id: 'override2'}],
-        },
-        get_permissions_response: {
-          permission: [{_id: 'perm1'}, {_id: 'perm2'}],
         },
         get_port_lists_response: {
           port_list: {_id: 'portlist1'},
@@ -91,9 +85,6 @@ describe('TrashCanCommand tests', () => {
         },
         get_report_formats_response: {
           report_format: [{_id: 'reportformat1'}, {_id: 'reportformat2'}],
-        },
-        get_roles_response: {
-          role: [{_id: 'role1'}, {_id: 'role2'}],
         },
         get_scanners_response: {
           scanner: {_id: 'scanner1'},
@@ -118,13 +109,10 @@ describe('TrashCanCommand tests', () => {
     expect(data.data.alerts.length).toBe(2);
     expect(data.data.credentials.length).toBe(2);
     expect(data.data.filters.length).toBe(2);
-    expect(data.data.groups.length).toBe(2);
     expect(data.data.overrides.length).toBe(2);
-    expect(data.data.permissions.length).toBe(2);
     expect(data.data.portLists.length).toBe(1);
     expect(data.data.reportConfigs.length).toBe(1);
     expect(data.data.reportFormats.length).toBe(2);
-    expect(data.data.roles.length).toBe(2);
     expect(data.data.scanConfigs.length).toBe(1);
     expect(data.data.scanners.length).toBe(1);
     expect(data.data.schedules.length).toBe(1);
@@ -148,7 +136,6 @@ describe('TrashCanCommand tests', () => {
     const data = await cmd.get({agentGroups: true});
     expect(data.data.agentGroups.length).toBe(2);
   });
-
 
   test('should handle failed requests gracefully', async () => {
     const response = createResponse({

@@ -250,9 +250,9 @@ describe('TargetDetailsPageToolBarIcons tests', () => {
     );
 
     const cloneIcon = screen.getAllByTitle('Clone Target');
-    const editIcon = screen.getAllByTitle('Permission to edit Target denied');
+    const editIcon = screen.getAllByTitle('Edit Target command unavailable');
     const deleteIcon = screen.getAllByTitle(
-      'Permission to move Target to trashcan denied',
+      'Move Target to trashcan command unavailable',
     );
     const exportIcon = screen.getAllByTitle('Export Target as XML');
 

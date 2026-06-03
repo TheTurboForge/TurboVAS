@@ -7,9 +7,7 @@ import React from 'react';
 import {useNavigate} from 'react-router';
 import type Gmp from 'gmp/gmp';
 import Filter from 'gmp/models/filter';
-import type Model from 'gmp/models/model';
 import type Override from 'gmp/models/override';
-import type Permission from 'gmp/models/permission';
 import type Task from 'gmp/models/task';
 import {isDefined} from 'gmp/utils/identity';
 import {TaskIcon} from 'web/components/icon';
@@ -34,18 +32,12 @@ import TableData from 'web/components/table/TableData';
 import TableRow from 'web/components/table/TableRow';
 import EntitiesTab from 'web/entity/EntitiesTab';
 import EntityPage from 'web/entity/EntityPage';
-import EntityPermissions, {
-  type EntityPermissionsProps,
-} from 'web/entity/EntityPermissions';
 import {type OnDownloadedFunc} from 'web/entity/hooks/useEntityDownload';
 import {goToDetails, goToList} from 'web/entity/navigation';
 import EntityTags from 'web/entity/Tags';
-import withEntityContainer, {
-  permissionsResourceFilter,
-} from 'web/entity/withEntityContainer';
+import withEntityContainer from 'web/entity/withEntityContainer';
 import useFeatures from 'web/hooks/useFeatures';
 import useTranslation from 'web/hooks/useTranslation';
-import {TARGET_RESOURCE_PROPERTIES_NAMES} from 'web/pages/targets/TargetComponent';
 import TaskDetailsPageToolBarIcons from 'web/pages/tasks/icons/TaskDetailsPageToolBarIcons';
 import TaskComponent from 'web/pages/tasks/TaskComponent';
 import TaskDetails from 'web/pages/tasks/TaskDetails';
@@ -55,15 +47,10 @@ import {
   loadEntities as loadOverrides,
 } from 'web/store/entities/overrides';
 import {
-  selector as permissionsSelector,
-  loadEntities as loadPermissions,
-} from 'web/store/entities/permissions';
-import {
   selector as taskSelector,
   loadEntity as loadTask,
 } from 'web/store/entities/tasks';
 import {renderYesNo} from 'web/utils/Render';
-import withComponentDefaults from 'web/utils/withComponentDefaults';
 
 interface DetailsProps {
   entity: Task;
@@ -73,7 +60,6 @@ interface DetailsProps {
 interface TaskDetailsPageProps {
   entity: Task;
   overrides?: Override[];
-  permissions?: Permission[];
   isLoading?: boolean;
   onChanged?: () => void;
   onDownloaded?: OnDownloadedFunc;
@@ -136,7 +122,6 @@ const Details = ({entity, links}: DetailsProps) => {
 
 const TaskDetailsPage = ({
   entity,
-  permissions = [],
   overrides = [],
   isLoading = false,
   onChanged,
@@ -215,9 +200,6 @@ const TaskDetailsPage = ({
                       <EntitiesTab entities={entity.userTags}>
                         {_('User Tags')}
                       </EntitiesTab>
-                      <EntitiesTab entities={permissions}>
-                        {_('Permissions')}
-                      </EntitiesTab>
                     </TabList>
                   </TabLayout>
 
@@ -233,15 +215,6 @@ const TaskDetailsPage = ({
                           onError={onError}
                         />
                       </TabPanel>
-                      <TabPanel>
-                        <TaskPermissions
-                          entity={entity}
-                          permissions={permissions}
-                          onChanged={onChanged}
-                          onDownloaded={onDownloaded}
-                          onError={onError}
-                        />
-                      </TabPanel>
                     </TabPanels>
                   </Tabs>
                 </TabsContainer>
@@ -254,61 +227,22 @@ const TaskDetailsPage = ({
   );
 };
 
-export const TaskPermissions = withComponentDefaults<
-  EntityPermissionsProps<Task>
->({
-  relatedResourcesLoaders: [
-    ({entity}: {entity: Task}) =>
-      isDefined(entity.alerts)
-        ? Promise.resolve([...entity.alerts])
-        : Promise.resolve([]),
-    ({entity}: {entity: Task}) => {
-      const resources = [entity.config, entity.scanner, entity.schedule].filter(
-        isDefined,
-      );
-      return Promise.resolve(resources);
-    },
-    ({entity, gmp}: {entity: Task; gmp: Gmp}) => {
-      if (isDefined(entity.target)) {
-        return gmp.target
-          .get({id: entity.target.id as string})
-          .then(response => {
-            const target = response.data;
-            const resources: Model[] = [target];
-
-            for (const name of TARGET_RESOURCE_PROPERTIES_NAMES) {
-              const cred = target[name];
-              if (isDefined(cred)) {
-                resources.push(cred);
-              }
-            }
-            return resources;
-          });
-      }
-      return Promise.resolve([]);
-    },
-  ],
-})(EntityPermissions<Task>);
 
 const taskIdFilter = (id: string) => Filter.fromString('task_id=' + id).all();
 
 const mapStateToProps = (rootState: unknown, {id}: {id: string}) => {
-  const permSel = permissionsSelector(rootState);
   const overridesSel = overridesSelector(rootState);
   return {
     overrides: overridesSel.getEntities(taskIdFilter(id)),
-    permissions: permSel.getEntities(permissionsResourceFilter(id)),
   };
 };
 
 const load = (gmp: Gmp) => {
   const loadTaskFunc = loadTask(gmp);
-  const loadPermissionsFunc = loadPermissions(gmp);
   const loadOverridesFunc = loadOverrides(gmp);
   return (id: string) => dispatch =>
     Promise.all([
       dispatch(loadTaskFunc(id)),
-      dispatch(loadPermissionsFunc(permissionsResourceFilter(id))),
       dispatch(loadOverridesFunc(taskIdFilter(id))),
     ]);
 };

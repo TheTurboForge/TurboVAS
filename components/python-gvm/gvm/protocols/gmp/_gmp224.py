@@ -33,7 +33,6 @@ from .requests.v224 import (
     FeedType,
     Filters,
     FilterType,
-    Groups,
     Help,
     HelpFormat,
     Hosts,
@@ -42,15 +41,12 @@ from .requests.v224 import (
     Nvts,
     OperatingSystems,
     Overrides,
-    Permissions,
-    PermissionSubjectType,
     PortLists,
     PortRangeType,
     ReportFormats,
     ReportFormatType,
     Reports,
     Results,
-    Roles,
     ScanConfigs,
     Scanners,
     ScannerType,
@@ -88,7 +84,6 @@ _TYPE_FIELDS = [
     InfoType,
     HelpFormat,
     PortRangeType,
-    PermissionSubjectType,
     ReportFormatType,
     ScannerType,
     SnmpAuthAlgorithm,
@@ -920,27 +915,17 @@ class GMPv224(GvmProtocol[T]):
         name: str,
         *,
         password: str | None = None,
-        hosts: list[str] | None = None,
-        hosts_allow: bool | None = False,
-        role_ids: list[EntityID] | None = None,
     ) -> T:
         """Create a new user
 
         Args:
             name: Name of the user
             password: Password of the user
-            hosts: A list of host addresses (IPs, DNS names)
-            hosts_allow: If True allow only access to passed hosts otherwise
-                deny access. Default is False for deny hosts.
-            role_ids: A list of role UUIDs for the user
         """
         return self._send_request_and_transform_response(
             Users.create_user(
                 name,
                 password=password,
-                hosts=hosts,
-                hosts_allow=hosts_allow,
-                role_ids=role_ids,
             )
         )
 
@@ -952,10 +937,6 @@ class GMPv224(GvmProtocol[T]):
         comment: str | None = None,
         password: str | None = None,
         auth_source: UserAuthType | None = None,
-        role_ids: list[EntityID] | None = None,
-        hosts: list[str] | None = None,
-        hosts_allow: bool | None = False,
-        group_ids: list[EntityID] | None = None,
     ) -> T:
         """Modify an existing user.
 
@@ -969,15 +950,6 @@ class GMPv224(GvmProtocol[T]):
             comment: Comment on the user.
             password: The password for the user.
             auth_source: Source allowed for authentication for this user.
-            roles_id: List of roles UUIDs for the user.
-            hosts: User access rules: List of hosts.
-            hosts_allow: Defines how the hosts list is to be interpreted.
-                If False (default) the list is treated as a deny list.
-                All hosts are allowed by default except those provided by
-                the hosts parameter. If True the list is treated as a
-                allow list. All hosts are denied by default except those
-                provided by the hosts parameter.
-            group_ids: List of group UUIDs for the user.
         """
         return self._send_request_and_transform_response(
             Users.modify_user(
@@ -986,10 +958,6 @@ class GMPv224(GvmProtocol[T]):
                 comment=comment,
                 password=password,
                 auth_source=auth_source,
-                role_ids=role_ids,
-                hosts=hosts,
-                hosts_allow=hosts_allow,
-                group_ids=group_ids,
             )
         )
 
@@ -1980,104 +1948,6 @@ class GMPv224(GvmProtocol[T]):
             )
         )
 
-    def clone_group(self, group_id: EntityID) -> T:
-        """Clone an existing group
-
-        Args:
-            group_id: UUID of an existing group to clone from
-        """
-        return self._send_request_and_transform_response(
-            Groups.clone_group(group_id)
-        )
-
-    def create_group(
-        self,
-        name: str,
-        *,
-        comment: str | None = None,
-        special: bool | None = False,
-        users: list[str] | None = None,
-    ) -> T:
-        """Create a new group
-
-        Args:
-            name: Name of the new group
-            comment: Comment for the group
-            special: Create permission giving members full access to each
-                other's entities
-            users: List of user names to be in the group
-        """
-        return self._send_request_and_transform_response(
-            Groups.create_group(
-                name, comment=comment, special=special, users=users
-            )
-        )
-
-    def delete_group(
-        self, group_id: EntityID, *, ultimate: bool | None = False
-    ) -> T:
-        """Deletes an existing group
-
-        Args:
-            group_id: UUID of the group to be deleted.
-            ultimate: Whether to remove entirely, or to the trashcan.
-        """
-        return self._send_request_and_transform_response(
-            Groups.delete_group(group_id, ultimate=ultimate)
-        )
-
-    def get_groups(
-        self,
-        *,
-        filter_string: str | None = None,
-        filter_id: EntityID | None = None,
-        trash: bool | None = None,
-    ) -> T:
-        """Request a list of groups
-
-        Args:
-            filter_string: Filter term to use for the query
-            filter_id: UUID of an existing filter to use for the query
-            trash: Whether to get the trashcan groups instead
-        """
-        return self._send_request_and_transform_response(
-            Groups.get_groups(
-                filter_string=filter_string, filter_id=filter_id, trash=trash
-            )
-        )
-
-    def get_group(self, group_id: EntityID) -> T:
-        """Request a single group
-
-        Args:
-            group_id: UUID of an existing group
-        """
-        return self._send_request_and_transform_response(
-            Groups.get_group(group_id)
-        )
-
-    def modify_group(
-        self,
-        group_id: EntityID,
-        *,
-        comment: str | None = None,
-        name: str | None = None,
-        users: list[str] | None = None,
-    ) -> T:
-        """Modifies an existing group.
-
-        Args:
-            group_id: UUID of group to modify.
-            comment: Comment on group.
-            name: Name of group.
-            users: List of user names to be in the group
-        """
-        return self._send_request_and_transform_response(
-            Groups.modify_group(
-                group_id, comment=comment, name=name, users=users
-            )
-        )
-
     def create_host(self, name: str, *, comment: str | None = None) -> T:
         """Create a new host host
 
@@ -2209,126 +2079,6 @@ class GMPv224(GvmProtocol[T]):
         return self._send_request_and_transform_response(
             OperatingSystems.modify_operating_system(
                 operating_system_id, comment=comment
-            )
-        )
-
-    def clone_permission(self, permission_id: EntityID) -> T:
-        """Clone an existing permission
-
-        Args:
-            permission_id: UUID of an existing permission to clone from
-        """
-        return self._send_request_and_transform_response(
-            Permissions.clone_permission(permission_id)
-        )
-
-    def create_permission(
-        self,
-        name: str,
-        subject_id: EntityID,
-        subject_type: PermissionSubjectType | str,
-        *,
-        resource_id: str | None = None,
-        resource_type: EntityType | str | None = None,
-        comment: str | None = None,
-    ) -> T:
-        """Create a new permission
-
-        Args:
-            name: Name of the new permission
-            subject_id: UUID of subject to whom the permission is granted
-            subject_type: Type of the subject user, group or role
-            comment: Comment for the permission
-            resource_id: UUID of entity to which the permission applies
-            resource_type: Type of the resource. For Super permissions user,
-                group or role
-        """
-        return self._send_request_and_transform_response(
-            Permissions.create_permission(
-                name,
-                subject_id,
-                subject_type,
-                resource_id=resource_id,
-                resource_type=resource_type,
-                comment=comment,
-            )
-        )
-
-    def delete_permission(
-        self, permission_id: EntityID, *, ultimate: bool | None = False
-    ) -> T:
-        """Deletes an existing permission
-
-        Args:
-            permission_id: UUID of the permission to be deleted.
-            ultimate: Whether to remove entirely, or to the trashcan.
-        """
-        return self._send_request_and_transform_response(
-            Permissions.delete_permission(permission_id, ultimate=ultimate)
-        )
-
-    def get_permissions(
-        self,
-        *,
-        filter_string: str | None = None,
-        filter_id: str | None = None,
-        trash: bool | None = None,
-    ) -> T:
-        """Request a list of permissions
-
-        Args:
-            filter_string: Filter term to use for the query
-            filter_id: UUID of an existing filter to use for the query
-            trash: Whether to get permissions in the trashcan instead
-        """
-        return self._send_request_and_transform_response(
-            Permissions.get_permissions(
-                filter_string=filter_string, filter_id=filter_id, trash=trash
-            )
-        )
-
-    def get_permission(self, permission_id: EntityID) -> T:
-        """Request a single permission
-
-        Args:
-            permission_id: UUID of an existing permission
-        """
-        return self._send_request_and_transform_response(
-            Permissions.get_permission(permission_id)
-        )
-
-    def modify_permission(
-        self,
-        permission_id: EntityID,
-        *,
-        comment: str | None = None,
-        name: str | None = None,
-        resource_id: EntityID | None = None,
-        resource_type: EntityType | str | None = None,
-        subject_id: EntityID | None = None,
-        subject_type: PermissionSubjectType | str | None = None,
-    ) -> T:
-        """Modifies an existing permission.
-
-        Args:
-            permission_id: UUID of permission to be modified.
-            comment: The comment on the permission.
-            name: Permission name, currently the name of a command.
-            subject_id: UUID of subject to whom the permission is granted
-            subject_type: Type of the subject user, group or role
-            resource_id: UUID of entity to which the permission applies
-            resource_type: Type of the resource. For Super permissions user,
-                group or role
-        """
-        return self._send_request_and_transform_response(
-            Permissions.modify_permission(
-                permission_id,
-                comment=comment,
-                name=name,
-                resource_id=resource_id,
-                resource_type=resource_type,
-                subject_id=subject_id,
-                subject_type=subject_type,
             )
         )
 
@@ -2465,95 +2215,6 @@ class GMPv224(GvmProtocol[T]):
                     override_details=override_details,
                     details=details,
             )
-        )
-
-    def clone_role(self, role_id: EntityID) -> T:
-        """Clone an existing role
-
-        Args:
-            role_id: UUID of an existing role to clone from
-        """
-        return self._send_request_and_transform_response(
-            Roles.clone_role(role_id)
-        )
-
-    def create_role(
-        self,
-        name: str,
-        *,
-        comment: str | None = None,
-        users: list[str] | None = None,
-    ) -> T:
-        """Create a new role
-
-        Args:
-            name: Name of the role
-            comment: Comment for the role
-            users: List of user names to add to the role
-        """
-        return self._send_request_and_transform_response(
-            Roles.create_role(name, comment=comment, users=users)
-        )
-
-    def delete_role(self, role_id: str, *, ultimate: bool | None = False) -> T:
-        """Deletes an existing role
-
-        Args:
-            role_id: UUID of the role to be deleted.
-            ultimate: Whether to remove entirely, or to the trashcan.
-        """
-        return self._send_request_and_transform_response(
-            Roles.delete_role(role_id, ultimate=ultimate)
-        )
-
-    def get_roles(
-        self,
-        *,
-        filter_string: str | None = None,
-        filter_id: EntityID | None = None,
-        trash: bool | None = None,
-    ) -> T:
-        """Request a list of roles
-
-        Args:
-            filter_string: Filter term to use for the query
-            filter_id: UUID of an existing filter to use for the query
-            trash: Whether to get the trashcan roles instead
-        """
-        return self._send_request_and_transform_response(
-            Roles.get_roles(
-                filter_string=filter_string, filter_id=filter_id, trash=trash
-            )
-        )
-
-    def get_role(self, role_id: EntityID) -> T:
-        """Request a single role
-
-        Args:
-            role_id: UUID of an existing role
-        """
-        return self._send_request_and_transform_response(
-            Roles.get_role(role_id)
-        )
-
-    def modify_role(
-        self,
-        role_id: EntityID,
-        *,
-        comment: str | None = None,
-        name: str | None = None,
-        users: list[str] | None = None,
-    ) -> T:
-        """Modifies an existing role.
-
-        Args:
-            role_id: UUID of role to modify.
-            comment: Name of role.
-            name: Comment on role.
-            users: List of user names.
-        """
-        return self._send_request_and_transform_response(
-            Roles.modify_role(role_id, comment=comment, name=name, users=users)
         )
 
     def clone_schedule(self, schedule_id: EntityID) -> T:
@@ -3220,7 +2881,6 @@ class GMPv224(GvmProtocol[T]):
         alert_ids: Sequence[EntityID] | None = None,
         comment: str | None = None,
         schedule_periods: int | None = None,
-        observers: Sequence[str] | None = None,
         preferences: Mapping[str, SupportsStr] | None = None,
     ) -> T:
         """Create a new scan task
@@ -3237,7 +2897,6 @@ class GMPv224(GvmProtocol[T]):
             schedule_id: UUID of a schedule when the task should be run.
             schedule_periods: A limit to the number of times the task will be
                 scheduled, or 0 for no limit
-            observers: List of names or ids of users which should be allowed to
                 observe this task
             preferences: Name/Value pairs of scanner preferences.
         """
@@ -3253,7 +2912,6 @@ class GMPv224(GvmProtocol[T]):
                 alert_ids=alert_ids,
                 comment=comment,
                 schedule_periods=schedule_periods,
-                observers=observers,
                 preferences=preferences,
             )
         )
@@ -3328,7 +2986,6 @@ class GMPv224(GvmProtocol[T]):
         schedule_periods: int | None = None,
         comment: str | None = None,
         alert_ids: Sequence[EntityID] | None = None,
-        observers: Sequence[str] | None = None,
         preferences: Mapping[str, SupportsStr] | None = None,
     ) -> T:
         """Modifies an existing task.
@@ -3345,7 +3002,6 @@ class GMPv224(GvmProtocol[T]):
             schedule_id: UUID of a schedule when the task should be run.
             schedule_periods: A limit to the number of times the task will be
                 scheduled, or 0 for no limit.
-            observers: List of names or ids of users which should be allowed to
                 observe this task
             preferences: Name/Value pairs of scanner preferences.
         """
@@ -3362,7 +3018,6 @@ class GMPv224(GvmProtocol[T]):
                 schedule_periods=schedule_periods,
                 comment=comment,
                 alert_ids=alert_ids,
-                observers=observers,
                 preferences=preferences,
             )
         )

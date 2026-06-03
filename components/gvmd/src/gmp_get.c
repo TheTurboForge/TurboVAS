@@ -343,60 +343,11 @@ send_get_common (const char *type, get_data_t *get, iterator_t *iterator,
                             writable,
                             in_use);
 
-  if (/* The user is the owner. */
-      (current_credentials.username
-       && get_iterator_owner_name (iterator)
-       && (strcmp (get_iterator_owner_name (iterator),
-                   current_credentials.username)
-           == 0))
-      /* Or the user is effectively the owner. */
-      || acl_user_has_super (current_credentials.uuid,
-                             get_iterator_owner (iterator))
-      /* Or the user has Admin rights and the resource is a permission or a
-       * report format... */
-      || (current_credentials.uuid
-          && ((strcmp (type, "permission") == 0)
-              && get_iterator_uuid (iterator)
-              /* ... but not the special Admin permission. */
-              && permission_is_admin (get_iterator_uuid (iterator)))
-          && acl_user_can_everything (current_credentials.uuid)))
-    {
-      buffer_xml_append_printf (buffer,
-                                "<permission>"
-                                "<name>Everything</name>"
-                                "</permission>"
-                                "</permissions>");
-    }
-  else if (current_credentials.uuid
-           && (strcmp (type, "user") == 0)
-           && acl_user_can_super_everyone (get_iterator_uuid (iterator))
-           && strcmp (get_iterator_uuid (iterator), current_credentials.uuid))
-    {
-      /* Resource is the Super Admin. */
-      buffer_xml_append_printf (buffer,
-                                "<permission><name>get_users</name></permission>"
-                                "</permissions>");
-    }
-  else
-    {
-      iterator_t perms;
-      get_data_t perms_get;
-
-      memset (&perms_get, '\0', sizeof (perms_get));
-      perms_get.filter = g_strdup_printf ("resource_uuid=%s"
-                                          " owner=any"
-                                          " permission=any",
-                                          get_iterator_uuid (iterator));
-      init_permission_iterator (&perms, &perms_get);
-      g_free (perms_get.filter);
-      while (next (&perms))
-        buffer_xml_append_printf (buffer,
-                                  "<permission><name>%s</name></permission>",
-                                  get_iterator_name (&perms));
-      cleanup_iterator (&perms);
-
-      buffer_xml_append_printf (buffer, "</permissions>");
-    }
+  buffer_xml_append_printf (buffer,
+                            "<permission>"
+                            "<name>Everything</name>"
+                            "</permission>"
+                            "</permissions>");
 
   tag_type = get->subtype ? get->subtype : get->type;
 

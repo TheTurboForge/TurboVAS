@@ -65,7 +65,7 @@ const TaskResumeIcon = <TTask extends Task>({
     return (
       <ResumeIcon
         active={false}
-        title={_('Permission to resume {{type}} denied', {type})}
+        title={_('Resume {{type}} command unavailable', {type})}
       />
     );
   }

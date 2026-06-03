@@ -29,16 +29,12 @@ gsad_init_validator ()
                      "|(create_credential)"
                      "|(create_alert)"
                      "|(create_filter)"
-                     "|(create_group)"
                      "|(create_host)"
                      "|(create_override)"
-                     "|(create_permission)"
-                     "|(create_permissions)"
                      "|(create_port_list)"
                      "|(create_port_range)"
                      "|(create_report)"
                      "|(create_report_config)"
-                     "|(create_role)"
                      "|(create_scanner)"
                      "|(create_schedule)"
                      "|(create_tag)"
@@ -57,15 +53,12 @@ gsad_init_validator ()
                      "|(delete_alert)"
                      "|(delete_filter)"
                      "|(delete_from_trash)"
-                     "|(delete_group)"
                      "|(delete_override)"
-                     "|(delete_permission)"
                      "|(delete_port_list)"
                      "|(delete_port_range)"
                      "|(delete_report)"
                      "|(delete_report_config)"
                      "|(delete_report_format)"
-                     "|(delete_role)"
                      "|(delete_scanner)"
                      "|(delete_schedule)"
                      "|(delete_tag)"
@@ -92,13 +85,9 @@ gsad_init_validator ()
                      "|(export_credentials)"
                      "|(export_filter)"
                      "|(export_filters)"
-                     "|(export_group)"
-                     "|(export_groups)"
                      "|(export_omp_doc)"
                      "|(export_override)"
                      "|(export_overrides)"
-                     "|(export_permission)"
-                     "|(export_permissions)"
                      "|(export_port_list)"
                      "|(export_port_lists)"
                      "|(export_preference_file)"
@@ -108,8 +97,6 @@ gsad_init_validator ()
                      "|(export_report_formats)"
                      "|(export_result)"
                      "|(export_results)"
-                     "|(export_role)"
-                     "|(export_roles)"
                      "|(export_scanner)"
                      "|(export_scanners)"
                      "|(export_schedule)"
@@ -146,15 +133,11 @@ gsad_init_validator ()
                      "|(get_feeds)"
                      "|(get_filter)"
                      "|(get_filters)"
-                     "|(get_group)"
-                     "|(get_groups)"
                      "|(get_info)"
                      "|(get_license)"
                      "|(get_nvt_families)"
                      "|(get_override)"
                      "|(get_overrides)"
-                     "|(get_permission)"
-                     "|(get_permissions)"
                      "|(get_port_list)"
                      "|(get_port_lists)"
                      "|(get_report)"
@@ -175,8 +158,6 @@ gsad_init_validator ()
                      "|(get_resource_names)"
                      "|(get_result)"
                      "|(get_results)"
-                     "|(get_role)"
-                     "|(get_roles)"
                      "|(get_scanner)"
                      "|(get_scanners)"
                      "|(get_schedule)"
@@ -199,13 +180,10 @@ gsad_init_validator ()
                      "|(get_trash_configs)"
                      "|(get_trash_credentials)"
                      "|(get_trash_filters)"
-                     "|(get_trash_groups)"
                      "|(get_trash_overrides)"
-                     "|(get_trash_permissions)"
                      "|(get_trash_port_lists)"
                      "|(get_trash_report_configs)"
                      "|(get_trash_report_formats)"
-                     "|(get_trash_roles)"
                      "|(get_trash_scanners)"
                      "|(get_trash_schedules)"
                      "|(get_trash_tags)"
@@ -243,15 +221,12 @@ gsad_init_validator ()
                      "|(save_import_task)"
                      "|(save_credential)"
                      "|(save_filter)"
-                     "|(save_group)"
                      "|(save_license)"
                      "|(save_my_settings)"
                      "|(save_override)"
-                     "|(save_permission)"
                      "|(save_port_list)"
                      "|(save_report_config)"
                      "|(save_report_format)"
-                     "|(save_role)"
                      "|(save_scanner)"
                      "|(save_schedule)"
                      "|(save_tag)"
@@ -380,7 +355,6 @@ gsad_init_validator ()
   gvm_validator_add (validator, "hostport", "^[-_[:alnum:]\\. :]+$");
   gvm_validator_add (validator, "hostpath", "^[-_[:alnum:]\\. :/]+$");
   gvm_validator_add (validator, "hosts", "^[-_[:alnum:],: \\./]+$");
-  gvm_validator_add (validator, "hosts_allow", "^(0|1)$");
   gvm_validator_add (validator, "hosts_opt", "^[-_[:alnum:],: \\./]*$");
   gvm_validator_add (validator, "hour", "^([01]?[0-9]|2[0-3])$");
   gvm_validator_add (validator, "howto_use", "(?s)^.*$");
@@ -456,13 +430,10 @@ gsad_init_validator ()
                      "|closed_cves|os|apps|errors"
                      "|topology|ssl_certs|cves)$");
   gvm_validator_add (validator, "resource_type", "(?s)^.*$");
-  gvm_validator_add (validator, "role", "^[[:alnum:] ]+$");
   gvm_validator_add (validator, "param:name", "^(.*){0,400}$");
   gvm_validator_add (validator, "param:value", "(?s)^.*$");
   gvm_validator_add (validator, "param_using_default:name", "^(.*){0,400}$");
   gvm_validator_add (validator, "param_using_default:value", "(?s)^.*$");
-  gvm_validator_add (validator, "permission", "^([_a-z]+|Super)$");
-  gvm_validator_add (validator, "permission_type", "^(read|write)$");
   gvm_validator_add (validator, "resource_id", "^[[:alnum:]\\-_.:\\/~]*$");
   gvm_validator_add (validator, "resources_action", "^(|add|set|remove)$");
   gvm_validator_add (validator, "optional_resource_type", "(?s)^.*$");
@@ -472,7 +443,6 @@ gsad_init_validator ()
   gvm_validator_add (validator, "method_data:value", "(?s)^.*$");
   gvm_validator_add (validator, "nvt:name", "(?s)^.*$");
   gvm_validator_add (validator, "restrict_credential_type", "^[a-z0-9\\_|]+$");
-  gvm_validator_add (validator, "subject_type", "^(group|role|user)$");
   gvm_validator_add (validator, "summary", "^.*$");
   gvm_validator_add (validator, "tag_name", "^[\\:\\-_[:alnum:], \\./]+$");
   gvm_validator_add (validator, "tag_value",
@@ -557,21 +527,15 @@ gsad_init_validator ()
   gvm_validator_alias (validator, "esxi_credential_id", "id");
   gvm_validator_alias (validator, "filter_id", "id");
   gvm_validator_alias (validator, "format_id", "id");
-  gvm_validator_alias (validator, "group_id", "id");
   gvm_validator_alias (validator, "inheritor_id", "id");
   gvm_validator_alias (validator, "krb5_credential_id", "id");
   gvm_validator_alias (validator, "override_id", "id");
-  gvm_validator_alias (validator, "permission_group_id", "id");
-  gvm_validator_alias (validator, "permission_id", "id");
-  gvm_validator_alias (validator, "permission_role_id", "id");
-  gvm_validator_alias (validator, "permission_user_id", "id");
   gvm_validator_alias (validator, "port_list_id", "id");
   gvm_validator_alias (validator, "port_range_id", "id");
   gvm_validator_alias (validator, "report_config_id", "id");
   gvm_validator_alias (validator, "report_format_id", "id");
   gvm_validator_alias (validator, "report_id", "id");
   gvm_validator_alias (validator, "result_id", "id");
-  gvm_validator_alias (validator, "role_id", "id");
   gvm_validator_alias (validator, "scanner_id", "id");
   gvm_validator_alias (validator, "schedule_id", "id");
   gvm_validator_alias (validator, "setting_id", "id");
@@ -602,8 +566,6 @@ gsad_init_validator ()
   gvm_validator_alias (validator, "alert_id_optional:value", "id_optional");
   gvm_validator_alias (validator, "alert_id_optional", "id_optional");
   gvm_validator_alias (validator, "alert_ids:value", "id_optional");
-  gvm_validator_alias (validator, "group_ids:value", "id_optional");
-  gvm_validator_alias (validator, "role_ids:value", "id_optional");
   gvm_validator_alias (validator, "subject_id_optional", "id_optional");
   gvm_validator_alias (validator, "user_id_optional", "id_optional");
 
@@ -662,8 +624,6 @@ gsad_init_validator ()
   gvm_validator_alias (validator, "force_wizard", "boolean");
   gvm_validator_alias (validator, "get_name", "name");
   gvm_validator_alias (validator, "grant_full", "boolean");
-  gvm_validator_alias (validator, "group_ids:name", "number");
-  gvm_validator_alias (validator, "groups", "optional_number");
   gvm_validator_alias (validator, "hosts_manual", "hosts");
   gvm_validator_alias (validator, "hosts_filter", "filter");
   gvm_validator_alias (validator, "exclude_hosts", "hosts_opt");
@@ -673,7 +633,6 @@ gsad_init_validator ()
   gvm_validator_alias (validator, "include_certificate_data", "boolean");
   gvm_validator_alias (validator, "ignore_pagination", "boolean");
   gvm_validator_alias (validator, "event", "condition");
-  gvm_validator_alias (validator, "access_hosts", "hosts_opt");
   gvm_validator_alias (validator, "max_checks", "number");
   gvm_validator_alias (validator, "max_hosts", "number");
   gvm_validator_alias (validator, "method", "condition");
@@ -723,8 +682,6 @@ gsad_init_validator ()
   gvm_validator_alias (validator, "replace_task_id", "boolean");
   gvm_validator_alias (validator, "reverse_lookup_only", "boolean");
   gvm_validator_alias (validator, "reverse_lookup_unify", "boolean");
-  gvm_validator_alias (validator, "role_ids:name", "number");
-  gvm_validator_alias (validator, "roles", "optional_number");
   gvm_validator_alias (validator, "period", "optional_number");
   gvm_validator_alias (validator, "period_unit", "calendar_unit");
   gvm_validator_alias (validator, "scanner_host", "hostpath");

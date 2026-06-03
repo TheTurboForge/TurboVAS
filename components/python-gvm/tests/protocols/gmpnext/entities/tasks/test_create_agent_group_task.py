@@ -173,23 +173,6 @@ class GmpCreateAgentGroupTaskTestMixin:
             b"</create_task>"
         )
 
-    def test_create_agent_group_task_with_observers(self):
-        self.gmp.create_agent_group_task(
-            name="foo",
-            agent_group_id="ag1",
-            scanner_id="s1",
-            observers=["u1", "u2"],
-        )
-
-        self.connection.send.has_been_called_with(
-            b"<create_task>"
-            b"<name>foo</name>"
-            b"<usage_type>scan</usage_type>"
-            b'<agent_group id="ag1"/>'
-            b'<scanner id="s1"/>'
-            b"<observers>u1,u2</observers>"
-            b"</create_task>"
-        )
 
     def test_create_agent_group_task_with_preferences(self):
         self.gmp.create_agent_group_task(

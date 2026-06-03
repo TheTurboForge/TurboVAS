@@ -660,177 +660,23 @@ manage_create_sql_functions ()
 
   sql ("CREATE OR REPLACE FUNCTION user_has_super_on_resource (arg_type text, arg_id integer)"
        " RETURNS boolean AS $$"
-       /* Test whether a user has super permissions on a resource.
-        *
-        * This must match user_has_super_on_resource in manage_acl.c. */
-       " DECLARE"
-       "   owns boolean;"
-       " BEGIN"
-       "   EXECUTE"
-       "   'SELECT"
-       "    EXISTS (SELECT * FROM permissions"
-       "            WHERE name = ''Super''"
-       /*                Super on everyone. */
-       "            AND ((resource = 0)"
-       /*                Super on other_user. */
-       "                 OR ((resource_type = ''user'')"
-       "                     AND (resource = (SELECT '"
-       "                                      || quote_ident_split($1 || 's')"
-       "                                      || '.owner'"
-       "                                      || ' FROM '"
-       "                                      || quote_ident_split($1 || 's')"
-       "                                      || ' WHERE id = $2)))"
-       /*                Super on other_user's role. */
-       "                 OR ((resource_type = ''role'')"
-       "                     AND (resource"
-       "                          IN (SELECT DISTINCT role"
-       "                              FROM role_users"
-       "                              WHERE \"user\""
-       "                                    = (SELECT '"
-       "                                       || quote_ident_split($1 || 's')"
-       "                                       || '.owner'"
-       "                                       || ' FROM '"
-       "                                       || quote_ident_split($1 || 's')"
-       "                                       || ' WHERE id = $2))))"
-       /*                Super on other_user's group. */
-       "                 OR ((resource_type = ''group'')"
-       "                     AND (resource"
-       "                          IN (SELECT DISTINCT \"group\""
-       "                              FROM group_users"
-       "                              WHERE \"user\""
-       "                                    = (SELECT '"
-       "                                       || quote_ident_split($1 || 's')"
-       "                                       || '.owner'"
-       "                                       || ' FROM '"
-       "                                       || quote_ident_split($1 || 's')"
-       "                                       || ' WHERE id = $2)))))"
-       "            AND subject_location = " G_STRINGIFY (LOCATION_TABLE)
-       "            AND ((subject_type = ''user''"
-       "                  AND subject = gvmd_user ())"
-       "                 OR (subject_type = ''group''"
-       "                     AND subject"
-       "                         IN (SELECT DISTINCT \"group\""
-       "                             FROM group_users"
-       "                             WHERE \"user\" = gvmd_user ()))"
-       "                 OR (subject_type = ''role''"
-       "                     AND subject"
-       "                         IN (SELECT DISTINCT role"
-       "                             FROM role_users"
-       "                             WHERE \"user\" = gvmd_user ()))))'"
-       "   USING arg_type, arg_id"
-       "   INTO owns;"
-       "   RETURN owns;"
-       " END;"
-       "$$ LANGUAGE plpgsql;");
+       "  SELECT EXISTS (SELECT 1 FROM users WHERE users.id = gvmd_user ());"
+       "$$ LANGUAGE SQL"
+       " STABLE;");
 
   sql ("CREATE OR REPLACE FUNCTION user_owns (arg_type text, arg_id integer)"
        " RETURNS boolean AS $$"
-       /* Test whether a user owns a resource.
-        *
-        * This must match user_owns in manage_acl.c. */
-       " DECLARE"
-       "   owns boolean;"
-       " BEGIN"
-       "   CASE"
-       "   WHEN arg_type = 'nvt'"
-       "        OR arg_type = 'cve'"
-       "        OR arg_type = 'cpe'"
-       "        OR arg_type = 'cert_bund_adv'"
-       "        OR arg_type = 'dfn_cert_adv'"
-       "   THEN RETURN true;"
-       "   WHEN user_has_super_on_resource (arg_type, arg_id)"
-       "   THEN RETURN true;"
-       "   WHEN arg_type = 'result'"
-       "   THEN CASE"
-       "        WHEN EXISTS (SELECT * FROM results, reports"
-       "                     WHERE results.id = arg_id"
-       "                     AND results.report = reports.id"
-       "                     AND ((reports.owner IS NULL)"
-       "                          OR (reports.owner = gvmd_user ())))"
-       "        THEN RETURN true;"
-       "        ELSE RETURN false;"
-       "        END CASE;"
-       "   WHEN arg_type = 'task'"
-       "   THEN CASE"
-       "        WHEN EXISTS (SELECT * FROM tasks"
-       "                     WHERE id = arg_id"
-       "                     AND hidden < 2"
-       "                     AND ((owner IS NULL)"
-       "                          OR (owner = gvmd_user ())))"
-       "        THEN RETURN true;"
-       "        ELSE RETURN false;"
-       "        END CASE;"
-       "   ELSE EXECUTE"
-       "        'SELECT"
-       "         EXISTS (SELECT *"
-       "                 FROM ' || quote_ident_split ($1 || 's') || '"
-       "                 WHERE id = $2"
-       "                 AND ((owner IS NULL)"
-       "                      OR (owner = gvmd_user ())))'"
-       "        USING arg_type, arg_id"
-       "        INTO owns;"
-       "        RETURN owns;"
-       "   END CASE;"
-       " END;"
-       "$$ LANGUAGE plpgsql;");
+       "  SELECT EXISTS (SELECT 1 FROM users WHERE users.id = gvmd_user ());"
+       "$$ LANGUAGE SQL"
+       " STABLE;");
 
   sql ("CREATE OR REPLACE FUNCTION user_has_access_uuid (arg_type text,"
        "                                                 arg_uuid text,"
        "                                                 arg_permission text,"
        "                                                 arg_trash integer)"
        " RETURNS boolean AS $$"
-       " DECLARE"
-       "  resource bigint;"
-       "  task_uuid text;"
-       "  is_get boolean;"
-       "  user_id bigint;"
-       "  ret boolean;"
-       " BEGIN"
-       "  EXECUTE"
-       "    'SELECT id FROM ' || quote_ident_split($1 || 's') || '"
-       "     WHERE uuid = $2'"
-       "    USING arg_type, arg_uuid"
-       "    INTO resource;"
-       "  ret = user_owns (arg_type, resource::integer);"
-       "  IF (ret)"
-       "  THEN"
-       "    RETURN ret;"
-       "  END IF;"
-       "  CASE"
-       "  WHEN arg_type = 'result'"
-       "  THEN"
-       "    task_uuid = (SELECT uuid FROM tasks"
-       "                WHERE id = (SELECT task FROM results"
-       "                             WHERE uuid = arg_uuid));"
-       "  WHEN arg_type = 'report'"
-       "  THEN"
-       "    task_uuid = (SELECT uuid FROM tasks"
-       "                WHERE id = (SELECT task FROM reports"
-       "                             WHERE uuid = arg_uuid));"
-       "  ELSE"
-       "    task_uuid = null;"
-       "  END CASE;"
-       "  is_get = substr (arg_permission, 0, 4) = 'get';"
-       "  user_id = gvmd_user ();"
-       "  ret = (SELECT count(*) FROM permissions"
-       "          WHERE resource_uuid = coalesce (task_uuid, arg_uuid)"
-       "            AND subject_location = " G_STRINGIFY (LOCATION_TABLE)
-       "            AND ((subject_type = 'user'"
-       "                  AND subject = user_id)"
-       "                 OR (subject_type = 'group'"
-       "                     AND subject"
-       "                         IN (SELECT DISTINCT \"group\""
-       "                             FROM group_users"
-       "                             WHERE \"user\" = user_id))"
-       "                 OR (subject_type = 'role'"
-       "                     AND subject"
-       "                         IN (SELECT DISTINCT role"
-       "                             FROM role_users"
-       "                             WHERE \"user\" = user_id)))"
-       "            AND (is_get OR name = arg_permission)) > 0;"
-       "  RETURN ret;"
-       " END;"
-       "$$ LANGUAGE plpgsql"
+       "  SELECT EXISTS (SELECT 1 FROM users WHERE users.id = gvmd_user ());"
+       "$$ LANGUAGE SQL"
        " STABLE COST 1000;");
 
   sql ("CREATE OR REPLACE FUNCTION compare_results ("
@@ -1611,41 +1457,10 @@ manage_create_sql_functions ()
        TASK_STATUS_QUEUED,
        TASK_STATUS_PROCESSING);
 
-  if (sql_int ("SELECT EXISTS (SELECT * FROM information_schema.tables"
-               "               WHERE table_catalog = '%s'"
-               "               AND table_schema = 'public'"
-               "               AND table_name = 'permissions')"
-               " ::integer;",
-               sql_database ()))
-    sql ("CREATE OR REPLACE FUNCTION user_can_everything (text)"
-         " RETURNS boolean AS $$"
-         /* Test whether a user may perform any operation.
-          *
-          * This must match user_can_everything in manage_acl.c. */
-         "  SELECT count(*) > 0 FROM permissions"
-         "  WHERE resource = 0"
-         "  AND ((subject_type = 'user'"
-         "        AND subject"
-         "            = (SELECT id FROM users"
-         "               WHERE users.uuid = $1))"
-         "       OR (subject_type = 'group'"
-         "           AND subject"
-         "               IN (SELECT DISTINCT \"group\""
-         "                   FROM group_users"
-         "                   WHERE \"user\"  = (SELECT id"
-         "                                     FROM users"
-         "                                     WHERE users.uuid"
-         "                                           = $1)))"
-         "       OR (subject_type = 'role'"
-         "           AND subject"
-         "               IN (SELECT DISTINCT role"
-         "                   FROM role_users"
-         "                   WHERE \"user\"  = (SELECT id"
-         "                                     FROM users"
-         "                                     WHERE users.uuid"
-         "                                           = $1))))"
-         "  AND name = 'Everything';"
-         "$$ LANGUAGE SQL;");
+  sql ("CREATE OR REPLACE FUNCTION user_can_everything (text)"
+       " RETURNS boolean AS $$"
+       "  SELECT EXISTS (SELECT 1 FROM users WHERE users.uuid = $1);"
+       "$$ LANGUAGE SQL;");
 
   sql ("CREATE OR REPLACE FUNCTION group_concat_pair (text, text, text)"
        " RETURNS text AS $$"
@@ -1856,46 +1671,32 @@ manage_create_sql_functions ()
        "$$ LANGUAGE SQL"
        " IMMUTABLE;");
 
-  if (sql_int ("SELECT (EXISTS (SELECT * FROM information_schema.tables"
-               "               WHERE table_catalog = '%s'"
-               "               AND table_schema = 'public'"
-               "               AND table_name = 'permissions_get_tasks'))"
-               " ::integer;",
-               sql_database ()))
-    {
-      sql ("DROP FUNCTION IF EXISTS"
-           " vuln_results (text, bigint, bigint, text, integer);");
-      sql ("CREATE OR REPLACE FUNCTION"
-           " vuln_results (text, bigint, bigint, text)"
-           " RETURNS bigint AS $$"
-           " SELECT count(*) FROM results"
-           " WHERE results.nvt = $1"
-           "   AND ($2 IS NULL OR results.task = $2)"
-           "   AND ($3 IS NULL OR results.report = $3)"
-           "   AND ($4 IS NULL OR results.host = $4)"
-           "   AND (results.severity != " G_STRINGIFY (SEVERITY_ERROR) ")"
-           "   AND (SELECT has_permission FROM permissions_get_tasks"
-           "         WHERE \"user\" = gvmd_user ()"
-           "           AND task = results.task)"
-           "$$ LANGUAGE SQL;");
+  sql ("DROP FUNCTION IF EXISTS"
+       " vuln_results (text, bigint, bigint, text, integer);");
+  sql ("CREATE OR REPLACE FUNCTION"
+       " vuln_results (text, bigint, bigint, text)"
+       " RETURNS bigint AS $$"
+       " SELECT count(*) FROM results"
+       " WHERE results.nvt = $1"
+       "   AND ($2 IS NULL OR results.task = $2)"
+       "   AND ($3 IS NULL OR results.report = $3)"
+       "   AND ($4 IS NULL OR results.host = $4)"
+       "   AND (results.severity != " G_STRINGIFY (SEVERITY_ERROR) ")"
+       "$$ LANGUAGE SQL;");
 
-      sql ("DROP FUNCTION IF EXISTS"
-           " vuln_results_exist (text, bigint, bigint, text, integer);");
-      sql ("CREATE OR REPLACE FUNCTION"
-           " vuln_results_exist (text, bigint, bigint, text)"
-           " RETURNS boolean AS $$"
-           " SELECT EXISTS"
-           "  (SELECT * FROM results"
-           "   WHERE results.nvt = $1"
-           "   AND ($2 IS NULL OR results.task = $2)"
-           "   AND ($3 IS NULL OR results.report = $3)"
-           "   AND ($4 IS NULL OR results.host = $4)"
-           "   AND (results.severity != " G_STRINGIFY (SEVERITY_ERROR) ")"
-           "   AND (SELECT has_permission FROM permissions_get_tasks"
-           "        WHERE \"user\" = gvmd_user ()"
-           "        AND task = results.task))"
-           "$$ LANGUAGE SQL;");
-    }
+  sql ("DROP FUNCTION IF EXISTS"
+       " vuln_results_exist (text, bigint, bigint, text, integer);");
+  sql ("CREATE OR REPLACE FUNCTION"
+       " vuln_results_exist (text, bigint, bigint, text)"
+       " RETURNS boolean AS $$"
+       " SELECT EXISTS"
+       "  (SELECT * FROM results"
+       "   WHERE results.nvt = $1"
+       "   AND ($2 IS NULL OR results.task = $2)"
+       "   AND ($3 IS NULL OR results.report = $3)"
+       "   AND ($4 IS NULL OR results.host = $4)"
+       "   AND (results.severity != " G_STRINGIFY (SEVERITY_ERROR) "))"
+       "$$ LANGUAGE SQL;");
 
   return 0;
 }
@@ -2193,8 +1994,6 @@ create_tables ()
        "  comment text,"
        "  password text,"
        "  timezone text,"
-       "  hosts text,"
-       "  hosts_allow integer,"
        "  method text,"
        "  creation_time integer,"
        "  modification_time integer);");
@@ -2375,33 +2174,9 @@ create_tables ()
        "  creation_time integer,"
        "  modification_time integer);");
 
-  sql ("CREATE TABLE IF NOT EXISTS groups"
-       " (id SERIAL PRIMARY KEY,"
-       "  uuid text UNIQUE NOT NULL,"
-       "  owner integer REFERENCES users (id) ON DELETE RESTRICT,"
-       "  name text NOT NULL,"
-       "  comment text,"
-       "  creation_time integer,"
-       "  modification_time integer);");
 
-  sql ("CREATE TABLE IF NOT EXISTS groups_trash"
-       " (id SERIAL PRIMARY KEY,"
-       "  uuid text UNIQUE NOT NULL,"
-       "  owner integer REFERENCES users (id) ON DELETE RESTRICT,"
-       "  name text NOT NULL,"
-       "  comment text,"
-       "  creation_time integer,"
-       "  modification_time integer);");
 
-  sql ("CREATE TABLE IF NOT EXISTS group_users"
-       " (id SERIAL PRIMARY KEY,"
-       "  \"group\" integer REFERENCES groups (id) ON DELETE RESTRICT,"
-       "  \"user\" integer REFERENCES users (id) ON DELETE RESTRICT);");
 
-  sql ("CREATE TABLE IF NOT EXISTS group_users_trash"
-       " (id SERIAL PRIMARY KEY,"
-       "  \"group\" integer REFERENCES groups_trash (id) ON DELETE RESTRICT,"
-       "  \"user\" integer REFERENCES users (id) ON DELETE RESTRICT);");
 
   sql ("CREATE TABLE IF NOT EXISTS hosts"
        " (id SERIAL PRIMARY KEY,"
@@ -2470,33 +2245,9 @@ create_tables ()
        "  name text,"
        "  value text);");
 
-  sql ("CREATE TABLE IF NOT EXISTS roles"
-       " (id SERIAL PRIMARY KEY,"
-       "  uuid text UNIQUE NOT NULL,"
-       "  owner integer REFERENCES users (id) ON DELETE RESTRICT,"
-       "  name text NOT NULL,"
-       "  comment text,"
-       "  creation_time integer,"
-       "  modification_time integer);");
 
-  sql ("CREATE TABLE IF NOT EXISTS roles_trash"
-       " (id SERIAL PRIMARY KEY,"
-       "  uuid text UNIQUE NOT NULL,"
-       "  owner integer REFERENCES users (id) ON DELETE RESTRICT,"
-       "  name text NOT NULL,"
-       "  comment text,"
-       "  creation_time integer,"
-       "  modification_time integer);");
 
-  sql ("CREATE TABLE IF NOT EXISTS role_users"
-       " (id SERIAL PRIMARY KEY,"
-       "  role integer REFERENCES roles (id) ON DELETE RESTRICT,"
-       "  \"user\" integer REFERENCES users (id) ON DELETE RESTRICT);");
 
-  sql ("CREATE TABLE IF NOT EXISTS role_users_trash"
-       " (id SERIAL PRIMARY KEY,"
-       "  role integer REFERENCES roles_trash (id) ON DELETE RESTRICT,"
-       "  \"user\" integer REFERENCES users (id) ON DELETE RESTRICT);");
 
   sql ("CREATE TABLE IF NOT EXISTS nvt_selectors"
        " (id SERIAL PRIMARY KEY,"
@@ -2888,11 +2639,6 @@ create_tables ()
        "  name text,"
        "  value text);");
 
-  sql ("CREATE TABLE IF NOT EXISTS permissions_get_tasks"
-       " (\"user\" integer REFERENCES users ON DELETE CASCADE,"
-       "  task integer REFERENCES tasks ON DELETE CASCADE,"
-       "  has_permission boolean,"
-       "  UNIQUE (\"user\", task));");
 
   sql ("CREATE TABLE IF NOT EXISTS reports"
        " (id SERIAL PRIMARY KEY,"
@@ -3181,37 +2927,7 @@ create_tables ()
        "  result integer," // REFERENCES results (id) ON DELETE RESTRICT,"
        "  end_time integer);");
 
-  sql ("CREATE TABLE IF NOT EXISTS permissions"
-       " (id SERIAL PRIMARY KEY,"
-       "  uuid text UNIQUE NOT NULL,"
-       "  owner integer REFERENCES users (id) ON DELETE RESTRICT,"
-       "  name text NOT NULL,"
-       "  comment text,"
-       "  resource_type text,"
-       "  resource integer,"
-       "  resource_uuid text,"
-       "  resource_location integer,"
-       "  subject_type text,"
-       "  subject integer,"
-       "  subject_location integer,"
-       "  creation_time integer,"
-       "  modification_time integer);");
 
-  sql ("CREATE TABLE IF NOT EXISTS permissions_trash"
-       " (id SERIAL PRIMARY KEY,"
-       "  uuid text UNIQUE NOT NULL,"
-       "  owner integer REFERENCES users (id) ON DELETE RESTRICT,"
-       "  name text NOT NULL,"
-       "  comment text,"
-       "  resource_type text,"
-       "  resource integer,"
-       "  resource_uuid text,"
-       "  resource_location integer,"
-       "  subject_type text,"
-       "  subject integer,"
-       "  subject_location integer,"
-       "  creation_time integer,"
-       "  modification_time integer);");
 
   sql ("CREATE TABLE IF NOT EXISTS settings"
        " (id SERIAL PRIMARY KEY,"
@@ -3402,11 +3118,6 @@ create_tables ()
        "                     'name');");
 
   create_indexes_nvt ();
-
-  sql ("SELECT create_index ('permissions_by_name',"
-       "                     'permissions', 'name');");
-  sql ("SELECT create_index ('permissions_by_resource',"
-       "                     'permissions', 'resource');");
 
   sql ("SELECT create_index ('report_counts_by_report_and_override',"
        "                     'report_counts', 'report, override');");

@@ -12,9 +12,7 @@ import Layout from 'web/components/layout/Layout';
 import DetailsLink from 'web/components/link/DetailsLink';
 import TableData from 'web/components/table/TableData';
 import RowDetailsToggle from 'web/entities/RowDetailsToggle';
-import ObserverIcon from 'web/entity/icon/ObserverIcon';
 import useTranslation from 'web/hooks/useTranslation';
-import useUserName from 'web/hooks/useUserName';
 
 interface EntityNameTableDataProps<TEntity extends Model> {
   'data-testid'?: string;
@@ -36,7 +34,6 @@ const EntityNameTableData = <TEntity extends Model>({
   onToggleDetailsClick,
 }: EntityNameTableDataProps<TEntity>) => {
   const [_] = useTranslation();
-  const username = useUserName() as string;
   return (
     <TableData data-testid={dataTestId}>
       <Layout align="space-between">
@@ -80,13 +77,6 @@ const EntityNameTableData = <TEntity extends Model>({
           {isDefined(entity.comment) && <Comment>({entity.comment})</Comment>}
           {children}
         </div>
-        <Layout>
-          <ObserverIcon
-            displayName={displayName}
-            entity={entity}
-            userName={username}
-          />
-        </Layout>
       </Layout>
     </TableData>
   );

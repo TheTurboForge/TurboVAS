@@ -64,7 +64,7 @@ const EntityEditIcon = <TEntity extends EntityEdit>({
     } else if (!entity.isWritable()) {
       title = _('{{entity}} is not writable', {entity: displayName});
     } else if (!mayEdit) {
-      title = _('Permission to edit {{entity}} denied', {entity: displayName});
+      title = _('Edit {{entity}} command unavailable', {entity: displayName});
     } else {
       title = _('Cannot modify {{entity}}', {entity: displayName});
     }

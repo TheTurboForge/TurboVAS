@@ -35,7 +35,7 @@ const TaskStartIcon = <TTask extends Task>({
     return (
       <StartIcon
         active={false}
-        title={_('Permission to start {{type}} denied', {type})}
+        title={_('Start {{type}} command unavailable', {type})}
       />
     );
   }

@@ -122,13 +122,6 @@ describe('OverrideDetailsPage tests', () => {
       'Owner:admin',
     );
 
-    expect(
-      screen.getByRole('tab', {name: /^information/i}),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('tab', {name: /^user tags/i})).toBeInTheDocument();
-    expect(
-      screen.getByRole('tab', {name: /^permissions/i}),
-    ).toBeInTheDocument();
 
     expect(screen.getByRole('row', {name: /^NVT Name/i})).toHaveTextContent(
       'foo nvt',
@@ -167,78 +160,6 @@ describe('OverrideDetailsPage tests', () => {
         name: /^Override from Severity > 0\.0 to False Positive/i,
       }),
     ).toBeInTheDocument();
-    expect(screen.getByTestId('override-box')).toHaveTextContent(
-      'override text',
-    );
-  });
-
-  test('should render user tags tab', () => {
-    const gmp = createGmp();
-    const {render, store} = rendererWith({
-      gmp,
-      capabilities: true,
-      router: true,
-      store: true,
-    });
-
-    store.dispatch(
-      entityLoadingActions.success(
-        '6d00d22f-551b-4fbe-8215-d8615eff73ea',
-        override,
-      ),
-    );
-
-    const {container} = render(
-      <DetailsPage id="6d00d22f-551b-4fbe-8215-d8615eff73ea" />,
-    );
-
-    const permissionsTab = screen.getByRole('tab', {name: /^permissions/i});
-    fireEvent.click(permissionsTab);
-    expect(container).toHaveTextContent('No permissions available');
-  });
-
-  test('should render permissions tab', () => {
-    const gmp = createGmp();
-    const {render, store} = rendererWith({
-      gmp,
-      capabilities: true,
-      router: true,
-      store: true,
-    });
-
-    store.dispatch(
-      entityLoadingActions.success(
-        '6d00d22f-551b-4fbe-8215-d8615eff73ea',
-        override,
-      ),
-    );
-
-    const {container} = render(
-      <DetailsPage id="6d00d22f-551b-4fbe-8215-d8615eff73ea" />,
-    );
-
-    const permissionsTab = screen.getByRole('tab', {name: /^permissions/i});
-    fireEvent.click(permissionsTab);
-    expect(container).toHaveTextContent('No permissions available');
-  });
-
-  test('should call commands', async () => {
-    const gmp = createGmp();
-    const {render, store} = rendererWith({
-      gmp,
-      capabilities: true,
-      router: true,
-      store: true,
-    });
-
-    store.dispatch(
-      entityLoadingActions.success(
-        '6d00d22f-551b-4fbe-8215-d8615eff73ea',
-        override,
-      ),
-    );
-
-    render(<DetailsPage id="6d00d22f-551b-4fbe-8215-d8615eff73ea" />);
 
     const cloneIcon = screen.getByTitle('Clone Override');
     expect(cloneIcon).toBeInTheDocument();

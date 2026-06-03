@@ -10,7 +10,6 @@ import {
   CERTIFICATE_STATUS_INACTIVE,
   CERTIFICATE_STATUS_EXPIRED,
 } from 'gmp/models/credential';
-import type Permission from 'gmp/models/permission';
 import {isDefined} from 'gmp/utils/identity';
 import DateTime from 'web/components/date/DateTime';
 import {CredentialIcon} from 'web/components/icon';
@@ -31,23 +30,16 @@ import TableRow from 'web/components/table/TableRow';
 import DetailsBlock from 'web/entity/DetailsBlock';
 import EntitiesTab from 'web/entity/EntitiesTab';
 import EntityPage from 'web/entity/EntityPage';
-import EntityPermissions from 'web/entity/EntityPermissions';
 import {type OnDownloadedFunc} from 'web/entity/hooks/useEntityDownload';
 import {goToDetails, goToList} from 'web/entity/navigation';
 import EntityTags from 'web/entity/Tags';
-import withEntityContainer, {
-  permissionsResourceFilter,
-} from 'web/entity/withEntityContainer';
+import withEntityContainer from 'web/entity/withEntityContainer';
 import useTranslation from 'web/hooks/useTranslation';
 import CredentialComponent from 'web/pages/credentials/CredentialComponent';
 import CredentialDetails from 'web/pages/credentials/CredentialDetails';
 import CredentialDetailsColGroup from 'web/pages/credentials/CredentialDetailsColGroup';
 import CredentialDetailsPageToolBarIcons from 'web/pages/credentials/CredentialDetailsPageToolBarIcons';
 import {selector, loadEntity} from 'web/store/entities/credentials';
-import {
-  selector as permissionsSelector,
-  loadEntities as loadPermissions,
-} from 'web/store/entities/permissions';
 
 interface DetailsProps {
   entity: Credential;
@@ -56,7 +48,6 @@ interface DetailsProps {
 interface CredentialDetailsPageProps {
   entity: Credential;
   isLoading: boolean;
-  permissions?: Permission[];
   onChanged?: () => void;
   onDownloaded?: OnDownloadedFunc;
   onError?: (error: Error) => void;
@@ -152,7 +143,6 @@ const Details = ({entity}: DetailsProps) => {
 const CredentialDetailsPage = ({
   entity,
   isLoading,
-  permissions = [],
   onChanged,
   onDownloaded,
   onError,
@@ -213,9 +203,6 @@ const CredentialDetailsPage = ({
                       <EntitiesTab entities={entity.userTags}>
                         {_('User Tags')}
                       </EntitiesTab>
-                      <EntitiesTab entities={permissions}>
-                        {_('Permissions')}
-                      </EntitiesTab>
                     </TabList>
                   </TabLayout>
 
@@ -228,15 +215,6 @@ const CredentialDetailsPage = ({
                         <EntityTags
                           entity={entity}
                           onChanged={onChanged}
-                          onError={onError}
-                        />
-                      </TabPanel>
-                      <TabPanel>
-                        <EntityPermissions
-                          entity={entity}
-                          permissions={permissions}
-                          onChanged={onChanged}
-                          onDownloaded={onDownloaded}
                           onError={onError}
                         />
                       </TabPanel>
@@ -254,18 +232,14 @@ const CredentialDetailsPage = ({
 
 const load = (gmp: Gmp) => {
   const loadEntityFunc = loadEntity(gmp);
-  const loadPermissionsFunc = loadPermissions(gmp);
   return (id: string) => dispatch =>
     Promise.all([
       dispatch(loadEntityFunc(id)),
-      dispatch(loadPermissionsFunc(permissionsResourceFilter(id))),
     ]);
 };
 
 const mapStateToProps = (rootState, {id}) => {
-  const permissionsSel = permissionsSelector(rootState);
   return {
-    permissions: permissionsSel.getEntities(permissionsResourceFilter(id)),
   };
 };
 

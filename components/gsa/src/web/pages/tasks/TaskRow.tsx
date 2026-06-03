@@ -14,7 +14,7 @@ import {isDefined} from 'gmp/utils/identity';
 import SeverityBar from 'web/components/bar/SeverityBar';
 import Comment from 'web/components/comment/Comment';
 import DateTime from 'web/components/date/DateTime';
-import {AlterableIcon, ProvideViewIcon, SensorIcon} from 'web/components/icon';
+import {AlterableIcon, SensorIcon} from 'web/components/icon';
 import IconDivider from 'web/components/layout/IconDivider';
 import Layout from 'web/components/layout/Layout';
 import DetailsLink from 'web/components/link/DetailsLink';
@@ -22,9 +22,7 @@ import Link from 'web/components/link/Link';
 import TableData from 'web/components/table/TableData';
 import TableRow from 'web/components/table/TableRow';
 import RowDetailsToggle from 'web/entities/RowDetailsToggle';
-import ObserverIcon from 'web/entity/icon/ObserverIcon';
 import useTranslation from 'web/hooks/useTranslation';
-import useUserName from 'web/hooks/useUserName';
 import TaskActions, {type TaskActionsProps} from 'web/pages/tasks/TaskActions';
 import TaskStatus from 'web/pages/tasks/TaskStatus';
 import TaskTrend from 'web/pages/tasks/TaskTrend';
@@ -89,31 +87,7 @@ const TaskRow = ({
   ...props
 }: TaskRowProps) => {
   const [_] = useTranslation();
-  const username = useUserName() as string;
-  const {scanner, observers, last_report: lastReport} = entity;
-
-  const obs: {role: string; user: string; group: string} = {
-    user: '',
-    role: '',
-    group: '',
-  };
-
-  let hasObservers = false;
-
-  if (isDefined(observers)) {
-    if (isDefined(observers.user)) {
-      hasObservers = true;
-      obs.user = _('Users {{user}}', {user: observers.user.join(', ')});
-    }
-    if (isDefined(observers.role)) {
-      hasObservers = true;
-      obs.role = _('Roles {{role}}', {role: observers.role.join(', ')});
-    }
-    if (isDefined(observers.group)) {
-      hasObservers = true;
-      obs.group = _('Groups {{group}}', {group: observers.group.join(', ')});
-    }
-  }
+  const {scanner, last_report: lastReport} = entity;
 
   return (
     <TableRow>
@@ -143,24 +117,6 @@ const TaskRow = ({
                   })}
                 />
               )}
-            <ObserverIcon
-              displayName={_('Task')}
-              entity={entity}
-              userName={username}
-            />
-            {hasObservers && (
-              <ProvideViewIcon
-                size="small"
-                title={_(
-                  'Task made visible for:\n{{user}}\n{{role}}\n{{group}}',
-                  {
-                    user: obs.user,
-                    role: obs.role,
-                    group: obs.group,
-                  },
-                )}
-              />
-            )}
           </IconDivider>
         </Layout>
       </TableData>

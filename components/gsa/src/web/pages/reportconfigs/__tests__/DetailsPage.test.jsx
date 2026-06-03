@@ -94,13 +94,6 @@ describe('ReportConfigDetailsPage tests', () => {
     expect(
       screen.getByRole('tab', {name: /^information/i}),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('tab', {name: /^parameter details/i}),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('tab', {name: /^user tags/i})).toBeInTheDocument();
-    expect(
-      screen.getByRole('tab', {name: /^permissions/i}),
-    ).toBeInTheDocument();
 
     expect(screen.getByRole('row', {name: /^Report Format/})).toHaveTextContent(
       'example-configurable-1',

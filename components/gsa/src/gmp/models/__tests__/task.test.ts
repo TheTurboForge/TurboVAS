@@ -26,7 +26,6 @@ describe('Task Model parse tests', () => {
     expect(task.max_checks).toBeUndefined();
     expect(task.max_hosts).toBeUndefined();
     expect(task.min_qod).toBeUndefined();
-    expect(task.observers).toBeUndefined();
     expect(task.preferences).toEqual({});
     expect(task.progress).toBeUndefined();
     expect(task.report_count).toBeUndefined();
@@ -59,7 +58,6 @@ describe('Task Model parse tests', () => {
     expect(task.max_checks).toBeUndefined();
     expect(task.max_hosts).toBeUndefined();
     expect(task.min_qod).toBeUndefined();
-    expect(task.observers).toBeUndefined();
     expect(task.preferences).toEqual({});
     expect(task.progress).toBeUndefined();
     expect(task.report_count).toBeUndefined();
@@ -412,40 +410,6 @@ describe('Task Model parse tests', () => {
     expect(task2.registryAllowInsecure).toEqual(true);
   });
 
-  test('should parse observers', () => {
-    const task = Task.fromElement({
-      observers: 'foo bar',
-    });
-    expect(task.observers?.user).toEqual(['foo', 'bar']);
-
-    const task2 = Task.fromElement({
-      observers: {
-        __text: 'anon nymous',
-        role: [{name: 'lorem'}],
-        group: [{name: 'ipsum'}, {name: 'dolor'}],
-      },
-    });
-
-    expect(task2.observers?.user).toEqual(['anon', 'nymous']);
-    expect(task2.observers?.role).toEqual(['lorem']);
-    expect(task2.observers?.group).toEqual(['ipsum', 'dolor']);
-
-    const task3 = Task.fromElement({
-      observers: '',
-    });
-    expect(task3.observers?.user).toBeUndefined();
-    expect(task3.observers?.role).toBeUndefined();
-    expect(task3.observers?.group).toBeUndefined();
-
-    const task4 = Task.fromElement({
-      observers: {
-        __text: '',
-      },
-    });
-    expect(task4.observers?.user).toBeUndefined();
-    expect(task4.observers?.role).toBeUndefined();
-    expect(task4.observers?.group).toBeUndefined();
-  });
 
   test('should parse alterable', () => {
     const task = Task.fromElement({

@@ -91,12 +91,10 @@ describe('normalizeType function tests', () => {
     expect(normalizeType('cve')).toEqual('cve');
     expect(normalizeType('dfncert')).toEqual('dfncert');
     expect(normalizeType('filter')).toEqual('filter');
-    expect(normalizeType('group')).toEqual('group');
     expect(normalizeType('host')).toEqual('host');
     expect(normalizeType('info')).toEqual('info');
     expect(normalizeType('nvt')).toEqual('nvt');
     expect(normalizeType('operatingsystem')).toEqual('operatingsystem');
-    expect(normalizeType('permission')).toEqual('permission');
     expect(normalizeType('portlist')).toEqual('portlist');
     expect(normalizeType('portrange')).toEqual('portrange');
     expect(normalizeType('report')).toEqual('report');
@@ -192,14 +190,12 @@ describe('typeName function tests', () => {
     expect(typeName('dfn_cert_adv')).toEqual('DFN-CERT Advisory');
     expect(typeName('dfncert')).toEqual('DFN-CERT Advisory');
     expect(typeName('filter')).toEqual('Filter');
-    expect(typeName('group')).toEqual('Group');
     expect(typeName('host')).toEqual('Host');
     expect(typeName('info')).toEqual('Info');
     expect(typeName('operatingsystem')).toEqual('Operating System');
     expect(typeName('override')).toEqual('Override');
     expect(typeName('os')).toEqual('Operating System');
     expect(typeName('nvt')).toEqual('NVT');
-    expect(typeName('permission')).toEqual('Permission');
     expect(typeName('port_list')).toEqual('Port List');
     expect(typeName('port_range')).toEqual('Port Range');
     expect(typeName('portlist')).toEqual('Port List');
@@ -210,7 +206,6 @@ describe('typeName function tests', () => {
     expect(typeName('report_format')).toEqual('Report Format');
     expect(typeName('reportformat')).toEqual('Report Format');
     expect(typeName('result')).toEqual('Result');
-    expect(typeName('role')).toEqual('Role');
     expect(typeName('scanconfig')).toEqual('Scan Config');
     expect(typeName('scanner')).toEqual('Scanner');
     expect(typeName('schedule')).toEqual('Schedule');
@@ -246,8 +241,6 @@ describe('resourceType function tests', () => {
   test('should support other valid resource types', () => {
     expect(resourceType('credential')).toEqual('credential');
     expect(resourceType('filter')).toEqual('filter');
-    expect(resourceType('group')).toEqual('group');
-    expect(resourceType('permission')).toEqual('permission');
     expect(resourceType('portlist')).toEqual('port_list');
     expect(resourceType('report')).toEqual('report');
     expect(resourceType('reportconfig')).toEqual('report_config');

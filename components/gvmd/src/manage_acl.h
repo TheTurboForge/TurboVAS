@@ -18,100 +18,37 @@
 /**
  * @brief Generate SQL for user permission check.
  *
- * @param[in]  resource  Resource.
+ * TurboVAS grants every authenticated operator effective access to scanner
+ * resources. These macros keep the inherited SQL format-argument contracts so
+ * older query construction sites stay mechanically safe while RBAC tables are
+ * removed.
  */
-#define ACL_USER_MAY_OPTS(resource)                                          \
-  /* This part is 'Any resource type' case from acl_where_owned_user. */     \
-  /* */                                                                      \
-  /* Either the user is the owner. */                                        \
-  " ((" resource ".owner = opts.user_id)"                                    \
-  /* Or the user has super permission on all. */                             \
-  "  OR EXISTS (SELECT * FROM permissions_subject"                           \
-  "             WHERE name = 'Super'"                                        \
-  "             AND (resource = 0))"                                         \
-  /* Or the user has super permission on the owner, */                       \
-  /* (directly, via the role, or via the group).    */                       \
-  "  OR " resource ".owner IN (SELECT *"                                     \
-  "                            FROM super_on_users)"                         \
-  /* Or there's a resource-level permission. */                              \
-  /* */                                                                      \
-  /* This part is permission_clause in acl_where_owned_user. */              \
-  "  OR EXISTS (SELECT id FROM permissions_subject"                          \
-  "             WHERE resource = " resource ".id"                            \
-  "             AND resource_type = opts.type"                               \
-  "             AND resource_location = " G_STRINGIFY (LOCATION_TABLE)       \
-  /*            Any permission. */                                           \
-  "             AND (t ())))"
+#define ACL_USER_MAY_OPTS(resource) " (EXISTS (SELECT 1 FROM users WHERE id = opts.user_id))"
 
 /**
  * @brief Generate SQL for user permission check.
- *
- * @param[in]  resource  Resource.
  */
 #define ACL_USER_MAY(resource)                                        \
-  "SELECT count(*) > 0 FROM permissions"                              \
-  " WHERE resource = " resource                                       \
-  " AND subject_location = " G_STRINGIFY (LOCATION_TABLE)             \
-  " AND ((subject_type = 'user'"                                      \
-  "       AND subject"                                                \
-  "           = (SELECT id FROM users"                                \
-  "              WHERE users.uuid = '%s'))"                           \
-  "      OR (subject_type = 'group'"                                  \
-  "          AND subject"                                             \
-  "              IN (SELECT DISTINCT \"group\""                       \
-  "                  FROM group_users"                                \
-  "                  WHERE \"user\" = (SELECT id"                     \
-  "                                FROM users"                        \
-  "                                WHERE users.uuid"                  \
-  "                                      = '%s')))"                   \
-  "      OR (subject_type = 'role'"                                   \
-  "          AND subject"                                             \
-  "              IN (SELECT DISTINCT role"                            \
-  "                  FROM role_users"                                 \
-  "                  WHERE \"user\" = (SELECT id"                     \
-  "                                    FROM users"                    \
-  "                                    WHERE users.uuid"              \
-  "                                          = '%s'))))"              \
-  /* Any permission implies GET. */                                   \
-  " AND ((lower (substr ('%s', 1, 3)) = 'get'"                        \
-  "       AND name LIKE '%%'"                                         \
-  "                     || lower (substr ('%s',"                      \
-  "                                       5,"                         \
-  "                                       length ('%s') - 5)))"       \
-  "      OR name = lower ('%s'))"
+  "SELECT EXISTS (SELECT 1 FROM users WHERE users.uuid = '%s')"       \
+  " OR ('%s' IS NULL AND '%s' IS NULL AND '%s' IS NULL"               \
+  "     AND '%s' IS NULL AND '%s' IS NULL AND '%s' IS NULL)"
 
 /**
- * @brief Generate SQL for global check.
- *
- * This is the SQL clause for selecting global resources.
+ * @brief Generate SQL for global resource check.
  */
-#define ACL_IS_GLOBAL()                                    \
-  "owner IS NULL"
+#define ACL_IS_GLOBAL() "owner IS NULL"
 
 /**
- * @brief Generate SQL for user ownership check.
- *
- * This is the SQL clause for selecting global resources and resources owned
- * directly by the user.
- *
- * Caller must organise the single argument, the user's UUID, as a string.
+ * @brief Generate SQL for effective ownership check.
  */
 #define ACL_USER_OWNS()                                    \
-  " (owner = (SELECT users.id FROM users"                  \
-  "           WHERE users.uuid = '%s'))"
+  " (EXISTS (SELECT 1 FROM users WHERE users.uuid = '%s'))"
 
 /**
- * @brief Generate SQL for user ownership check.
- *
- * This is the SQL clause for selecting global resources and resources owned
- * directly by the user.
- *
- * Caller must organise the single argument, the user's UUID, as a string.
+ * @brief Generate SQL for global or effective ownership check.
  */
-#define ACL_GLOBAL_OR_USER_OWNS()                              \
-  " ((" ACL_IS_GLOBAL () ")"                                   \
-  "  OR (owner = (SELECT users.id FROM users"                  \
-  "               WHERE users.uuid = '%s')))"
+#define ACL_GLOBAL_OR_USER_OWNS()                          \
+  " (EXISTS (SELECT 1 FROM users WHERE users.uuid = '%s'))"
 
 command_t *
 acl_commands (gchar **);

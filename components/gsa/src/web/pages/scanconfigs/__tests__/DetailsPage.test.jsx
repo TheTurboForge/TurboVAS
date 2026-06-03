@@ -236,13 +236,6 @@ describe('ScanConfigDetailsPage tests', () => {
     expect(
       screen.getByRole('tab', {name: /^nvt families/i}),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('tab', {name: /^nvt preferences/i}),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('tab', {name: /^user tags/i})).toBeInTheDocument();
-    expect(
-      screen.getByRole('tab', {name: /^permissions/i}),
-    ).toBeInTheDocument();
 
     expect(
       screen.getByRole('row', {name: /^comment some comment/i}),
@@ -382,24 +375,6 @@ describe('ScanConfigDetailsPage tests', () => {
     expect(container).toHaveTextContent('No user tags available');
   });
 
-  test('should render permissions tab', () => {
-    const gmp = createGmp();
-    const {render, store} = rendererWith({
-      gmp,
-      capabilities: true,
-      router: true,
-      store: true,
-    });
-
-    store.dispatch(entityLoadingActions.success('12345', config));
-
-    const {container} = render(<DetailsPage id="12345" />);
-
-    const permissionsTab = screen.getByRole('tab', {name: /^permissions/i});
-    fireEvent.click(permissionsTab);
-
-    expect(container).toHaveTextContent('No permissions available');
-  });
 
   test('should call commands', async () => {
     const deleteFunc = testing.fn().mockRejectedValue({
@@ -491,12 +466,12 @@ describe('ScanConfigDetailsPage tests', () => {
     );
 
     const cloneIcon = screen.getByTitle(
-      'Permission to clone Scan Config denied',
+      'Clone Scan Config command unavailable',
     );
     fireEvent.click(cloneIcon);
     expect(gmp.scanconfig.clone).not.toHaveBeenCalled();
 
-    const editIcon = screen.getByTitle('Permission to edit Scan Config denied');
+    const editIcon = screen.getByTitle('Edit Scan Config command unavailable');
     fireEvent.click(editIcon);
     expect(gmp.nvtfamilies.get).not.toHaveBeenCalled();
     expect(gmp.scanners.getAll).not.toHaveBeenCalled();
@@ -506,7 +481,7 @@ describe('ScanConfigDetailsPage tests', () => {
     expect(gmp.scanconfig.export).toHaveBeenCalledWith(config2);
 
     const deleteIcon = screen.getByTitle(
-      'Permission to move Scan Config to trashcan denied',
+      'Move Scan Config to trashcan command unavailable',
     );
     fireEvent.click(deleteIcon);
     expect(gmp.scanconfig.delete).not.toHaveBeenCalled();

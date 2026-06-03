@@ -52,8 +52,8 @@ class GMPv226(GMPv225[T]):
         Arguments:
             resource_type: Type must be either ALERT, CERT_BUND_ADV,
                 CONFIG, CPE, CREDENTIAL, CVE, DFN_CERT_ADV, FILTER,
-                GROUP, HOST, NVT, OS, OVERRIDE, PERMISSION,
-                PORT_LIST, REPORT_FORMAT, REPORT, REPORT_CONFIG, RESULT, ROLE,
+                HOST, NVT, OS, OVERRIDE, PORT_LIST, REPORT_FORMAT,
+                REPORT, REPORT_CONFIG, RESULT,
                 SCANNER, SCHEDULE, TARGET, TASK, TLS_CERTIFICATE
                 or USER
             filter_string: Filter term to use for the query
@@ -75,8 +75,8 @@ class GMPv226(GMPv225[T]):
             resource_id: ID of an existing resource
             resource_type: Type must be either ALERT, CERT_BUND_ADV,
                 CONFIG, CPE, CREDENTIAL, CVE, DFN_CERT_ADV, FILTER,
-                GROUP, HOST, NVT, OS, OVERRIDE, PERMISSION,
-                PORT_LIST, REPORT_FORMAT, REPORT, REPORT_CONFIG, RESULT, ROLE,
+                HOST, NVT, OS, OVERRIDE, PORT_LIST, REPORT_FORMAT,
+                REPORT, REPORT_CONFIG, RESULT,
                 SCANNER, SCHEDULE, TARGET, TASK, TLS_CERTIFICATE
                 or USER
         """

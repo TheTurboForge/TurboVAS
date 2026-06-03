@@ -117,7 +117,6 @@ describe('ScheduleDetailsPage tests', () => {
     const tablist = screen.getByRole('tablist');
     within(tablist).getByRole('tab', {name: /information/i});
     within(tablist).getByRole('tab', {name: /user tags/i});
-    within(tablist).getByRole('tab', {name: /permissions/i});
 
     screen.getByText('Comment');
     screen.getByText('hello world');
@@ -153,26 +152,6 @@ describe('ScheduleDetailsPage tests', () => {
     expect(container).toHaveTextContent('No user tags available');
   });
 
-  test('should render permissions tab', () => {
-    const gmp = createGmp();
-    const {render, store} = rendererWith({
-      gmp,
-      capabilities: true,
-      router: true,
-      store: true,
-    });
-
-    store.dispatch(entityLoadingActions.success('12345', schedule));
-
-    const {container} = render(<ScheduleDetailsPage id="12345" />);
-
-    const tablist = screen.getByRole('tablist');
-    const permissionsTab = within(tablist).getByRole('tab', {
-      name: /permissions/i,
-    });
-    fireEvent.click(permissionsTab);
-    expect(container).toHaveTextContent('No permissions available');
-  });
 
   test('should call commands', async () => {
     const gmp = createGmp();

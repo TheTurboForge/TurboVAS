@@ -169,20 +169,12 @@ get_filter (gvm_connection_t *, gsad_credentials_t *, params_t *, const char *,
             gsad_command_response_data_t *);
 
 static char *
-get_group (gvm_connection_t *, gsad_credentials_t *, params_t *, const char *,
-           gsad_command_response_data_t *);
-
-static char *
 get_credential (gvm_connection_t *, gsad_credentials_t *, params_t *,
                 const char *, gsad_command_response_data_t *);
 
 static char *
 get_override (gvm_connection_t *, gsad_credentials_t *, params_t *,
               const char *, gsad_command_response_data_t *);
-
-static char *
-get_permission (gvm_connection_t *, gsad_credentials_t *, params_t *,
-                const char *, gsad_command_response_data_t *);
 
 static char *
 get_port_list (gvm_connection_t *, gsad_credentials_t *, params_t *,
@@ -203,10 +195,6 @@ get_report_config (gvm_connection_t *, gsad_credentials_t *, params_t *,
 static char *
 get_report_format (gvm_connection_t *, gsad_credentials_t *, params_t *,
                    const char *, gsad_command_response_data_t *);
-
-static char *
-get_role (gvm_connection_t *, gsad_credentials_t *, params_t *, const char *,
-          gsad_command_response_data_t *);
 
 static char *
 get_scanner (gvm_connection_t *, gsad_credentials_t *, params_t *, const char *,
@@ -12676,34 +12664,6 @@ get_trash_filters_gmp (gvm_connection_t *connection,
  *
  * @return Enveloped XML object.
  */
-char *
-get_trash_groups_gmp (gvm_connection_t *connection,
-                      gsad_credentials_t *credentials, params_t *params,
-                      gsad_command_response_data_t *response_data)
-{
-  GString *xml;
-
-  xml = g_string_new ("<get_trash>");
-
-  GET_TRASH_RESOURCE ("GET_GROUPS", "get_groups", "groups");
-
-  /* Cleanup, and return transformed XML. */
-
-  g_string_append (xml, "</get_trash>");
-  return envelope_gmp (connection, credentials, params,
-                       g_string_free (xml, FALSE), response_data);
-}
-
-/**
- * @brief Setup trash page XML, envelope the result.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
 /**
  * @brief Setup trash page XML, envelope the result.
  *
@@ -12724,34 +12684,6 @@ get_trash_overrides_gmp (gvm_connection_t *connection,
   xml = g_string_new ("<get_trash>");
 
   GET_TRASH_RESOURCE ("GET_OVERRIDES", "get_overrides", "overrides");
-
-  /* Cleanup, and return transformed XML. */
-
-  g_string_append (xml, "</get_trash>");
-  return envelope_gmp (connection, credentials, params,
-                       g_string_free (xml, FALSE), response_data);
-}
-
-/**
- * @brief Setup trash page XML, envelope the result.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-get_trash_permissions_gmp (gvm_connection_t *connection,
-                           gsad_credentials_t *credentials, params_t *params,
-                           gsad_command_response_data_t *response_data)
-{
-  GString *xml;
-
-  xml = g_string_new ("<get_trash>");
-
-  GET_TRASH_RESOURCE ("GET_PERMISSIONS", "get_permissions", "permissions");
 
   /* Cleanup, and return transformed XML. */
 
@@ -12838,34 +12770,6 @@ get_trash_report_formats_gmp (gvm_connection_t *connection,
 
   GET_TRASH_RESOURCE ("GET_REPORT_FORMATS", "get_report_formats",
                       "report_formats");
-
-  /* Cleanup, and return transformed XML. */
-
-  g_string_append (xml, "</get_trash>");
-  return envelope_gmp (connection, credentials, params,
-                       g_string_free (xml, FALSE), response_data);
-}
-
-/**
- * @brief Setup trash page XML, envelope the result.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-get_trash_roles_gmp (gvm_connection_t *connection,
-                     gsad_credentials_t *credentials, params_t *params,
-                     gsad_command_response_data_t *response_data)
-{
-  GString *xml;
-
-  xml = g_string_new ("<get_trash>");
-
-  GET_TRASH_RESOURCE ("GET_ROLES", "get_roles", "roles");
 
   /* Cleanup, and return transformed XML. */
 
@@ -13053,1025 +12957,6 @@ get_trash_agent_group_gmp (gvm_connection_t *connection,
 }
 
 #undef GET_TRASH_RESOURCE
-
-/* Groups. */
-
-/**
- * @brief Get one group, envelope the result.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[in]  extra_xml    Extra XML to insert inside page element.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-static char *
-get_group (gvm_connection_t *connection, gsad_credentials_t *credentials,
-           params_t *params, const char *extra_xml,
-           gsad_command_response_data_t *response_data)
-{
-  return get_one (connection, "group", credentials, params, extra_xml, NULL,
-                  response_data);
-}
-
-/**
- * @brief Get one group, envelope the result.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-get_group_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
-               params_t *params, gsad_command_response_data_t *response_data)
-{
-  return get_group (connection, credentials, params, NULL, response_data);
-}
-
-/**
- * @brief Get all groups, envelope the result.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-get_groups_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
-                params_t *params, gsad_command_response_data_t *response_data)
-{
-  return get_many (connection, "groups", credentials, params, NULL,
-                   response_data);
-}
-
-/**
- * @brief Delete a group, get all groups, envelope the result.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-delete_group_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
-                  params_t *params, gsad_command_response_data_t *response_data)
-{
-  return move_resource_to_trash (connection, "group", credentials, params,
-                                 response_data);
-}
-
-/**
- * @brief Create a group, get all groups, envelope the result.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-create_group_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
-                  params_t *params, gsad_command_response_data_t *response_data)
-{
-  gchar *html, *command, *specials_element;
-  const char *name, *comment, *users, *grant_full;
-  entity_t entity;
-  GString *xml;
-  int ret;
-
-  name = params_value (params, "name");
-  comment = params_value (params, "comment");
-  grant_full = params_value (params, "grant_full");
-  users = params_value (params, "users");
-
-  CHECK_VARIABLE_INVALID (name, "Create Group");
-  CHECK_VARIABLE_INVALID (comment, "Create Group");
-  CHECK_VARIABLE_INVALID (users, "Create Group");
-
-  /* Create the group. */
-
-  xml = g_string_new ("");
-
-  xml_string_append (xml,
-                     "<name>%s</name>"
-                     "<comment>%s</comment>"
-                     "<users>%s</users>",
-                     name, comment, users);
-
-  if (grant_full)
-    specials_element = g_strdup_printf ("<full/>");
-  else
-    specials_element = NULL;
-
-  command = g_strdup_printf ("<create_group>"
-                             "%s"
-                             "<specials>"
-                             "%s"
-                             "</specials>"
-                             "</create_group>",
-                             xml->str, specials_element);
-
-  g_string_free (xml, TRUE);
-  g_free (specials_element);
-
-  ret = gmp (connection, credentials, NULL, &entity, response_data, command);
-  g_free (command);
-  switch (ret)
-    {
-    case 0:
-      break;
-    case 1:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while creating a new group. "
-        "No new group was created. "
-        "Diagnostics: Failure to send command to manager daemon.",
-        response_data);
-    case 2:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while creating a new group. "
-        "It is unclear whether the group has been created or not. "
-        "Diagnostics: Failure to receive response from manager daemon.",
-        response_data);
-    default:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while creating a new group. "
-        "It is unclear whether the group has been created or not. "
-        "Diagnostics: Internal Error.",
-        response_data);
-    }
-
-  if (entity_attribute (entity, "id"))
-    params_add (params, "group_id", entity_attribute (entity, "id"));
-  html = response_from_entity (connection, credentials, params, entity,
-                               "Create Group", response_data);
-  free_entity (entity);
-  return html;
-}
-
-/**
- * @brief Export a group.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]   credentials          Username and password for authentication.
- * @param[in]   params               Request parameters.
- * @param[out]  response_data        Extra data return for the HTTP response.
- *
- * @return Group XML on success.  Enveloped XML on error.
- */
-char *
-export_group_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
-                  params_t *params, gsad_command_response_data_t *response_data)
-{
-  return export_resource (connection, "group", credentials, params,
-                          response_data);
-}
-
-/**
- * @brief Export a list of groups.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]   credentials          Username and password for authentication.
- * @param[in]   params               Request parameters.
- * @param[out]  response_data        Extra data return for the HTTP response.
- *
- * @return Groups XML on success.  Enveloped XML
- *         on error.
- */
-char *
-export_groups_gmp (gvm_connection_t *connection,
-                   gsad_credentials_t *credentials, params_t *params,
-                   gsad_command_response_data_t *response_data)
-{
-  return export_many (connection, "group", credentials, params, response_data);
-}
-
-/**
- * @brief Modify a group, return the next page.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-save_group_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
-                params_t *params, gsad_command_response_data_t *response_data)
-{
-  int ret;
-  gchar *html;
-  const char *group_id, *name, *comment, *users;
-  entity_t entity;
-
-  group_id = params_value (params, "group_id");
-  name = params_value (params, "name");
-  comment = params_value (params, "comment");
-  users = params_value (params, "users");
-
-  CHECK_VARIABLE_INVALID (group_id, "Save Group");
-  CHECK_VARIABLE_INVALID (name, "Save Group");
-  CHECK_VARIABLE_INVALID (comment, "Save Group");
-  CHECK_VARIABLE_INVALID (users, "Save Group");
-
-  /* Modify the Group. */
-
-  entity = NULL;
-  ret = gmpf (connection, credentials, NULL, &entity, response_data,
-              "<modify_group group_id=\"%s\">"
-              "<name>%s</name>"
-              "<comment>%s</comment>"
-              "<users>%s</users>"
-              "</modify_group>",
-              group_id, name, comment, users);
-
-  switch (ret)
-    {
-    case 0:
-      break;
-    case 1:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while saving a group. "
-        "The group was not saved. "
-        "Diagnostics: Failure to send command to manager daemon.",
-        response_data);
-    case 2:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while saving a group. "
-        "It is unclear whether the group has been saved or not. "
-        "Diagnostics: Failure to receive response from manager daemon.",
-        response_data);
-    default:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while saving a group. "
-        "It is unclear whether the group has been saved or not. "
-        "Diagnostics: Internal Error.",
-        response_data);
-    }
-
-  html = response_from_entity (connection, credentials, params, entity,
-                               "Save Group", response_data);
-  free_entity (entity);
-  return html;
-}
-
-/* Permissions. */
-
-/**
- * @brief Get one permission, envelope the result.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[in]  extra_xml    Extra XML to insert inside page element.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-get_permission (gvm_connection_t *connection, gsad_credentials_t *credentials,
-                params_t *params, const char *extra_xml,
-                gsad_command_response_data_t *response_data)
-{
-  gmp_arguments_t *arguments;
-  arguments = gmp_arguments_new ();
-
-  gmp_arguments_add (arguments, "alerts", "1");
-
-  return get_one (connection, "permission", credentials, params, extra_xml,
-                  arguments, response_data);
-}
-
-/**
- * @brief Get one permission, envelope the result.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-get_permission_gmp (gvm_connection_t *connection,
-                    gsad_credentials_t *credentials, params_t *params,
-                    gsad_command_response_data_t *response_data)
-{
-  return get_permission (connection, credentials, params, NULL, response_data);
-}
-
-/**
- * @brief Get all permissions, envelope the result.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-get_permissions_gmp (gvm_connection_t *connection,
-                     gsad_credentials_t *credentials, params_t *params,
-                     gsad_command_response_data_t *response_data)
-{
-  return get_many (connection, "permissions", credentials, params, NULL,
-                   response_data);
-}
-
-/**
- * @brief Delete a permission, get all permissions, envelope the result.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-delete_permission_gmp (gvm_connection_t *connection,
-                       gsad_credentials_t *credentials, params_t *params,
-                       gsad_command_response_data_t *response_data)
-{
-  return move_resource_to_trash (connection, "permission", credentials, params,
-                                 response_data);
-}
-
-/**
- * @brief Create a permission, get all permissions, envelope the result.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-create_permission_gmp (gvm_connection_t *connection,
-                       gsad_credentials_t *credentials, params_t *params,
-                       gsad_command_response_data_t *response_data)
-{
-  int ret;
-  gchar *html;
-  const char *name, *comment, *resource_id, *resource_type;
-  const char *subject_id, *subject_type;
-  entity_t entity;
-
-  name = params_value (params, "permission");
-  comment = params_value (params, "comment");
-  resource_id = params_value (params, "id_or_empty");
-  resource_type = params_value (params, "optional_resource_type");
-  subject_type = params_value (params, "subject_type");
-
-  CHECK_VARIABLE_INVALID (name, "Create Permission");
-  CHECK_VARIABLE_INVALID (comment, "Create Permission");
-  if (params_given (params, "id_or_empty"))
-    CHECK_VARIABLE_INVALID (resource_id, "Create Permission");
-  CHECK_VARIABLE_INVALID (subject_type, "Create Permission");
-  if (params_given (params, "optional_resource_type"))
-    CHECK_VARIABLE_INVALID (resource_type, "Create Permission");
-
-  if (str_equal (subject_type, "user"))
-    subject_id = params_value (params, "permission_user_id");
-  else if (str_equal (subject_type, "group"))
-    subject_id = params_value (params, "permission_group_id");
-  else if (str_equal (subject_type, "role"))
-    subject_id = params_value (params, "permission_role_id");
-  else
-    subject_id = NULL;
-
-  CHECK_VARIABLE_INVALID (subject_id, "Create Permission");
-
-  /* Create the permission(s). */
-
-  entity = NULL;
-  ret = gmpf (connection, credentials, NULL, &entity, response_data,
-              "<create_permission>"
-              "<name>%s</name>"
-              "<comment>%s</comment>"
-              "<resource id=\"%s\">"
-              "<type>%s</type>"
-              "</resource>"
-              "<subject id=\"%s\"><type>%s</type></subject>"
-              "</create_permission>",
-              name, comment ? comment : "", resource_id ? resource_id : "",
-              resource_type ? resource_type : "", subject_id, subject_type);
-
-  switch (ret)
-    {
-    case 0:
-      break;
-    case 1:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while creating a permission. "
-        "The permission was not created. "
-        "Diagnostics: Failure to send command to manager daemon.",
-        response_data);
-    case 2:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while creating a permission. "
-        "It is unclear whether the permission has been created or not. "
-        "Diagnostics: Failure to receive response from manager daemon.",
-        response_data);
-    default:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while creating a permission. "
-        "It is unclear whether the permission has been created or not. "
-        "Diagnostics: Internal Error.",
-        response_data);
-    }
-
-  if (entity_attribute (entity, "id"))
-    params_add (params, "permission_id", entity_attribute (entity, "id"));
-
-  html = response_from_entity (connection, credentials, params, entity,
-                               "Create Permission", response_data);
-
-  free_entity (entity);
-  return html;
-}
-
-#define CHECK_GMPF_RET                                                      \
-  switch (ret)                                                              \
-    {                                                                       \
-    case 0:                                                                 \
-      break;                                                                \
-    case 1:                                                                 \
-      gsad_command_response_data_set_status_code (                          \
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);                     \
-      return gsad_http_create_gsad_message (                                \
-        credentials,                                                        \
-        "An internal error occurred while creating a permission. "          \
-        "The permission was not created. "                                  \
-        "Diagnostics: Failure to send command to manager daemon.",          \
-        response_data);                                                     \
-    case 2:                                                                 \
-      gsad_command_response_data_set_status_code (                          \
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);                     \
-      return gsad_http_create_gsad_message (                                \
-        credentials,                                                        \
-        "An internal error occurred while creating a permission. "          \
-        "It is unclear whether the permission has been created or not. "    \
-        "Diagnostics: Failure to receive response from manager daemon.",    \
-        response_data);                                                     \
-    default:                                                                \
-      gsad_command_response_data_set_status_code (                          \
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);                     \
-      return gsad_http_create_gsad_message (                                \
-        credentials,                                                        \
-        "An internal error occurred while creating a permission. "          \
-        "It is unclear whether the permission has been created or not. "    \
-        "Diagnostics: Internal Error.",                                     \
-        response_data);                                                     \
-    }                                                                       \
-  if (gmp_success (entity))                                                 \
-    {                                                                       \
-      successes++;                                                          \
-      free_entity (entity);                                                 \
-    }                                                                       \
-  else                                                                      \
-    {                                                                       \
-      html = response_from_entity (connection, credentials, params, entity, \
-                                   "Create Permissions", response_data);    \
-      free_entity (entity);                                                 \
-      return html;                                                          \
-    }
-
-#define INCLUDE_RELATED_CURRENT_RESOURCE_ONLY 0
-#define INCLUDE_RELATED_ALL_RESOURCES 1
-#define INCLUDE_RELATED_RESOURCES_ONLY 2
-
-/**
- * @brief Create multiple permission, get next page, envelope the result.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-create_permissions_gmp (gvm_connection_t *connection,
-                        gsad_credentials_t *credentials, params_t *params,
-                        gsad_command_response_data_t *response_data)
-{
-  int ret;
-  gchar *html, *summary_response;
-  int successes;
-  const char *permission, *comment, *resource_id, *resource_type;
-  const char *subject_id, *subject_type;
-  const char *permission_resource_type;
-  int include_related;
-
-  entity_t entity;
-
-  permission = params_value (params, "permission_type");
-  comment = params_value (params, "comment");
-  resource_id = params_value (params, "resource_id");
-  resource_type = params_value (params, "resource_type");
-  subject_type = params_value (params, "subject_type");
-
-  CHECK_VARIABLE_INVALID (params_value (params, "include_related"),
-                          "Create Permission");
-  CHECK_VARIABLE_INVALID (permission, "Create Permission");
-  CHECK_VARIABLE_INVALID (comment, "Create Permission");
-  CHECK_VARIABLE_INVALID (resource_id, "Create Permission");
-  CHECK_VARIABLE_INVALID (subject_type, "Create Permission");
-  CHECK_VARIABLE_INVALID (resource_type, "Create Permission");
-
-  if (str_equal (resource_type, "host") || str_equal (resource_type, "os"))
-    {
-      permission_resource_type = "asset";
-    }
-  else
-    permission_resource_type = resource_type;
-
-  include_related = atoi (params_value (params, "include_related"));
-
-  if (str_equal (subject_type, "user"))
-    subject_id = params_value (params, "permission_user_id");
-  else if (str_equal (subject_type, "group"))
-    subject_id = params_value (params, "permission_group_id");
-  else if (str_equal (subject_type, "role"))
-    subject_id = params_value (params, "permission_role_id");
-  else
-    subject_id = NULL;
-
-  CHECK_VARIABLE_INVALID (subject_id, "Create Permission");
-
-  successes = 0;
-
-  /* Create the permission(s). */
-
-  // Main resource permissions
-  if (include_related != INCLUDE_RELATED_RESOURCES_ONLY)
-    {
-      if (str_equal (permission, "read") || str_equal (permission, "write"))
-        {
-          entity = NULL;
-          ret = gmpf (connection, credentials, NULL, &entity, response_data,
-                      "<create_permission>"
-                      "<name>get_%ss</name>"
-                      "<comment>%s</comment>"
-                      "<resource id=\"%s\">"
-                      "</resource>"
-                      "<subject id=\"%s\"><type>%s</type></subject>"
-                      "</create_permission>",
-                      permission_resource_type, comment ? comment : "",
-                      resource_id, subject_id, subject_type);
-
-          CHECK_GMPF_RET
-        }
-
-      if ((str_equal (permission, "write"))
-          && !str_equal (permission_resource_type, "result")
-          && !str_equal (permission_resource_type, "report"))
-        {
-          // create modify permission for resource
-          entity = NULL;
-          ret = gmpf (connection, credentials, NULL, &entity, response_data,
-                      "<create_permission>"
-                      "<name>modify_%s</name>"
-                      "<comment>%s</comment>"
-                      "<resource id=\"%s\">"
-                      "</resource>"
-                      "<subject id=\"%s\"><type>%s</type></subject>"
-                      "</create_permission>",
-                      permission_resource_type, comment ? comment : "",
-                      resource_id, subject_id, subject_type);
-
-          CHECK_GMPF_RET
-
-          if (str_equal (permission_resource_type, "task"))
-            {
-              // create start_task, stop_task and resume_task permission
-              entity = NULL;
-              ret = gmpf (connection, credentials, NULL, &entity, response_data,
-                          "<create_permission>"
-                          "<name>start_%s</name>"
-                          "<comment>%s</comment>"
-                          "<resource id=\"%s\">"
-                          "</resource>"
-                          "<subject id=\"%s\"><type>%s</type></subject>"
-                          "</create_permission>",
-                          permission_resource_type, comment ? comment : "",
-                          resource_id, subject_id, subject_type);
-
-              CHECK_GMPF_RET
-
-              entity = NULL;
-              ret = gmpf (connection, credentials, NULL, &entity, response_data,
-                          "<create_permission>"
-                          "<name>stop_%s</name>"
-                          "<comment>%s</comment>"
-                          "<resource id=\"%s\">"
-                          "</resource>"
-                          "<subject id=\"%s\"><type>%s</type></subject>"
-                          "</create_permission>",
-                          permission_resource_type, comment ? comment : "",
-                          resource_id, subject_id, subject_type);
-
-              CHECK_GMPF_RET
-
-              entity = NULL;
-              ret = gmpf (connection, credentials, NULL, &entity, response_data,
-                          "<create_permission>"
-                          "<name>resume_%s</name>"
-                          "<comment>%s</comment>"
-                          "<resource id=\"%s\">"
-                          "</resource>"
-                          "<subject id=\"%s\"><type>%s</type></subject>"
-                          "</create_permission>",
-                          permission_resource_type, comment ? comment : "",
-                          resource_id, subject_id, subject_type);
-
-              CHECK_GMPF_RET
-            }
-
-          if (str_equal (permission_resource_type, "alert"))
-            {
-              // create test permission
-              entity = NULL;
-              ret = gmpf (connection, credentials, NULL, &entity, response_data,
-                          "<create_permission>"
-                          "<name>test_%s</name>"
-                          "<comment>%s</comment>"
-                          "<resource id=\"%s\">"
-                          "</resource>"
-                          "<subject id=\"%s\"><type>%s</type></subject>"
-                          "</create_permission>",
-                          permission_resource_type, comment ? comment : "",
-                          resource_id, subject_id, subject_type);
-
-              CHECK_GMPF_RET
-            }
-
-          if (str_equal (permission_resource_type, "report_format")
-              || str_equal (permission_resource_type, "scanner"))
-            {
-              // create verify permission
-              entity = NULL;
-              ret = gmpf (connection, credentials, NULL, &entity, response_data,
-                          "<create_permission>"
-                          "<name>verify_%s</name>"
-                          "<comment>%s</comment>"
-                          "<resource id=\"%s\">"
-                          "</resource>"
-                          "<subject id=\"%s\"><type>%s</type></subject>"
-                          "</create_permission>",
-                          permission_resource_type, comment ? comment : "",
-                          resource_id, subject_id, subject_type);
-
-              CHECK_GMPF_RET
-            }
-        }
-    }
-
-  // Related permissions
-  if (include_related != INCLUDE_RELATED_CURRENT_RESOURCE_ONLY)
-    {
-      params_t *related;
-      related = params_values (params, "related:");
-      if (related)
-        {
-          params_iterator_t iter;
-          char *name;
-          param_t *param;
-
-          params_iterator_init (&iter, related);
-          while (params_iterator_next (&iter, &name, &param))
-            {
-              char *related_id = name;
-              char *related_type;
-
-              if (str_equal (param->value, "host")
-                  || str_equal (param->value, "os"))
-                {
-                  related_type = "asset";
-                }
-              else
-                related_type = param->value;
-
-              if (str_equal (permission, "read") == 0
-                  || str_equal (permission, "write") == 0)
-                {
-                  entity = NULL;
-                  ret =
-                    gmpf (connection, credentials, NULL, &entity, response_data,
-                          "<create_permission>"
-                          "<name>get_%ss</name>"
-                          "<comment>%s</comment>"
-                          "<resource id=\"%s\">"
-                          "</resource>"
-                          "<subject id=\"%s\"><type>%s</type></subject>"
-                          "</create_permission>",
-                          related_type, comment ? comment : "", related_id,
-                          subject_id, subject_type);
-
-                  CHECK_GMPF_RET
-                }
-
-              if ((str_equal (permission, "write"))
-                  && !str_equal (related_type, "result")
-                  && !str_equal (related_type, "report"))
-                {
-                  entity = NULL;
-                  ret =
-                    gmpf (connection, credentials, NULL, &entity, response_data,
-                          "<create_permission>"
-                          "<name>modify_%s</name>"
-                          "<comment>%s</comment>"
-                          "<resource id=\"%s\">"
-                          "</resource>"
-                          "<subject id=\"%s\"><type>%s</type></subject>"
-                          "</create_permission>",
-                          related_type, comment ? comment : "", related_id,
-                          subject_id, subject_type);
-
-                  CHECK_GMPF_RET
-
-                  if (str_equal (related_type, "task"))
-                    {
-                      entity = NULL;
-                      ret = gmpf (connection, credentials, NULL, &entity,
-                                  response_data,
-                                  "<create_permission>"
-                                  "<name>start_%s</name>"
-                                  "<comment>%s</comment>"
-                                  "<resource id=\"%s\">"
-                                  "</resource>"
-                                  "<subject id=\"%s\"><type>%s</type></subject>"
-                                  "</create_permission>",
-                                  related_type, comment ? comment : "",
-                                  related_id, subject_id, subject_type);
-
-                      CHECK_GMPF_RET
-
-                      entity = NULL;
-                      ret = gmpf (connection, credentials, NULL, &entity,
-                                  response_data,
-                                  "<create_permission>"
-                                  "<name>stop_%s</name>"
-                                  "<comment>%s</comment>"
-                                  "<resource id=\"%s\">"
-                                  "</resource>"
-                                  "<subject id=\"%s\"><type>%s</type></subject>"
-                                  "</create_permission>",
-                                  related_type, comment ? comment : "",
-                                  related_id, subject_id, subject_type);
-
-                      CHECK_GMPF_RET
-
-                      entity = NULL;
-                      ret = gmpf (connection, credentials, NULL, &entity,
-                                  response_data,
-                                  "<create_permission>"
-                                  "<name>resume_%s</name>"
-                                  "<comment>%s</comment>"
-                                  "<resource id=\"%s\">"
-                                  "</resource>"
-                                  "<subject id=\"%s\"><type>%s</type></subject>"
-                                  "</create_permission>",
-                                  related_type, comment ? comment : "",
-                                  related_id, subject_id, subject_type);
-
-                      CHECK_GMPF_RET
-                    }
-
-                  if (str_equal (related_type, "alert"))
-                    {
-                      entity = NULL;
-                      ret = gmpf (connection, credentials, NULL, &entity,
-                                  response_data,
-                                  "<create_permission>"
-                                  "<name>test_%s</name>"
-                                  "<comment>%s</comment>"
-                                  "<resource id=\"%s\">"
-                                  "</resource>"
-                                  "<subject id=\"%s\"><type>%s</type></subject>"
-                                  "</create_permission>",
-                                  related_type, comment ? comment : "",
-                                  related_id, subject_id, subject_type);
-
-                      CHECK_GMPF_RET
-                    }
-
-                  if (str_equal (related_type, "report_format")
-                      || str_equal (related_type, "scanner"))
-                    {
-                      entity = NULL;
-                      ret = gmpf (connection, credentials, NULL, &entity,
-                                  response_data,
-                                  "<create_permission>"
-                                  "<name>verify_%s</name>"
-                                  "<comment>%s</comment>"
-                                  "<resource id=\"%s\">"
-                                  "</resource>"
-                                  "<subject id=\"%s\"><type>%s</type></subject>"
-                                  "</create_permission>",
-                                  related_type, comment ? comment : "",
-                                  related_id, subject_id, subject_type);
-
-                      CHECK_GMPF_RET
-                    }
-                }
-            }
-        }
-    }
-
-  summary_response =
-    g_strdup_printf ("Successfully created %i permissions", successes);
-
-  html = action_result (connection, credentials, params, response_data,
-                        "Create Permissions", summary_response, NULL, NULL);
-
-  g_free (summary_response);
-
-  return html;
-}
-
-#undef CHECK_GMPF_RET
-
-/**
- * @brief Export a permission.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]   credentials          Username and password for authentication.
- * @param[in]   params               Request parameters.
- * @param[out]  response_data        Extra data return for the HTTP response.
- *
- * @return Permission XML on success.  Enveloped XML on error.
- */
-char *
-export_permission_gmp (gvm_connection_t *connection,
-                       gsad_credentials_t *credentials, params_t *params,
-                       gsad_command_response_data_t *response_data)
-{
-  return export_resource (connection, "permission", credentials, params,
-                          response_data);
-}
-
-/**
- * @brief Export a list of permissions.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]   credentials          Username and password for authentication.
- * @param[in]   params               Request parameters.
- * @param[out]  response_data        Extra data return for the HTTP response.
- *
- * @return Permissions XML on success.  Enveloped XML
- *         on error.
- */
-char *
-export_permissions_gmp (gvm_connection_t *connection,
-                        gsad_credentials_t *credentials, params_t *params,
-                        gsad_command_response_data_t *response_data)
-{
-  return export_many (connection, "permission", credentials, params,
-                      response_data);
-}
-
-/**
- * @brief Modify a permission, get all permissions, envelope the result.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-save_permission_gmp (gvm_connection_t *connection,
-                     gsad_credentials_t *credentials, params_t *params,
-                     gsad_command_response_data_t *response_data)
-{
-  gchar *html;
-  const char *permission_id, *name, *comment, *resource_id, *resource_type;
-  const char *subject_id, *subject_type;
-  entity_t entity;
-  int ret;
-
-  permission_id = params_value (params, "permission_id");
-  name = params_value (params, "permission");
-  comment = params_value (params, "comment");
-  subject_type = params_value (params, "subject_type");
-  resource_id = params_value (params, "id_or_empty");
-  resource_type = params_value (params, "optional_resource_type");
-
-  CHECK_VARIABLE_INVALID (permission_id, "Save Permission");
-  CHECK_VARIABLE_INVALID (name, "Save Permission");
-  CHECK_VARIABLE_INVALID (comment, "Save Permission");
-  CHECK_VARIABLE_INVALID (resource_id, "Save Permission");
-  CHECK_VARIABLE_INVALID (subject_type, "Save Permission");
-  if (params_given (params, "optional_resource_type"))
-    CHECK_VARIABLE_INVALID (resource_type, "Save Permission");
-
-  if (strcmp (subject_type, "user") == 0)
-    subject_id = params_value (params, "user_id");
-  else if (strcmp (subject_type, "group") == 0)
-    subject_id = params_value (params, "group_id");
-  else if (strcmp (subject_type, "role") == 0)
-    subject_id = params_value (params, "role_id");
-  else
-    subject_id = NULL;
-  CHECK_VARIABLE_INVALID (subject_id, "Save Permission");
-
-  /* Modify the permission. */
-
-  entity = NULL;
-  ret = gmpf (connection, credentials, NULL, &entity, response_data,
-              "<modify_permission permission_id=\"%s\">"
-              "<name>%s</name>"
-              "<comment>%s</comment>"
-              "<subject id=\"%s\">"
-              "<type>%s</type>"
-              "</subject>"
-              "<resource id=\"%s\">"
-              "<type>%s</type>"
-              "</resource>"
-              "</modify_permission>",
-              permission_id, name, comment, subject_id, subject_type,
-              (resource_id && strlen (resource_id)) ? resource_id : "0",
-              resource_type ? resource_type : "");
-  switch (ret)
-    {
-    case 0:
-      break;
-    case 1:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while modifying a permission. "
-        "The permission was not modified. "
-        "Diagnostics: Failure to send command to manager daemon.",
-        response_data);
-    case 2:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while modifying a permission. "
-        "It is unclear whether the permission has been modified or not. "
-        "Diagnostics: Failure to receive response from manager daemon.",
-        response_data);
-    default:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while modifying a permission. "
-        "It is unclear whether the permission has been modified or not. "
-        "Diagnostics: Internal Error.",
-        response_data);
-    }
-
-  html = response_from_entity (connection, credentials, params, entity,
-                               "Save Permission", response_data);
-  free_entity (entity);
-  return html;
-}
 
 /* Port lists. */
 
@@ -14479,270 +13364,6 @@ import_port_list_gmp (gvm_connection_t *connection,
 
   html = response_from_entity (connection, credentials, params, entity,
                                "Import Port List", response_data);
-  free_entity (entity);
-  return html;
-}
-
-/* Roles. */
-
-/**
- * @brief Delete a role, get all roles, envelope the result.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-delete_role_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
-                 params_t *params, gsad_command_response_data_t *response_data)
-{
-  return move_resource_to_trash (connection, "role", credentials, params,
-                                 response_data);
-}
-
-/**
- * @brief Create a role, get all roles, envelope the result.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-create_role_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
-                 params_t *params, gsad_command_response_data_t *response_data)
-{
-  char *ret;
-  const char *name, *comment, *users;
-  entity_t entity;
-
-  name = params_value (params, "name");
-  comment = params_value (params, "comment");
-  users = params_value (params, "users");
-
-  CHECK_VARIABLE_INVALID (name, "Create Role");
-  CHECK_VARIABLE_INVALID (comment, "Create Role");
-  CHECK_VARIABLE_INVALID (users, "Create Role");
-
-  entity = NULL;
-  switch (gmpf (connection, credentials, NULL, &entity, response_data,
-                "<create_role>"
-                "<name>%s</name>"
-                "<comment>%s</comment>"
-                "<users>%s</users>"
-                "</create_role>",
-                name, comment, users))
-    {
-    case 0:
-      break;
-    case 1:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while creating a new role. "
-        "No new role was created. "
-        "Diagnostics: Failure to send command to manager daemon.",
-        response_data);
-    case 2:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while creating a new role. "
-        "It is unclear whether the role has been created or not. "
-        "Diagnostics: Failure to receive response from manager daemon.",
-        response_data);
-    default:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while creating a new role. "
-        "It is unclear whether the role has been created or not. "
-        "Diagnostics: Internal Error.",
-        response_data);
-    }
-
-  if (entity_attribute (entity, "id"))
-    params_add (params, "role_id", entity_attribute (entity, "id"));
-  ret = response_from_entity (connection, credentials, params, entity,
-                              "Create Role", response_data);
-  free_entity (entity);
-  return ret;
-}
-
-/**
- * @brief Get one role, envelope the result.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[in]  extra_xml    Extra XML to insert inside page element.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-static char *
-get_role (gvm_connection_t *connection, gsad_credentials_t *credentials,
-          params_t *params, const char *extra_xml,
-          gsad_command_response_data_t *response_data)
-{
-  return get_one (connection, "role", credentials, params, extra_xml, NULL,
-                  response_data);
-}
-
-/**
- * @brief Get one role, envelope the result.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-get_role_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
-              params_t *params, gsad_command_response_data_t *response_data)
-{
-  return get_role (connection, credentials, params, NULL, response_data);
-}
-
-/**
- * @brief Get all roles, envelope the result.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-get_roles_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
-               params_t *params, gsad_command_response_data_t *response_data)
-{
-  return get_many (connection, "roles", credentials, params, NULL,
-                   response_data);
-}
-
-/**
- * @brief Export a role.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]   credentials          Username and password for authentication.
- * @param[in]   params               Request parameters.
- * @param[out]  response_data        Extra data return for the HTTP response.
- *
- * @return Role XML on success.  Enveloped XML on error.
- */
-char *
-export_role_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
-                 params_t *params, gsad_command_response_data_t *response_data)
-{
-  return export_resource (connection, "role", credentials, params,
-                          response_data);
-}
-
-/**
- * @brief Export a list of roles.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]   credentials          Username and password for authentication.
- * @param[in]   params               Request parameters.
- * @param[out]  response_data        Extra data return for the HTTP response.
- *
- * @return Roles XML on success.  Enveloped XML
- *         on error.
- */
-char *
-export_roles_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
-                  params_t *params, gsad_command_response_data_t *response_data)
-{
-  return export_many (connection, "role", credentials, params, response_data);
-}
-
-/**
- * @brief Modify a role, return the next page.
- *
- * @param[in]  connection     Connection to manager.
- * @param[in]  credentials  Username and password for authentication.
- * @param[in]  params       Request parameters.
- * @param[out] response_data  Extra data return for the HTTP response.
- *
- * @return Enveloped XML object.
- */
-char *
-save_role_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
-               params_t *params, gsad_command_response_data_t *response_data)
-{
-  int ret;
-  gchar *html;
-  const char *role_id, *name, *comment, *users;
-  entity_t entity;
-
-  role_id = params_value (params, "role_id");
-  name = params_value (params, "name");
-  comment = params_value (params, "comment");
-  users = params_value (params, "users");
-
-  CHECK_VARIABLE_INVALID (role_id, "Save Role");
-  CHECK_VARIABLE_INVALID (name, "Save Role");
-  CHECK_VARIABLE_INVALID (comment, "Save Role");
-  CHECK_VARIABLE_INVALID (users, "Save Role");
-
-  /* Modify the Role. */
-
-  entity = NULL;
-  ret = gmpf (connection, credentials, NULL, &entity, response_data,
-              "<modify_role role_id=\"%s\">"
-              "<name>%s</name>"
-              "<comment>%s</comment>"
-              "<users>%s</users>"
-              "</modify_role>",
-              role_id, name, comment, users);
-
-  switch (ret)
-    {
-    case 0:
-      break;
-    case 1:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while saving a role. "
-        "The role was not saved. "
-        "Diagnostics: Failure to send command to manager daemon.",
-        response_data);
-    case 2:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while saving a role. "
-        "It is unclear whether the role has been saved or not. "
-        "Diagnostics: Failure to receive response from manager daemon.",
-        response_data);
-    default:
-      gsad_command_response_data_set_status_code (
-        response_data, MHD_HTTP_INTERNAL_SERVER_ERROR);
-      return gsad_http_create_gsad_message (
-        credentials,
-        "An internal error occurred while saving a role. "
-        "It is unclear whether the role has been saved or not. "
-        "Diagnostics: Internal Error.",
-        response_data);
-    }
-
-  html = response_from_entity (connection, credentials, params, entity,
-                               "Save Role", response_data);
   free_entity (entity);
   return html;
 }
@@ -15506,24 +14127,18 @@ char *
 create_user_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
                  params_t *params, gsad_command_response_data_t *response_data)
 {
-  const char *name, *password, *hosts, *hosts_allow;
-  const char *auth_method, *comment;
+  const char *name, *password, *auth_method, *comment;
   int ret;
-  params_t *groups, *roles;
-  GString *group_elements, *role_elements, *string;
+  GString *string;
   gchar *buf, *html;
   entity_t entity;
 
   name = params_value (params, "login");
   password = params_value (params, "password");
-  hosts = params_value (params, "access_hosts");
-  hosts_allow = params_value (params, "hosts_allow");
   auth_method = params_value (params, "auth_method");
   comment = params_value (params, "comment");
 
   CHECK_VARIABLE_INVALID (name, "Create User");
-  CHECK_VARIABLE_INVALID (hosts, "Create User");
-  CHECK_VARIABLE_INVALID (hosts_allow, "Create User");
 
   if (auth_method && strcmp (auth_method, "1") == 0)
     {
@@ -15535,67 +14150,13 @@ create_user_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
       CHECK_VARIABLE_INVALID (comment, "Create User");
     }
 
-  /* Create the user. */
-
   string = g_string_new ("<create_user>");
   buf = g_markup_printf_escaped ("<name>%s</name>"
                                  "<password>%s</password>",
                                  name, password ? password : "");
-
   g_string_append (string, buf);
   g_free (buf);
 
-  group_elements = g_string_new ("<groups>");
-  if (params_given (params, "group_id_optional:"))
-    groups = params_values (params, "group_id_optional:");
-  else
-    groups = params_values (params, "group_ids:");
-
-  if (groups)
-    {
-      params_iterator_t iter;
-      char *name;
-      param_t *param;
-
-      params_iterator_init (&iter, groups);
-      while (params_iterator_next (&iter, &name, &param))
-        {
-          if (param->value && strcmp (param->value, "--"))
-            g_string_append_printf (group_elements, "<group id=\"%s\"/>",
-                                    param->value ? param->value : "");
-        }
-    }
-  g_string_append (string, group_elements->str);
-  g_string_free (group_elements, TRUE);
-  g_string_append (string, "</groups>");
-
-  role_elements = g_string_new ("");
-  if (params_given (params, "role_id_optional:"))
-    roles = params_values (params, "role_id_optional:");
-  else
-    roles = params_values (params, "role_ids:");
-
-  if (roles)
-    {
-      params_iterator_t iter;
-      char *name;
-      param_t *param;
-
-      params_iterator_init (&iter, roles);
-      while (params_iterator_next (&iter, &name, &param))
-        {
-          if (param->value && strcmp (param->value, "--"))
-            g_string_append_printf (role_elements, "<role id=\"%s\"/>",
-                                    param->value ? param->value : "");
-        }
-    }
-  g_string_append (string, role_elements->str);
-  g_string_free (role_elements, TRUE);
-
-  buf = g_markup_printf_escaped ("<hosts allow=\"%s\">%s</hosts>", hosts_allow,
-                                 hosts);
-  g_string_append (string, buf);
-  g_free (buf);
   if (auth_method && !strcmp (auth_method, "1"))
     g_string_append (string,
                      "<sources><source>ldap_connect</source></sources>");
@@ -15604,12 +14165,9 @@ create_user_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
                      "<sources><source>radius_connect</source></sources>");
 
   if (comment)
-    {
-      xml_string_append (string, "<comment>%s</comment>", comment);
-    }
+    xml_string_append (string, "<comment>%s</comment>", comment);
 
   g_string_append (string, "</create_user>");
-
   buf = g_string_free (string, FALSE);
 
   entity = NULL;
@@ -15753,17 +14311,11 @@ save_user_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
   int ret;
   gchar *html, *buf;
   const char *user_id, *login, *old_login, *modify_password, *password;
-  const char *hosts, *hosts_allow, *comment;
+  const char *comment;
   entity_t entity;
-  GString *command, *group_elements, *role_elements;
-  params_t *groups, *roles;
+  GString *command;
   gsad_user_t *current_user;
 
-  /* List of hosts user has/lacks access rights. */
-  hosts = params_value (params, "access_hosts");
-  /* Whether hosts grants ("1") or forbids ("0") access.  "2" for all
-   * access. */
-  hosts_allow = params_value (params, "hosts_allow");
   login = params_value (params, "login");
   old_login = params_value (params, "old_login");
   modify_password = params_value (params, "modify_password");
@@ -15773,23 +14325,14 @@ save_user_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
 
   CHECK_VARIABLE_INVALID (user_id, "Save User");
   CHECK_VARIABLE_INVALID (modify_password, "Save User");
-  CHECK_VARIABLE_INVALID (hosts, "Save User");
-  CHECK_VARIABLE_INVALID (hosts_allow, "Save User");
   CHECK_VARIABLE_INVALID (login, "Save User");
   CHECK_VARIABLE_INVALID (old_login, "Save User");
 
   if (modify_password && str_equal (modify_password, "1"))
-    {
-      // require password if modify_password is 1 (== set new password)
-      CHECK_VARIABLE_INVALID (password, "Save User");
-    }
+    CHECK_VARIABLE_INVALID (password, "Save User");
 
   if (params_given (params, "comment"))
-    {
-      CHECK_VARIABLE_INVALID (comment, "Save User");
-    }
-
-  /* Modify the user. */
+    CHECK_VARIABLE_INVALID (comment, "Save User");
 
   command = g_string_new ("");
   buf = g_markup_printf_escaped ("<modify_user user_id=\"%s\">"
@@ -15804,18 +14347,12 @@ save_user_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
 
   if (login
       && current_user
-      /* gvmd forbids users from modifying their own names. */
       && strcmp (login, gsad_user_get_username (current_user)))
     {
       buf = g_markup_printf_escaped ("<new_name>%s</new_name>", login);
       g_string_append (command, buf);
       g_free (buf);
     }
-
-  buf = g_markup_printf_escaped ("<hosts allow=\"%s\">%s</hosts>", hosts_allow,
-                                 hosts);
-  g_string_append (command, buf);
-  g_free (buf);
 
   if (modify_password && !strcmp (modify_password, "2"))
     g_string_append (command,
@@ -15826,63 +14363,8 @@ save_user_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
   else
     g_string_append (command, "<sources><source>file</source></sources>");
 
-  group_elements = g_string_new ("<groups>");
-  if (params_given (params, "group_id_optional:"))
-    groups = params_values (params, "group_id_optional:");
-  else
-    groups = params_values (params, "group_ids:");
-
-  if (groups)
-    {
-      params_iterator_t iter;
-      char *name;
-      param_t *param;
-
-      params_iterator_init (&iter, groups);
-      while (params_iterator_next (&iter, &name, &param))
-        {
-          if (param->value && strcmp (param->value, "--"))
-            g_string_append_printf (group_elements, "<group id=\"%s\"/>",
-                                    param->value ? param->value : "");
-        }
-    }
-  g_string_append (command, group_elements->str);
-  g_string_free (group_elements, TRUE);
-  g_string_append (command, "</groups>");
-
-  role_elements = g_string_new ("");
-  if (params_given (params, "role_id_optional:"))
-    roles = params_values (params, "role_id_optional:");
-  else
-    roles = params_values (params, "role_ids:");
-
-  if (roles)
-    {
-      params_iterator_t iter;
-      char *name;
-      param_t *param;
-
-      params_iterator_init (&iter, roles);
-      while (params_iterator_next (&iter, &name, &param))
-        {
-          if (param->value
-              && strcmp (param->value, "--")
-              /* Skip "Super Admin" which may not be added to a user. */
-              && strcmp (param->value, "9c5a6ec6-6fe2-11e4-8cb6-406186ea4fc5"))
-            g_string_append_printf (role_elements, "<role id=\"%s\"/>",
-                                    param->value ? param->value : "");
-        }
-    }
-  else
-    g_string_append_printf (role_elements, "<role id=\"0\"/>");
-
-  g_string_append (command, role_elements->str);
-  g_string_free (role_elements, TRUE);
-
   if (comment)
-    {
-      xml_string_append (command, "<comment>%s</comment>", comment);
-    }
+    xml_string_append (command, "<comment>%s</comment>", comment);
 
   g_string_append (command, "</modify_user>");
 
@@ -15899,26 +14381,18 @@ save_user_gmp (gvm_connection_t *connection, gsad_credentials_t *credentials,
           if (!str_equal (modify_password, "0")
               || !str_equal (old_login, login))
             {
-              /* logout all other user sessions if new password was set,
-                 authentication type has changed or username has changed */
               if (current_user)
-                {
-                  gsad_session_remove_other_sessions (
-                    gsad_user_get_token (current_user), old_login);
-                }
+                gsad_session_remove_other_sessions (
+                  gsad_user_get_token (current_user), old_login);
             }
 
           if (current_user
               && str_equal (old_login, gsad_user_get_username (current_user)))
             {
-              /* update username of current user */
               gsad_user_set_username (current_user, login);
 
               if (str_equal (modify_password, "1"))
-                {
-                  /* update password of current user */
-                  gsad_user_set_password (current_user, password);
-                }
+                gsad_user_set_password (current_user, password);
             }
         }
       break;
@@ -19141,12 +17615,8 @@ exec_gmp_get (gsad_http_connection_t *con, gsad_connection_info_t *con_info,
   ELSE (export_credentials)
   ELSE (export_filter)
   ELSE (export_filters)
-  ELSE (export_group)
-  ELSE (export_groups)
   ELSE (export_override)
   ELSE (export_overrides)
-  ELSE (export_permission)
-  ELSE (export_permissions)
   ELSE (export_port_list)
   ELSE (export_port_lists)
   ELSE (export_preference_file)
@@ -19156,8 +17626,6 @@ exec_gmp_get (gsad_http_connection_t *con, gsad_connection_info_t *con_info,
   ELSE (export_report_formats)
   ELSE (export_result)
   ELSE (export_results)
-  ELSE (export_role)
-  ELSE (export_roles)
   ELSE (export_scanner)
   ELSE (export_scanners)
   ELSE (export_schedule)
@@ -19194,15 +17662,11 @@ exec_gmp_get (gsad_http_connection_t *con, gsad_connection_info_t *con_info,
   ELSE (get_feeds)
   ELSE (get_filter)
   ELSE (get_filters)
-  ELSE (get_group)
-  ELSE (get_groups)
   ELSE (get_info)
   ELSE (get_license)
   ELSE (get_nvt_families)
   ELSE (get_override)
   ELSE (get_overrides)
-  ELSE (get_permission)
-  ELSE (get_permissions)
   ELSE (get_port_list)
   ELSE (get_port_lists)
   ELSE (get_report)
@@ -19223,8 +17687,6 @@ exec_gmp_get (gsad_http_connection_t *con, gsad_connection_info_t *con_info,
   ELSE (get_resource_names)
   ELSE (get_result)
   ELSE (get_results)
-  ELSE (get_role)
-  ELSE (get_roles)
   ELSE (get_scanner)
   ELSE (get_scanners)
   ELSE (get_schedule)
@@ -19247,13 +17709,10 @@ exec_gmp_get (gsad_http_connection_t *con, gsad_connection_info_t *con_info,
   ELSE (get_trash_configs)
   ELSE (get_trash_credentials)
   ELSE (get_trash_filters)
-  ELSE (get_trash_groups)
   ELSE (get_trash_overrides)
-  ELSE (get_trash_permissions)
   ELSE (get_trash_port_lists)
   ELSE (get_trash_report_configs)
   ELSE (get_trash_report_formats)
-  ELSE (get_trash_roles)
   ELSE (get_trash_scanners)
   ELSE (get_trash_schedules)
   ELSE (get_trash_tags)
@@ -19486,11 +17945,8 @@ exec_gmp_post (gsad_http_connection_t *con, gsad_connection_info_t *con_info,
   ELSE (create_import_task)
   ELSE (create_credential)
   ELSE (create_filter)
-  ELSE (create_group)
   ELSE (create_host)
   ELSE (create_override)
-  ELSE (create_permission)
-  ELSE (create_permissions)
   ELSE (create_port_list)
   ELSE (create_port_range)
   ELSE (create_report)
@@ -19502,7 +17958,6 @@ exec_gmp_post (gsad_http_connection_t *con, gsad_connection_info_t *con_info,
   ELSE (create_target)
   ELSE (create_tls_certificate)
   ELSE (create_user)
-  ELSE (create_role)
   ELSE (create_agent_group)
   ELSE (create_agent_group_task)
   ELSE (delete_agent_group)
@@ -19512,15 +17967,12 @@ exec_gmp_post (gsad_http_connection_t *con, gsad_connection_info_t *con_info,
   ELSE (delete_credential)
   ELSE (delete_filter)
   ELSE (delete_from_trash)
-  ELSE (delete_group)
   ELSE (delete_override)
-  ELSE (delete_permission)
   ELSE (delete_port_list)
   ELSE (delete_port_range)
   ELSE (delete_report)
   ELSE (delete_report_config)
   ELSE (delete_report_format)
-  ELSE (delete_role)
   ELSE (delete_scanner)
   ELSE (delete_schedule)
   ELSE (delete_tag)
@@ -19553,14 +18005,11 @@ exec_gmp_post (gsad_http_connection_t *con, gsad_connection_info_t *con_info,
   ELSE (save_config_nvt)
   ELSE (save_credential)
   ELSE (save_filter)
-  ELSE (save_group)
   ELSE (save_license)
   ELSE (save_override)
-  ELSE (save_permission)
   ELSE (save_port_list)
   ELSE (save_report_config)
   ELSE (save_report_format)
-  ELSE (save_role)
   ELSE (save_scanner)
   ELSE (save_schedule)
   ELSE (save_tag)

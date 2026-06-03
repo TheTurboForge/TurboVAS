@@ -96,7 +96,6 @@
 #include "manage_nvts.h"
 #include "manage_report_export_scheduler.h"
 #include "manage_runtime_flags.h"
-#include "manage_roles.h"
 #include "manage_scan_queue.h"
 #include "manage_scanner_relays.h"
 #include "manage_settings.h"
@@ -2400,7 +2399,6 @@ gvmd (int argc, char** argv, char *env[])
   static gchar *encryption_key_type = NULL;
   static int encryption_key_length = 0;
   static gchar *set_encryption_key = NULL;
-  static gboolean get_roles = FALSE;
   static gboolean get_users = FALSE;
   static gboolean get_scanners = FALSE;
   static gboolean foreground = FALSE;
@@ -2615,10 +2613,6 @@ gvmd (int argc, char** argv, char *env[])
         { "foreground", 'f', 0, G_OPTION_ARG_NONE,
           &foreground,
           "Run in foreground.",
-          NULL },
-        { "get-roles", '\0', 0, G_OPTION_ARG_NONE,
-          &get_roles,
-          "List roles and exit.",
           NULL },
         { "get-scanners", '\0', 0, G_OPTION_ARG_NONE,
           &get_scanners,
@@ -3744,24 +3738,6 @@ gvmd (int argc, char** argv, char *env[])
         return EXIT_FAILURE;
 
       ret = manage_delete_user (log_config, &database, delete_user, inheritor);
-      log_config_free ();
-      if (ret)
-        return EXIT_FAILURE;
-      return EXIT_SUCCESS;
-    }
-
-  if (get_roles)
-    {
-      int ret;
-
-      setproctitle ("Getting roles");
-
-      if (option_lock (&lockfile_checking))
-        return EXIT_FAILURE;
-
-      set_skip_update_nvti_cache (TRUE);
-      ret = manage_get_roles (log_config, &database, verbose);
-      set_skip_update_nvti_cache (FALSE);
       log_config_free ();
       if (ret)
         return EXIT_FAILURE;

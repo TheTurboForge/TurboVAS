@@ -82,7 +82,7 @@ describe('Task StopIcon component tests', () => {
     fireEvent.click(element);
 
     expect(clickHandler).not.toHaveBeenCalled();
-    expect(element).toHaveAttribute('title', 'Permission to stop task denied');
+    expect(element).toHaveAttribute('title', 'Stop task command unavailable');
     expect(element).toHaveAttribute('disabled');
     expect(element).toHaveAttribute('data-disabled', 'true');
   });

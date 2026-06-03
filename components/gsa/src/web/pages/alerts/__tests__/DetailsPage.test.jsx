@@ -151,13 +151,6 @@ describe('Alert DetailsPage tests', () => {
     );
     expect(entityInfo).toHaveTextContent('Owner:admin');
 
-    expect(
-      screen.getByRole('tab', {name: /^information/i}),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('tab', {name: /^user tags/i})).toBeInTheDocument();
-    expect(
-      screen.getByRole('tab', {name: /^permissions/i}),
-    ).toBeInTheDocument();
 
     expect(
       screen.getByRole('row', {name: /^comment bar/i}),
@@ -197,24 +190,6 @@ describe('Alert DetailsPage tests', () => {
     expect(container).toHaveTextContent('No user tags available');
   });
 
-  test('should render permissions tab', () => {
-    const gmp = createGmp();
-
-    const {render, store} = rendererWith({
-      capabilities: true,
-      gmp,
-      router: true,
-      store: true,
-    });
-
-    store.dispatch(entityLoadingActions.success('12345', alert));
-
-    const {container} = render(<DetailsPage id="12345" />);
-
-    const permissionsTab = screen.getByRole('tab', {name: /^permissions/i});
-    fireEvent.click(permissionsTab);
-    expect(container).toHaveTextContent('No permissions available');
-  });
 
   test('should call commands', async () => {
     const gmp = createGmp();
@@ -375,7 +350,7 @@ describe('Alert ToolBarIcons tests', () => {
     const editIcon = screen.getByTestId('edit-icon');
     expect(editIcon).toHaveAttribute(
       'title',
-      'Permission to edit Alert denied',
+      'Edit Alert command unavailable',
     );
     fireEvent.click(editIcon);
     expect(handleAlertEditClick).not.toHaveBeenCalled();
@@ -383,7 +358,7 @@ describe('Alert ToolBarIcons tests', () => {
     const deleteIcon = screen.getByTestId('trashcan-icon');
     expect(deleteIcon).toHaveAttribute(
       'title',
-      'Permission to move Alert to trashcan denied',
+      'Move Alert to trashcan command unavailable',
     );
     fireEvent.click(deleteIcon);
     expect(handleAlertDeleteClick).not.toHaveBeenCalled();

@@ -34,14 +34,6 @@ const user = User.fromElement({
   owner: {name: 'admin'},
   permissions: {permission: {name: 'Everything'}},
   writable: 1,
-  role: {_id: 'role1', name: 'Admin'},
-  groups: {
-    group: [{_id: 'group1', name: 'Group 1'}],
-  },
-  hosts: {
-    __text: '192.168.1.1',
-    _allow: '0',
-  },
 });
 
 const reloadInterval = -1;
@@ -112,15 +104,6 @@ const createGmp = ({
     reloadInterval,
   },
   session: createSession(),
-  permissions: {
-    get: testing.fn().mockResolvedValue({
-      data: [],
-      meta: {
-        filter: Filter.fromString(),
-        counts: new CollectionCounts(),
-      },
-    }),
-  },
 });
 
 const wrongCaps = new Capabilities(['get_configs']);
@@ -172,15 +155,6 @@ describe('UsersListPage tests', () => {
       screen.getByRole('columnheader', {name: /name/i}),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('columnheader', {name: /roles/i}),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('columnheader', {name: /groups/i}),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('columnheader', {name: /host access/i}),
-    ).toBeInTheDocument();
-    expect(
       screen.getByRole('columnheader', {name: /actions/i}),
     ).toBeInTheDocument();
 
@@ -188,8 +162,6 @@ describe('UsersListPage tests', () => {
     expect(
       screen.getByRole('cell', {name: /user 1 \(test comment\)/i}),
     ).toBeInTheDocument();
-    expect(screen.getByRole('cell', {name: /admin/i})).toBeInTheDocument();
-    expect(screen.getByRole('cell', {name: /group 1/i})).toBeInTheDocument();
 
     // table row actions
     expect(screen.getByTitle('Delete User')).toBeInTheDocument();

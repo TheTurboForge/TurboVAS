@@ -221,18 +221,18 @@ const loggedInRoutes = [
         }),
       },
 
-      // Group routes
+      // Removed RBAC routes
       {
         path: 'groups',
-        lazy: async () => ({
-          Component: (await import('web/pages/groups/ListPage')).default,
-        }),
+        loader: () => {
+          throw redirect('/tasks');
+        },
       },
       {
         path: 'group/:id',
-        lazy: async () => ({
-          Component: (await import('web/pages/groups/DetailsPage')).default,
-        }),
+        loader: () => {
+          throw redirect('/tasks');
+        },
       },
 
       // Host routes
@@ -322,21 +322,17 @@ const loggedInRoutes = [
         }),
       },
 
-      // Permission routes
       {
         path: 'permissions',
-        lazy: async () => ({
-          Component: (await import('web/pages/permissions/PermissionListPage'))
-            .default,
-        }),
+        loader: () => {
+          throw redirect('/tasks');
+        },
       },
       {
         path: 'permission/:id',
-        lazy: async () => ({
-          Component: (
-            await import('web/pages/permissions/PermissionDetailsPage')
-          ).default,
-        }),
+        loader: () => {
+          throw redirect('/tasks');
+        },
       },
 
       // Port List routes
@@ -464,18 +460,17 @@ const loggedInRoutes = [
         }),
       },
 
-      // Role routes
       {
         path: 'roles',
-        lazy: async () => ({
-          Component: (await import('web/pages/roles/RoleListPage')).default,
-        }),
+        loader: () => {
+          throw redirect('/tasks');
+        },
       },
       {
         path: 'role/:id',
-        lazy: async () => ({
-          Component: (await import('web/pages/roles/RoleDetailsPage')).default,
-        }),
+        loader: () => {
+          throw redirect('/tasks');
+        },
       },
 
       // Scan Config routes

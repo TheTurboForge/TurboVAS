@@ -61,7 +61,7 @@ const EntityVerifyIcon = <TEntity extends EntityVerify>({
     } else if (!mayVerify) {
       title = _('{{entity}} may not be verified', {entity: displayName});
     } else {
-      title = _('Permission to verify {{entity}} denied', {
+      title = _('Verify {{entity}} command unavailable', {
         entity: displayName,
       });
     }

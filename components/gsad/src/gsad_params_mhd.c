@@ -110,8 +110,7 @@ params_mhd_append (params_t *params, const gchar *name, const gchar *filename,
    * For example multiple instances of "x:" in the request
    *  become "x:1", "x:2", "x:3", etc.
    */
-  if ((strcmp (name, "alert_ids:") == 0) || (strcmp (name, "role_ids:") == 0)
-      || (strcmp (name, "group_ids:") == 0)
+  if ((strcmp (name, "alert_ids:") == 0)
       || (strcmp (name, "report_format_ids:") == 0)
       || (strcmp (name, "id_list:") == 0)
       || (strcmp (name, "resource_ids:") == 0) || (strcmp (name, "kdcs:") == 0)
@@ -238,8 +237,7 @@ params_mhd_add (void *params, enum MHD_ValueKind kind, const gchar *name,
   /*
    * Array param (See params_append_mhd for a description)
    */
-  if ((strcmp (name, "alert_ids:") == 0) || (strcmp (name, "role_ids:") == 0)
-      || (strcmp (name, "group_ids:") == 0)
+  if ((strcmp (name, "alert_ids:") == 0)
       || (strcmp (name, "report_format_ids:") == 0)
       || (strcmp (name, "id_list:") == 0) || (strcmp (name, "agent_ids:") == 0)
       || (strcmp (name, "scheduler_cron_times:") == 0)

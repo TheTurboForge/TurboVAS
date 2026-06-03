@@ -1,14 +1,12 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
 import React from 'react';
-import {map} from 'gmp/utils/array';
 import ExportIcon from 'web/components/icon/ExportIcon';
-import HorizontalSeparator from 'web/components/layout/HorizontalSep';
 import IconDivider from 'web/components/layout/IconDivider';
-import DetailsLink from 'web/components/link/DetailsLink';
 import TableData from 'web/components/table/TableData';
 import TableRow from 'web/components/table/TableRow';
 import EntityNameTableData from 'web/entities/EntityNameTableData';
@@ -17,7 +15,7 @@ import CloneIcon from 'web/entity/icon/CloneIcon';
 import DeleteIcon from 'web/entity/icon/DeleteIcon';
 import EditIcon from 'web/entity/icon/EditIcon';
 import useTranslation from 'web/hooks/useTranslation';
-import {convert_auth_method, convert_allow} from 'web/pages/users/Details';
+import {convert_auth_method} from 'web/pages/users/Details';
 import PropTypes from 'web/utils/PropTypes';
 
 const Actions = withEntitiesActions(
@@ -47,7 +45,6 @@ const Actions = withEntitiesActions(
         <CloneIcon
           displayName={_('User')}
           entity={entity}
-          mayClone={!entity.isSuperAdmin()}
           name="user"
           title={_('Clone User')}
           value={entity}
@@ -79,20 +76,7 @@ const Row = ({
   ...props
 }) => {
   const [_] = useTranslation();
-  const roles = map(entity.roles, role => (
-    <DetailsLink key={role.id} id={role.id} textOnly={!links} type="role">
-      {role.name}
-    </DetailsLink>
-  ));
-
-  const groups = map(entity.groups, group => (
-    <DetailsLink key={group.id} id={group.id} textOnly={!links} type="group">
-      {group.name}
-    </DetailsLink>
-  ));
-
   const authMethod = convert_auth_method(entity.authMethod, _);
-  const host_allow = convert_allow(entity.hosts, _).replace(/&#x2F;/g, '/');
   return (
     <TableRow>
       <EntityNameTableData
@@ -102,13 +86,6 @@ const Row = ({
         type="user"
         onToggleDetailsClick={onToggleDetailsClick}
       />
-      <TableData>
-        <HorizontalSeparator $wrap>{roles}</HorizontalSeparator>
-      </TableData>
-      <TableData>
-        <HorizontalSeparator $wrap>{groups}</HorizontalSeparator>
-      </TableData>
-      <TableData>{host_allow}</TableData>
       <TableData>{authMethod}</TableData>
       <ActionsComponent {...props} entity={entity} />
     </TableRow>

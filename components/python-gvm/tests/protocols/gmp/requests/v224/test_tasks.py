@@ -240,25 +240,6 @@ class TasksTestCase(unittest.TestCase):
                 schedule_periods="invalid",
             )
 
-    def test_create_task_with_observers(self):
-        request = Tasks().create_task(
-            "name",
-            target_id="target_id",
-            config_id="config_id",
-            scanner_id="scanner_id",
-            observers=["observer_id1", "observer_id2"],
-        )
-        self.assertEqual(
-            bytes(request),
-            b"<create_task>"
-            b"<name>name</name>"
-            b"<usage_type>scan</usage_type>"
-            b'<config id="config_id"/>'
-            b'<target id="target_id"/>'
-            b'<scanner id="scanner_id"/>'
-            b"<observers>observer_id1,observer_id2</observers>"
-            b"</create_task>",
-        )
 
     def test_create_task_with_preferences(self):
         request = Tasks().create_task(
@@ -599,23 +580,6 @@ class TasksTestCase(unittest.TestCase):
             b'<modify_task task_id="task_id"><alert id="0"/></modify_task>',
         )
 
-    def test_modify_task_with_observers(self):
-        request = Tasks().modify_task(
-            "task_id", observers=["observer_id1", "observer_id2"]
-        )
-        self.assertEqual(
-            bytes(request),
-            b'<modify_task task_id="task_id">'
-            b"<observers>observer_id1,observer_id2</observers>"
-            b"</modify_task>",
-        )
-        request = Tasks().modify_task("task_id", observers=[])
-        self.assertEqual(
-            bytes(request),
-            b'<modify_task task_id="task_id">'
-            b"<observers></observers>"
-            b"</modify_task>",
-        )
 
     def test_modify_task_with_preferences(self):
         request = Tasks().modify_task(

@@ -574,15 +574,6 @@ Lists filters.
 
 Returns Filter Name, uuid, type, and the term (filter)
 
-## `list-groups.gmp.py`
-
-Lists all groups
-
-### Example
-
-`$ gvm-script --gmp-username *admin-user* --gmp-password *password* socket list-groups.gmp.py`
-
-Returns Group Name, uuid, members
 
 ## `list-portlists.gmp.py`
 
@@ -612,14 +603,6 @@ where status is "All", "Requested", "Queued", "Interrupted", "Running", "Stop Re
 - Script now shows, in percentage, how far the scan/report is.
 - There are no reports generated before at least one scan task has been started.
 
-## `list-roles.gmp.py`
-
-Lists all roles
-
-### Example
-`$ gvm-script --gmp-username *admin-user* --gmp-password *password* socket list-roles.gmp.py`
-
-Returns Role Name, uuid, members
 
 ## `list-scan-configs.gmp.py`
 
@@ -676,7 +659,7 @@ Lists all users
 
 `$ gvm-script --gmp-username *admin-user* --gmp-password *password* socket list-users.gmp.py`
 
-Returns user Name, uuid, role, groups
+Returns user name and uuid
 
 ¹ The default order is "None" which equals sequential, meaning that if this field is empty scanning will be sequential as it will be if specifically set to sequential. Possible results are None, Sequential, Reverse, or Random.
 

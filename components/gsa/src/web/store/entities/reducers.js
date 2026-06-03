@@ -11,12 +11,10 @@ import {reducer as credential} from 'web/store/entities/credentials';
 import {reducer as cve} from 'web/store/entities/cves';
 import {reducer as dfncert} from 'web/store/entities/dfncerts';
 import {reducer as filter} from 'web/store/entities/filters';
-import {reducer as group} from 'web/store/entities/groups';
 import {reducer as host} from 'web/store/entities/hosts';
 import {reducer as nvt} from 'web/store/entities/nvts';
 import {reducer as operatingsystem} from 'web/store/entities/operatingsystems';
 import {reducer as override} from 'web/store/entities/overrides';
-import {reducer as permission} from 'web/store/entities/permissions';
 import {reducer as portlist} from 'web/store/entities/portlists';
 import {reducer as reportconfig} from 'web/store/entities/reportconfigs';
 import {reducer as reportformat} from 'web/store/entities/reportformats';
@@ -25,7 +23,6 @@ import {
   deltaReducer as deltaReport,
 } from 'web/store/entities/reports';
 import {reducer as result} from 'web/store/entities/results';
-import {reducer as role} from 'web/store/entities/roles';
 import {reducer as scanconfig} from 'web/store/entities/scanconfigs';
 import {reducer as scanner} from 'web/store/entities/scanners';
 import {reducer as schedule} from 'web/store/entities/schedules';
@@ -45,18 +42,15 @@ const entitiesReducer = combineReducers({
   deltaReport,
   dfncert,
   filter,
-  group,
   host,
   nvt,
   operatingsystem,
   override,
-  permission,
   portlist,
   reportconfig,
   reportformat,
   report,
   result,
-  role,
   scanconfig,
   scanner,
   schedule,

@@ -169,9 +169,9 @@ describe('OverrideDetailsPageToolBarIcons tests', () => {
     );
 
     const cloneIcon = screen.getByTitle('Clone Override');
-    const editIcon = screen.getByTitle('Permission to edit Override denied');
+    const editIcon = screen.getByTitle('Edit Override command unavailable');
     const deleteIcon = screen.getByTitle(
-      'Permission to move Override to trashcan denied',
+      'Move Override to trashcan command unavailable',
     );
     const exportIcon = screen.getByTitle('Export Override as XML');
 

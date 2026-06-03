@@ -41,7 +41,7 @@ const EntitySettingsIcon = ({
     } else if (!entity.isWritable()) {
       title = _('{{entity}} settings is not writable', {entity: displayName});
     } else if (!mayEditSettings) {
-      title = _('Permission to edit {{entity}} settings denied', {
+      title = _('Edit {{entity}} settings command unavailable', {
         entity: displayName,
       });
     } else {

@@ -25,18 +25,15 @@ from ._dfn_cert_advisories import DfnCertAdvisories
 from ._entity_type import EntityType
 from ._feed import Feed, FeedType
 from ._filters import Filters, FilterType
-from ._groups import Groups
 from ._help import Help, HelpFormat
 from ._hosts import Hosts, HostsOrdering
 from ._nvts import Nvts
 from ._operating_systems import OperatingSystems
 from ._overrides import Overrides
-from ._permissions import Permissions, PermissionSubjectType
 from ._port_lists import PortLists, PortRangeType
 from ._report_formats import ReportFormats, ReportFormatType
 from ._reports import Reports
 from ._results import Results
-from ._roles import Roles
 from ._scan_configs import ScanConfigs
 from ._scanners import Scanners, ScannerType
 from ._schedules import Schedules
@@ -74,7 +71,6 @@ __all__ = (
     "FeedType",
     "FilterType",
     "Filters",
-    "Groups",
     "Help",
     "HelpFormat",
     "Hosts",
@@ -83,15 +79,12 @@ __all__ = (
     "Nvts",
     "OperatingSystems",
     "Overrides",
-    "PermissionSubjectType",
-    "Permissions",
     "PortLists",
     "PortRangeType",
     "ReportFormatType",
     "ReportFormats",
     "Reports",
     "Results",
-    "Roles",
     "ScanConfigs",
     "ScannerType",
     "Scanners",

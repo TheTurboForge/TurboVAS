@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -17,18 +18,6 @@ export const SORT_FIELDS = [
     displayName: _l('Name'),
   },
   {
-    name: 'roles',
-    displayName: _l('Roles'),
-  },
-  {
-    name: 'groups',
-    displayName: _l('Groups'),
-  },
-  {
-    name: 'host_access',
-    displayName: _l('Host Access'),
-  },
-  {
     name: 'ldap',
     displayName: _l('Authentication Type'),
   },
@@ -41,7 +30,7 @@ const UsersTable = createEntitiesTable({
   rowDetails: withRowDetails('user')(UserDetails),
   footer: createEntitiesFooter({
     download: 'users.xml',
-    span: 7,
+    span: 4,
     delete: true,
   }),
 });

@@ -66,7 +66,7 @@ const EntityCloneIcon = <TEntity extends EntityClone>({
     } else if (!mayClone) {
       title = _('{{entity}} may not be cloned', {entity: displayName});
     } else {
-      title = _('Permission to clone {{entity}} denied', {entity: displayName});
+      title = _('Clone {{entity}} command unavailable', {entity: displayName});
     }
   }
   return (

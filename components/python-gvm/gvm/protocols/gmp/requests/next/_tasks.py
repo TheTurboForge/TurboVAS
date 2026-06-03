@@ -7,7 +7,7 @@ from numbers import Integral
 
 from gvm.errors import InvalidArgument, RequiredArgument
 from gvm.protocols.core import Request
-from gvm.utils import SupportsStr, deprecated, to_bool, to_comma_list
+from gvm.utils import SupportsStr, deprecated, to_bool
 from gvm.xml import XmlCommand
 
 from .._entity_id import EntityID
@@ -43,7 +43,6 @@ class Tasks:
         schedule_id: EntityID | None = None,
         alert_ids: Sequence[EntityID] | None = None,
         schedule_periods: int | None = None,
-        observers: Sequence[str] | None = None,
         preferences: Mapping[str, SupportsStr] | None = None,
     ) -> Request:
         """Create a new scan task using an agent group.
@@ -57,7 +56,6 @@ class Tasks:
             alert_ids: List of UUIDs for alerts to be applied to the task.
             schedule_id: UUID of a schedule when the task should be run.
             schedule_periods: Limit to number of scheduled runs, 0 for unlimited.
-            observers: List of usernames or IDs allowed to observe the task.
             preferences: Scanner preferences as name/value pairs.
         """
         if not name:
@@ -106,8 +104,6 @@ class Tasks:
                     )
                 cmd.add_element("schedule_periods", str(schedule_periods))
 
-        if observers:
-            cmd.add_element("observers", to_comma_list(observers))
 
         if preferences is not None:
             xml_prefs = cmd.add_element("preferences")
@@ -172,7 +168,6 @@ class Tasks:
         alert_ids: Sequence[EntityID] | None = None,
         comment: str | None = None,
         schedule_periods: int | None = None,
-        observers: Sequence[str] | None = None,
         preferences: Mapping[str, SupportsStr] | None = None,
     ) -> Request:
         """Create a new scan task
@@ -189,7 +184,6 @@ class Tasks:
             schedule_id: UUID of a schedule when the task should be run.
             schedule_periods: A limit to the number of times the task will be
                 scheduled, or 0 for no limit
-            observers: List of names or ids of users which should be allowed to
                 observe this task
             preferences: Name/Value pairs of scanner preferences.
         """
@@ -255,11 +249,6 @@ class Tasks:
                     )
                 cmd.add_element("schedule_periods", str(schedule_periods))
 
-        if observers:
-            # gvmd splits by comma and space
-            # gvmd tries to lookup each value as user name and afterwards as
-            # user id. So both user name and user id are possible
-            cmd.add_element("observers", to_comma_list(observers))
 
         if preferences is not None:
             xml_prefs = cmd.add_element("preferences")
@@ -368,7 +357,6 @@ class Tasks:
         schedule_periods: int | None = None,
         comment: str | None = None,
         alert_ids: Sequence[EntityID] | None = None,
-        observers: Sequence[str] | None = None,
         preferences: Mapping[str, SupportsStr] | None = None,
     ) -> Request:
         """Modifies an existing task.
@@ -386,7 +374,6 @@ class Tasks:
             schedule_id: UUID of a schedule when the task should be run.
             schedule_periods: A limit to the number of times the task will be
                 scheduled, or 0 for no limit.
-            observers: List of names or ids of users which should be allowed to
                 observe this task
             preferences: Name/Value pairs of scanner preferences.
         """
@@ -462,8 +449,6 @@ class Tasks:
                 for alert in alert_ids:
                     cmd.add_element("alert", attrs={"id": str(alert)})
 
-        if observers is not None:
-            cmd.add_element("observers", to_comma_list(observers))
 
         if preferences is not None:
             xml_prefs = cmd.add_element("preferences")

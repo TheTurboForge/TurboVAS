@@ -715,12 +715,12 @@ describe('Task ToolBarIcons tests', () => {
     fireEvent.click(cloneIcon);
     expect(handleTaskClone).toHaveBeenCalledWith(task);
 
-    const editIcon = screen.getByTitle('Permission to edit Task denied');
+    const editIcon = screen.getByTitle('Edit Task command unavailable');
     fireEvent.click(editIcon);
     expect(handleTaskEdit).not.toHaveBeenCalled();
 
     const deleteIcon = screen.getByTitle(
-      'Permission to move Task to trashcan denied',
+      'Move Task to trashcan command unavailable',
     );
     fireEvent.click(deleteIcon);
     expect(handleTaskDelete).not.toHaveBeenCalled();
@@ -729,7 +729,7 @@ describe('Task ToolBarIcons tests', () => {
     fireEvent.click(exportIcon);
     expect(handleTaskDownload).toHaveBeenCalledWith(task);
 
-    const startIcon = screen.getByTitle('Permission to start task denied');
+    const startIcon = screen.getByTitle('Start task command unavailable');
     fireEvent.click(startIcon);
     expect(handleTaskStart).not.toHaveBeenCalled();
 

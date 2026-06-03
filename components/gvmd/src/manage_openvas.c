@@ -11,7 +11,6 @@
 #include "manage_openvas.h"
 #include "manage_sql.h"
 #include "manage_sql_targets.h"
-#include "manage_users.h"
 
 #undef G_LOG_DOMAIN
 /**
@@ -40,27 +39,7 @@ const size_t target_credential_getters_count
 void
 add_user_scan_preferences (GHashTable *scanner_options)
 {
-  gchar *hosts, *name;
-  int hosts_allow;
-
-  // Limit access to hosts
-  hosts = user_hosts (current_credentials.uuid);
-  hosts_allow = user_hosts_allow (current_credentials.uuid);
-
-  if (hosts_allow == 1)
-    name = g_strdup ("hosts_allow");
-  else if (hosts_allow == 0)
-    name = g_strdup ("hosts_deny");
-  else
-    name = NULL;
-
-  if (name
-      && (hosts_allow || (hosts && strlen (hosts))))
-    g_hash_table_replace (scanner_options,
-                          name,
-                          hosts ? hosts : g_strdup (""));
-  else
-    g_free (hosts);
+  (void) scanner_options;
 }
 
 #if ENABLE_CREDENTIAL_STORES

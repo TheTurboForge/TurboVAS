@@ -35,13 +35,10 @@ import AlertsTable from 'web/pages/alerts/Table';
 import CredentialTable from 'web/pages/credentials/CredentialTable';
 import TrashActions from 'web/pages/extras/TrashActions';
 import FiltersTable from 'web/pages/filters/Table';
-import GroupsTable from 'web/pages/groups/Table';
 import OverridesTable from 'web/pages/overrides/Table';
-import PermissionsTable from 'web/pages/permissions/PermissionTable';
 import PortListTable from 'web/pages/portlists/PortListTable';
 import ReportConfigsTable from 'web/pages/reportconfigs/Table';
 import ReportFormatsTable from 'web/pages/reportformats/Table';
-import RolesTable from 'web/pages/roles/RoleTable';
 import ScanConfigsTable from 'web/pages/scanconfigs/Table';
 import ScannerTable from 'web/pages/scanners/ScannerTable';
 import SchedulesTable from 'web/pages/schedules/Table';
@@ -262,27 +259,12 @@ const TrashCan = () => {
             <FiltersTable entities={trash.filters} {...tableProps} />
           </span>
         )}
-        {hasEntities(trash?.groups) && (
-          <span>
-            <LinkTarget id="group" />
-            <h1>{_('Groups')}</h1>
-            <GroupsTable entities={trash.groups} {...tableProps} />
-          </span>
-        )}
         {hasEntities(trash?.overrides) && (
           <span>
             <LinkTarget id="override" />
             <h1>{_('Overrides')}</h1>
             {/* @ts-expect-error */}
             <OverridesTable entities={trash.overrides} {...tableProps} />
-          </span>
-        )}
-        {hasEntities(trash?.permissions) && (
-          <span>
-            <LinkTarget id="permission" />
-            <h1>{_('Permissions')}</h1>
-            {/* @ts-expect-error */}
-            <PermissionsTable entities={trash.permissions} {...tableProps} />
           </span>
         )}
         {hasEntities(trash?.portLists) && (
@@ -311,14 +293,6 @@ const TrashCan = () => {
               entities={trash.reportFormats}
               {...tableProps}
             />
-          </span>
-        )}
-        {hasEntities(trash?.roles) && (
-          <span>
-            <LinkTarget id="role" />
-            <h1>{_('Roles')}</h1>
-            {/* @ts-expect-error */}
-            <RolesTable entities={trash.roles} {...tableProps} />
           </span>
         )}
         {hasEntities(trash?.scanConfigs) && (

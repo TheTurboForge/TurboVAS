@@ -160,14 +160,6 @@ class GmpModifyTaskTestMixin:
         with self.assertRaises(InvalidArgument):
             self.gmp.modify_task(task_id="t1", schedule_periods=-1)
 
-    def test_modify_task_with_observers(self):
-        self.gmp.modify_task(task_id="t1", observers=["u1", "u2"])
-
-        self.connection.send.has_been_called_with(
-            b'<modify_task task_id="t1">'
-            b"<observers>u1,u2</observers>"
-            b"</modify_task>"
-        )
 
     def test_modify_task_with_preferences(self):
         self.gmp.modify_task(

@@ -55,7 +55,7 @@ describe('Task ResumeIcon component tests', () => {
     expect(clickHandler).not.toHaveBeenCalled();
     expect(element).toHaveAttribute(
       'title',
-      'Permission to resume task denied',
+      'Resume task command unavailable',
     );
     expect(element).toHaveAttribute('disabled');
     expect(element).toHaveAttribute('data-disabled', 'true');

@@ -40,7 +40,7 @@ const Actions = compose(
   if (can_create_target) {
     new_title = _('Create Target from Host');
   } else {
-    new_title = _('Permission to create Target denied');
+    new_title = _('Create Target command unavailable');
   }
   return (
     <IconDivider grow align={['center', 'center']}>

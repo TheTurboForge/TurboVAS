@@ -32,7 +32,7 @@ const TaskStopIcon = <TTask extends Task>({
       return (
         <StopIcon
           active={false}
-          title={_('Permission to stop {{type}} denied', {type})}
+          title={_('Stop {{type}} command unavailable', {type})}
         />
       );
     }

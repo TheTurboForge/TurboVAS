@@ -29,15 +29,9 @@ const UserComponent = props => {
   const [_] = useTranslation();
 
   const [dialogVisible, setDialogVisible] = useState(false);
-  const [accessHosts, setAccessHosts] = useState();
   const [comment, setComment] = useState();
-  const [groupIds, setGroupIds] = useState();
-  const [groups, setGroups] = useState();
-  const [hostsAllow, setHostsAllow] = useState();
   const [name, setName] = useState();
   const [oldName, setOldName] = useState();
-  const [roleIds, setRoleIds] = useState();
-  const [roles, setRoles] = useState();
   const [settings, setSettings] = useState();
   const [title, setTitle] = useState();
   const [user, setUser] = useState();
@@ -52,43 +46,20 @@ const UserComponent = props => {
 
   const openUserDialog = async user => {
     try {
-      const [groupsResponse, rolesResponse, authSettingsResponse] =
-        await Promise.all([
-          gmp.groups.getAll({
-            filter: 'permission=modify_group', //  list only groups current user may modify
-          }),
-          gmp.roles.getAll(),
-          gmp.user.currentAuthSettings(),
-        ]);
-
-      setGroups(groupsResponse.data);
-      setRoles(rolesResponse.data);
-
-      const settings = authSettingsResponse.data;
-      setSettings(settings);
+      const authSettingsResponse = await gmp.user.currentAuthSettings();
+      setSettings(authSettingsResponse.data);
       setDialogVisible(true);
 
       if (isDefined(user)) {
-        const newGroupIds = user.groups.map(group => group.id);
-        const newRoleIds = user.roles.map(role => role.id);
-
-        setAccessHosts(user.hosts.addresses.join(', '));
         setComment(user.comment);
-        setGroupIds(newGroupIds);
-        setHostsAllow(user.hosts.allow);
         setName(user.name);
         setOldName(user.name);
-        setRoleIds(newRoleIds);
         setTitle(_('Edit User {{- name}}', user));
         setUser(user);
       } else {
-        setAccessHosts(undefined);
         setComment(undefined);
-        setGroupIds(undefined);
-        setHostsAllow(undefined);
         setName(undefined);
         setOldName(undefined);
-        setRoleIds(undefined);
         setTitle(undefined);
         setUser(undefined);
       }
@@ -120,15 +91,9 @@ const UserComponent = props => {
           })}
           {dialogVisible && (
             <UserDialog
-              accessHosts={accessHosts}
               comment={comment}
-              groupIds={groupIds}
-              groups={groups}
-              hostsAllow={hostsAllow}
               name={name}
               oldName={oldName}
-              roleIds={roleIds}
-              roles={roles}
               settings={settings}
               title={title}
               user={user}

@@ -122,54 +122,6 @@ describe('Scan Config row tests', () => {
     expect(element).toHaveTextContent('(Deprecated)');
   });
 
-  test('should render observer icon', () => {
-    const config = ScanConfig.fromElement({
-      _id: '1234',
-      name: 'foo',
-      comment: 'bar',
-      in_use: 0,
-      writable: 1,
-      owner: {
-        name: 'user',
-      },
-      permissions: {permission: [{name: 'everything'}]},
-      family_count: {
-        __text: 2,
-        growing: SCANCONFIG_TREND_STATIC,
-      },
-      nvt_count: {
-        __text: 4,
-        growing: SCANCONFIG_TREND_DYNAMIC,
-      },
-    });
-
-    const handleToggleDetailsClick = testing.fn();
-    const handleScanConfigClone = testing.fn();
-    const handleScanConfigDelete = testing.fn();
-    const handleScanConfigDownload = testing.fn();
-    const handleScanConfigEdit = testing.fn();
-    const handleOpenEditNvtDetailsDialog = testing.fn();
-
-    const {render} = rendererWithTableBody({
-      gmp: createGmp(),
-      capabilities: true,
-      store: true,
-    });
-    render(
-      <Row
-        entity={config}
-        openEditNvtDetailsDialog={handleOpenEditNvtDetailsDialog}
-        onScanConfigCloneClick={handleScanConfigClone}
-        onScanConfigDeleteClick={handleScanConfigDelete}
-        onScanConfigDownloadClick={handleScanConfigDownload}
-        onScanConfigEditClick={handleScanConfigEdit}
-        onToggleDetailsClick={handleToggleDetailsClick}
-      />,
-    );
-
-    const observerIcon = screen.getByTestId('observer-icon');
-    expect(observerIcon).toHaveAttribute('title', 'Scan Config owned by user');
-  });
 
   test('should call click handlers', () => {
     const handleToggleDetailsClick = testing.fn();
@@ -281,14 +233,14 @@ describe('Scan Config row tests', () => {
     expect(handleScanConfigSettings).not.toHaveBeenCalledWith(entity);
     expect(settingsIcon).toHaveAttribute(
       'title',
-      'Permission to edit Scan Config settings denied',
+      'Edit Scan Config settings command unavailable',
     );
 
     const trashcanIcon = screen.getByTestId('trashcan-icon');
     expect(handleScanConfigDelete).not.toHaveBeenCalled();
     expect(trashcanIcon).toHaveAttribute(
       'title',
-      'Permission to move Scan Config to trashcan denied',
+      'Move Scan Config to trashcan command unavailable',
     );
 
     const editIcon = screen.getByTestId('edit-icon');
@@ -296,7 +248,7 @@ describe('Scan Config row tests', () => {
     expect(handleScanConfigEdit).not.toHaveBeenCalled();
     expect(editIcon).toHaveAttribute(
       'title',
-      'Permission to edit Scan Config denied',
+      'Edit Scan Config command unavailable',
     );
 
     const cloneIcon = screen.getByTestId('clone-icon');
@@ -304,7 +256,7 @@ describe('Scan Config row tests', () => {
     expect(handleScanConfigClone).not.toHaveBeenCalled();
     expect(cloneIcon).toHaveAttribute(
       'title',
-      'Permission to clone Scan Config denied',
+      'Clone Scan Config command unavailable',
     );
 
     const exportIcon = screen.getByTestId('export-icon');

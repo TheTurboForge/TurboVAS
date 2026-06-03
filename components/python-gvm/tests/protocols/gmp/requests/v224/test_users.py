@@ -7,7 +7,6 @@ import unittest
 from gvm.errors import InvalidArgument, RequiredArgument
 from gvm.protocols.gmp.requests.v224 import UserAuthType, Users
 
-
 class UsersTestCase(unittest.TestCase):
     def test_get_users(self):
         request = Users().get_users()
@@ -37,43 +36,6 @@ class UsersTestCase(unittest.TestCase):
         self.assertEqual(
             bytes(request),
             b"<create_user><name>foo</name><password>bar</password></create_user>",
-        )
-
-    def test_create_user_with_hosts(self):
-        request = Users().create_user(
-            name="foo", hosts=["h1", "h2"], hosts_allow=True
-        )
-
-        self.assertEqual(
-            bytes(request),
-            b"<create_user>"
-            b"<name>foo</name>"
-            b'<hosts allow="1">h1,h2</hosts>'
-            b"</create_user>",
-        )
-
-        request = Users().create_user(
-            name="foo", hosts=["h1", "h2"], hosts_allow=False
-        )
-
-        self.assertEqual(
-            bytes(request),
-            b"<create_user>"
-            b"<name>foo</name>"
-            b'<hosts allow="0">h1,h2</hosts>'
-            b"</create_user>",
-        )
-
-    def test_create_user_with_role_ids(self):
-        request = Users().create_user(name="foo", role_ids=["r1", "r2"])
-
-        self.assertEqual(
-            bytes(request),
-            b"<create_user>"
-            b"<name>foo</name>"
-            b'<role id="r1"/>'
-            b'<role id="r2"/>'
-            b"</create_user>",
         )
 
     def test_create_user_missing_name(self):
@@ -111,44 +73,6 @@ class UsersTestCase(unittest.TestCase):
             b'<modify_user user_id="u1"><comment>foo</comment></modify_user>',
         )
 
-    def test_modify_user_with_role_ids(self):
-        request = Users().modify_user(user_id="u1", role_ids=[])
-
-        self.assertEqual(bytes(request), b'<modify_user user_id="u1"/>')
-
-        request = Users().modify_user(user_id="u1", role_ids=["r1"])
-
-        self.assertEqual(
-            bytes(request),
-            b'<modify_user user_id="u1"><role id="r1"/></modify_user>',
-        )
-
-        request = Users().modify_user(user_id="u1", role_ids=["r1", "r2"])
-
-        self.assertEqual(
-            bytes(request),
-            b'<modify_user user_id="u1"><role id="r1"/><role id="r2"/></modify_user>',
-        )
-
-    def test_modify_user_with_group_ids(self):
-        request = Users().modify_user(user_id="u1", group_ids=[])
-
-        self.assertEqual(bytes(request), b'<modify_user user_id="u1"/>')
-
-        request = Users().modify_user(user_id="u1", group_ids=["g1"])
-
-        self.assertEqual(
-            bytes(request),
-            b'<modify_user user_id="u1"><groups><group id="g1"/></groups></modify_user>',
-        )
-
-        request = Users().modify_user(user_id="u1", group_ids=["g1", "g2"])
-
-        self.assertEqual(
-            bytes(request),
-            b'<modify_user user_id="u1"><groups><group id="g1"/><group id="g2"/></groups></modify_user>',
-        )
-
     def test_modify_user_with_password(self):
         request = Users().modify_user(user_id="u1", password="bar")
 
@@ -181,29 +105,6 @@ class UsersTestCase(unittest.TestCase):
     def test_modify_user_invalid_auth_source(self):
         with self.assertRaises(InvalidArgument):
             Users().modify_user(user_id="u1", auth_source="foo")
-
-    def test_modify_user_with_hosts(self):
-        request = Users().modify_user(
-            user_id="u1", hosts=["h1", "h2"], hosts_allow=True
-        )
-
-        self.assertEqual(
-            bytes(request),
-            b'<modify_user user_id="u1">'
-            b'<hosts allow="1">h1,h2</hosts>'
-            b"</modify_user>",
-        )
-
-        request = Users().modify_user(
-            user_id="u1", hosts=["h1", "h2"], hosts_allow=False
-        )
-
-        self.assertEqual(
-            bytes(request),
-            b'<modify_user user_id="u1">'
-            b'<hosts allow="0">h1,h2</hosts>'
-            b"</modify_user>",
-        )
 
     def test_clone_user(self):
         request = Users().clone_user(user_id="u1")

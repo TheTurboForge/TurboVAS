@@ -6,7 +6,6 @@
 from gvm._enum import Enum
 from gvm.errors import RequiredArgument
 from gvm.protocols.core import Request
-from gvm.utils import to_bool, to_comma_list
 from gvm.xml import XmlCommand
 
 from .._entity_id import EntityID
@@ -27,19 +26,12 @@ class Users:
         name: str,
         *,
         password: str | None = None,
-        hosts: list[str] | None = None,
-        hosts_allow: bool | None = False,
-        role_ids: list[EntityID] | None = None,
     ) -> Request:
         """Create a new user
 
         Args:
             name: Name of the user
             password: Password of the user
-            hosts: A list of host addresses (IPs, DNS names)
-            hosts_allow: If True allow only access to passed hosts otherwise
-                deny access. Default is False for deny hosts.
-            role_ids: A list of role UUIDs for the user
         """
         if not name:
             raise RequiredArgument(
@@ -52,16 +44,6 @@ class Users:
         if password:
             cmd.add_element("password", password)
 
-        if hosts:
-            cmd.add_element(
-                "hosts",
-                to_comma_list(hosts),
-                attrs={"allow": to_bool(hosts_allow)},
-            )
-
-        if role_ids:
-            for role in role_ids:
-                cmd.add_element("role", attrs={"id": str(role)})
 
         return cmd
 
@@ -74,10 +56,6 @@ class Users:
         comment: str | None = None,
         password: str | None = None,
         auth_source: UserAuthType | str | None = None,
-        role_ids: list[EntityID] | None = None,
-        hosts: list[str] | None = None,
-        hosts_allow: bool | None = False,
-        group_ids: list[EntityID] | None = None,
     ) -> Request:
         """Modify an existing user.
 
@@ -91,15 +69,6 @@ class Users:
             comment: Comment on the user.
             password: The password for the user.
             auth_source: Source allowed for authentication for this user.
-            roles_id: List of roles UUIDs for the user.
-            hosts: User access rules: List of hosts.
-            hosts_allow: Defines how the hosts list is to be interpreted.
-                If False (default) the list is treated as a deny list.
-                All hosts are allowed by default except those provided by
-                the hosts parameter. If True the list is treated as a
-                allow list. All hosts are denied by default except those
-                provided by the hosts parameter.
-            group_ids: List of group UUIDs for the user.
         """
         if not user_id:
             raise RequiredArgument(
@@ -113,16 +82,6 @@ class Users:
         if name:
             cmd.add_element("new_name", name)
 
-        if role_ids:
-            for role in role_ids:
-                cmd.add_element("role", attrs={"id": role})
-
-        if hosts:
-            cmd.add_element(
-                "hosts",
-                to_comma_list(hosts),
-                attrs={"allow": to_bool(hosts_allow)},
-            )
 
         if comment:
             cmd.add_element("comment", comment)
@@ -136,10 +95,6 @@ class Users:
                 auth_source = UserAuthType(auth_source)
             xml_auth_src.add_element("source", auth_source.value)
 
-        if group_ids:
-            xml_groups = cmd.add_element("groups")
-            for group_id in group_ids:
-                xml_groups.add_element("group", attrs={"id": group_id})
 
         return cmd
 

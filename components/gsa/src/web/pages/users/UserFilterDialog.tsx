@@ -41,18 +41,6 @@ const UserFilterDialog = ({
       displayName: _('Name'),
     },
     {
-      name: 'roles',
-      displayName: _('Roles'),
-    },
-    {
-      name: 'groups',
-      displayName: _('Groups'),
-    },
-    {
-      name: 'host_access',
-      displayName: _('Host Access'),
-    },
-    {
       name: 'ldap',
       displayName: _('Authentication Type'),
     },

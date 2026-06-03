@@ -71,7 +71,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <scan_end></scan_end>
             </report>
         </current_report>
-        <observers></observers>
         <average_duration>0</average_duration>
         <result_count>0</result_count>
         <preferences>

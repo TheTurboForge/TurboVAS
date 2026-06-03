@@ -250,15 +250,15 @@ describe('ScanConfigDetailPageToolBarIcons tests', () => {
     ).not.toBeInTheDocument();
 
     fireEvent.click(
-      screen.getByTitle('Permission to clone Scan Config denied'),
+      screen.getByTitle('Clone Scan Config command unavailable'),
     );
     expect(handleScanConfigClone).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByTitle('Permission to edit Scan Config denied'));
+    fireEvent.click(screen.getByTitle('Edit Scan Config command unavailable'));
     expect(handleScanConfigEdit).not.toHaveBeenCalled();
 
     fireEvent.click(
-      screen.getByTitle('Permission to move Scan Config to trashcan denied'),
+      screen.getByTitle('Move Scan Config to trashcan command unavailable'),
     );
     expect(handleScanConfigDelete).not.toHaveBeenCalled();
 

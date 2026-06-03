@@ -59,7 +59,7 @@ const EntityCreateIcon = <TEntity extends WithEntityType>({
     } else if (!mayCreate) {
       title = _('{{entity}} may not be created', {entity: displayName});
     } else {
-      title = _('Permission to create {{entity}} denied', {
+      title = _('Create {{entity}} command unavailable', {
         entity: displayName,
       });
     }

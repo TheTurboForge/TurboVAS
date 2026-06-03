@@ -100,53 +100,6 @@ describe('Report Config row tests', () => {
     expect(baseElement).toHaveTextContent('4321');
   });
 
-  test('should render observer icon', () => {
-    const config = ReportConfig.fromElement({
-      _id: '1234',
-      name: 'foo',
-      comment: 'bar',
-      in_use: '0',
-      writable: '1',
-      owner: {
-        name: 'user',
-      },
-      permissions: {permission: [{name: 'everything'}]},
-      report_format: {
-        _id: '54321',
-        name: 'baz',
-      },
-    });
-
-    const handleToggleDetailsClick = testing.fn();
-    const handleReportConfigClone = testing.fn();
-    const handleReportConfigDelete = testing.fn();
-    const handleReportConfigDownload = testing.fn();
-    const handleReportConfigEdit = testing.fn();
-
-    const {render} = rendererWithTableBody({
-      gmp: createGmp(),
-      capabilities: true,
-      store: true,
-      router: true,
-    });
-
-    render(
-      <Row
-        entity={config}
-        onReportConfigCloneClick={handleReportConfigClone}
-        onReportConfigDeleteClick={handleReportConfigDelete}
-        onReportConfigDownloadClick={handleReportConfigDownload}
-        onReportConfigEditClick={handleReportConfigEdit}
-        onToggleDetailsClick={handleToggleDetailsClick}
-      />,
-    );
-
-    const observerIcon = screen.getByTestId('observer-icon');
-    expect(observerIcon).toHaveAttribute(
-      'title',
-      'Report Config owned by user',
-    );
-  });
 
   test('should call click handlers', () => {
     const handleToggleDetailsClick = testing.fn();
@@ -242,7 +195,7 @@ describe('Report Config row tests', () => {
     const deleteIcon = screen.getByTestId('trashcan-icon');
     expect(deleteIcon).toHaveAttribute(
       'title',
-      'Permission to move Report Config to trashcan denied',
+      'Move Report Config to trashcan command unavailable',
     );
     fireEvent.click(deleteIcon);
     expect(handleReportConfigDelete).not.toHaveBeenCalled();
@@ -250,7 +203,7 @@ describe('Report Config row tests', () => {
     const editIcon = screen.getByTestId('edit-icon');
     expect(editIcon).toHaveAttribute(
       'title',
-      'Permission to edit Report Config denied',
+      'Edit Report Config command unavailable',
     );
     fireEvent.click(editIcon);
     expect(handleReportConfigEdit).not.toHaveBeenCalled();
@@ -258,7 +211,7 @@ describe('Report Config row tests', () => {
     const cloneIcon = screen.getByTestId('clone-icon');
     expect(cloneIcon).toHaveAttribute(
       'title',
-      'Permission to clone Report Config denied',
+      'Clone Report Config command unavailable',
     );
     fireEvent.click(cloneIcon);
     expect(handleReportConfigClone).not.toHaveBeenCalled();

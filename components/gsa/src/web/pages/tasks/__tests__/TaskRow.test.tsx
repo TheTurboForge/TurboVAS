@@ -149,11 +149,6 @@ describe('TaskRow tests', () => {
         name: 'scanner',
         type: GREENBONE_SENSOR_SCANNER_TYPE,
       },
-      observers: {
-        __text: 'anon nymous',
-        role: [{name: 'lorem'}],
-        group: [{name: 'ipsum'}, {name: 'dolor'}],
-      },
     });
 
     const handleReportImport = testing.fn();
@@ -195,12 +190,6 @@ describe('TaskRow tests', () => {
     expect(sensorIcon).toHaveAttribute(
       'title',
       'Task is configured to run on sensor scanner',
-    );
-
-    const observerIcon = screen.getByTestId('provide-view-icon');
-    expect(observerIcon).toHaveAttribute(
-      'title',
-      'Task made visible for:\nUsers anon, nymous\nRoles lorem\nGroups ipsum, dolor',
     );
   });
 
@@ -682,9 +671,6 @@ describe('TaskRow tests', () => {
     fireEvent.click(rowDetails);
     expect(handleToggleDetailsClick).toHaveBeenCalledWith(undefined, '314');
 
-    const observerIcon = screen.getByTestId('observer-icon');
-    expect(observerIcon).toHaveAttribute('title', 'Task owned by user');
-
     // Status
     const bars = screen.getAllByTestId('progressbar-box');
     expect(bars[0]).toHaveAttribute('title', TASK_STATUS.done);
@@ -720,7 +706,7 @@ describe('TaskRow tests', () => {
     const startIcon = screen.getByTestId('start-icon');
     expect(startIcon).toHaveAttribute(
       'title',
-      'Permission to start task denied',
+      'Start task command unavailable',
     );
     fireEvent.click(startIcon);
     expect(handleTaskStart).not.toHaveBeenCalled();
@@ -733,13 +719,13 @@ describe('TaskRow tests', () => {
     const deleteIcon = screen.getByTestId('trashcan-icon');
     expect(deleteIcon).toHaveAttribute(
       'title',
-      'Permission to move Task to trashcan denied',
+      'Move Task to trashcan command unavailable',
     );
     fireEvent.click(deleteIcon);
     expect(handleTaskDelete).not.toHaveBeenCalled();
 
     const editIcon = screen.getByTestId('edit-icon');
-    expect(editIcon).toHaveAttribute('title', 'Permission to edit Task denied');
+    expect(editIcon).toHaveAttribute('title', 'Edit Task command unavailable');
     fireEvent.click(editIcon);
     expect(handleTaskEdit).not.toHaveBeenCalled();
 

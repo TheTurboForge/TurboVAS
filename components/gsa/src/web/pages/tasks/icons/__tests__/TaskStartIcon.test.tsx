@@ -55,7 +55,7 @@ describe('Task StartIcon component tests', () => {
     fireEvent.click(element);
 
     expect(clickHandler).not.toHaveBeenCalled();
-    expect(element).toHaveAttribute('title', 'Permission to start task denied');
+    expect(element).toHaveAttribute('title', 'Start task command unavailable');
     expect(element).toHaveAttribute('disabled');
     expect(element).toHaveAttribute('data-disabled', 'true');
   });

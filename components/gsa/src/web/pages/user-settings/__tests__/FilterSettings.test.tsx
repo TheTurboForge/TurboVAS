@@ -29,7 +29,7 @@ describe('FilterSettings', () => {
     const {render} = rendererWith({capabilities, gmp, store: true});
     render(<FilterSettings />);
     const rows = screen.getAllByRole('row');
-    expect(rows.length).toBe(32);
+    expect(rows.length).toBe(29);
   });
 
   test('renders all filter settings rows and links', async () => {
@@ -50,17 +50,14 @@ describe('FilterSettings', () => {
       scanconfig: 'Configs',
       credential: 'Credentials',
       filter: 'Filters',
-      group: 'Groups',
       host: 'Hosts',
       operatingsystem: 'Operating Systems',
       override: 'Overrides',
-      permission: 'Permissions',
       portlist: 'Port Lists',
       report: 'Reports',
       reportconfig: 'Report Configs',
       reportformat: 'Report Formats',
       result: 'Results',
-      role: 'Roles',
       scanner: 'Scanners',
       schedule: 'Schedules',
       tag: 'Tags',

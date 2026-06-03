@@ -506,7 +506,6 @@ class GMPNext(GMPv227[T]):
         schedule_id: EntityID | None = None,
         alert_ids: Sequence[EntityID] | None = None,
         schedule_periods: int | None = None,
-        observers: Sequence[str] | None = None,
         preferences: Mapping[str, SupportsStr] | None = None,
     ) -> T:
         """Create a new scan task using an agent group.
@@ -520,7 +519,6 @@ class GMPNext(GMPv227[T]):
             alert_ids: List of UUIDs for alerts to be applied to the task.
             schedule_id: UUID of a schedule when the task should be run.
             schedule_periods: Limit to number of scheduled runs, 0 for unlimited.
-            observers: List of usernames or IDs allowed to observe the task.
             preferences: Scanner preferences as name/value pairs.
         """
         return self._send_request_and_transform_response(
@@ -533,7 +531,6 @@ class GMPNext(GMPv227[T]):
                 schedule_id=schedule_id,
                 alert_ids=alert_ids,
                 schedule_periods=schedule_periods,
-                observers=observers,
                 preferences=preferences,
             )
         )
@@ -576,7 +573,6 @@ class GMPNext(GMPv227[T]):
         alert_ids: Sequence[EntityID] | None = None,
         comment: str | None = None,
         schedule_periods: int | None = None,
-        observers: Sequence[str] | None = None,
         preferences: Mapping[str, SupportsStr] | None = None,
     ) -> T:
         """Create a new scan task
@@ -593,7 +589,6 @@ class GMPNext(GMPv227[T]):
             schedule_id: UUID of a schedule when the task should be run.
             schedule_periods: A limit to the number of times the task will be
                 scheduled, or 0 for no limit
-            observers: List of names or ids of users which should be allowed to
                 observe this task
             preferences: Name/Value pairs of scanner preferences.
         """
@@ -609,7 +604,6 @@ class GMPNext(GMPv227[T]):
                 alert_ids=alert_ids,
                 comment=comment,
                 schedule_periods=schedule_periods,
-                observers=observers,
                 preferences=preferences,
             )
         )
@@ -685,7 +679,6 @@ class GMPNext(GMPv227[T]):
         schedule_periods: int | None = None,
         comment: str | None = None,
         alert_ids: Sequence[EntityID] | None = None,
-        observers: Sequence[str] | None = None,
         preferences: Mapping[str, SupportsStr] | None = None,
     ) -> T:
         """Modifies an existing task.
@@ -703,7 +696,6 @@ class GMPNext(GMPv227[T]):
             schedule_id: UUID of a schedule when the task should be run.
             schedule_periods: A limit to the number of times the task will be
                 scheduled, or 0 for no limit.
-            observers: List of names or ids of users which should be allowed to
                 observe this task
             preferences: Name/Value pairs of scanner preferences.
         """
@@ -721,7 +713,6 @@ class GMPNext(GMPv227[T]):
                 alert_ids=alert_ids,
                 comment=comment,
                 schedule_periods=schedule_periods,
-                observers=observers,
                 preferences=preferences,
             )
         )

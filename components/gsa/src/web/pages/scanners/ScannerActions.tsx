@@ -82,7 +82,7 @@ const ScannerActions = ({
           title={
             capabilities.mayOp('verify_scanner')
               ? _('Verify Scanner')
-              : _('Permissions to verify Scanner denied')
+              : _('Verify Scanner command unavailable')
           }
           value={entity}
           onClick={onScannerVerifyClick}

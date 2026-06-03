@@ -93,8 +93,6 @@ def parse_send_xml_tree(gmp, xml_tree):
         if task.find("schedule_periods") is not None:
             keywords["schedule_periods"] = int(task.find("schedule_periods").text)
 
-        if task.find("observers").text:
-            keywords["observers"] = task.find("observers").text
 
         if task.xpath("schedule/@id")[0]:
             keywords["schedule_id"] = task.xpath("schedule/@id")[0]

@@ -6,7 +6,6 @@
 import React from 'react';
 import {useQueryClient} from '@tanstack/react-query';
 import {useNavigate, useParams} from 'react-router';
-import Filter from 'gmp/models/filter';
 import type Tag from 'gmp/models/tag';
 import Download from 'web/components/form/Download';
 import useDownload from 'web/components/form/useDownload';
@@ -28,13 +27,11 @@ import Tabs from 'web/components/tab/Tabs';
 import TabsContainer from 'web/components/tab/TabsContainer';
 import EntitiesTab from 'web/entity/EntitiesTab';
 import EntityPage from 'web/entity/EntityPage';
-import EntityPermissions from 'web/entity/EntityPermissions';
 import CloneIcon from 'web/entity/icon/CloneIcon';
 import CreateIcon from 'web/entity/icon/CreateIcon';
 import EditIcon from 'web/entity/icon/EditIcon';
 import TrashIcon from 'web/entity/icon/TrashIcon';
 import {goToDetails, goToList} from 'web/entity/navigation';
-import {useGetPermissions} from 'web/hooks/use-query/permissions';
 import {useGetTag} from 'web/hooks/use-query/tags';
 import useCapabilities from 'web/hooks/useCapabilities';
 import useTranslation from 'web/hooks/useTranslation';
@@ -119,13 +116,6 @@ const TagDetailsPage = () => {
     id: id ?? '',
   });
 
-  const permFilter = Filter.fromString('resource_uuid=' + (id ?? '')).all();
-  const {data: permissionsData} = useGetPermissions({
-    filter: permFilter,
-    enabled: Boolean(id),
-  });
-
-  const permissions = permissionsData?.entities ?? [];
 
   const onChanged = () => {
     void queryClient.invalidateQueries({queryKey: ['get_tag']});
@@ -211,9 +201,6 @@ const TagDetailsPage = () => {
                         <EntitiesTab count={entity.resourceCount}>
                           {_('Assigned Items')}
                         </EntitiesTab>
-                        <EntitiesTab entities={permissions}>
-                          {_('Permissions')}
-                        </EntitiesTab>
                       </TabList>
                     </TabLayout>
 
@@ -224,15 +211,6 @@ const TagDetailsPage = () => {
                         </TabPanel>
                         <TabPanel>
                           <TagResourceList entity={entity} />
-                        </TabPanel>
-                        <TabPanel>
-                          <EntityPermissions
-                            entity={entity}
-                            permissions={permissions}
-                            onChanged={onChanged}
-                            onDownloaded={onDownloaded}
-                            onError={onError}
-                          />
                         </TabPanel>
                       </TabPanels>
                     </Tabs>

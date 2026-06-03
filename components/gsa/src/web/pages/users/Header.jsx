@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -27,31 +28,7 @@ const Header = ({
           currentSortDir={currentSortDir}
           sortBy={sort ? 'name' : false}
           title={_('Name')}
-          width="20%"
-          onSortChange={onSortChange}
-        />
-        <TableHead
-          currentSortBy={currentSortBy}
-          currentSortDir={currentSortDir}
-          sortBy={sort ? 'roles' : false}
-          title={_('Roles')}
-          width="26%"
-          onSortChange={onSortChange}
-        />
-        <TableHead
-          currentSortBy={currentSortBy}
-          currentSortDir={currentSortDir}
-          sortBy={sort ? 'groups' : false}
-          title={_('Groups')}
-          width="26%"
-          onSortChange={onSortChange}
-        />
-        <TableHead
-          currentSortBy={currentSortBy}
-          currentSortDir={currentSortDir}
-          sortBy={sort ? 'host_access' : false}
-          title={_('Host Access')}
-          width="10%"
+          width="70%"
           onSortChange={onSortChange}
         />
         <TableHead
@@ -59,7 +36,7 @@ const Header = ({
           currentSortDir={currentSortDir}
           sortBy={sort ? 'ldap' : false}
           title={_('Authentication Type')}
-          width="10%"
+          width="20%"
           onSortChange={onSortChange}
         />
         {actionsColumn}

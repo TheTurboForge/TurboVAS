@@ -155,9 +155,9 @@ describe('ScheduleDetailsPageToolBarIcons tests', () => {
     );
 
     const cloneIcon = screen.getByTitle('Clone Schedule');
-    const editIcon = screen.getByTitle('Permission to edit Schedule denied');
+    const editIcon = screen.getByTitle('Edit Schedule command unavailable');
     const deleteIcon = screen.getByTitle(
-      'Permission to move Schedule to trashcan denied',
+      'Move Schedule to trashcan command unavailable',
     );
     const exportIcon = screen.getByTitle('Export Schedule as XML');
 

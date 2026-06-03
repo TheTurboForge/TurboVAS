@@ -4248,6 +4248,74 @@ migrate_277_to_278 ()
 }
 
 
+static int
+migrate_278_to_279 ()
+{
+  sql_begin_immediate ();
+
+  sql ("DELETE FROM settings"
+       " WHERE uuid IN"
+       " ('ff000362-338f-11ea-9051-28d24461215b',"
+       "  'f722e5a4-88d8-475f-95b9-e4dcafbc075b',"
+       "  'ffb16b28-538c-11e3-b8f9-406186ea4fc5',"
+       "  'f38e673a-bcd1-11e2-a19a-406186ea4fc5');");
+  sql ("DELETE FROM filters"
+       " WHERE type IN ('group', 'permission', 'role');");
+  sql ("DELETE FROM filters_trash"
+       " WHERE type IN ('group', 'permission', 'role');");
+  sql ("DELETE FROM tag_resources"
+       " WHERE resource_type IN ('group', 'permission', 'role');");
+  sql ("DELETE FROM tag_resources_trash"
+       " WHERE resource_type IN ('group', 'permission', 'role');");
+
+  sql ("DROP TABLE IF EXISTS permissions_get_tasks CASCADE;");
+  sql ("DROP TABLE IF EXISTS permissions_trash CASCADE;");
+  sql ("DROP TABLE IF EXISTS permissions CASCADE;");
+  sql ("DROP TABLE IF EXISTS group_users_trash CASCADE;");
+  sql ("DROP TABLE IF EXISTS group_users CASCADE;");
+  sql ("DROP TABLE IF EXISTS groups_trash CASCADE;");
+  sql ("DROP TABLE IF EXISTS groups CASCADE;");
+  sql ("DROP TABLE IF EXISTS role_users_trash CASCADE;");
+  sql ("DROP TABLE IF EXISTS role_users CASCADE;");
+  sql ("DROP TABLE IF EXISTS roles_trash CASCADE;");
+  sql ("DROP TABLE IF EXISTS roles CASCADE;");
+
+  sql ("ALTER TABLE users DROP COLUMN IF EXISTS hosts;");
+  sql ("ALTER TABLE users DROP COLUMN IF EXISTS hosts_allow;");
+  sql ("CREATE OR REPLACE FUNCTION user_can_everything (text)"
+       " RETURNS boolean AS $$"
+       "  SELECT EXISTS (SELECT 1 FROM users WHERE uuid = $1);"
+       "$$ LANGUAGE SQL;");
+  sql ("CREATE OR REPLACE FUNCTION user_has_super_on_resource (arg_type text, arg_id integer)"
+       " RETURNS boolean AS $$"
+       "  SELECT EXISTS (SELECT 1 FROM users WHERE users.id = gvmd_user ());"
+       "$$ LANGUAGE SQL"
+       " STABLE;");
+
+  sql ("CREATE OR REPLACE FUNCTION user_owns (arg_type text, arg_id integer)"
+       " RETURNS boolean AS $$"
+       "  SELECT EXISTS (SELECT 1 FROM users WHERE users.id = gvmd_user ());"
+       "$$ LANGUAGE SQL"
+       " STABLE;");
+
+  sql ("CREATE OR REPLACE FUNCTION user_has_access_uuid (arg_type text,"
+       "                                                 arg_uuid text,"
+       "                                                 arg_permission text,"
+       "                                                 arg_trash integer)"
+       " RETURNS boolean AS $$"
+       "  SELECT EXISTS (SELECT 1 FROM users WHERE users.id = gvmd_user ());"
+       "$$ LANGUAGE SQL"
+       " STABLE COST 1000;");
+
+
+  set_db_version (279);
+
+  sql_commit ();
+
+  return 0;
+}
+
+
 #undef UPDATE_DASHBOARD_SETTINGS
 
 /**
@@ -4332,6 +4400,7 @@ static migrator_t database_migrators[] = {
   {276, migrate_275_to_276},
   {277, migrate_276_to_277},
   {278, migrate_277_to_278},
+  {279, migrate_278_to_279},
   /* End marker. */
   {-1, NULL}};
 

@@ -345,31 +345,6 @@ describe('TaskDetailsPage tests', () => {
     expect(container).toHaveTextContent('No user tags available');
   });
 
-  test('should render permissions tab', () => {
-    const getTask = testing.fn().mockResolvedValue({
-      data: task2,
-    });
-
-    const gmp = createGmp({
-      getTask,
-    });
-
-    const {render, store} = rendererWith({
-      gmp,
-      capabilities: true,
-      router: true,
-      store: true,
-      features: new Features(['ENABLE_CREDENTIAL_STORES']),
-    });
-
-    store.dispatch(entityLoadingActions.success('12345', task2));
-
-    const {container} = render(<TaskDetailsPage id="12345" />);
-
-    const permissionsTab = screen.getByRole('tab', {name: /^permissions/i});
-    fireEvent.click(permissionsTab);
-    expect(container).toHaveTextContent('No permissions available');
-  });
 
   test('should call commands', async () => {
     const getTask = testing.fn().mockResolvedValue({

@@ -151,18 +151,6 @@ const Menu = () => {
   const userMatch = useMatch('/user/*');
   const isUserActive = Boolean(usersMatch || userMatch);
 
-  const groupsMatch = useMatch('/groups');
-  const groupMatch = useMatch('/group/*');
-  const isGroupsActive = Boolean(groupsMatch || groupMatch);
-
-  const rolesMatch = useMatch('/roles');
-  const roleMatch = useMatch('/role/*');
-  const isRolesActive = Boolean(rolesMatch || roleMatch);
-
-  const permissionsMatch = useMatch('/permissions');
-  const permissionMatch = useMatch('/permission/*');
-  const isPermissionsActive = Boolean(permissionsMatch || permissionMatch);
-
   const isPerformanceActive = Boolean(useMatch('/performance'));
   const isTrashcanActive = Boolean(useMatch('/trashcan'));
   const isFeedStatusActive = Boolean(useMatch('/feed-status'));
@@ -433,9 +421,6 @@ const Menu = () => {
         icon: SlidersHorizontal,
         defaultOpened: [
           isUserActive,
-          isGroupsActive,
-          isRolesActive,
-          isPermissionsActive,
           isPerformanceActive,
           isTrashcanActive,
           isFeedStatusActive,
@@ -449,24 +434,6 @@ const Menu = () => {
             to: '/users',
             isPathMatch: Boolean(usersMatch),
             active: isUserActive,
-          },
-          capabilities.mayAccess('group') && {
-            label: _('Groups'),
-            to: '/groups',
-            isPathMatch: Boolean(groupsMatch),
-            active: isGroupsActive,
-          },
-          capabilities.mayAccess('role') && {
-            label: _('Roles'),
-            to: '/roles',
-            isPathMatch: Boolean(rolesMatch),
-            active: isRolesActive,
-          },
-          capabilities.mayAccess('permission') && {
-            label: _('Permissions'),
-            to: '/permissions',
-            isPathMatch: Boolean(permissionsMatch),
-            active: isPermissionsActive,
           },
           capabilities.mayOp('get_system_reports') && {
             label: _('Performance'),

@@ -165,25 +165,6 @@ describe('ScannerDetailsPage tests', () => {
     ).toBeInTheDocument();
   });
 
-  test('should render permissions tab', () => {
-    const scanner = createMockScanner();
-    const gmp = createGmp({scanner});
-
-    const {render, store} = rendererWith({
-      capabilities: true,
-      gmp,
-      router: true,
-      store: true,
-    });
-
-    store.dispatch(entityLoadingActions.success('scanner-123', scanner));
-
-    render(<ScannerDetailsPage id="scanner-123" />);
-
-    expect(
-      screen.getByRole('tab', {name: 'Permissions ( 0 )'}),
-    ).toBeInTheDocument();
-  });
 
   test('should not render agent default configuration tab for regular scanner', () => {
     const scanner = createMockScanner(OPENVAS_SCANNER_TYPE);
@@ -332,26 +313,6 @@ describe('ScannerDetailsPage tests', () => {
     expect(container).toHaveTextContent('No user tags available');
   });
 
-  test('should display permissions content when tab is clicked', () => {
-    const scanner = createMockScanner();
-    const gmp = createGmp({scanner});
-
-    const {render, store} = rendererWith({
-      capabilities: true,
-      gmp,
-      router: true,
-      store: true,
-    });
-
-    store.dispatch(entityLoadingActions.success('scanner-123', scanner));
-
-    const {container} = render(<ScannerDetailsPage id="scanner-123" />);
-
-    const permissionsTab = screen.getByRole('tab', {name: 'Permissions ( 0 )'});
-    fireEvent.click(permissionsTab);
-
-    expect(container).toHaveTextContent('No permissions available');
-  });
 
   test('should render toolbar icons', () => {
     const scanner = createMockScanner();

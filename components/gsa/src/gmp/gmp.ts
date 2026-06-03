@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import 'gmp/commands/groups';
 import 'gmp/commands/hosts';
 import 'gmp/commands/license';
 import 'gmp/commands/os';
@@ -45,8 +44,6 @@ import NvtCommand from 'gmp/commands/nvt';
 import NvtFamiliesCommand from 'gmp/commands/nvt-families';
 import NvtsCommand from 'gmp/commands/nvts';
 import PerformanceCommand from 'gmp/commands/performance';
-import PermissionCommand from 'gmp/commands/permission';
-import PermissionsCommand from 'gmp/commands/permissions';
 import {PortListCommand, PortListsCommand} from 'gmp/commands/port-lists';
 import ReportCommand from 'gmp/commands/report';
 import ReportApplicationsCommand from 'gmp/commands/report-applications';
@@ -65,8 +62,6 @@ import ReportsCommand from 'gmp/commands/reports';
 import ResourceNamesCommand from 'gmp/commands/resource-names';
 import {ResultCommand} from 'gmp/commands/result';
 import {ResultsCommand} from 'gmp/commands/results';
-import RoleCommand from 'gmp/commands/role';
-import RolesCommand from 'gmp/commands/roles';
 import ScannerCommand from 'gmp/commands/scanner';
 import ScannersCommand from 'gmp/commands/scanners';
 import TagCommand from 'gmp/commands/tag';
@@ -130,8 +125,6 @@ class Gmp {
   public readonly nvtfamilies: NvtFamiliesCommand;
   public readonly nvts: NvtsCommand;
   public readonly performance: PerformanceCommand;
-  public readonly permission: PermissionCommand;
-  public readonly permissions: PermissionsCommand;
   public readonly portlist: PortListCommand;
   public readonly portlists: PortListsCommand;
   public readonly report: ReportCommand;
@@ -151,8 +144,6 @@ class Gmp {
   public readonly result: ResultCommand;
   public readonly results: ResultsCommand;
   public readonly resourcenames: ResourceNamesCommand;
-  public readonly role: RoleCommand;
-  public readonly roles: RolesCommand;
   public readonly scanner: ScannerCommand;
   public readonly scanners: ScannersCommand;
   public readonly tag: TagCommand;
@@ -220,8 +211,6 @@ class Gmp {
     this.nvtfamilies = new NvtFamiliesCommand(this.http);
     this.nvts = new NvtsCommand(this.http);
     this.performance = new PerformanceCommand(this.http);
-    this.permission = new PermissionCommand(this.http);
-    this.permissions = new PermissionsCommand(this.http);
     this.portlist = new PortListCommand(this.http);
     this.portlists = new PortListsCommand(this.http);
     this.report = new ReportCommand(this.http);
@@ -241,8 +230,6 @@ class Gmp {
     this.result = new ResultCommand(this.http);
     this.results = new ResultsCommand(this.http);
     this.resourcenames = new ResourceNamesCommand(this.http);
-    this.role = new RoleCommand(this.http);
-    this.roles = new RolesCommand(this.http);
     this.scanner = new ScannerCommand(this.http);
     this.scanners = new ScannersCommand(this.http);
     this.tag = new TagCommand(this.http);

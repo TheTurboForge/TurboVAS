@@ -1,18 +1,12 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
 import React from 'react';
-import {
-  AUTH_METHOD_LDAP,
-  AUTH_METHOD_RADIUS,
-  ACCESS_ALLOW_ALL,
-  ACCESS_DENY_ALL,
-} from 'gmp/models/user';
-import HorizontalSep from 'web/components/layout/HorizontalSep';
+import {AUTH_METHOD_LDAP, AUTH_METHOD_RADIUS} from 'gmp/models/user';
 import Layout from 'web/components/layout/Layout';
-import DetailsLink from 'web/components/link/DetailsLink';
 import InfoTable from 'web/components/table/InfoTable';
 import TableBody from 'web/components/table/TableBody';
 import TableCol from 'web/components/table/TableCol';
@@ -31,29 +25,9 @@ export const convert_auth_method = (auth_method, _) => {
   return _('Local');
 };
 
-export const convert_allow = ({addresses, allow}, _) => {
-  if (allow === ACCESS_ALLOW_ALL) {
-    if (addresses.length === 0) {
-      return _('Allow all');
-    }
-    return _('Allow all and deny from {{addresses}}', {
-      addresses: addresses.join(', '),
-    });
-  }
-  if (allow === ACCESS_DENY_ALL) {
-    if (addresses.length === 0) {
-      return _('Deny all');
-    }
-    return _('Deny all and allow from {{addresses}}', {
-      addresses: addresses.join(', '),
-    });
-  }
-  return '';
-};
-
-const UserDetails = ({entity, links = true}) => {
+const UserDetails = ({entity}) => {
   const [_] = useTranslation();
-  const {authMethod, comment, groups = [], hosts = {}, roles = []} = entity;
+  const {authMethod, comment} = entity;
   return (
     <Layout grow flex="column">
       <InfoTable>
@@ -68,52 +42,6 @@ const UserDetails = ({entity, links = true}) => {
           </TableRow>
 
           <TableRow>
-            <TableData>{_('Roles')}</TableData>
-            <TableData>
-              <HorizontalSep>
-                {roles.map(role => {
-                  return (
-                    <span key={role.id}>
-                      <DetailsLink id={role.id} textOnly={!links} type="role">
-                        {role.name}
-                      </DetailsLink>
-                    </span>
-                  );
-                })}
-              </HorizontalSep>
-            </TableData>
-          </TableRow>
-
-          <TableRow>
-            <TableData>{_('Groups')}</TableData>
-            <TableData>
-              <HorizontalSep>
-                {groups.map(group => {
-                  return (
-                    <span key={group.id}>
-                      <DetailsLink
-                        key={group.id}
-                        id={group.id}
-                        textOnly={!links}
-                        type="group"
-                      >
-                        {group.name}
-                      </DetailsLink>
-                    </span>
-                  );
-                })}
-              </HorizontalSep>
-            </TableData>
-          </TableRow>
-
-          <TableRow>
-            <TableData>{_('Host Access')}</TableData>
-            <TableData>
-              {convert_allow(hosts, _).replace(/&#x2F;/g, '/')}
-            </TableData>
-          </TableRow>
-
-          <TableRow>
             <TableData>{_('Authentication Type')}</TableData>
             <TableData>{convert_auth_method(authMethod, _)}</TableData>
           </TableRow>
@@ -125,7 +53,6 @@ const UserDetails = ({entity, links = true}) => {
 
 UserDetails.propTypes = {
   entity: PropTypes.model.isRequired,
-  links: PropTypes.bool,
 };
 
 export default UserDetails;

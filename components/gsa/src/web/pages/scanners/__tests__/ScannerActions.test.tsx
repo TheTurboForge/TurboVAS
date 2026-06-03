@@ -49,13 +49,13 @@ describe('ScannerActions tests', () => {
     render(<ScannerActions entity={scanner} />);
 
     expect(
-      screen.getByTitle('Permission to move Scanner to trashcan denied'),
+      screen.getByTitle('Move Scanner to trashcan command unavailable'),
     ).toBeInTheDocument();
     expect(
-      screen.getByTitle('Permission to edit Scanner denied'),
+      screen.getByTitle('Edit Scanner command unavailable'),
     ).toBeInTheDocument();
     expect(
-      screen.getByTitle('Permission to clone Scanner denied'),
+      screen.getByTitle('Clone Scanner command unavailable'),
     ).toBeInTheDocument();
     expect(screen.getByTitle('Export Scanner')).toBeInTheDocument();
     expect(screen.getByTitle('Verify Scanner')).toBeInTheDocument();
@@ -78,17 +78,17 @@ describe('ScannerActions tests', () => {
     render(<ScannerActions entity={scanner} />);
 
     expect(
-      screen.getByTitle('Permission to move Scanner to trashcan denied'),
+      screen.getByTitle('Move Scanner to trashcan command unavailable'),
     ).toBeInTheDocument();
     expect(
-      screen.getByTitle('Permission to edit Scanner denied'),
+      screen.getByTitle('Edit Scanner command unavailable'),
     ).toBeInTheDocument();
     expect(
-      screen.getByTitle('Permission to clone Scanner denied'),
+      screen.getByTitle('Clone Scanner command unavailable'),
     ).toBeInTheDocument();
     expect(screen.getByTitle('Export Scanner')).toBeInTheDocument();
     expect(
-      screen.getByTitle('Permissions to verify Scanner denied'),
+      screen.getByTitle('Verify Scanner command unavailable'),
     ).toBeInTheDocument();
     expect(
       screen.getByTitle('Download Client Certificate'),

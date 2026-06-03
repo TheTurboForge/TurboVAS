@@ -20,24 +20,17 @@ import Tabs from 'web/components/tab/Tabs';
 import TabsContainer from 'web/components/tab/TabsContainer';
 import EntitiesTab from 'web/entity/EntitiesTab';
 import EntityPage from 'web/entity/EntityPage';
-import EntityPermissions from 'web/entity/EntityPermissions';
 import CloneIcon from 'web/entity/icon/CloneIcon';
 import CreateIcon from 'web/entity/icon/CreateIcon';
 import EditIcon from 'web/entity/icon/EditIcon';
 import TrashIcon from 'web/entity/icon/TrashIcon';
 import {goToDetails, goToList} from 'web/entity/navigation';
 import EntityTags from 'web/entity/Tags';
-import withEntityContainer, {
-  permissionsResourceFilter,
-} from 'web/entity/withEntityContainer';
+import withEntityContainer from 'web/entity/withEntityContainer';
 import useTranslation from 'web/hooks/useTranslation';
 import AlertComponent from 'web/pages/alerts/AlertComponent';
 import AlertDetails from 'web/pages/alerts/Details';
 import {selector, loadEntity} from 'web/store/entities/alerts';
-import {
-  selector as permissionsSelector,
-  loadEntities as loadPermissions,
-} from 'web/store/entities/permissions';
 import {
   loadAllEntities as loadAllReportConfigs,
   selector as reportConfigsSelector,
@@ -93,7 +86,6 @@ ToolBarIcons.propTypes = {
 
 const Page = ({
   entity,
-  permissions = [],
   reportConfigs,
   reportFormats,
   onChanged,
@@ -140,9 +132,6 @@ const Page = ({
                       <EntitiesTab entities={entity.userTags}>
                         {_('User Tags')}
                       </EntitiesTab>
-                      <EntitiesTab entities={permissions}>
-                        {_('Permissions')}
-                      </EntitiesTab>
                     </TabList>
                   </TabLayout>
                   <Tabs>
@@ -161,15 +150,6 @@ const Page = ({
                           onError={onError}
                         />
                       </TabPanel>
-                      <TabPanel>
-                        <EntityPermissions
-                          entity={entity}
-                          permissions={permissions}
-                          onChanged={onChanged}
-                          onDownloaded={onDownloaded}
-                          onError={onError}
-                        />
-                      </TabPanel>
                     </TabPanels>
                   </Tabs>
                 </TabsContainer>
@@ -184,7 +164,6 @@ const Page = ({
 
 Page.propTypes = {
   entity: PropTypes.model,
-  permissions: PropTypes.array,
   reportConfigs: PropTypes.array,
   reportFormats: PropTypes.array,
   onChanged: PropTypes.func.isRequired,
@@ -194,24 +173,20 @@ Page.propTypes = {
 
 const load = gmp => {
   const loadEntityFunc = loadEntity(gmp);
-  const loadPermissionsFunc = loadPermissions(gmp);
   const loadAllReportFormatsFunc = loadAllReportFormats(gmp);
   const loadAllReportConfigsFunc = loadAllReportConfigs(gmp);
   return id => dispatch =>
     Promise.all([
       dispatch(loadEntityFunc(id)),
-      dispatch(loadPermissionsFunc(permissionsResourceFilter(id))),
       dispatch(loadAllReportFormatsFunc()),
       dispatch(loadAllReportConfigsFunc()),
     ]);
 };
 
 const mapStateToProps = (rootState, {id}) => {
-  const permissionsSel = permissionsSelector(rootState);
   const reportFormatsSel = reportFormatsSelector(rootState);
   const reportConfigsSel = reportConfigsSelector(rootState);
   return {
-    permissions: permissionsSel.getEntities(permissionsResourceFilter(id)),
     reportFormats: reportFormatsSel.getAllEntities(),
     reportConfigs: reportConfigsSel.getAllEntities(),
   };

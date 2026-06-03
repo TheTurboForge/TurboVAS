@@ -4293,8 +4293,6 @@ typedef enum
   CLIENT_CREATE_TASK_CONFIG,
   CLIENT_CREATE_TASK_COPY,
   CLIENT_CREATE_TASK_NAME,
-  CLIENT_CREATE_TASK_OBSERVERS,
-  CLIENT_CREATE_TASK_OBSERVERS_GROUP,
   CLIENT_CREATE_TASK_PREFERENCES,
   CLIENT_CREATE_TASK_PREFERENCES_PREFERENCE,
   CLIENT_CREATE_TASK_PREFERENCES_PREFERENCE_NAME,
@@ -4308,12 +4306,8 @@ typedef enum
   CLIENT_CREATE_USER,
   CLIENT_CREATE_USER_COMMENT,
   CLIENT_CREATE_USER_COPY,
-  CLIENT_CREATE_USER_GROUPS,
-  CLIENT_CREATE_USER_GROUPS_GROUP,
-  CLIENT_CREATE_USER_HOSTS,
   CLIENT_CREATE_USER_NAME,
   CLIENT_CREATE_USER_PASSWORD,
-  CLIENT_CREATE_USER_ROLE,
   CLIENT_CREATE_USER_SOURCES,
   CLIENT_CREATE_USER_SOURCES_SOURCE,
 #if ENABLE_AGENTS
@@ -4560,8 +4554,6 @@ typedef enum
   CLIENT_MODIFY_TASK_CONFIG,
   CLIENT_MODIFY_TASK_FILE,
   CLIENT_MODIFY_TASK_NAME,
-  CLIENT_MODIFY_TASK_OBSERVERS,
-  CLIENT_MODIFY_TASK_OBSERVERS_GROUP,
   CLIENT_MODIFY_TASK_PREFERENCES,
   CLIENT_MODIFY_TASK_PREFERENCES_PREFERENCE,
   CLIENT_MODIFY_TASK_PREFERENCES_PREFERENCE_NAME,
@@ -4573,13 +4565,9 @@ typedef enum
   CLIENT_MODIFY_TLS_CERTIFICATE,
   CLIENT_MODIFY_USER,
   CLIENT_MODIFY_USER_COMMENT,
-  CLIENT_MODIFY_USER_GROUPS,
-  CLIENT_MODIFY_USER_GROUPS_GROUP,
-  CLIENT_MODIFY_USER_HOSTS,
   CLIENT_MODIFY_USER_NAME,
   CLIENT_MODIFY_USER_NEW_NAME,
   CLIENT_MODIFY_USER_PASSWORD,
-  CLIENT_MODIFY_USER_ROLE,
   CLIENT_MODIFY_USER_SOURCES,
   CLIENT_MODIFY_USER_SOURCES_SOURCE,
   CLIENT_MOVE_TASK,
@@ -4819,16 +4807,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
             gvm_append_string (&create_filter_data->term, "");
             set_client_state (CLIENT_CREATE_FILTER);
           }
-        else if (strcasecmp ("CREATE_GROUP", element_name) == 0)
-          {
-            gvm_append_string (&create_group_data->users, "");
-            set_client_state (CLIENT_CREATE_GROUP);
-          }
-        else if (strcasecmp ("CREATE_ROLE", element_name) == 0)
-          {
-            gvm_append_string (&create_role_data->users, "");
-            set_client_state (CLIENT_CREATE_ROLE);
-          }
         else if (strcasecmp ("CREATE_OVERRIDE", element_name) == 0)
           set_client_state (CLIENT_CREATE_OVERRIDE);
         else if (strcasecmp ("CREATE_PORT_LIST", element_name) == 0)
@@ -4839,11 +4817,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
           }
         else if (strcasecmp ("CREATE_PORT_RANGE", element_name) == 0)
           set_client_state (CLIENT_CREATE_PORT_RANGE);
-        else if (strcasecmp ("CREATE_PERMISSION", element_name) == 0)
-          {
-            gvm_append_string (&create_permission_data->comment, "");
-            set_client_state (CLIENT_CREATE_PERMISSION);
-          }
         else if (strcasecmp ("CREATE_REPORT", element_name) == 0)
           set_client_state (CLIENT_CREATE_REPORT);
         else if (strcasecmp ("CREATE_REPORT_CONFIG", element_name) == 0)
@@ -4878,7 +4851,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
           {
             create_task_data->task = make_task (NULL, NULL, 1, 1);
             create_task_data->alerts = make_array ();
-            create_task_data->groups = make_array ();
             set_client_state (CLIENT_CREATE_TASK);
           }
         else if (strcasecmp ("CREATE_TLS_CERTIFICATE", element_name) == 0)
@@ -4888,12 +4860,7 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
             set_client_state (CLIENT_CREATE_TLS_CERTIFICATE);
           }
         else if (strcasecmp ("CREATE_USER", element_name) == 0)
-          {
-            set_client_state (CLIENT_CREATE_USER);
-            create_user_data->groups = make_array ();
-            create_user_data->roles = make_array ();
-            create_user_data->hosts_allow = 0;
-          }
+          set_client_state (CLIENT_CREATE_USER);
 #if ENABLE_AGENTS
         else if (strcasecmp ("DELETE_AGENT_GROUP", element_name) == 0)
           {
@@ -4966,18 +4933,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
               delete_filter_data->ultimate = 0;
             set_client_state (CLIENT_DELETE_FILTER);
           }
-        else if (strcasecmp ("DELETE_GROUP", element_name) == 0)
-          {
-            const gchar* attribute;
-            append_attribute (attribute_names, attribute_values, "group_id",
-                              &delete_group_data->group_id);
-            if (find_attribute (attribute_names, attribute_values,
-                                "ultimate", &attribute))
-              delete_group_data->ultimate = strcmp (attribute, "0");
-            else
-              delete_group_data->ultimate = 0;
-            set_client_state (CLIENT_DELETE_GROUP);
-          }
         else if (strcasecmp ("DELETE_OVERRIDE", element_name) == 0)
           {
             const gchar* attribute;
@@ -4989,19 +4944,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
             else
               delete_override_data->ultimate = 0;
             set_client_state (CLIENT_DELETE_OVERRIDE);
-          }
-        else if (strcasecmp ("DELETE_PERMISSION", element_name) == 0)
-          {
-            const gchar* attribute;
-            append_attribute (attribute_names, attribute_values,
-                              "permission_id",
-                              &delete_permission_data->permission_id);
-            if (find_attribute (attribute_names, attribute_values,
-                                "ultimate", &attribute))
-              delete_permission_data->ultimate = strcmp (attribute, "0");
-            else
-              delete_permission_data->ultimate = 0;
-            set_client_state (CLIENT_DELETE_PERMISSION);
           }
         else if (strcasecmp ("DELETE_PORT_LIST", element_name) == 0)
           {
@@ -5045,18 +4987,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
             else
               delete_report_format_data->ultimate = 0;
             set_client_state (CLIENT_DELETE_REPORT_FORMAT);
-          }
-        else if (strcasecmp ("DELETE_ROLE", element_name) == 0)
-          {
-            const gchar* attribute;
-            append_attribute (attribute_names, attribute_values, "role_id",
-                              &delete_role_data->role_id);
-            if (find_attribute (attribute_names, attribute_values,
-                                "ultimate", &attribute))
-              delete_role_data->ultimate = strcmp (attribute, "0");
-            else
-              delete_role_data->ultimate = 0;
-            set_client_state (CLIENT_DELETE_ROLE);
           }
         else if (strcasecmp ("DELETE_SCANNER", element_name) == 0)
           {
@@ -5355,13 +5285,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
               get_filters_data->alerts = 0;
             set_client_state (CLIENT_GET_FILTERS);
           }
-        else if (strcasecmp ("GET_GROUPS", element_name) == 0)
-          {
-            get_data_parse_attributes (&get_groups_data->get, "group",
-                                       attribute_names,
-                                       attribute_values);
-            set_client_state (CLIENT_GET_GROUPS);
-          }
 
         ELSE_GET_START (integration_configs, INTEGRATION_CONFIGS)
 
@@ -5476,13 +5399,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
             else
               get_port_lists_data->targets = 0;
             set_client_state (CLIENT_GET_PORT_LISTS);
-          }
-        else if (strcasecmp ("GET_PERMISSIONS", element_name) == 0)
-          {
-            get_data_parse_attributes (&get_permissions_data->get, "permission",
-                                       attribute_names,
-                                       attribute_values);
-            set_client_state (CLIENT_GET_PERMISSIONS);
           }
         else if (strcasecmp ("GET_PREFERENCES", element_name) == 0)
           {
@@ -5661,13 +5577,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
               get_results_data->get_counts = 1;
 
             set_client_state (CLIENT_GET_RESULTS);
-          }
-        else if (strcasecmp ("GET_ROLES", element_name) == 0)
-          {
-            get_data_parse_attributes (&get_roles_data->get, "role",
-                                       attribute_names,
-                                       attribute_values);
-            set_client_state (CLIENT_GET_ROLES);
           }
         else if (strcasecmp ("GET_SCANNERS", element_name) == 0)
           {
@@ -5925,12 +5834,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
                               &modify_filter_data->filter_id);
             set_client_state (CLIENT_MODIFY_FILTER);
           }
-        else if (strcasecmp ("MODIFY_GROUP", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "group_id",
-                              &modify_group_data->group_id);
-            set_client_state (CLIENT_MODIFY_GROUP);
-          }
         else if (strcasecmp ("MODIFY_PORT_LIST", element_name) == 0)
           {
             append_attribute (attribute_names, attribute_values,
@@ -5959,13 +5862,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
                               &modify_override_data->override_id);
             set_client_state (CLIENT_MODIFY_OVERRIDE);
           }
-        else if (strcasecmp ("MODIFY_PERMISSION", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values,
-                              "permission_id",
-                              &modify_permission_data->permission_id);
-            set_client_state (CLIENT_MODIFY_PERMISSION);
-          }
         else if (strcasecmp ("MODIFY_REPORT_CONFIG", element_name) == 0)
           {
             modify_report_config_start (gmp_parser, attribute_names,
@@ -5978,12 +5874,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
                               "report_format_id",
                               &modify_report_format_data->report_format_id);
             set_client_state (CLIENT_MODIFY_REPORT_FORMAT);
-          }
-        else if (strcasecmp ("MODIFY_ROLE", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "role_id",
-                              &modify_role_data->role_id);
-            set_client_state (CLIENT_MODIFY_ROLE);
           }
         else if (strcasecmp ("MODIFY_SCANNER", element_name) == 0)
           {
@@ -6024,7 +5914,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
             append_attribute (attribute_names, attribute_values, "task_id",
                               &modify_task_data->task_id);
             modify_task_data->alerts = make_array ();
-            modify_task_data->groups = make_array ();
             set_client_state (CLIENT_MODIFY_TASK);
           }
         else if (strcasecmp ("MODIFY_TLS_CERTIFICATE", element_name) == 0)
@@ -6897,11 +6786,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
           }
         else if (strcasecmp ("NAME", element_name) == 0)
           set_client_state (CLIENT_MODIFY_TASK_NAME);
-        else if (strcasecmp ("OBSERVERS", element_name) == 0)
-          {
-            gvm_append_string (&modify_task_data->observers, "");
-            set_client_state (CLIENT_MODIFY_TASK_OBSERVERS);
-          }
         else if (strcasecmp ("PREFERENCES", element_name) == 0)
           {
             modify_task_data->preferences = make_array ();
@@ -6935,17 +6819,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
           }
         ELSE_READ_OVER;
 
-      case CLIENT_MODIFY_TASK_OBSERVERS:
-        if (strcasecmp ("GROUP", element_name) == 0)
-          {
-            const gchar* attribute;
-            if (find_attribute (attribute_names, attribute_values, "id",
-                                &attribute))
-              array_add (modify_task_data->groups, g_strdup (attribute));
-            set_client_state (CLIENT_MODIFY_TASK_OBSERVERS_GROUP);
-          }
-        ELSE_READ_OVER;
-
       case CLIENT_MODIFY_TASK_PREFERENCES:
         if (strcasecmp ("PREFERENCE", element_name) == 0)
           {
@@ -6976,25 +6849,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
             gvm_append_string (&modify_user_data->comment, "");
             set_client_state (CLIENT_MODIFY_USER_COMMENT);
           }
-        else if (strcasecmp ("GROUPS", element_name) == 0)
-          {
-            if (modify_user_data->groups)
-              array_free (modify_user_data->groups);
-            modify_user_data->groups = make_array ();
-            set_client_state (CLIENT_MODIFY_USER_GROUPS);
-          }
-        else if (strcasecmp ("HOSTS", element_name) == 0)
-          {
-            const gchar *attribute;
-            if (find_attribute
-                (attribute_names, attribute_values, "allow", &attribute))
-              modify_user_data->hosts_allow = strcmp (attribute, "0");
-            else
-              modify_user_data->hosts_allow = 1;
-            /* Init, so that modify_user clears hosts if HOSTS is empty. */
-            gvm_append_string (&modify_user_data->hosts, "");
-            set_client_state (CLIENT_MODIFY_USER_HOSTS);
-          }
         else if (strcasecmp ("NAME", element_name) == 0)
           set_client_state (CLIENT_MODIFY_USER_NAME);
         else if (strcasecmp ("NEW_NAME", element_name) == 0)
@@ -7009,20 +6863,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
               modify_user_data->modify_password = 1;
             set_client_state (CLIENT_MODIFY_USER_PASSWORD);
           }
-        else if (strcasecmp ("ROLE", element_name) == 0)
-          {
-            const gchar* attribute;
-            /* Init array here, so it's NULL if there are no ROLEs. */
-            if (modify_user_data->roles == NULL)
-              {
-                array_free (modify_user_data->roles);
-                modify_user_data->roles = make_array ();
-              }
-            if (find_attribute (attribute_names, attribute_values, "id",
-                                &attribute))
-              array_add (modify_user_data->roles, g_strdup (attribute));
-            set_client_state (CLIENT_MODIFY_USER_ROLE);
-          }
         else if (strcasecmp ("SOURCES", element_name) == 0)
           {
             modify_user_data->sources = make_array ();
@@ -7031,17 +6871,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
         else
           set_read_over (gmp_parser);
         break;
-
-      case CLIENT_MODIFY_USER_GROUPS:
-        if (strcasecmp ("GROUP", element_name) == 0)
-          {
-            const gchar* attribute;
-            if (find_attribute (attribute_names, attribute_values, "id",
-                                &attribute))
-              array_add (modify_user_data->groups, g_strdup (attribute));
-            set_client_state (CLIENT_MODIFY_USER_GROUPS_GROUP);
-          }
-        ELSE_READ_OVER;
 
       case CLIENT_MODIFY_USER_SOURCES:
         if (strcasecmp ("SOURCE", element_name) == 0)
@@ -7916,8 +7745,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
               array_add (create_task_data->alerts, g_strdup (attribute));
             set_client_state (CLIENT_CREATE_TASK_ALERT);
           }
-        else if (strcasecmp ("OBSERVERS", element_name) == 0)
-          set_client_state (CLIENT_CREATE_TASK_OBSERVERS);
         else if (strcasecmp ("SCHEDULE", element_name) == 0)
           {
             append_attribute (attribute_names, attribute_values, "id",
@@ -7934,17 +7761,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
           }
         else if (strcasecmp ("USAGE_TYPE", element_name) == 0)
           set_client_state (CLIENT_CREATE_TASK_USAGE_TYPE);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_TASK_OBSERVERS:
-        if (strcasecmp ("GROUP", element_name) == 0)
-          {
-            const gchar* attribute;
-            if (find_attribute (attribute_names, attribute_values, "id",
-                                &attribute))
-              array_add (create_task_data->groups, g_strdup (attribute));
-            set_client_state (CLIENT_CREATE_TASK_OBSERVERS_GROUP);
-          }
         ELSE_READ_OVER;
 
       case CLIENT_CREATE_TASK_PREFERENCES:
@@ -7976,30 +7792,10 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
           set_client_state (CLIENT_CREATE_USER_COMMENT);
         else if (strcasecmp ("COPY", element_name) == 0)
           set_client_state (CLIENT_CREATE_USER_COPY);
-        else if (strcasecmp ("GROUPS", element_name) == 0)
-          set_client_state (CLIENT_CREATE_USER_GROUPS);
-        else if (strcasecmp ("HOSTS", element_name) == 0)
-          {
-            const gchar *attribute;
-            if (find_attribute
-                (attribute_names, attribute_values, "allow", &attribute))
-              create_user_data->hosts_allow = strcmp (attribute, "0");
-            else
-              create_user_data->hosts_allow = 1;
-            set_client_state (CLIENT_CREATE_USER_HOSTS);
-          }
         else if (strcasecmp ("NAME", element_name) == 0)
           set_client_state (CLIENT_CREATE_USER_NAME);
         else if (strcasecmp ("PASSWORD", element_name) == 0)
           set_client_state (CLIENT_CREATE_USER_PASSWORD);
-        else if (strcasecmp ("ROLE", element_name) == 0)
-          {
-            const gchar* attribute;
-            if (find_attribute (attribute_names, attribute_values, "id",
-                                &attribute))
-              array_add (create_user_data->roles, g_strdup (attribute));
-            set_client_state (CLIENT_CREATE_USER_ROLE);
-          }
         else if (strcasecmp ("SOURCES", element_name) == 0)
           {
             create_user_data->sources = make_array ();
@@ -8008,17 +7804,6 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
         else
           set_read_over (gmp_parser);
         break;
-
-      case CLIENT_CREATE_USER_GROUPS:
-        if (strcasecmp ("GROUP", element_name) == 0)
-          {
-            const gchar* attribute;
-            if (find_attribute (attribute_names, attribute_values, "id",
-                                &attribute))
-              array_add (create_user_data->groups, g_strdup (attribute));
-            set_client_state (CLIENT_CREATE_USER_GROUPS_GROUP);
-          }
-        ELSE_READ_OVER;
 
       case CLIENT_CREATE_USER_SOURCES:
         if (strcasecmp ("SOURCE", element_name) == 0)
@@ -18676,7 +18461,7 @@ handle_get_tasks (gmp_parser_t *gmp_parser, GError **error)
       int scanner_available;
       double severity = 0, severity_2 = 0;
       gchar *response;
-      iterator_t alerts, groups, roles;
+      iterator_t alerts;
       gchar *in_assets, *max_checks, *max_hosts;
       gchar *auto_delete, *auto_delete_data, *assets_apply_overrides;
       gchar *assets_min_qod, *accept_invalid_certs, *registry_allow_insecure;
@@ -18922,7 +18707,7 @@ handle_get_tasks (gmp_parser_t *gmp_parser, GError **error)
           g_free (second_last_report_id);
 
           owner = task_owner_name (index);
-          observers = task_observers (index);
+          observers = NULL;
           config_name = task_config_name (index);
           config_uuid = task_config_uuid (index);
           target_available = 1;
@@ -19138,38 +18923,8 @@ handle_get_tasks (gmp_parser_t *gmp_parser, GError **error)
             }
           g_free (response);
           g_free (agent_group_xml);
-
-          SENDF_TO_CLIENT_OR_FAIL
-           ("<observers>%s",
-            ((owner == NULL)
-            || (strcmp (owner,
-                        current_credentials.username)))
-              ? ""
-              : observers);
           free (owner);
           free (observers);
-
-          init_task_group_iterator (&groups, index);
-          while (next (&groups))
-            SENDF_TO_CLIENT_OR_FAIL
-             ("<group id=\"%s\">"
-              "<name>%s</name>"
-              "</group>",
-              task_group_iterator_uuid (&groups),
-              task_group_iterator_name (&groups));
-          cleanup_iterator (&groups);
-
-          init_task_role_iterator (&roles, index);
-          while (next (&roles))
-            SENDF_TO_CLIENT_OR_FAIL
-             ("<role id=\"%s\">"
-              "<name>%s</name>"
-              "</role>",
-              task_role_iterator_uuid (&roles),
-              task_role_iterator_name (&roles));
-          cleanup_iterator (&roles);
-
-          SENDF_TO_CLIENT_OR_FAIL ("</observers>");
 
           init_task_alert_iterator (&alerts, index);
           while (next (&alerts))
@@ -19406,9 +19161,6 @@ handle_get_users (gmp_parser_t *gmp_parser, GError **error)
   SEND_GET_START ("user");
   while (1)
     {
-      iterator_t groups, roles;
-      const char *hosts;
-      int hosts_allow;
 
       ret = get_next (&users, &get_users_data->get, &first, &count,
                       init_user_iterator);
@@ -19422,52 +19174,11 @@ handle_get_users (gmp_parser_t *gmp_parser, GError **error)
 
       SEND_GET_COMMON (user, &get_users_data->get, &users);
 
-      hosts = user_iterator_hosts (&users);
-      hosts_allow = user_iterator_hosts_allow (&users);
-
-      SENDF_TO_CLIENT_OR_FAIL ("<hosts allow=\"%i\">%s</hosts>"
-                               "<sources><source>%s</source></sources>",
-                               hosts_allow,
-                               hosts ? hosts : "",
+      SENDF_TO_CLIENT_OR_FAIL ("<sources><source>%s</source></sources>"
+                               "</user>",
                                user_iterator_method (&users)
                                 ? user_iterator_method (&users)
                                 : "file");
-
-      /* User Roles */
-      init_user_role_iterator (&roles,
-                                get_iterator_resource (&users));
-      while (next (&roles))
-        {
-          SENDF_TO_CLIENT_OR_FAIL ("<role id=\"%s\">"
-                                   "<name>%s</name>",
-                                   user_role_iterator_uuid (&roles),
-                                   user_role_iterator_name (&roles));
-          if (user_role_iterator_readable (&roles))
-            SEND_TO_CLIENT_OR_FAIL ("</role>");
-          else
-            SEND_TO_CLIENT_OR_FAIL ("<permissions/>"
-                                    "</role>");
-        }
-      cleanup_iterator (&roles);
-
-      SEND_TO_CLIENT_OR_FAIL ("<groups>");
-      init_user_group_iterator (&groups,
-                                get_iterator_resource (&users));
-      while (next (&groups))
-        {
-          SENDF_TO_CLIENT_OR_FAIL ("<group id=\"%s\">"
-                                   "<name>%s</name>",
-                                   user_group_iterator_uuid (&groups),
-                                   user_group_iterator_name (&groups));
-          if (user_group_iterator_readable (&groups))
-            SEND_TO_CLIENT_OR_FAIL ("</group>");
-          else
-            SEND_TO_CLIENT_OR_FAIL ("<permissions/>"
-                                    "</group>");
-        }
-      cleanup_iterator (&groups);
-      SEND_TO_CLIENT_OR_FAIL ("</groups>"
-                              "</user>");
       count++;
     }
   cleanup_iterator (&users);
@@ -24047,61 +23758,7 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
                 XML_ERROR_SYNTAX ("create_task", "Schedule must exist"));
               goto create_task_fail;
             }
-
-          /* Set any observers. */
-
-          if (create_task_data->observers)
-            {
-              int fail;
-              fail = set_task_observers (create_task_data->task,
-                                         create_task_data->observers);
-              switch (fail)
-                {
-                  case 0:
-                    break;
-                  case 1:
-                  case 2:
-                    SEND_TO_CLIENT_OR_FAIL
-                      (XML_ERROR_SYNTAX ("create_task",
-                                         "User name error in observers"));
-                    goto create_task_fail;
-                  case -1:
-                  default:
-                    SEND_TO_CLIENT_OR_FAIL
-                      (XML_INTERNAL_ERROR ("create_task"));
-                    goto create_task_fail;
-                }
-            }
-
-          /* Set any observer groups. */
-
-          if (create_task_data->groups->len)
-            {
-              gchar *fail_group_id;
-
-              switch (set_task_groups (create_task_data->task,
-                                       create_task_data->groups,
-                                       &fail_group_id))
-                {
-                  case 0:
-                    break;
-                  case 1:
-                    if (send_find_error_to_client
-                         ("create_task", "group", fail_group_id, gmp_parser))
-                      {
-                        error_send_to_client (error);
-                        return;
-                      }
-                    log_event_fail ("task", "Task", NULL, "created");
-                    goto create_task_fail;
-                  case -1:
-                  default:
-                    SEND_TO_CLIENT_OR_FAIL
-                      (XML_INTERNAL_ERROR ("create_task"));
-                    log_event_fail ("task", "Task", NULL, "created");
-                    goto create_task_fail;
-                }
-            }
+          /* Observer sharing is removed in TurboVAS. */
 
           if ((scanner == 0) || scanner_type_requires_config (scanner_type (scanner)))
             {
@@ -24210,7 +23867,6 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
       CLOSE (CLIENT_CREATE_TASK, COPY);
       CLOSE (CLIENT_CREATE_TASK, ALERT);
       CLOSE (CLIENT_CREATE_TASK, NAME);
-      CLOSE (CLIENT_CREATE_TASK, OBSERVERS);
       CLOSE (CLIENT_CREATE_TASK, PREFERENCES);
       CLOSE (CLIENT_CREATE_TASK, TARGET);
       CLOSE (CLIENT_CREATE_TASK, USAGE_TYPE);
@@ -24220,7 +23876,6 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
       CLOSE (CLIENT_CREATE_TASK, AGENT_GROUP);
 #endif /* ENABLE_AGENTS */
 
-      CLOSE (CLIENT_CREATE_TASK_OBSERVERS, GROUP);
 
       case CLIENT_CREATE_TASK_PREFERENCES_PREFERENCE:
         array_add (create_task_data->preferences,
@@ -24303,12 +23958,12 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
                         ? create_user_data->password : "",
                       create_user_data->comment
                         ? create_user_data->comment : "",
-                      create_user_data->hosts,
-                      create_user_data->hosts_allow,
+                      NULL,
+                      0,
                       create_user_data->sources,
-                      create_user_data->groups,
+                      NULL,
                       &fail_group_id,
-                      create_user_data->roles,
+                      NULL,
                       &fail_role_id,
                       &errdesc,
                       &new_user,
@@ -24386,12 +24041,8 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
         }
       CLOSE (CLIENT_CREATE_USER, COMMENT);
       CLOSE (CLIENT_CREATE_USER, COPY);
-      CLOSE (CLIENT_CREATE_USER, GROUPS);
-      CLOSE (CLIENT_CREATE_USER_GROUPS, GROUP);
-      CLOSE (CLIENT_CREATE_USER, HOSTS);
       CLOSE (CLIENT_CREATE_USER, NAME);
       CLOSE (CLIENT_CREATE_USER, PASSWORD);
-      CLOSE (CLIENT_CREATE_USER, ROLE);
       case CLIENT_CREATE_USER_SOURCES:
         array_terminate (create_user_data->sources);
         set_client_state (CLIENT_CREATE_USER);
@@ -26618,7 +26269,6 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
 
             if (modify_task_data->action && (modify_task_data->comment
                                              || modify_task_data->alerts->len
-                                             || modify_task_data->groups->len
                                              || modify_task_data->name))
               SEND_TO_CLIENT_OR_FAIL
                (XML_ERROR_SYNTAX ("modify_task",
@@ -26706,10 +26356,10 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
                                       modify_task_data->scanner_id,
                                       modify_task_data->target_id,
                                       modify_task_data->config_id,
-                                      modify_task_data->observers,
+                                      NULL,
                                       modify_task_data->alerts,
                                       modify_task_data->alterable,
-                                      modify_task_data->groups,
+                                      NULL,
                                       modify_task_data->schedule_id,
                                       modify_task_data->schedule_periods,
                                       modify_task_data->preferences,
@@ -26912,7 +26562,6 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
       CLOSE (CLIENT_MODIFY_TASK, CONFIG);
       CLOSE (CLIENT_MODIFY_TASK, ALERT);
       CLOSE (CLIENT_MODIFY_TASK, NAME);
-      CLOSE (CLIENT_MODIFY_TASK, OBSERVERS);
       CLOSE (CLIENT_MODIFY_TASK, PREFERENCES);
       CLOSE (CLIENT_MODIFY_TASK, SCHEDULE);
       CLOSE (CLIENT_MODIFY_TASK, SCHEDULE_PERIODS);
@@ -26922,7 +26571,6 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
 #endif /* ENABLE_AGENTS */
       CLOSE (CLIENT_MODIFY_TASK, FILE);
 
-      CLOSE (CLIENT_MODIFY_TASK_OBSERVERS, GROUP);
 
       case CLIENT_MODIFY_TASK_PREFERENCES_PREFERENCE:
         array_add (modify_task_data->preferences,
@@ -26969,11 +26617,11 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
                          /* Leave the password as it is. */
                          : NULL),
                        modify_user_data->comment,
-                       modify_user_data->hosts,
-                       modify_user_data->hosts_allow,
+                       NULL,
+                       0,
                        modify_user_data->sources,
-                       modify_user_data->groups, &fail_group_id,
-                       modify_user_data->roles, &fail_role_id,
+                       NULL, &fail_group_id,
+                       NULL, &fail_role_id,
                        &errdesc))
                 {
                   case 0:
@@ -27067,13 +26715,9 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
           break;
         }
       CLOSE (CLIENT_MODIFY_USER, COMMENT);
-      CLOSE (CLIENT_MODIFY_USER, GROUPS);
-      CLOSE (CLIENT_MODIFY_USER_GROUPS, GROUP);
-      CLOSE (CLIENT_MODIFY_USER, HOSTS);
       CLOSE (CLIENT_MODIFY_USER, NAME);
       CLOSE (CLIENT_MODIFY_USER, NEW_NAME);
       CLOSE (CLIENT_MODIFY_USER, PASSWORD);
-      CLOSE (CLIENT_MODIFY_USER, ROLE);
       case CLIENT_MODIFY_USER_SOURCES:
         array_terminate (modify_user_data->sources);
         set_client_state (CLIENT_MODIFY_USER);
@@ -28030,9 +27674,6 @@ gmp_xml_handle_text (/* unused */ GMarkupParseContext* context,
       APPEND (CLIENT_MODIFY_TASK_NAME,
               &modify_task_data->name);
 
-      APPEND (CLIENT_MODIFY_TASK_OBSERVERS,
-              &modify_task_data->observers);
-
       APPEND (CLIENT_MODIFY_TASK_FILE,
               &modify_task_data->file);
 
@@ -28048,9 +27689,6 @@ gmp_xml_handle_text (/* unused */ GMarkupParseContext* context,
 
       APPEND (CLIENT_MODIFY_USER_COMMENT,
               &modify_user_data->comment);
-
-      APPEND (CLIENT_MODIFY_USER_HOSTS,
-              &modify_user_data->hosts);
 
       APPEND (CLIENT_MODIFY_USER_NAME,
               &modify_user_data->name);
@@ -28570,9 +28208,6 @@ gmp_xml_handle_text (/* unused */ GMarkupParseContext* context,
       APPEND (CLIENT_CREATE_TASK_NAME,
               &create_task_data->name);
 
-      APPEND (CLIENT_CREATE_TASK_OBSERVERS,
-              &create_task_data->observers);
-
       APPEND (CLIENT_CREATE_TASK_PREFERENCES_PREFERENCE_NAME,
               &create_task_data->preference->name);
 
@@ -28595,9 +28230,6 @@ gmp_xml_handle_text (/* unused */ GMarkupParseContext* context,
 
       APPEND (CLIENT_CREATE_USER_COPY,
               &create_user_data->copy);
-
-      APPEND (CLIENT_CREATE_USER_HOSTS,
-              &create_user_data->hosts);
 
       APPEND (CLIENT_CREATE_USER_NAME,
               &create_user_data->name);

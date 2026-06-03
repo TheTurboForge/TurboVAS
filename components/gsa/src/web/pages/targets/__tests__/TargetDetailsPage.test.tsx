@@ -138,13 +138,6 @@ describe('TargetDetailsPage tests', () => {
     );
     expect(entityInfo).toHaveTextContent('Owner:admin');
 
-    expect(
-      screen.getByRole('tab', {name: /^information/i}),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('tab', {name: /^user tags/i})).toBeInTheDocument();
-    expect(
-      screen.getByRole('tab', {name: /^permissions/i}),
-    ).toBeInTheDocument();
 
     expect(
       screen.getByRole('row', {name: /^name target 1/i}),
@@ -276,23 +269,6 @@ describe('TargetDetailsPage tests', () => {
     expect(container).toHaveTextContent('No user tags available');
   });
 
-  test('should render permissions tab', () => {
-    const gmp = createGmp();
-    const {render, store} = rendererWith({
-      gmp,
-      capabilities: true,
-      router: true,
-      store: true,
-    });
-
-    store.dispatch(entityLoadingActions.success('46264', target));
-
-    const {container} = render(<TargetDetailsPage id="46264" />);
-
-    const permissionsTab = screen.getByRole('tab', {name: /^permissions/i});
-    fireEvent.click(permissionsTab);
-    expect(container).toHaveTextContent('No permissions available');
-  });
 
   test('should call commands', async () => {
     const gmp = createGmp();

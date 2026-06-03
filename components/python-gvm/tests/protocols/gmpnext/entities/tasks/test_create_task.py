@@ -304,25 +304,6 @@ class GmpCreateTaskTestMixin:
                 schedule_periods=-1,
             )
 
-    def test_create_task_with_observers(self):
-        self.gmp.create_task(
-            name="foo",
-            config_id="c1",
-            target_id="t1",
-            scanner_id="s1",
-            observers=["u1", "u2"],
-        )
-
-        self.connection.send.has_been_called_with(
-            b"<create_task>"
-            b"<name>foo</name>"
-            b"<usage_type>scan</usage_type>"
-            b'<config id="c1"/>'
-            b'<target id="t1"/>'
-            b'<scanner id="s1"/>'
-            b"<observers>u1,u2</observers>"
-            b"</create_task>"
-        )
 
     def test_create_task_with_preferences(self):
         self.gmp.create_task(
@@ -360,7 +341,6 @@ class GmpCreateTaskTestMixin:
                 config_id="c1",
                 target_id="0",
                 scanner_id="s1",
-                observers="",
             )
 
         # target_id=0 is considered as False
@@ -370,5 +350,4 @@ class GmpCreateTaskTestMixin:
                 config_id="c1",
                 target_id=0,
                 scanner_id="s1",
-                observers="",
             )

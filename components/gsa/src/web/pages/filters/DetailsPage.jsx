@@ -20,24 +20,17 @@ import Tabs from 'web/components/tab/Tabs';
 import TabsContainer from 'web/components/tab/TabsContainer';
 import EntitiesTab from 'web/entity/EntitiesTab';
 import EntityPage from 'web/entity/EntityPage';
-import EntityPermissions from 'web/entity/EntityPermissions';
 import CloneIcon from 'web/entity/icon/CloneIcon';
 import CreateIcon from 'web/entity/icon/CreateIcon';
 import EditIcon from 'web/entity/icon/EditIcon';
 import TrashIcon from 'web/entity/icon/TrashIcon';
 import {goToDetails, goToList} from 'web/entity/navigation';
 import EntityTags from 'web/entity/Tags';
-import withEntityContainer, {
-  permissionsResourceFilter,
-} from 'web/entity/withEntityContainer';
+import withEntityContainer from 'web/entity/withEntityContainer';
 import useTranslation from 'web/hooks/useTranslation';
 import FilterDetails from 'web/pages/filters/Details';
 import FilterComponent from 'web/pages/filters/FilterComponent';
 import {selector, loadEntity} from 'web/store/entities/filters';
-import {
-  selector as permissionsSelector,
-  loadEntities as loadPermissions,
-} from 'web/store/entities/permissions';
 import PropTypes from 'web/utils/PropTypes';
 const ToolBarIcons = ({
   entity,
@@ -85,7 +78,6 @@ ToolBarIcons.propTypes = {
 
 const Page = ({
   entity,
-  permissions = [],
   onChanged,
   onDownloaded,
   onError,
@@ -129,9 +121,6 @@ const Page = ({
                       <EntitiesTab entities={entity.userTags}>
                         {_('User Tags')}
                       </EntitiesTab>
-                      <EntitiesTab entities={permissions}>
-                        {_('Permissions')}
-                      </EntitiesTab>
                     </TabList>
                   </TabLayout>
 
@@ -144,15 +133,6 @@ const Page = ({
                         <EntityTags
                           entity={entity}
                           onChanged={onChanged}
-                          onError={onError}
-                        />
-                      </TabPanel>
-                      <TabPanel>
-                        <EntityPermissions
-                          entity={entity}
-                          permissions={permissions}
-                          onChanged={onChanged}
-                          onDownloaded={onDownloaded}
                           onError={onError}
                         />
                       </TabPanel>
@@ -170,7 +150,6 @@ const Page = ({
 
 Page.propTypes = {
   entity: PropTypes.model,
-  permissions: PropTypes.array,
   onChanged: PropTypes.func.isRequired,
   onDownloaded: PropTypes.func.isRequired,
   onError: PropTypes.func.isRequired,
@@ -178,18 +157,14 @@ Page.propTypes = {
 
 const load = gmp => {
   const loadEntityFunc = loadEntity(gmp);
-  const loadPermissionsFunc = loadPermissions(gmp);
   return id => dispatch =>
     Promise.all([
       dispatch(loadEntityFunc(id)),
-      dispatch(loadPermissionsFunc(permissionsResourceFilter(id))),
     ]);
 };
 
 const mapStateToProps = (rootState, {id}) => {
-  const permissionsSel = permissionsSelector(rootState);
   return {
-    permissions: permissionsSel.getEntities(permissionsResourceFilter(id)),
   };
 };
 

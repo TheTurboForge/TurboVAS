@@ -126,5 +126,8 @@ runtime-app-smoke:
 runtime-webui-smoke *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-webui-smoke "$@"
 
+runtime-rbac-smoke *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-rbac-smoke "$@"
+
 gvmd-smoke:
     @tools/turbovasctl gvmd-smoke

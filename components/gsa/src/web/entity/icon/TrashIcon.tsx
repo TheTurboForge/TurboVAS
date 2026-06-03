@@ -64,7 +64,7 @@ const EntityTrashIcon = <TEntity extends EntityTrash>({
     } else if (!entity.isWritable()) {
       title = _('{{entity}} is not writable', {entity: displayName});
     } else if (!mayDelete) {
-      title = _('Permission to move {{entity}} to trashcan denied', {
+      title = _('Move {{entity}} to trashcan command unavailable', {
         entity: displayName,
       });
     } else {
