@@ -69,11 +69,6 @@
 #define SETTING_UUID_INTEGRATION_CONFIG_OWNER "e15e8a57-0285-439b-929a-068880b410b4"
 
 /**
- * @brief UUID of 'Feed Import Roles' setting.
- */
-#define SETTING_UUID_FEED_IMPORT_ROLES "ff000362-338f-11ea-9051-28d24461215b"
-
-/**
  * @brief UUID of setting.
  */
 #define SETTING_UUID_FILE_DETAILS "a6ac88c5-729c-41ba-ac0a-deea4a3441f2"

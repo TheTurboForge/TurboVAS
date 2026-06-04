@@ -257,7 +257,6 @@ const allowedSnakeCase = [
   'host_cves',
   'host_identifier',
   'hostnames_by_ip',
-  'hosts_allow',
   'hosts_array',
   'hosts_count',
   'hosts_filter',

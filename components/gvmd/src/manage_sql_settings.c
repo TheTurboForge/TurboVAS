@@ -967,30 +967,6 @@ setting_normalise (const gchar *uuid, const gchar *value)
       return g_strstrip (g_strdup (value));
     }
 
-  if (strcmp (uuid, SETTING_UUID_FEED_IMPORT_ROLES) == 0)
-    {
-      GString *normalised;
-      gchar **split, **point;
-
-      normalised = g_string_new ("");
-      point = split = g_strsplit (value, ",", 0);
-
-      while (*point)
-        {
-          g_string_append_printf (normalised,
-                                  "%s%s",
-                                  point == split ? "" : ",",
-                                  g_strstrip (*point));
-          point++;
-        }
-
-      g_strfreev (split);
-
-      g_string_ascii_down (normalised);
-
-      return g_string_free (normalised, FALSE);
-    }
-
   if (strcmp (uuid, SETTING_UUID_SECINFO_SQL_BUFFER_THRESHOLD) == 0)
     {
       int threshold;
@@ -1069,25 +1045,6 @@ setting_verify (const gchar *uuid, const gchar *value, const gchar *user)
       g_free (quoted_uuid);
     }
 
-  if (strcmp (uuid, SETTING_UUID_FEED_IMPORT_ROLES) == 0)
-    {
-      gchar **split, **point;
-
-      point = split = g_strsplit (value, ",", 0);
-      while (*point)
-        {
-          if (g_regex_match_simple ("^[-0123456789abcdefABCDEF]{36}$",
-                                    g_strstrip (*point), 0, 0)
-              == FALSE)
-            {
-              g_strfreev (split);
-              return 1;
-            }
-          point++;
-        }
-      g_strfreev (split);
-    }
-
   if (strcmp (uuid, SETTING_UUID_SECINFO_SQL_BUFFER_THRESHOLD) == 0)
     {
       int threshold;
@@ -1125,8 +1082,6 @@ setting_description (const gchar *uuid)
     return "Maintainer email address used in generated Debian LSC packages.";
   if (strcmp (uuid, SETTING_UUID_FEED_IMPORT_OWNER) == 0)
     return "User who is given ownership of new resources from feed.";
-  if (strcmp (uuid, SETTING_UUID_FEED_IMPORT_ROLES) == 0)
-    return "Roles given access to new resources from feed.";
   if (strcmp (uuid, SETTING_UUID_SECINFO_SQL_BUFFER_THRESHOLD) == 0)
     return "Buffer size threshold in MiB for running buffered SQL statements"
            " in SecInfo updates before the end of the file being processed.";
@@ -1158,8 +1113,6 @@ setting_name (const gchar *uuid)
     return "Debian LSC Package Maintainer";
   if (strcmp (uuid, SETTING_UUID_FEED_IMPORT_OWNER) == 0)
     return "Feed Import Owner";
-  if (strcmp (uuid, SETTING_UUID_FEED_IMPORT_ROLES) == 0)
-    return "Feed Import Roles";
   if (strcmp (uuid, SETTING_UUID_SECINFO_SQL_BUFFER_THRESHOLD) == 0)
     return "SecInfo SQL Buffer Threshold";
   if (strcmp (uuid, SETTING_UUID_CVE_CPE_MATCHING_VERSION) == 0)
@@ -1197,7 +1150,6 @@ manage_modify_setting (GSList *log_config, const db_conn_info_t *database,
       && strcmp (uuid, SETTING_UUID_MAX_ROWS_PER_PAGE)
       && strcmp (uuid, SETTING_UUID_LSC_DEB_MAINTAINER)
       && strcmp (uuid, SETTING_UUID_FEED_IMPORT_OWNER)
-      && strcmp (uuid, SETTING_UUID_FEED_IMPORT_ROLES)
       && strcmp (uuid, SETTING_UUID_SECINFO_SQL_BUFFER_THRESHOLD)
       && strcmp (uuid, SETTING_UUID_CVE_CPE_MATCHING_VERSION)
       && strcmp (uuid, SETTING_UUID_INTEGRATION_CONFIG_OWNER))
@@ -1228,7 +1180,6 @@ manage_modify_setting (GSList *log_config, const db_conn_info_t *database,
       if ((strcmp (uuid, SETTING_UUID_AGENT_OWNER) == 0)
           || (strcmp (uuid, SETTING_UUID_DEFAULT_CA_CERT) == 0)
           || (strcmp (uuid, SETTING_UUID_FEED_IMPORT_OWNER) == 0)
-          || (strcmp (uuid, SETTING_UUID_FEED_IMPORT_ROLES) == 0)
           || (strcmp (uuid, SETTING_UUID_SECINFO_SQL_BUFFER_THRESHOLD) == 0)
           || (strcmp (uuid, SETTING_UUID_CVE_CPE_MATCHING_VERSION) == 0)
           || (strcmp (uuid, SETTING_UUID_INTEGRATION_CONFIG_OWNER) == 0))

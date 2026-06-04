@@ -9,14 +9,12 @@
 #include "manage_authentication.h"
 #include "manage_sql.h"
 #include "manage_sql_filters.h"
-#include "manage_sql_groups.h"
 #include "manage_sql_permissions.h"
 #include "manage_sql_permissions_cache.h"
 #include "manage_sql_port_lists.h"
 #include "manage_sql_report_configs.h"
 #include "manage_sql_report_formats.h"
 #include "manage_sql_resources.h"
-#include "manage_sql_roles.h"
 #include "manage_sql_schedules.h"
 #include "manage_sql_settings.h"
 #include "manage_sql_targets.h"
@@ -75,34 +73,6 @@ user_uuid (user_t user)
 }
 
 /**
- * @brief Return the hosts of a user.
- *
- * @param[in]  uuid  UUID of user.
- *
- * @return Newly allocated hosts value if available, else NULL.
- */
-gchar *
-user_hosts (const char *uuid)
-{
-  (void) uuid;
-  return g_strdup ("");
-}
-
-/**
- * @brief Return whether hosts value of a user denotes allowed.
- *
- * @param[in]  uuid  UUID of user.
- *
- * @return 1 if allow, else 0.
- */
-int
-user_hosts_allow (const char *uuid)
-{
-  (void) uuid;
-  return 2;
-}
-
-/**
  * @brief Count number of users.
  *
  * @param[in]  get  GET params.
@@ -154,117 +124,6 @@ init_user_iterator (iterator_t* iterator, get_data_t *get)
  * @return Method of the user or NULL if iteration is complete.
  */
 DEF_ACCESS (user_iterator_method, GET_ITERATOR_COLUMN_COUNT);
-
-/**
- * @brief Get the hosts from a user iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return Hosts or NULL if iteration is complete.
- */
-const char *
-user_iterator_hosts (iterator_t *iterator)
-{
-  if (iterator->done) return NULL;
-  return "";
-}
-
-int
-user_iterator_hosts_allow (iterator_t *iterator)
-{
-  if (iterator->done) return -1;
-  return 2;
-}
-
-/**
- * @brief Initialise an info iterator.
- *
- * @param[in]  iterator        Iterator.
- * @param[in]  user            User.
- */
-void
-init_user_group_iterator (iterator_t *iterator, user_t user)
-{
-  (void) user;
-  init_iterator (iterator, "SELECT NULL, NULL, NULL WHERE FALSE;");
-}
-
-/**
- * @brief Get the UUID from a user group iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return UUID or NULL if iteration is complete.  Freed by cleanup_iterator.
- */
-DEF_ACCESS (user_group_iterator_uuid, 1);
-
-/**
- * @brief Get the NAME from a user group iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return NAME or NULL if iteration is complete.  Freed by cleanup_iterator.
- */
-DEF_ACCESS (user_group_iterator_name, 2);
-
-/**
- * @brief Get the read permission status from a GET iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return 1 if may read, else 0.
- */
-int
-user_group_iterator_readable (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_int (iterator, 3);
-}
-
-/**
- * @brief Initialise an info iterator.
- *
- * @param[in]  iterator        Iterator.
- * @param[in]  user            User.
- */
-void
-init_user_role_iterator (iterator_t *iterator, user_t user)
-{
-  (void) user;
-  init_iterator (iterator, "SELECT NULL, NULL, NULL WHERE FALSE;");
-}
-
-/**
- * @brief Get the UUID from a user role iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return UUID or NULL if iteration is complete.  Freed by cleanup_iterator.
- */
-DEF_ACCESS (user_role_iterator_uuid, 1);
-
-/**
- * @brief Get the NAME from a user role iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return NAME or NULL if iteration is complete.  Freed by cleanup_iterator.
- */
-DEF_ACCESS (user_role_iterator_name, 2);
-
-/**
- * @brief Get the read permission status from a GET iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return 1 if may read, else 0.
- */
-int
-user_role_iterator_readable (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_int (iterator, 4);
-}
 
 /**
  * @brief Find a user for a specific permission, given a UUID.
@@ -551,30 +410,20 @@ add_users (const gchar *type, resource_t resource, const char *users)
  * @param[in]  name         The name of the new user.
  * @param[in]  password     The password of the new user.
  * @param[in]  comment      Comment for the new user or NULL.
- * @param[in]  hosts        The host the user is allowed/forbidden to scan.
- * @param[in]  hosts_allow  Whether hosts is allow or forbid.
  * @param[in]  allowed_methods  Allowed login methods.
- * @param[in]  groups       Groups.
- * @param[out] group_id_return  ID of group on "failed to find" error.
- * @param[in]  roles        Roles.
- * @param[out] role_id_return  ID of role on "failed to find" error.
  * @param[out] r_errdesc    If not NULL the address of a variable to receive
  *                          a malloced string with the error description.  Will
  *                          always be set to NULL on success.
  * @param[out] new_user     Created user.
- * @param[in]  forbid_super_admin  Whether to forbid creation of Super Admin.
  *
- * @return 0 if the user has been added successfully, 1 failed to find group,
- *         2 failed to find role, 3 syntax error in hosts, 99 permission denied,
+ * @return 0 if the user has been added successfully, 99 permission denied,
  *         -1 on error, -2 if user exists already, -3 if wrong number of methods,
  *         -4 error in method.
  */
 int
 create_user (const gchar * name, const gchar * password, const gchar *comment,
-             const gchar * hosts, int hosts_allow,
-             const array_t * allowed_methods, array_t *groups,
-             gchar **group_id_return, array_t *roles, gchar **role_id_return,
-             gchar **r_errdesc, user_t *new_user, int forbid_super_admin)
+             const array_t * allowed_methods, gchar **r_errdesc,
+             user_t *new_user)
 {
   char *errstr, *uuid;
   gchar *quoted_method, *quoted_name, *hash;
@@ -582,13 +431,6 @@ create_user (const gchar * name, const gchar * password, const gchar *comment,
   int ret;
   user_t user;
 
-  (void) hosts;
-  (void) hosts_allow;
-  (void) groups;
-  (void) group_id_return;
-  (void) roles;
-  (void) role_id_return;
-  (void) forbid_super_admin;
 
   assert (name);
   assert (password);
@@ -709,7 +551,6 @@ delete_user (const char *user_id_arg, const char *name_arg,
 {
   user_t user, inheritor;
 
-  (void) forbid_super_admin;
 
   assert (user_id_arg || name_arg);
 
@@ -857,22 +698,13 @@ copy_user (const char* name, const char* comment, const char *user_id,
 int
 modify_user (const gchar * user_id, gchar **name, const gchar *new_name,
              const gchar * password, const gchar * comment,
-             const gchar * hosts, int hosts_allow,
-             const array_t * allowed_methods, array_t *groups,
-             gchar **group_id_return, array_t *roles, gchar **role_id_return,
-             gchar **r_errdesc)
+             const array_t * allowed_methods, gchar **r_errdesc)
 {
   char *errstr;
   gchar *hash, *quoted_method, *uuid;
   gchar *quoted_new_name, *quoted_comment;
   user_t user;
 
-  (void) hosts;
-  (void) hosts_allow;
-  (void) groups;
-  (void) group_id_return;
-  (void) roles;
-  (void) role_id_return;
 
   if (r_errdesc)
     *r_errdesc = NULL;
@@ -1027,8 +859,8 @@ manage_create_user (GSList *log_config, const db_conn_info_t *database,
 
   current_credentials.uuid = "";
 
-  ret = create_user (name, password ? password : uuid, "", NULL, 0,
-                     NULL, NULL, NULL, NULL, NULL, &rejection_msg, NULL, 0);
+  ret = create_user (name, password ? password : uuid, "",
+                     NULL, &rejection_msg, NULL);
 
   switch (ret)
     {

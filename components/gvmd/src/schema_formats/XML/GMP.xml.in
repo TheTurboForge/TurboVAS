@@ -3180,7 +3180,6 @@ SPDX-License-Identifier: AGPL-3.0-or-later
           <alts>
             <alt>User</alt>
             <alt>Admin</alt>
-            <alt>Super Admin</alt>
             <alt>Observer</alt>
           </alts>
         </type>
@@ -12791,18 +12790,12 @@ END:VCALENDAR
           <required>1</required>
         </attrib>
         <e>feed_owner_set</e>
-        <e>feed_roles_set</e>
         <e>feed_resources_access</e>
         <any><e>feed</e></any>
       </pattern>
       <ele>
         <name>feed_owner_set</name>
         <summary>Whether the feed owner is set</summary>
-        <pattern><t>boolean</t></pattern>
-      </ele>
-      <ele>
-        <name>feed_roles_set</name>
-        <summary>Whether the feed roles are set</summary>
         <pattern><t>boolean</t></pattern>
       </ele>
       <ele>
@@ -12874,7 +12867,6 @@ END:VCALENDAR
       <response>
         <get_feeds_response status_text="OK" status="200">
           <feed_owner_set>1</feed_owner_set>
-          <feed_roles_set>1</feed_roles_set>
           <feed_resources_access>1</feed_resources_access>
           <feed>
             <type>NVT</type>
@@ -32010,8 +32002,8 @@ END:VCALENDAR
     <summary>Extend &quot;get_feeds&quot; command</summary>
     <description>
       <p>
-        &quot;get_feeds&quot; command is extended with &quot;feed_owner_set&quot;,
-        &quot;feed_roles_set&quot; and &quot;feed_resources_access&quot;.
+        &quot;get_feeds&quot; command is extended with &quot;feed_owner_set&quot;
+        and &quot;feed_resources_access&quot;.
       </p>
     </description>
     <version>22.6</version>

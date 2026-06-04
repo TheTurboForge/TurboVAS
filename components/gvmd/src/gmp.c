@@ -106,14 +106,12 @@
 #include "manage_alerts.h"
 #include "manage_assets.h"
 #include "manage_filters.h"
-#include "manage_groups.h"
 #include "manage_overrides.h"
 #include "manage_permissions.h"
 #include "manage_port_lists.h"
 #include "manage_report_configs.h"
 #include "manage_report_formats.h"
 #include "manage_resources.h"
-#include "manage_roles.h"
 #include "manage_runtime_flags.h"
 #include "manage_settings.h"
 #include "manage_schedules.h"
@@ -624,34 +622,6 @@ create_filter_data_reset (create_filter_data_t *data)
 }
 
 /**
- * @brief Command data for the create_group command.
- */
-typedef struct
-{
-  char *comment;                 ///< Comment.
-  char *copy;                    ///< UUID of resource to copy.
-  char *name;                    ///< Name of new group.
-  char *users;                   ///< Users belonging to new group.
-  int special_full;              ///< Boolean.  Give group Super on itself.
-} create_group_data_t;
-
-/**
- * @brief Reset command data.
- *
- * @param[in]  data  Command data.
- */
-static void
-create_group_data_reset (create_group_data_t *data)
-{
-  free (data->comment);
-  free (data->copy);
-  free (data->name);
-  free (data->users);
-
-  memset (data, 0, sizeof (create_group_data_t));
-}
-
-/**
  * @brief Command data for the create_override command.
  */
 typedef struct
@@ -692,39 +662,6 @@ create_override_data_reset (create_override_data_t *data)
   free (data->severity);
 
   memset (data, 0, sizeof (create_override_data_t));
-}
-
-/**
- * @brief Command data for the create_permission command.
- */
-typedef struct
-{
-  char *comment;         ///< Comment.
-  char *copy;            ///< UUID of resource to copy.
-  char *name;            ///< Permission name.
-  char *resource_type;   ///< Resource type, for special permissions.
-  char *resource_id;     ///< Resource permission applies to.
-  char *subject_type;    ///< Subject type permission applies to.
-  char *subject_id;      ///< Subject permission applies to.
-} create_permission_data_t;
-
-/**
- * @brief Reset command data.
- *
- * @param[in]  data  Command data.
- */
-static void
-create_permission_data_reset (create_permission_data_t *data)
-{
-  free (data->comment);
-  free (data->copy);
-  free (data->name);
-  free (data->resource_type);
-  free (data->resource_id);
-  free (data->subject_type);
-  free (data->subject_id);
-
-  memset (data, 0, sizeof (create_permission_data_t));
 }
 
 /**
@@ -892,33 +829,6 @@ create_report_data_reset (create_report_data_t *data)
   free (data->type);
 
   memset (data, 0, sizeof (create_report_data_t));
-}
-
-/**
- * @brief Command data for the create_role command.
- */
-typedef struct
-{
-  char *comment;                 ///< Comment.
-  char *copy;                    ///< UUID of resource to copy.
-  char *name;                    ///< Name of new role.
-  char *users;                   ///< Users belonging to new role.
-} create_role_data_t;
-
-/**
- * @brief Reset command data.
- *
- * @param[in]  data  Command data.
- */
-static void
-create_role_data_reset (create_role_data_t *data)
-{
-  free (data->comment);
-  free (data->copy);
-  free (data->name);
-  free (data->users);
-
-  memset (data, 0, sizeof (create_role_data_t));
 }
 
 /**
@@ -1129,7 +1039,6 @@ create_task_data_reset (create_task_data_t *data)
   free (data->scanner_id);
   free (data->copy);
   array_free (data->alerts);
-  array_free (data->groups);
   free (data->name);
   free (data->observers);
   if (data->preferences)
@@ -1164,13 +1073,9 @@ create_task_data_reset (create_task_data_t *data)
 typedef struct
 {
   char *copy;             ///< UUID of resource to copy.
-  array_t *groups;        ///< IDs of groups.
-  char *hosts;            ///< Hosts.
-  int hosts_allow;        ///< Whether hosts are allowed.
   char *name;             ///< User name.
   char *password;         ///< Password.
   char *comment;          ///< Comment.
-  array_t *roles;         ///< User's roles.
   gchar *current_source;  ///< Current source, for collecting sources.
   array_t *sources;       ///< Sources.
 } create_user_data_t;
@@ -1184,12 +1089,9 @@ static void
 create_user_data_reset (create_user_data_t * data)
 {
   g_free (data->copy);
-  array_free (data->groups);
   g_free (data->name);
   g_free (data->password);
   g_free (data->comment);
-  g_free (data->hosts);
-  array_free (data->roles);
   if (data->sources)
     {
       array_free (data->sources);
@@ -1311,28 +1213,6 @@ delete_filter_data_reset (delete_filter_data_t *data)
 }
 
 /**
- * @brief Command data for the delete_group command.
- */
-typedef struct
-{
-  char *group_id;   ///< ID of group to delete.
-  int ultimate;      ///< Boolean.  Whether to remove entirely or to trashcan.
-} delete_group_data_t;
-
-/**
- * @brief Reset command data.
- *
- * @param[in]  data  Command data.
- */
-static void
-delete_group_data_reset (delete_group_data_t *data)
-{
-  free (data->group_id);
-
-  memset (data, 0, sizeof (delete_group_data_t));
-}
-
-/**
  * @brief Command data for the delete_override command.
  */
 typedef struct
@@ -1340,28 +1220,6 @@ typedef struct
   char *override_id;   ///< ID of override to delete.
   int ultimate;        ///< Boolean.  Whether to remove entirely or to trashcan.
 } delete_override_data_t;
-
-/**
- * @brief Command data for the delete_permission command.
- */
-typedef struct
-{
-  char *permission_id; ///< ID of permission to delete.
-  int ultimate;        ///< Boolean.  Whether to remove entirely or to trashcan.
-} delete_permission_data_t;
-
-/**
- * @brief Reset command data.
- *
- * @param[in]  data  Command data.
- */
-static void
-delete_permission_data_reset (delete_permission_data_t *data)
-{
-  free (data->permission_id);
-
-  memset (data, 0, sizeof (delete_permission_data_t));
-}
 
 /**
  * @brief Command data for the delete_port_list command.
@@ -1462,28 +1320,6 @@ delete_report_format_data_reset (delete_report_format_data_t *data)
   free (data->report_format_id);
 
   memset (data, 0, sizeof (delete_report_format_data_t));
-}
-
-/**
- * @brief Command data for the delete_role command.
- */
-typedef struct
-{
-  char *role_id;     ///< ID of role to delete.
-  int ultimate;      ///< Dummy field for generic macros.
-} delete_role_data_t;
-
-/**
- * @brief Reset command data.
- *
- * @param[in]  data  Command data.
- */
-static void
-delete_role_data_reset (delete_role_data_t *data)
-{
-  free (data->role_id);
-
-  memset (data, 0, sizeof (delete_role_data_t));
 }
 
 /**
@@ -1798,26 +1634,6 @@ get_filters_data_reset (get_filters_data_t *data)
 }
 
 /**
- * @brief Command data for the get_groups command.
- */
-typedef struct
-{
-  get_data_t get;    ///< Get args.
-} get_groups_data_t;
-
-/**
- * @brief Reset command data.
- *
- * @param[in]  data  Command data.
- */
-static void
-get_groups_data_reset (get_groups_data_t *data)
-{
-  get_data_reset (&data->get);
-  memset (data, 0, sizeof (get_groups_data_t));
-}
-
-/**
  * @brief Command data for the get_info command.
  */
 typedef struct
@@ -1922,26 +1738,6 @@ get_overrides_data_reset (get_overrides_data_t *data)
   free (data->task_id);
 
   memset (data, 0, sizeof (get_overrides_data_t));
-}
-
-/**
- * @brief Command data for the get_permissions command.
- */
-typedef struct
-{
-  get_data_t get;     ///< Get args.
-} get_permissions_data_t;
-
-/**
- * @brief Reset command data.
- *
- * @param[in]  data  Command data.
- */
-static void
-get_permissions_data_reset (get_permissions_data_t *data)
-{
-  get_data_reset (&data->get);
-  memset (data, 0, sizeof (get_permissions_data_t));
 }
 
 /**
@@ -2116,26 +1912,6 @@ get_results_data_reset (get_results_data_t *data)
   free (data->task_id);
 
   memset (data, 0, sizeof (get_results_data_t));
-}
-
-/**
- * @brief Command data for the get_roles command.
- */
-typedef struct
-{
-  get_data_t get;    ///< Get args.
-} get_roles_data_t;
-
-/**
- * @brief Reset command data.
- *
- * @param[in]  data  Command data.
- */
-static void
-get_roles_data_reset (get_roles_data_t *data)
-{
-  get_data_reset (&data->get);
-  memset (data, 0, sizeof (get_roles_data_t));
 }
 
 /**
@@ -2622,15 +2398,23 @@ modify_filter_data_reset (modify_filter_data_t *data)
 }
 
 /**
- * @brief Command data for the modify_group command.
+ * @brief Command data for the modify_override command.
  */
 typedef struct
 {
-  char *comment;                 ///< Comment.
-  char *name;                    ///< Name of group.
-  char *group_id;                ///< Group UUID.
-  char *users;                   ///< Users for group.
-} modify_group_data_t;
+  char *active;       ///< Whether the override is active.
+  char *hosts;        ///< Hosts to which to limit override.
+  char *new_severity; ///< New severity score of overridden results.
+  char *new_threat;   ///< New threat value of overridden results.
+  char *nvt_oid;      ///< NVT to which to limit override.
+  char *override_id;  ///< ID of override to modify.
+  char *port;         ///< Port to which to limit override.
+  char *result_id;    ///< ID of result to which to limit override.
+  char *severity;     ///< Severity score of results to override.
+  char *task_id;      ///< ID of task to which to limit override.
+  char *text;         ///< Text of override.
+  char *threat;       ///< Threat to which to limit override.
+} modify_override_data_t;
 
 /**
  * @brief Reset command data.
@@ -2638,29 +2422,37 @@ typedef struct
  * @param[in]  data  Command data.
  */
 static void
-modify_group_data_reset (modify_group_data_t *data)
+modify_override_data_reset (modify_override_data_t *data)
 {
-  free (data->comment);
-  free (data->name);
-  free (data->group_id);
-  free (data->users);
+  free (data->active);
+  free (data->hosts);
+  free (data->new_severity);
+  free (data->new_threat);
+  free (data->nvt_oid);
+  free (data->override_id);
+  free (data->port);
+  free (data->result_id);
+  free (data->severity);
+  free (data->task_id);
+  free (data->text);
+  free (data->threat);
 
-  memset (data, 0, sizeof (modify_group_data_t));
+  memset (data, 0, sizeof (modify_override_data_t));
 }
 
 /**
- * @brief Command data for the modify_permission command.
+ * @brief Command data for the modify_user command.
  */
 typedef struct
 {
-  char *comment;                 ///< Comment.
-  char *name;                    ///< Name of permission.
-  char *permission_id;           ///< Permission UUID.
-  char *resource_id;             ///< Resource.
-  char *resource_type;           ///< Resource type, for Super permissions.
-  char *subject_type;            ///< Subject type.
-  char *subject_id;              ///< Subject UUID.
-} modify_permission_data_t;
+  gchar *name;               ///< User name.
+  gchar *new_name;           ///< New user name.
+  gchar *password;           ///< Password.
+  gchar *comment;            ///< Comment.
+  array_t *sources;          ///< Sources.
+  gchar *current_source;     ///< Current source, for collecting sources.
+  gchar *user_id;            ///< ID of user.
+} modify_user_data_t;
 
 /**
  * @brief Reset command data.
@@ -2668,17 +2460,19 @@ typedef struct
  * @param[in]  data  Command data.
  */
 static void
-modify_permission_data_reset (modify_permission_data_t *data)
+modify_user_data_reset (modify_user_data_t * data)
 {
-  free (data->comment);
-  free (data->name);
-  free (data->resource_id);
-  free (data->resource_type);
-  free (data->permission_id);
-  free (data->subject_type);
-  free (data->subject_id);
-
-  memset (data, 0, sizeof (modify_permission_data_t));
+  g_free (data->name);
+  g_free (data->new_name);
+  g_free (data->user_id);
+  g_free (data->password);
+  g_free (data->comment);
+  if (data->sources)
+    {
+      array_free (data->sources);
+    }
+  g_free (data->current_source);
+  memset (data, 0, sizeof (modify_user_data_t));
 }
 
 /**
@@ -2735,33 +2529,6 @@ modify_report_format_data_reset (modify_report_format_data_t *data)
   free (data->summary);
 
   memset (data, 0, sizeof (modify_report_format_data_t));
-}
-
-/**
- * @brief Command data for the modify_role command.
- */
-typedef struct
-{
-  char *comment;                 ///< Comment.
-  char *name;                    ///< Name of role.
-  char *role_id;                 ///< Role UUID.
-  char *users;                   ///< Users for role.
-} modify_role_data_t;
-
-/**
- * @brief Reset command data.
- *
- * @param[in]  data  Command data.
- */
-static void
-modify_role_data_reset (modify_role_data_t *data)
-{
-  free (data->comment);
-  free (data->name);
-  free (data->role_id);
-  free (data->users);
-
-  memset (data, 0, sizeof (modify_role_data_t));
 }
 
 /**
@@ -2974,7 +2741,6 @@ typedef struct
   array_t *alerts;     ///< IDs of new alerts for task.
   char *file;          ///< File to attach to task.
   char *file_name;     ///< Name of file to attach to task.
-  array_t *groups;     ///< IDs of new groups for task.
   char *name;          ///< New name for task.
   char *observers;     ///< Space separated list of observer user names.
   name_value_t *preference;  ///< Current preference.
@@ -2997,7 +2763,6 @@ modify_task_data_reset (modify_task_data_t *data)
   free (data->action);
   free (data->alterable);
   array_free (data->alerts);
-  array_free (data->groups);
   free (data->comment);
   free (data->scanner_id);
   free (data->config_id);
@@ -3027,92 +2792,6 @@ modify_task_data_reset (modify_task_data_t *data)
   free (data->agent_group_id);
 
   memset (data, 0, sizeof (modify_task_data_t));
-}
-
-/**
- * @brief Command data for the modify_override command.
- */
-typedef struct
-{
-  char *active;       ///< Whether the override is active.
-  char *hosts;        ///< Hosts to which to limit override.
-  char *new_severity; ///< New severity score of overridden results.
-  char *new_threat;   ///< New threat value of overridden results.
-  char *nvt_oid;      ///< NVT to which to limit override.
-  char *override_id;  ///< ID of override to modify.
-  char *port;         ///< Port to which to limit override.
-  char *result_id;    ///< ID of result to which to limit override.
-  char *severity;     ///< Severity score of results to override.
-  char *task_id;      ///< ID of task to which to limit override.
-  char *text;         ///< Text of override.
-  char *threat;       ///< Threat to which to limit override.
-} modify_override_data_t;
-
-/**
- * @brief Reset command data.
- *
- * @param[in]  data  Command data.
- */
-static void
-modify_override_data_reset (modify_override_data_t *data)
-{
-  free (data->active);
-  free (data->hosts);
-  free (data->new_severity);
-  free (data->new_threat);
-  free (data->nvt_oid);
-  free (data->override_id);
-  free (data->port);
-  free (data->result_id);
-  free (data->severity);
-  free (data->task_id);
-  free (data->text);
-  free (data->threat);
-
-  memset (data, 0, sizeof (modify_override_data_t));
-}
-
-/**
- * @brief Command data for the modify_user command.
- */
-typedef struct
-{
-  array_t *groups;           ///< IDs of groups.
-  gchar *hosts;              ///< Hosts.
-  int hosts_allow;           ///< Whether hosts are allowed.
-  gboolean modify_password;  ///< Whether to modify password.
-  gchar *name;               ///< User name.
-  gchar *new_name;           ///< New user name.
-  gchar *password;           ///< Password.
-  gchar *comment;            ///< Comment.
-  array_t *roles;            ///< IDs of roles.
-  array_t *sources;          ///< Sources.
-  gchar *current_source;     ///< Current source, for collecting sources.
-  gchar *user_id;            ///< ID of user.
-} modify_user_data_t;
-
-/**
- * @brief Reset command data.
- *
- * @param[in]  data  Command data.
- */
-static void
-modify_user_data_reset (modify_user_data_t * data)
-{
-  array_free (data->groups);
-  g_free (data->name);
-  g_free (data->new_name);
-  g_free (data->user_id);
-  g_free (data->password);
-  g_free (data->comment);
-  g_free (data->hosts);
-  array_free (data->roles);
-  if (data->sources)
-    {
-      array_free (data->sources);
-    }
-  g_free (data->current_source);
-  memset (data, 0, sizeof (modify_user_data_t));
 }
 
 /**
@@ -3336,12 +3015,9 @@ typedef union
   create_alert_data_t create_alert;                   ///< create_alert
   create_credential_data_t create_credential;         ///< create_credential
   create_filter_data_t create_filter;                 ///< create_filter
-  create_group_data_t create_group;                   ///< create_group
   create_override_data_t create_override;             ///< create_override
-  create_permission_data_t create_permission;         ///< create_permission
   create_port_range_data_t create_port_range;         ///< create_port_range
   create_report_data_t create_report;                 ///< create_report
-  create_role_data_t create_role;                     ///< create_role
   create_scanner_data_t create_scanner;               ///< create_scanner
   create_schedule_data_t create_schedule;             ///< create_schedule
   create_tag_data_t create_tag;                       ///< create_tag
@@ -3353,14 +3029,11 @@ typedef union
   delete_config_data_t delete_config;                 ///< delete_config
   delete_alert_data_t delete_alert;                   ///< delete_alert
   delete_filter_data_t delete_filter;                 ///< delete_filter
-  delete_group_data_t delete_group;                   ///< delete_group
   delete_override_data_t delete_override;             ///< delete_override
-  delete_permission_data_t delete_permission;         ///< delete_permission
   delete_port_list_data_t delete_port_list;           ///< delete_port_list
   delete_port_range_data_t delete_port_range;         ///< delete_port_range
   delete_report_data_t delete_report;                 ///< delete_report
   delete_report_format_data_t delete_report_format;   ///< delete_report_format
-  delete_role_data_t delete_role;                     ///< delete_role
   delete_scanner_data_t delete_scanner;               ///< delete_scanner
   delete_schedule_data_t delete_schedule;             ///< delete_schedule
   delete_tag_data_t delete_tag;                       ///< delete_tag
@@ -3374,12 +3047,10 @@ typedef union
   get_credentials_data_t get_credentials;             ///< get_credentials
   get_feeds_data_t get_feeds;                         ///< get_feeds
   get_filters_data_t get_filters;                     ///< get_filters
-  get_groups_data_t get_groups;                       ///< get_groups
   get_info_data_t get_info;                           ///< get_info
   get_nvts_data_t get_nvts;                           ///< get_nvts
   get_nvt_families_data_t get_nvt_families;           ///< get_nvt_families
   get_overrides_data_t get_overrides;                 ///< get_overrides
-  get_permissions_data_t get_permissions;             ///< get_permissions
   get_port_lists_data_t get_port_lists;               ///< get_port_lists
   get_preferences_data_t get_preferences;             ///< get_preferences
   get_reports_data_t get_reports;                     ///< get_reports
@@ -3387,7 +3058,6 @@ typedef union
   get_report_formats_data_t get_report_formats;       ///< get_report_formats
   get_resource_names_data_t get_resource_names;       ///< get_resource_names
   get_results_data_t get_results;                     ///< get_results
-  get_roles_data_t get_roles;                         ///< get_roles
   get_schedules_data_t get_schedules;                 ///< get_schedules
   get_scanners_data_t get_scanners;                   ///< get_scanners
   get_settings_data_t get_settings;                   ///< get_settings
@@ -3404,11 +3074,8 @@ typedef union
   modify_config_data_t modify_config;                 ///< modify_config
   modify_credential_data_t modify_credential;         ///< modify_credential
   modify_filter_data_t modify_filter;                 ///< modify_filter
-  modify_group_data_t modify_group;                   ///< modify_group
-  modify_permission_data_t modify_permission;         ///< modify_permission
   modify_port_list_data_t modify_port_list;           ///< modify_port_list
   modify_report_format_data_t modify_report_format;   ///< modify_report_format
-  modify_role_data_t modify_role;                     ///< modify_role
   modify_scanner_data_t modify_scanner;               ///< modify_scanner
   modify_schedule_data_t modify_schedule;             ///< modify_schedule
   modify_setting_data_t modify_setting;               ///< modify_setting
@@ -3471,34 +3138,16 @@ static create_filter_data_t *create_filter_data
  = (create_filter_data_t*) &(command_data.create_filter);
 
 /**
- * @brief Parser callback data for CREATE_GROUP.
- */
-static create_group_data_t *create_group_data
- = (create_group_data_t*) &(command_data.create_group);
-
-/**
  * @brief Parser callback data for CREATE_OVERRIDE.
  */
 static create_override_data_t *create_override_data
  = (create_override_data_t*) &(command_data.create_override);
 
 /**
- * @brief Parser callback data for CREATE_PERMISSION.
- */
-static create_permission_data_t *create_permission_data
- = (create_permission_data_t*) &(command_data.create_permission);
-
-/**
  * @brief Parser callback data for CREATE_PORT_RANGE.
  */
 static create_port_range_data_t *create_port_range_data
  = (create_port_range_data_t*) &(command_data.create_port_range);
-
-/**
- * @brief Parser callback data for CREATE_ROLE.
- */
-static create_role_data_t *create_role_data
- = (create_role_data_t*) &(command_data.create_role);
 
 /**
  * @brief Parser callback data for CREATE_REPORT.
@@ -3573,22 +3222,10 @@ static delete_filter_data_t *delete_filter_data
  = (delete_filter_data_t*) &(command_data.delete_filter);
 
 /**
- * @brief Parser callback data for DELETE_GROUP.
- */
-static delete_group_data_t *delete_group_data
- = (delete_group_data_t*) &(command_data.delete_group);
-
-/**
  * @brief Parser callback data for DELETE_OVERRIDE.
  */
 static delete_override_data_t *delete_override_data
  = (delete_override_data_t*) &(command_data.delete_override);
-
-/**
- * @brief Parser callback data for DELETE_PERMISSION.
- */
-static delete_permission_data_t *delete_permission_data
- = (delete_permission_data_t*) &(command_data.delete_permission);
 
 /**
  * @brief Parser callback data for DELETE_PORT_LIST.
@@ -3613,12 +3250,6 @@ static delete_report_data_t *delete_report_data
  */
 static delete_report_format_data_t *delete_report_format_data
  = (delete_report_format_data_t*) &(command_data.delete_report_format);
-
-/**
- * @brief Parser callback data for DELETE_ROLE.
- */
-static delete_role_data_t *delete_role_data
- = (delete_role_data_t*) &(command_data.delete_role);
 
 /**
  * @brief Parser callback data for DELETE_SCANNER.
@@ -3699,12 +3330,6 @@ static get_filters_data_t *get_filters_data
  = &(command_data.get_filters);
 
 /**
- * @brief Parser callback data for GET_GROUPS.
- */
-static get_groups_data_t *get_groups_data
- = &(command_data.get_groups);
-
-/**
  * @brief Parser callback data for GET_INFO.
  */
 static get_info_data_t *get_info_data
@@ -3727,12 +3352,6 @@ static get_nvt_families_data_t *get_nvt_families_data
  */
 static get_overrides_data_t *get_overrides_data
  = &(command_data.get_overrides);
-
-/**
- * @brief Parser callback data for GET_PERMISSIONS.
- */
-static get_permissions_data_t *get_permissions_data
- = &(command_data.get_permissions);
 
 /**
  * @brief Parser callback data for GET_PORT_LISTS.
@@ -3775,12 +3394,6 @@ static get_resource_names_data_t *get_resource_names_data
  */
 static get_results_data_t *get_results_data
  = &(command_data.get_results);
-
-/**
- * @brief Parser callback data for GET_ROLES.
- */
-static get_roles_data_t *get_roles_data
- = &(command_data.get_roles);
 
 /**
  * @brief Parser callback data for GET_scannerS.
@@ -3873,22 +3486,10 @@ static modify_filter_data_t *modify_filter_data
  = &(command_data.modify_filter);
 
 /**
- * @brief Parser callback data for MODIFY_GROUP.
- */
-static modify_group_data_t *modify_group_data
- = &(command_data.modify_group);
-
-/**
  * @brief Parser callback data for MODIFY_OVERRIDE.
  */
 static modify_override_data_t *modify_override_data
  = (modify_override_data_t*) &(command_data.create_override);
-
-/**
- * @brief Parser callback data for MODIFY_PERMISSION.
- */
-static modify_permission_data_t *modify_permission_data
- = &(command_data.modify_permission);
 
 /**
  * @brief Parser callback data for MODIFY_PORT_LIST.
@@ -3901,12 +3502,6 @@ static modify_port_list_data_t *modify_port_list_data
  */
 static modify_report_format_data_t *modify_report_format_data
  = &(command_data.modify_report_format);
-
-/**
- * @brief Parser callback data for MODIFY_ROLE.
- */
-static modify_role_data_t *modify_role_data
- = &(command_data.modify_role);
 
 /**
  * @brief Parser callback data for MODIFY_SCANNER.
@@ -4104,13 +3699,6 @@ typedef enum
   CLIENT_CREATE_FILTER_NAME,
   CLIENT_CREATE_FILTER_TERM,
   CLIENT_CREATE_FILTER_TYPE,
-  CLIENT_CREATE_GROUP,
-  CLIENT_CREATE_GROUP_COMMENT,
-  CLIENT_CREATE_GROUP_COPY,
-  CLIENT_CREATE_GROUP_NAME,
-  CLIENT_CREATE_GROUP_USERS,
-  CLIENT_CREATE_GROUP_SPECIALS,
-  CLIENT_CREATE_GROUP_SPECIALS_FULL,
   CLIENT_CREATE_OVERRIDE,
   CLIENT_CREATE_OVERRIDE_ACTIVE,
   CLIENT_CREATE_OVERRIDE_COPY,
@@ -4124,14 +3712,6 @@ typedef enum
   CLIENT_CREATE_OVERRIDE_TASK,
   CLIENT_CREATE_OVERRIDE_TEXT,
   CLIENT_CREATE_OVERRIDE_THREAT,
-  CLIENT_CREATE_PERMISSION,
-  CLIENT_CREATE_PERMISSION_COMMENT,
-  CLIENT_CREATE_PERMISSION_COPY,
-  CLIENT_CREATE_PERMISSION_NAME,
-  CLIENT_CREATE_PERMISSION_RESOURCE,
-  CLIENT_CREATE_PERMISSION_RESOURCE_TYPE,
-  CLIENT_CREATE_PERMISSION_SUBJECT,
-  CLIENT_CREATE_PERMISSION_SUBJECT_TYPE,
   CLIENT_CREATE_PORT_LIST,
   CLIENT_CREATE_PORT_RANGE,
   CLIENT_CREATE_PORT_RANGE_COMMENT,
@@ -4228,11 +3808,6 @@ typedef enum
   CLIENT_CREATE_REPORT_TASK,
   CLIENT_CREATE_REPORT_TASK_COMMENT,
   CLIENT_CREATE_REPORT_TASK_NAME,
-  CLIENT_CREATE_ROLE,
-  CLIENT_CREATE_ROLE_COMMENT,
-  CLIENT_CREATE_ROLE_COPY,
-  CLIENT_CREATE_ROLE_NAME,
-  CLIENT_CREATE_ROLE_USERS,
   CLIENT_CREATE_SCANNER,
   CLIENT_CREATE_SCANNER_COMMENT,
   CLIENT_CREATE_SCANNER_COPY,
@@ -4320,15 +3895,12 @@ typedef enum
   CLIENT_DELETE_CONFIG,
   CLIENT_DELETE_CREDENTIAL,
   CLIENT_DELETE_FILTER,
-  CLIENT_DELETE_GROUP,
   CLIENT_DELETE_OVERRIDE,
-  CLIENT_DELETE_PERMISSION,
   CLIENT_DELETE_PORT_LIST,
   CLIENT_DELETE_PORT_RANGE,
   CLIENT_DELETE_REPORT,
   CLIENT_DELETE_REPORT_CONFIG,
   CLIENT_DELETE_REPORT_FORMAT,
-  CLIENT_DELETE_ROLE,
   CLIENT_DELETE_SCANNER,
   CLIENT_DELETE_SCHEDULE,
   CLIENT_DELETE_TAG,
@@ -4358,14 +3930,12 @@ typedef enum
   CLIENT_GET_FEATURES,
   CLIENT_GET_FEEDS,
   CLIENT_GET_FILTERS,
-  CLIENT_GET_GROUPS,
   CLIENT_GET_INFO,
   CLIENT_GET_INTEGRATION_CONFIGS,
   CLIENT_GET_LICENSE,
   CLIENT_GET_NVTS,
   CLIENT_GET_NVT_FAMILIES,
   CLIENT_GET_OVERRIDES,
-  CLIENT_GET_PERMISSIONS,
   CLIENT_GET_PORT_LISTS,
   CLIENT_GET_PREFERENCES,
   CLIENT_GET_REPORTS,
@@ -4382,7 +3952,6 @@ typedef enum
   CLIENT_GET_REPORT_VULNS,
   CLIENT_GET_RESOURCE_NAMES,
   CLIENT_GET_RESULTS,
-  CLIENT_GET_ROLES,
   CLIENT_GET_SCANNERS,
   CLIENT_GET_SCHEDULES,
   CLIENT_GET_SETTINGS,
@@ -4456,10 +4025,6 @@ typedef enum
   CLIENT_MODIFY_FILTER_NAME,
   CLIENT_MODIFY_FILTER_TERM,
   CLIENT_MODIFY_FILTER_TYPE,
-  CLIENT_MODIFY_GROUP,
-  CLIENT_MODIFY_GROUP_COMMENT,
-  CLIENT_MODIFY_GROUP_NAME,
-  CLIENT_MODIFY_GROUP_USERS,
   CLIENT_MODIFY_INTEGRATION_CONFIG,
   CLIENT_MODIFY_LICENSE,
   CLIENT_MODIFY_OVERRIDE,
@@ -4474,13 +4039,6 @@ typedef enum
   CLIENT_MODIFY_OVERRIDE_TEXT,
   CLIENT_MODIFY_OVERRIDE_THREAT,
   CLIENT_MODIFY_OVERRIDE_NVT,
-  CLIENT_MODIFY_PERMISSION,
-  CLIENT_MODIFY_PERMISSION_COMMENT,
-  CLIENT_MODIFY_PERMISSION_NAME,
-  CLIENT_MODIFY_PERMISSION_RESOURCE,
-  CLIENT_MODIFY_PERMISSION_RESOURCE_TYPE,
-  CLIENT_MODIFY_PERMISSION_SUBJECT,
-  CLIENT_MODIFY_PERMISSION_SUBJECT_TYPE,
   CLIENT_MODIFY_PORT_LIST,
   CLIENT_MODIFY_PORT_LIST_COMMENT,
   CLIENT_MODIFY_PORT_LIST_NAME,
@@ -4492,10 +4050,6 @@ typedef enum
   CLIENT_MODIFY_REPORT_FORMAT_PARAM_NAME,
   CLIENT_MODIFY_REPORT_FORMAT_PARAM_VALUE,
   CLIENT_MODIFY_REPORT_FORMAT_SUMMARY,
-  CLIENT_MODIFY_ROLE,
-  CLIENT_MODIFY_ROLE_COMMENT,
-  CLIENT_MODIFY_ROLE_NAME,
-  CLIENT_MODIFY_ROLE_USERS,
   CLIENT_MODIFY_SCANNER,
   CLIENT_MODIFY_SCANNER_COMMENT,
   CLIENT_MODIFY_SCANNER_NAME,
@@ -6388,6 +5942,19 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
         break;
 #endif
 
+      case CLIENT_CREATE_FILTER:
+        if (strcasecmp ("COMMENT", element_name) == 0)
+          set_client_state (CLIENT_CREATE_FILTER_COMMENT);
+        else if (strcasecmp ("COPY", element_name) == 0)
+          set_client_state (CLIENT_CREATE_FILTER_COPY);
+        else if (strcasecmp ("NAME", element_name) == 0)
+          set_client_state (CLIENT_CREATE_FILTER_NAME);
+        else if (strcasecmp ("TERM", element_name) == 0)
+          set_client_state (CLIENT_CREATE_FILTER_TERM);
+        else if (strcasecmp ("TYPE", element_name) == 0)
+          set_client_state (CLIENT_CREATE_FILTER_TYPE);
+        ELSE_READ_OVER;
+
       case CLIENT_MODIFY_FILTER:
         if (strcasecmp ("COMMENT", element_name) == 0)
           {
@@ -6411,457 +5978,29 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
           }
         ELSE_READ_OVER;
 
-      case CLIENT_MODIFY_GROUP:
-        if (strcasecmp ("COMMENT", element_name) == 0)
-          {
-            gvm_append_string (&modify_group_data->comment, "");
-            set_client_state (CLIENT_MODIFY_GROUP_COMMENT);
-          }
-        else if (strcasecmp ("NAME", element_name) == 0)
-          {
-            gvm_append_string (&modify_group_data->name, "");
-            set_client_state (CLIENT_MODIFY_GROUP_NAME);
-          }
-        else if (strcasecmp ("USERS", element_name) == 0)
-          {
-            gvm_append_string (&modify_group_data->users, "");
-            set_client_state (CLIENT_MODIFY_GROUP_USERS);
-          }
-        ELSE_READ_OVER;
-      case CLIENT_MODIFY_INTEGRATION_CONFIG:
-        modify_integration_config_element_start (gmp_parser, element_name,
-                                                 attribute_names,
-                                                 attribute_values);
-        break;
-
-      case CLIENT_MODIFY_PERMISSION:
-        if (strcasecmp ("COMMENT", element_name) == 0)
-          {
-            gvm_append_string (&modify_permission_data->comment, "");
-            set_client_state (CLIENT_MODIFY_PERMISSION_COMMENT);
-          }
-        else if (strcasecmp ("NAME", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_PERMISSION_NAME);
-        else if (strcasecmp ("RESOURCE", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &modify_permission_data->resource_id);
-            set_client_state (CLIENT_MODIFY_PERMISSION_RESOURCE);
-          }
-        else if (strcasecmp ("SUBJECT", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &modify_permission_data->subject_id);
-            set_client_state (CLIENT_MODIFY_PERMISSION_SUBJECT);
-          }
-        ELSE_READ_OVER;
-
-      case CLIENT_MODIFY_PERMISSION_RESOURCE:
-        if (strcasecmp ("TYPE", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_PERMISSION_RESOURCE_TYPE);
-        ELSE_READ_OVER;
-
-      case CLIENT_MODIFY_PERMISSION_SUBJECT:
-        if (strcasecmp ("TYPE", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_PERMISSION_SUBJECT_TYPE);
-        ELSE_READ_OVER;
-
-      case CLIENT_MODIFY_PORT_LIST:
-        if (strcasecmp ("NAME", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_PORT_LIST_NAME);
-        else if (strcasecmp ("COMMENT", element_name) == 0)
-          {
-            gvm_free_string_var (&modify_port_list_data->comment);
-            gvm_append_string (&modify_port_list_data->comment, "");
-            set_client_state (CLIENT_MODIFY_PORT_LIST_COMMENT);
-          }
-        ELSE_READ_OVER;
-
-      case CLIENT_MODIFY_REPORT_CONFIG:
-        modify_report_config_element_start (gmp_parser, element_name,
-                                            attribute_names,
-                                            attribute_values);
-        break;
-
-      case CLIENT_MODIFY_REPORT_FORMAT:
-        if (strcasecmp ("ACTIVE", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_REPORT_FORMAT_ACTIVE);
-        else if (strcasecmp ("NAME", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_REPORT_FORMAT_NAME);
-        else if (strcasecmp ("SUMMARY", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_REPORT_FORMAT_SUMMARY);
-        else if (strcasecmp ("PARAM", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_REPORT_FORMAT_PARAM);
-        ELSE_READ_OVER;
-
-      case CLIENT_MODIFY_REPORT_FORMAT_PARAM:
-        if (strcasecmp ("NAME", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_REPORT_FORMAT_PARAM_NAME);
-        else if (strcasecmp ("VALUE", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_REPORT_FORMAT_PARAM_VALUE);
-        ELSE_READ_OVER;
-
-      case CLIENT_MODIFY_ROLE:
-        if (strcasecmp ("COMMENT", element_name) == 0)
-          {
-            gvm_append_string (&modify_role_data->comment, "");
-            set_client_state (CLIENT_MODIFY_ROLE_COMMENT);
-          }
-        else if (strcasecmp ("NAME", element_name) == 0)
-          {
-            gvm_append_string (&modify_role_data->name, "");
-            set_client_state (CLIENT_MODIFY_ROLE_NAME);
-          }
-        else if (strcasecmp ("USERS", element_name) == 0)
-          {
-            gvm_append_string (&modify_role_data->users, "");
-            set_client_state (CLIENT_MODIFY_ROLE_USERS);
-          }
-        ELSE_READ_OVER;
-
-      case CLIENT_MODIFY_SCANNER:
-        if (strcasecmp ("COMMENT", element_name) == 0)
-          {
-            gvm_append_string (&modify_scanner_data->comment, "");
-            set_client_state (CLIENT_MODIFY_SCANNER_COMMENT);
-          }
-        else if (strcasecmp ("NAME", element_name) == 0)
-          {
-            gvm_append_string (&modify_scanner_data->name, "");
-            set_client_state (CLIENT_MODIFY_SCANNER_NAME);
-          }
-        else if (strcasecmp ("HOST", element_name) == 0)
-          {
-            gvm_append_string (&modify_scanner_data->host, "");
-            set_client_state (CLIENT_MODIFY_SCANNER_HOST);
-          }
-        else if (strcasecmp ("PORT", element_name) == 0)
-          {
-            gvm_append_string (&modify_scanner_data->port, "");
-            set_client_state (CLIENT_MODIFY_SCANNER_PORT);
-          }
-        else if (strcasecmp ("TYPE", element_name) == 0)
-          {
-            gvm_append_string (&modify_scanner_data->type, "");
-            set_client_state (CLIENT_MODIFY_SCANNER_TYPE);
-          }
-        else if (strcasecmp ("CA_PUB", element_name) == 0)
-          {
-            gvm_append_string (&modify_scanner_data->ca_pub, "");
-            set_client_state (CLIENT_MODIFY_SCANNER_CA_PUB);
-          }
-        else if (strcasecmp ("CREDENTIAL", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &modify_scanner_data->credential_id);
-            set_client_state (CLIENT_MODIFY_SCANNER_CREDENTIAL);
-          }
-        else if (strcasecmp ("RELAY_HOST", element_name) == 0)
-          {
-            gvm_append_string (&modify_scanner_data->relay_host, "");
-            set_client_state (CLIENT_MODIFY_SCANNER_RELAY_HOST);
-          }
-        else if (strcasecmp ("RELAY_PORT", element_name) == 0)
-          {
-            gvm_append_string (&modify_scanner_data->relay_port, "");
-            set_client_state (CLIENT_MODIFY_SCANNER_RELAY_PORT);
-          }
-        ELSE_READ_OVER;
-
-      case CLIENT_MODIFY_SCHEDULE:
-        if (strcasecmp ("COMMENT", element_name) == 0)
-          {
-            gvm_append_string (&modify_schedule_data->comment, "");
-            set_client_state (CLIENT_MODIFY_SCHEDULE_COMMENT);
-          }
-        else if (strcasecmp ("NAME", element_name) == 0)
-          {
-            gvm_append_string (&modify_schedule_data->name, "");
-            set_client_state (CLIENT_MODIFY_SCHEDULE_NAME);
-          }
-        else if (strcasecmp ("ICALENDAR", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_SCHEDULE_ICALENDAR);
-        else if (strcasecmp ("TIMEZONE", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_SCHEDULE_TIMEZONE);
-        ELSE_READ_OVER;
-
-      case CLIENT_MODIFY_SETTING:
-        if (strcasecmp ("NAME", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_SETTING_NAME);
-        else if (strcasecmp ("VALUE", element_name) == 0)
-          {
-            gvm_append_string (&modify_setting_data->value, "");
-            set_client_state (CLIENT_MODIFY_SETTING_VALUE);
-          }
-        ELSE_READ_OVER;
-
-      case CLIENT_MODIFY_TAG:
-        if (strcasecmp ("ACTIVE", element_name) == 0)
-          {
-            gvm_append_string (&modify_tag_data->active, "");
-            set_client_state (CLIENT_MODIFY_TAG_ACTIVE);
-          }
-        else if (strcasecmp ("RESOURCES", element_name) == 0)
-          {
-            modify_tag_data->resource_ids = make_array ();
-            append_attribute (attribute_names, attribute_values, "filter",
-                              &modify_tag_data->resources_filter);
-            append_attribute (attribute_names, attribute_values, "action",
-                              &modify_tag_data->resources_action);
-            set_client_state (CLIENT_MODIFY_TAG_RESOURCES);
-          }
-        else if (strcasecmp ("COMMENT", element_name) == 0)
-          {
-            gvm_append_string (&modify_tag_data->comment, "");
-            set_client_state (CLIENT_MODIFY_TAG_COMMENT);
-          }
-        else if (strcasecmp ("NAME", element_name) == 0)
-          {
-            gvm_append_string (&modify_tag_data->name, "");
-            set_client_state (CLIENT_MODIFY_TAG_NAME);
-          }
-        else if (strcasecmp ("VALUE", element_name) == 0)
-          {
-            gvm_append_string (&modify_tag_data->value, "");
-            set_client_state (CLIENT_MODIFY_TAG_VALUE);
-          }
-        ELSE_READ_OVER;
-
-      case CLIENT_MODIFY_TAG_RESOURCES:
-        if (strcasecmp ("RESOURCE", element_name) == 0)
-          {
-            const gchar* attribute;
-            if (find_attribute (attribute_names, attribute_values, "id",
-                                &attribute))
-              array_add (modify_tag_data->resource_ids, g_strdup (attribute));
-            set_client_state (CLIENT_MODIFY_TAG_RESOURCES_RESOURCE);
-          }
-        else if (strcasecmp ("TYPE", element_name) == 0)
-          {
-            gvm_append_string (&modify_tag_data->resource_type, "");
-            set_client_state (CLIENT_MODIFY_TAG_RESOURCES_TYPE);
-          }
-        ELSE_READ_OVER;
-
-      case CLIENT_MODIFY_TARGET:
-        if (strcasecmp ("EXCLUDE_HOSTS", element_name) == 0)
-          {
-            gvm_append_string (&modify_target_data->exclude_hosts, "");
-            set_client_state (CLIENT_MODIFY_TARGET_EXCLUDE_HOSTS);
-          }
-        else if (strcasecmp ("REVERSE_LOOKUP_ONLY", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_TARGET_REVERSE_LOOKUP_ONLY);
-        else if (strcasecmp ("REVERSE_LOOKUP_UNIFY", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_TARGET_REVERSE_LOOKUP_UNIFY);
-        else if (strcasecmp ("ALIVE_TESTS", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_TARGET_ALIVE_TESTS);
-        else if (strcasecmp ("ALLOW_SIMULTANEOUS_IPS", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_TARGET_ALLOW_SIMULTANEOUS_IPS);
-        else if (strcasecmp ("COMMENT", element_name) == 0)
-          {
-            gvm_append_string (&modify_target_data->comment, "");
-            set_client_state (CLIENT_MODIFY_TARGET_COMMENT);
-          }
-        else if (strcasecmp ("ESXI_CREDENTIAL", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &modify_target_data->esxi_credential_id);
-            set_client_state (CLIENT_MODIFY_TARGET_ESXI_CREDENTIAL);
-          }
-        else if (strcasecmp ("ESXI_LSC_CREDENTIAL", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &modify_target_data->esxi_lsc_credential_id);
-            set_client_state (CLIENT_MODIFY_TARGET_ESXI_LSC_CREDENTIAL);
-          }
-        else if (strcasecmp ("HOSTS", element_name) == 0)
-          {
-            gvm_append_string (&modify_target_data->hosts, "");
-            set_client_state (CLIENT_MODIFY_TARGET_HOSTS);
-          }
-        else if (strcasecmp ("PORT_LIST", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &modify_target_data->port_list_id);
-            set_client_state (CLIENT_MODIFY_TARGET_PORT_LIST);
-          }
-        else if (strcasecmp ("KRB5_CREDENTIAL", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &modify_target_data->krb5_credential_id);
-            set_client_state (CLIENT_MODIFY_TARGET_KRB5_CREDENTIAL);
-          }
-        else if (strcasecmp ("SSH_CREDENTIAL", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &modify_target_data->ssh_credential_id);
-            set_client_state (CLIENT_MODIFY_TARGET_SSH_CREDENTIAL);
-          }
-        else if (strcasecmp ("SSH_LSC_CREDENTIAL", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &modify_target_data->ssh_lsc_credential_id);
-            set_client_state (CLIENT_MODIFY_TARGET_SSH_LSC_CREDENTIAL);
-          }
-        else if (strcasecmp ("SSH_ELEVATE_CREDENTIAL", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &modify_target_data->ssh_elevate_credential_id);
-            set_client_state (CLIENT_MODIFY_TARGET_SSH_ELEVATE_CREDENTIAL);
-          }
-        else if (strcasecmp ("SMB_CREDENTIAL", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &modify_target_data->smb_credential_id);
-            set_client_state (CLIENT_MODIFY_TARGET_SMB_CREDENTIAL);
-          }
-        else if (strcasecmp ("SMB_LSC_CREDENTIAL", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &modify_target_data->smb_lsc_credential_id);
-            set_client_state (CLIENT_MODIFY_TARGET_SMB_LSC_CREDENTIAL);
-          }
-        else if (strcasecmp ("SNMP_CREDENTIAL", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &modify_target_data->snmp_credential_id);
-            set_client_state (CLIENT_MODIFY_TARGET_SNMP_CREDENTIAL);
-          }
-        else if (strcasecmp ("NAME", element_name) == 0)
-          {
-            gvm_append_string (&modify_target_data->name, "");
-            set_client_state (CLIENT_MODIFY_TARGET_NAME);
-          }
-        ELSE_READ_OVER;
-
-      case CLIENT_MODIFY_TARGET_ALIVE_TESTS:
-        if (strcasecmp ("ALIVE_TEST", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_TARGET_ALIVE_TESTS_ALIVE_TEST);
-        ELSE_READ_OVER;
-
-      case CLIENT_MODIFY_TARGET_SSH_CREDENTIAL:
-        if (strcasecmp ("PORT", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_TARGET_SSH_CREDENTIAL_PORT);
-        ELSE_READ_OVER;
-
-      case CLIENT_MODIFY_TARGET_SSH_LSC_CREDENTIAL:
-        if (strcasecmp ("PORT", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_TARGET_SSH_LSC_CREDENTIAL_PORT);
-        ELSE_READ_OVER;
-
-      case CLIENT_MODIFY_TASK:
-        if (strcasecmp ("ALTERABLE", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_TASK_ALTERABLE);
-        else if (strcasecmp ("COMMENT", element_name) == 0)
-          {
-            gvm_append_string (&modify_task_data->comment, "");
-            set_client_state (CLIENT_MODIFY_TASK_COMMENT);
-          }
-        else if (strcasecmp ("SCANNER", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &modify_task_data->scanner_id);
-            set_client_state (CLIENT_MODIFY_TASK_SCANNER);
-          }
-#if ENABLE_AGENTS
-        else if (strcasecmp ("AGENT_GROUP", element_name) == 0)
-          {
-             append_attribute (attribute_names, attribute_values, "id",
-                               &modify_task_data->agent_group_id);
-             set_client_state (CLIENT_MODIFY_TASK_AGENT_GROUP);
-          }
-#endif /* ENABLE_AGENTS */
-        else if (strcasecmp ("ALERT", element_name) == 0)
-          {
-            const gchar* attribute;
-            if (find_attribute (attribute_names, attribute_values, "id",
-                                &attribute))
-              array_add (modify_task_data->alerts, g_strdup (attribute));
-            set_client_state (CLIENT_MODIFY_TASK_ALERT);
-          }
-        else if (strcasecmp ("CONFIG", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &modify_task_data->config_id);
-            set_client_state (CLIENT_MODIFY_TASK_CONFIG);
-          }
-        else if (strcasecmp ("NAME", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_TASK_NAME);
-        else if (strcasecmp ("PREFERENCES", element_name) == 0)
-          {
-            modify_task_data->preferences = make_array ();
-            set_client_state (CLIENT_MODIFY_TASK_PREFERENCES);
-          }
-        else if (strcasecmp ("SCHEDULE", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &modify_task_data->schedule_id);
-            set_client_state (CLIENT_MODIFY_TASK_SCHEDULE);
-          }
-        else if (strcasecmp ("SCHEDULE_PERIODS", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_TASK_SCHEDULE_PERIODS);
-        else if (strcasecmp ("TARGET", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &modify_task_data->target_id);
-            set_client_state (CLIENT_MODIFY_TASK_TARGET);
-          }
-        else if (strcasecmp ("FILE", element_name) == 0)
-          {
-            const gchar* attribute;
-            append_attribute (attribute_names, attribute_values, "name",
-                              &modify_task_data->file_name);
-            if (find_attribute (attribute_names, attribute_values,
-                                "action", &attribute))
-              gvm_append_string (&modify_task_data->action, attribute);
-            else
-              gvm_append_string (&modify_task_data->action, "update");
-            set_client_state (CLIENT_MODIFY_TASK_FILE);
-          }
-        ELSE_READ_OVER;
-
-      case CLIENT_MODIFY_TASK_PREFERENCES:
-        if (strcasecmp ("PREFERENCE", element_name) == 0)
-          {
-            assert (modify_task_data->preference == NULL);
-            modify_task_data->preference = g_malloc (sizeof (name_value_t));
-            modify_task_data->preference->name = NULL;
-            modify_task_data->preference->value = NULL;
-            set_client_state (CLIENT_MODIFY_TASK_PREFERENCES_PREFERENCE);
-          }
-        ELSE_READ_OVER;
-
-      case CLIENT_MODIFY_TASK_PREFERENCES_PREFERENCE:
-        if (strcasecmp ("SCANNER_NAME", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_TASK_PREFERENCES_PREFERENCE_NAME);
-        else if (strcasecmp ("VALUE", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_TASK_PREFERENCES_PREFERENCE_VALUE);
-        ELSE_READ_OVER;
-
-      case CLIENT_MODIFY_TLS_CERTIFICATE:
-        modify_tls_certificate_element_start (gmp_parser, element_name,
-                                              attribute_names,
-                                              attribute_values);
-        break;
-
       case CLIENT_MODIFY_USER:
         if (strcasecmp ("COMMENT", element_name) == 0)
           {
+            gvm_free_string_var (&modify_user_data->comment);
             gvm_append_string (&modify_user_data->comment, "");
             set_client_state (CLIENT_MODIFY_USER_COMMENT);
           }
         else if (strcasecmp ("NAME", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_USER_NAME);
+          {
+            gvm_free_string_var (&modify_user_data->name);
+            gvm_append_string (&modify_user_data->name, "");
+            set_client_state (CLIENT_MODIFY_USER_NAME);
+          }
         else if (strcasecmp ("NEW_NAME", element_name) == 0)
-          set_client_state (CLIENT_MODIFY_USER_NEW_NAME);
+          {
+            gvm_free_string_var (&modify_user_data->new_name);
+            gvm_append_string (&modify_user_data->new_name, "");
+            set_client_state (CLIENT_MODIFY_USER_NEW_NAME);
+          }
         else if (strcasecmp ("PASSWORD", element_name) == 0)
           {
-            const gchar *attribute;
-            if (find_attribute
-                (attribute_names, attribute_values, "modify", &attribute))
-              modify_user_data->modify_password = strcmp (attribute, "0");
-            else
-              modify_user_data->modify_password = 1;
+            gvm_free_string_var (&modify_user_data->password);
+            gvm_append_string (&modify_user_data->password, "");
             set_client_state (CLIENT_MODIFY_USER_PASSWORD);
           }
         else if (strcasecmp ("SOURCES", element_name) == 0)
@@ -6869,966 +6008,7 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
             modify_user_data->sources = make_array ();
             set_client_state (CLIENT_MODIFY_USER_SOURCES);
           }
-        else
-          set_read_over (gmp_parser);
-        break;
-
-      case CLIENT_MODIFY_USER_SOURCES:
-        if (strcasecmp ("SOURCE", element_name) == 0)
-         {
-           set_client_state (CLIENT_MODIFY_USER_SOURCES_SOURCE);
-         }
-        else
-          set_read_over (gmp_parser);
-        break;
-
-      case CLIENT_CREATE_ASSET:
-        if (strcasecmp ("ASSET", element_name) == 0)
-          set_client_state (CLIENT_CREATE_ASSET_ASSET);
-        else if (strcasecmp ("REPORT", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &create_asset_data->report_id);
-            set_client_state (CLIENT_CREATE_ASSET_REPORT);
-          }
         ELSE_READ_OVER;
-
-      case CLIENT_CREATE_ASSET_ASSET:
-        if (strcasecmp ("COMMENT", element_name) == 0)
-          set_client_state (CLIENT_CREATE_ASSET_ASSET_COMMENT);
-        else if (strcasecmp ("NAME", element_name) == 0)
-          set_client_state (CLIENT_CREATE_ASSET_ASSET_NAME);
-        else if (strcasecmp ("TYPE", element_name) == 0)
-          set_client_state (CLIENT_CREATE_ASSET_ASSET_TYPE);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_ASSET_REPORT:
-        if (strcasecmp ("FILTER", element_name) == 0)
-          set_client_state (CLIENT_CREATE_ASSET_REPORT_FILTER);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_ASSET_REPORT_FILTER:
-        if (strcasecmp ("TERM", element_name) == 0)
-          set_client_state (CLIENT_CREATE_ASSET_REPORT_FILTER_TERM);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_CONFIG:
-        create_config_element_start (gmp_parser, element_name,
-                                     attribute_names,
-                                     attribute_values);
-        break;
-
-#if ENABLE_AGENTS
-      case CLIENT_CREATE_AGENT_GROUP:
-        create_agent_group_element_start (gmp_parser, element_name,
-                                          attribute_names,
-                                          attribute_values);
-        break;
-#endif /* ENABLE_AGENTS */
-
-      case CLIENT_CREATE_ALERT:
-        if (strcasecmp ("ACTIVE", element_name) == 0)
-          set_client_state (CLIENT_CREATE_ALERT_ACTIVE);
-        else if (strcasecmp ("COMMENT", element_name) == 0)
-          set_client_state (CLIENT_CREATE_ALERT_COMMENT);
-        else if (strcasecmp ("COPY", element_name) == 0)
-          set_client_state (CLIENT_CREATE_ALERT_COPY);
-        else if (strcasecmp ("CONDITION", element_name) == 0)
-          set_client_state (CLIENT_CREATE_ALERT_CONDITION);
-        else if (strcasecmp ("EVENT", element_name) == 0)
-          set_client_state (CLIENT_CREATE_ALERT_EVENT);
-        else if (strcasecmp ("FILTER", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &create_alert_data->filter_id);
-            set_client_state (CLIENT_CREATE_ALERT_FILTER);
-          }
-        else if (strcasecmp ("METHOD", element_name) == 0)
-          set_client_state (CLIENT_CREATE_ALERT_METHOD);
-        else if (strcasecmp ("NAME", element_name) == 0)
-          set_client_state (CLIENT_CREATE_ALERT_NAME);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_ALERT_CONDITION:
-        if (strcasecmp ("DATA", element_name) == 0)
-          set_client_state (CLIENT_CREATE_ALERT_CONDITION_DATA);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_ALERT_CONDITION_DATA:
-        if (strcasecmp ("NAME", element_name) == 0)
-          set_client_state (CLIENT_CREATE_ALERT_CONDITION_DATA_NAME);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_ALERT_EVENT:
-        if (strcasecmp ("DATA", element_name) == 0)
-          set_client_state (CLIENT_CREATE_ALERT_EVENT_DATA);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_ALERT_EVENT_DATA:
-        if (strcasecmp ("NAME", element_name) == 0)
-          set_client_state (CLIENT_CREATE_ALERT_EVENT_DATA_NAME);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_ALERT_METHOD:
-        if (strcasecmp ("DATA", element_name) == 0)
-          set_client_state (CLIENT_CREATE_ALERT_METHOD_DATA);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_ALERT_METHOD_DATA:
-        if (strcasecmp ("NAME", element_name) == 0)
-          set_client_state (CLIENT_CREATE_ALERT_METHOD_DATA_NAME);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_CREDENTIAL:
-        if (strcasecmp ("ALLOW_INSECURE", element_name) == 0)
-          set_client_state (CLIENT_CREATE_CREDENTIAL_ALLOW_INSECURE);
-        else if (strcasecmp ("AUTH_ALGORITHM", element_name) == 0)
-          set_client_state (CLIENT_CREATE_CREDENTIAL_AUTH_ALGORITHM);
-        else if (strcasecmp ("CERTIFICATE", element_name) == 0)
-          set_client_state (CLIENT_CREATE_CREDENTIAL_CERTIFICATE);
-        else if (strcasecmp ("COMMENT", element_name) == 0)
-          set_client_state (CLIENT_CREATE_CREDENTIAL_COMMENT);
-        else if (strcasecmp ("COMMUNITY", element_name) == 0)
-          set_client_state (CLIENT_CREATE_CREDENTIAL_COMMUNITY);
-        else if (strcasecmp ("KDC", element_name) == 0)
-          set_client_state (CLIENT_CREATE_CREDENTIAL_KDC);
-        else if (strcasecmp ("KDCS", element_name) == 0)
-          {
-            create_credential_data->kdcs = make_array ();
-            set_client_state (CLIENT_CREATE_CREDENTIAL_KDCS);
-          }
-        else if (strcasecmp ("KEY", element_name) == 0)
-          {
-            create_credential_data->key = 1;
-            set_client_state (CLIENT_CREATE_CREDENTIAL_KEY);
-          }
-        else if (strcasecmp ("LOGIN", element_name) == 0)
-          set_client_state (CLIENT_CREATE_CREDENTIAL_LOGIN);
-        else if (strcasecmp ("COPY", element_name) == 0)
-          set_client_state (CLIENT_CREATE_CREDENTIAL_COPY);
-        else if (strcasecmp ("NAME", element_name) == 0)
-          set_client_state (CLIENT_CREATE_CREDENTIAL_NAME);
-        else if (strcasecmp ("PASSWORD", element_name) == 0)
-          {
-            gvm_append_string (&create_credential_data->password, "");
-            set_client_state (CLIENT_CREATE_CREDENTIAL_PASSWORD);
-          }
-        else if (strcasecmp ("PRIVACY", element_name) == 0)
-          set_client_state (CLIENT_CREATE_CREDENTIAL_PRIVACY);
-        else if (strcasecmp ("REALM", element_name) == 0)
-          set_client_state (CLIENT_CREATE_CREDENTIAL_REALM);
-        else if (strcasecmp ("TYPE", element_name) == 0)
-          set_client_state (CLIENT_CREATE_CREDENTIAL_TYPE);
-#if ENABLE_CREDENTIAL_STORES
-        else if (strcasecmp ("CREDENTIAL_STORE_ID", element_name) == 0)
-          {
-            set_client_state (CLIENT_CREATE_CREDENTIAL_CREDENTIAL_STORE_ID);
-          }
-        else if (strcasecmp ("VAULT_ID", element_name) == 0)
-          {
-            set_client_state (CLIENT_CREATE_CREDENTIAL_VAULT_ID);
-          }
-        else if (strcasecmp ("HOST_IDENTIFIER", element_name) == 0)
-          {
-            set_client_state (CLIENT_CREATE_CREDENTIAL_HOST_IDENTIFIER);
-          }
-        else if (strcasecmp ("PRIVACY_HOST_IDENTIFIER", element_name) == 0)
-          {
-            set_client_state (CLIENT_CREATE_CREDENTIAL_PRIVACY_HOST_IDENTIFIER);
-          }
-#endif
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_CREDENTIAL_KDCS:
-        if (strcasecmp ("KDC", element_name) == 0)
-          {
-            gvm_free_string_var (&create_credential_data->kdcs_kdc);
-            gvm_append_string (&create_credential_data->kdcs_kdc, "");
-            set_client_state (CLIENT_CREATE_CREDENTIAL_KDCS_KDC);
-          }
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_CREDENTIAL_KEY:
-        if (strcasecmp ("PHRASE", element_name) == 0)
-          {
-            gvm_append_string (&create_credential_data->key_phrase, "");
-            set_client_state (CLIENT_CREATE_CREDENTIAL_KEY_PHRASE);
-          }
-        else if (strcasecmp ("PRIVATE", element_name) == 0)
-          set_client_state (CLIENT_CREATE_CREDENTIAL_KEY_PRIVATE);
-        else if (strcasecmp ("PUBLIC", element_name) == 0)
-          set_client_state (CLIENT_CREATE_CREDENTIAL_KEY_PUBLIC);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_CREDENTIAL_PRIVACY:
-        if (strcasecmp ("ALGORITHM", element_name) == 0)
-          set_client_state (CLIENT_CREATE_CREDENTIAL_PRIVACY_ALGORITHM);
-        else if (strcasecmp ("PASSWORD", element_name) == 0)
-          set_client_state (CLIENT_CREATE_CREDENTIAL_PRIVACY_PASSWORD);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_FILTER:
-        if (strcasecmp ("COMMENT", element_name) == 0)
-          set_client_state (CLIENT_CREATE_FILTER_COMMENT);
-        else if (strcasecmp ("COPY", element_name) == 0)
-          set_client_state (CLIENT_CREATE_FILTER_COPY);
-        else if (strcasecmp ("NAME", element_name) == 0)
-          {
-            gvm_append_string (&create_filter_data->name, "");
-            set_client_state (CLIENT_CREATE_FILTER_NAME);
-          }
-        else if (strcasecmp ("TERM", element_name) == 0)
-          set_client_state (CLIENT_CREATE_FILTER_TERM);
-        else if (strcasecmp ("TYPE", element_name) == 0)
-          set_client_state (CLIENT_CREATE_FILTER_TYPE);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_GROUP:
-        if (strcasecmp ("COMMENT", element_name) == 0)
-          set_client_state (CLIENT_CREATE_GROUP_COMMENT);
-        else if (strcasecmp ("COPY", element_name) == 0)
-          set_client_state (CLIENT_CREATE_GROUP_COPY);
-        else if (strcasecmp ("NAME", element_name) == 0)
-          {
-            gvm_append_string (&create_group_data->name, "");
-            set_client_state (CLIENT_CREATE_GROUP_NAME);
-          }
-        else if (strcasecmp ("SPECIALS", element_name) == 0)
-          set_client_state (CLIENT_CREATE_GROUP_SPECIALS);
-        else if (strcasecmp ("USERS", element_name) == 0)
-          set_client_state (CLIENT_CREATE_GROUP_USERS);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_GROUP_SPECIALS:
-        if (strcasecmp ("FULL", element_name) == 0)
-          {
-            create_group_data->special_full = 1;
-            set_client_state (CLIENT_CREATE_GROUP_SPECIALS_FULL);
-          }
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_PERMISSION:
-        if (strcasecmp ("COMMENT", element_name) == 0)
-          set_client_state (CLIENT_CREATE_PERMISSION_COMMENT);
-        else if (strcasecmp ("COPY", element_name) == 0)
-          set_client_state (CLIENT_CREATE_PERMISSION_COPY);
-        else if (strcasecmp ("NAME", element_name) == 0)
-          {
-            gvm_append_string (&create_permission_data->name, "");
-            set_client_state (CLIENT_CREATE_PERMISSION_NAME);
-          }
-        else if (strcasecmp ("RESOURCE", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &create_permission_data->resource_id);
-            set_client_state (CLIENT_CREATE_PERMISSION_RESOURCE);
-          }
-        else if (strcasecmp ("SUBJECT", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &create_permission_data->subject_id);
-            set_client_state (CLIENT_CREATE_PERMISSION_SUBJECT);
-          }
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_PERMISSION_RESOURCE:
-        if (strcasecmp ("TYPE", element_name) == 0)
-          set_client_state (CLIENT_CREATE_PERMISSION_RESOURCE_TYPE);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_PERMISSION_SUBJECT:
-        if (strcasecmp ("TYPE", element_name) == 0)
-          set_client_state (CLIENT_CREATE_PERMISSION_SUBJECT_TYPE);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_PORT_LIST:
-        create_port_list_element_start (gmp_parser, element_name,
-                                        attribute_names,
-                                        attribute_values);
-        break;
-
-      case CLIENT_CREATE_PORT_RANGE:
-        if (strcasecmp ("COMMENT", element_name) == 0)
-          set_client_state (CLIENT_CREATE_PORT_RANGE_COMMENT);
-        else if (strcasecmp ("END", element_name) == 0)
-          set_client_state (CLIENT_CREATE_PORT_RANGE_END);
-        else if (strcasecmp ("PORT_LIST", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &create_port_range_data->port_list_id);
-            set_client_state (CLIENT_CREATE_PORT_RANGE_PORT_LIST);
-          }
-        else if (strcasecmp ("START", element_name) == 0)
-          set_client_state (CLIENT_CREATE_PORT_RANGE_START);
-        else if (strcasecmp ("TYPE", element_name) == 0)
-          set_client_state (CLIENT_CREATE_PORT_RANGE_TYPE);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_ROLE:
-        if (strcasecmp ("COMMENT", element_name) == 0)
-          set_client_state (CLIENT_CREATE_ROLE_COMMENT);
-        else if (strcasecmp ("COPY", element_name) == 0)
-          set_client_state (CLIENT_CREATE_ROLE_COPY);
-        else if (strcasecmp ("NAME", element_name) == 0)
-          {
-            gvm_append_string (&create_role_data->name, "");
-            set_client_state (CLIENT_CREATE_ROLE_NAME);
-          }
-        else if (strcasecmp ("USERS", element_name) == 0)
-          set_client_state (CLIENT_CREATE_ROLE_USERS);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_REPORT:
-        if (strcasecmp ("IN_ASSETS", element_name) == 0)
-          {
-            set_client_state (CLIENT_CREATE_REPORT_IN_ASSETS);
-          }
-        else if (strcasecmp ("REPORT", element_name) == 0)
-          {
-            const gchar* attribute;
-
-            append_attribute (attribute_names, attribute_values,
-                              "type", &create_report_data->type);
-
-            if (find_attribute (attribute_names, attribute_values, "format_id",
-                                &attribute))
-              {
-                /* Assume this is the wrapper REPORT. */
-                create_report_data->wrapper = 1;
-                set_client_state (CLIENT_CREATE_REPORT_REPORT);
-              }
-            else
-              {
-                /* Assume the report is immediately inside the CREATE_REPORT. */
-                create_report_data->wrapper = 0;
-                create_report_data->details = make_array ();
-                create_report_data->host_ends = make_array ();
-                create_report_data->host_starts = make_array ();
-                create_report_data->results = make_array ();
-                create_report_data->result_detection = make_array ();
-                set_client_state (CLIENT_CREATE_REPORT_RR);
-              }
-          }
-        else if (strcasecmp ("TASK", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &create_report_data->task_id);
-            set_client_state (CLIENT_CREATE_REPORT_TASK);
-          }
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_REPORT_REPORT:
-        if (strcasecmp ("REPORT", element_name) == 0)
-          {
-            create_report_data->details = make_array ();
-            create_report_data->host_ends = make_array ();
-            create_report_data->host_starts = make_array ();
-            create_report_data->results = make_array ();
-            create_report_data->result_detection = make_array ();
-            set_client_state (CLIENT_CREATE_REPORT_RR);
-          }
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_REPORT_RR:
-        if (strcasecmp ("ERRORS", element_name) == 0)
-          {
-            set_client_state (CLIENT_CREATE_REPORT_RR_ERRORS);
-          }
-        else if (strcasecmp ("HOST", element_name) == 0)
-          {
-            set_client_state (CLIENT_CREATE_REPORT_RR_H);
-          }
-        else if (strcasecmp ("HOST_END", element_name) == 0)
-          set_client_state (CLIENT_CREATE_REPORT_RR_HOST_END);
-        else if (strcasecmp ("HOST_START", element_name) == 0)
-          set_client_state (CLIENT_CREATE_REPORT_RR_HOST_START);
-        else if (strcasecmp ("RESULTS", element_name) == 0)
-          set_client_state (CLIENT_CREATE_REPORT_RR_RESULTS);
-        else if (strcasecmp ("SCAN_END", element_name) == 0)
-          {
-            set_client_state (CLIENT_CREATE_REPORT_RR_SCAN_END);
-          }
-        else if (strcasecmp ("SCAN_START", element_name) == 0)
-          {
-            set_client_state (CLIENT_CREATE_REPORT_RR_SCAN_START);
-          }
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_REPORT_RR_ERRORS:
-        if (strcasecmp ("ERROR", element_name) == 0)
-          {
-            set_client_state (CLIENT_CREATE_REPORT_RR_ERRORS_ERROR);
-          }
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_REPORT_RR_ERRORS_ERROR:
-        if (strcasecmp ("DESCRIPTION", element_name) == 0)
-          set_client_state
-           (CLIENT_CREATE_REPORT_RR_ERRORS_ERROR_DESCRIPTION);
-        else if (strcasecmp ("HOST", element_name) == 0)
-          {
-            set_client_state (CLIENT_CREATE_REPORT_RR_ERRORS_ERROR_HOST);
-          }
-        else if (strcasecmp ("NVT", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "oid",
-                              &create_report_data->result_nvt_oid);
-            set_client_state (CLIENT_CREATE_REPORT_RR_ERRORS_ERROR_NVT);
-          }
-        else if (strcasecmp ("PORT", element_name) == 0)
-          set_client_state (CLIENT_CREATE_REPORT_RR_ERRORS_ERROR_PORT);
-        else if (strcasecmp ("SCAN_NVT_VERSION", element_name) == 0)
-          set_client_state
-           (CLIENT_CREATE_REPORT_RR_ERRORS_ERROR_SCAN_NVT_VERSION);
-        else if (strcasecmp ("SEVERITY", element_name) == 0)
-          set_client_state (CLIENT_CREATE_REPORT_RR_ERRORS_ERROR_SEVERITY);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_REPORT_RR_ERRORS_ERROR_HOST:
-        if (strcasecmp ("ASSET", element_name) == 0)
-          set_client_state
-            (CLIENT_CREATE_REPORT_RR_ERRORS_ERROR_HOST_ASSET);
-        else if (strcasecmp ("HOSTNAME", element_name) == 0)
-          set_client_state
-            (CLIENT_CREATE_REPORT_RR_ERRORS_ERROR_HOST_HOSTNAME);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_REPORT_RR_ERRORS_ERROR_NVT:
-        if (strcasecmp ("CVSS_BASE", element_name) == 0)
-          set_client_state
-           (CLIENT_CREATE_REPORT_RR_ERRORS_ERROR_NVT_CVSS_BASE);
-        else if (strcasecmp ("NAME", element_name) == 0)
-          set_client_state (CLIENT_CREATE_REPORT_RR_ERRORS_ERROR_NVT_NAME);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_REPORT_RR_HOST_END:
-        if (strcasecmp ("HOST", element_name) == 0)
-          set_client_state (CLIENT_CREATE_REPORT_RR_HOST_END_HOST);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_REPORT_RR_HOST_START:
-        if (strcasecmp ("HOST", element_name) == 0)
-          set_client_state (CLIENT_CREATE_REPORT_RR_HOST_START_HOST);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_REPORT_RR_H:
-        if (strcasecmp ("IP", element_name) == 0)
-          {
-            set_client_state (CLIENT_CREATE_REPORT_RR_H_IP);
-          }
-        else if (strcasecmp ("DETAIL", element_name) == 0)
-          {
-            set_client_state (CLIENT_CREATE_REPORT_RR_H_DETAIL);
-          }
-        else if (strcasecmp ("END", element_name) == 0)
-          {
-            set_client_state (CLIENT_CREATE_REPORT_RR_H_END);
-          }
-        else if (strcasecmp ("START", element_name) == 0)
-          {
-            set_client_state (CLIENT_CREATE_REPORT_RR_H_START);
-          }
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_REPORT_RR_H_DETAIL:
-        if (strcasecmp ("NAME", element_name) == 0)
-          {
-            set_client_state (CLIENT_CREATE_REPORT_RR_H_DETAIL_NAME);
-          }
-        else if (strcasecmp ("VALUE", element_name) == 0)
-          {
-            set_client_state (CLIENT_CREATE_REPORT_RR_H_DETAIL_VALUE);
-          }
-        else if (strcasecmp ("SOURCE", element_name) == 0)
-          {
-            set_client_state (CLIENT_CREATE_REPORT_RR_H_DETAIL_SOURCE);
-          }
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_REPORT_RR_H_DETAIL_SOURCE:
-        if (strcasecmp ("DESCRIPTION", element_name) == 0)
-          {
-            set_client_state (CLIENT_CREATE_REPORT_RR_H_DETAIL_SOURCE_DESC);
-          }
-        else if (strcasecmp ("NAME", element_name) == 0)
-          {
-            set_client_state (CLIENT_CREATE_REPORT_RR_H_DETAIL_SOURCE_NAME);
-          }
-        else if (strcasecmp ("TYPE", element_name) == 0)
-          {
-            set_client_state (CLIENT_CREATE_REPORT_RR_H_DETAIL_SOURCE_TYPE);
-          }
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_REPORT_RR_RESULTS:
-        if (strcasecmp ("RESULT", element_name) == 0)
-          set_client_state
-           (CLIENT_CREATE_REPORT_RR_RESULTS_RESULT);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_REPORT_RR_RESULTS_RESULT:
-        if (strcasecmp ("DESCRIPTION", element_name) == 0)
-          set_client_state (CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_DESCRIPTION);
-        else if (strcasecmp ("HOST", element_name) == 0)
-          {
-            set_client_state (CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_HOST);
-          }
-        else if (strcasecmp ("NVT", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "oid",
-                              &create_report_data->result_nvt_oid);
-            set_client_state (CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_NVT);
-          }
-        else if (strcasecmp ("ORIGINAL_SEVERITY", element_name) == 0)
-          set_client_state (
-            CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_ORIGINAL_SEVERITY);
-        else if (strcasecmp ("ORIGINAL_THREAT", element_name) == 0)
-          set_client_state (
-            CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_ORIGINAL_THREAT);
-        else if (strcasecmp ("PORT", element_name) == 0)
-          set_client_state (CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_PORT);
-        else if (strcasecmp ("QOD", element_name) == 0)
-          set_client_state (CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_QOD);
-        else if (strcasecmp ("SCAN_NVT_VERSION", element_name) == 0)
-          set_client_state (
-            CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_SCAN_NVT_VERSION);
-        else if (strcasecmp ("SEVERITY", element_name) == 0)
-          set_client_state (CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_SEVERITY);
-        else if (strcasecmp ("THREAT", element_name) == 0)
-          set_client_state (CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_THREAT);
-        else if (strcasecmp ("DETECTION", element_name) == 0)
-          set_client_state (CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_DETECTION);
-        ELSE_READ_OVER;
-      case CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_DETECTION:
-        if (strcasecmp ("RESULT", element_name) == 0)
-          {
-            set_client_state (
-              CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_DETECTION_RESULT);
-          }
-       ELSE_READ_OVER;
-     case CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_DETECTION_RESULT:
-        if (strcasecmp ("DETAILS", element_name) == 0)
-          {
-            set_client_state (
-              CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_DETECTION_RESULT_DETAILS);
-          }
-        ELSE_READ_OVER;
-      case CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_DETECTION_RESULT_DETAILS:
-        if (strcasecmp ("DETAIL", element_name) == 0)
-          {
-            set_client_state (
-              CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_DETECTION_RESULT_DETAILS_DETAIL);
-          }
-        ELSE_READ_OVER;
-      case CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_DETECTION_RESULT_DETAILS_DETAIL:
-        if (strcasecmp ("NAME", element_name) == 0)
-          {
-            set_client_state (
-              CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_DETECTION_RESULT_DETAILS_DETAIL_NAME);
-          }
-        else if (strcasecmp ("VALUE", element_name) == 0)
-          {
-            set_client_state (
-              CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_DETECTION_RESULT_DETAILS_DETAIL_VALUE);
-          }
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_HOST:
-        if (strcasecmp ("ASSET", element_name) == 0)
-          set_client_state
-            (CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_HOST_ASSET);
-        else if (strcasecmp ("HOSTNAME", element_name) == 0)
-          set_client_state
-            (CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_HOST_HOSTNAME);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_NVT:
-        if (strcasecmp ("BID", element_name) == 0)
-          set_client_state (CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_NVT_BID);
-        else if (strcasecmp ("CVE", element_name) == 0)
-          set_client_state (CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_NVT_CVE);
-        else if (strcasecmp ("CVSS_BASE", element_name) == 0)
-          set_client_state
-           (CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_NVT_CVSS_BASE);
-        else if (strcasecmp ("FAMILY", element_name) == 0)
-          set_client_state (CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_NVT_FAMILY);
-        else if (strcasecmp ("NAME", element_name) == 0)
-          set_client_state (CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_NVT_NAME);
-        else if (strcasecmp ("XREF", element_name) == 0)
-          set_client_state (CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_NVT_XREF);
-        else if (strcasecmp ("CERT", element_name) == 0)
-          set_client_state (CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_NVT_CERT);
-        ELSE_READ_OVER;
-
-      case (CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_NVT_CERT):
-        if (strcasecmp ("CERT_REF", element_name) == 0)
-          set_client_state
-              (CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_NVT_CERT_CERT_REF);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_QOD:
-        if (strcasecmp ("TYPE", element_name) == 0)
-          set_client_state (CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_QOD_TYPE);
-        else if (strcasecmp ("VALUE", element_name) == 0)
-          set_client_state (CLIENT_CREATE_REPORT_RR_RESULTS_RESULT_QOD_VALUE);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_REPORT_TASK:
-        if (strcasecmp ("COMMENT", element_name) == 0)
-          set_client_state (CLIENT_CREATE_REPORT_TASK_COMMENT);
-        else if (strcasecmp ("NAME", element_name) == 0)
-          set_client_state (CLIENT_CREATE_REPORT_TASK_NAME);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_REPORT_CONFIG:
-        create_report_config_element_start (gmp_parser, element_name,
-                                            attribute_names,
-                                            attribute_values);
-        break;
-
-      case CLIENT_CREATE_REPORT_FORMAT:
-        create_report_format_element_start (gmp_parser, element_name,
-                                            attribute_names,
-                                            attribute_values);
-        break;
-
-      case CLIENT_CREATE_OVERRIDE:
-        if (strcasecmp ("ACTIVE", element_name) == 0)
-          set_client_state (CLIENT_CREATE_OVERRIDE_ACTIVE);
-        else if (strcasecmp ("COPY", element_name) == 0)
-          set_client_state (CLIENT_CREATE_OVERRIDE_COPY);
-        else if (strcasecmp ("HOSTS", element_name) == 0)
-          set_client_state (CLIENT_CREATE_OVERRIDE_HOSTS);
-        else if (strcasecmp ("NEW_SEVERITY", element_name) == 0)
-          set_client_state (CLIENT_CREATE_OVERRIDE_NEW_SEVERITY);
-        else if (strcasecmp ("NEW_THREAT", element_name) == 0)
-          set_client_state (CLIENT_CREATE_OVERRIDE_NEW_THREAT);
-        else if (strcasecmp ("NVT", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "oid",
-                              &create_override_data->nvt_oid);
-            set_client_state (CLIENT_CREATE_OVERRIDE_NVT);
-          }
-        else if (strcasecmp ("PORT", element_name) == 0)
-          set_client_state (CLIENT_CREATE_OVERRIDE_PORT);
-        else if (strcasecmp ("RESULT", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &create_override_data->result_id);
-            if (create_override_data->result_id
-                && create_override_data->result_id[0] == '\0')
-              {
-                g_free (create_override_data->result_id);
-                create_override_data->result_id = NULL;
-              }
-            set_client_state (CLIENT_CREATE_OVERRIDE_RESULT);
-          }
-        else if (strcasecmp ("SEVERITY", element_name) == 0)
-          set_client_state (CLIENT_CREATE_OVERRIDE_SEVERITY);
-        else if (strcasecmp ("TASK", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &create_override_data->task_id);
-            if (create_override_data->task_id
-                && create_override_data->task_id[0] == '\0')
-              {
-                g_free (create_override_data->task_id);
-                create_override_data->task_id = NULL;
-              }
-            set_client_state (CLIENT_CREATE_OVERRIDE_TASK);
-          }
-        else if (strcasecmp ("TEXT", element_name) == 0)
-          set_client_state (CLIENT_CREATE_OVERRIDE_TEXT);
-        else if (strcasecmp ("THREAT", element_name) == 0)
-          set_client_state (CLIENT_CREATE_OVERRIDE_THREAT);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_TAG:
-        if (strcasecmp ("ACTIVE", element_name) == 0)
-          {
-            gvm_append_string (&create_tag_data->active, "");
-            set_client_state (CLIENT_CREATE_TAG_ACTIVE);
-          }
-        else if (strcasecmp ("RESOURCES", element_name) == 0)
-          {
-            create_tag_data->resource_ids = make_array ();
-            append_attribute (attribute_names, attribute_values, "filter",
-                              &create_tag_data->resources_filter);
-            set_client_state (CLIENT_CREATE_TAG_RESOURCES);
-          }
-        else if (strcasecmp ("COMMENT", element_name) == 0)
-          {
-            gvm_append_string (&create_tag_data->comment, "");
-            set_client_state (CLIENT_CREATE_TAG_COMMENT);
-          }
-        else if (strcasecmp ("COPY", element_name) == 0)
-          {
-            gvm_append_string (&create_tag_data->copy, "");
-            set_client_state (CLIENT_CREATE_TAG_COPY);
-          }
-        else if (strcasecmp ("NAME", element_name) == 0)
-          {
-            gvm_append_string (&create_tag_data->name, "");
-            set_client_state (CLIENT_CREATE_TAG_NAME);
-          }
-        else if (strcasecmp ("VALUE", element_name) == 0)
-          {
-            gvm_append_string (&create_tag_data->value, "");
-            set_client_state (CLIENT_CREATE_TAG_VALUE);
-          }
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_TAG_RESOURCES:
-        if (strcasecmp ("RESOURCE", element_name) == 0)
-          {
-            const gchar* attribute;
-            if (find_attribute (attribute_names, attribute_values, "id",
-                                &attribute))
-              array_add (create_tag_data->resource_ids, g_strdup (attribute));
-            set_client_state (CLIENT_CREATE_TAG_RESOURCES_RESOURCE);
-          }
-        else if (strcasecmp ("TYPE", element_name) == 0)
-          {
-            gvm_append_string (&create_tag_data->resource_type, "");
-            set_client_state (CLIENT_CREATE_TAG_RESOURCES_TYPE);
-          }
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_TARGET:
-        if (strcasecmp ("ASSET_HOSTS", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "filter",
-                              &create_target_data->asset_hosts_filter);
-            set_client_state (CLIENT_CREATE_TARGET_ASSET_HOSTS);
-          }
-        else if (strcasecmp ("EXCLUDE_HOSTS", element_name) == 0)
-          set_client_state (CLIENT_CREATE_TARGET_EXCLUDE_HOSTS);
-        else if (strcasecmp ("REVERSE_LOOKUP_ONLY", element_name) == 0)
-          set_client_state (CLIENT_CREATE_TARGET_REVERSE_LOOKUP_ONLY);
-        else if (strcasecmp ("REVERSE_LOOKUP_UNIFY", element_name) == 0)
-          set_client_state (CLIENT_CREATE_TARGET_REVERSE_LOOKUP_UNIFY);
-        else if (strcasecmp ("ALIVE_TESTS", element_name) == 0)
-          set_client_state (CLIENT_CREATE_TARGET_ALIVE_TESTS);
-        else if (strcasecmp ("ALLOW_SIMULTANEOUS_IPS", element_name) == 0)
-          set_client_state (CLIENT_CREATE_TARGET_ALLOW_SIMULTANEOUS_IPS);
-        else if (strcasecmp ("COMMENT", element_name) == 0)
-          set_client_state (CLIENT_CREATE_TARGET_COMMENT);
-        else if (strcasecmp ("COPY", element_name) == 0)
-          set_client_state (CLIENT_CREATE_TARGET_COPY);
-        else if (strcasecmp ("ESXI_CREDENTIAL", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &create_target_data->esxi_credential_id);
-            set_client_state (CLIENT_CREATE_TARGET_ESXI_CREDENTIAL);
-          }
-        else if (strcasecmp ("ESXI_LSC_CREDENTIAL", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &create_target_data->esxi_lsc_credential_id);
-            set_client_state (CLIENT_CREATE_TARGET_ESXI_LSC_CREDENTIAL);
-          }
-        else if (strcasecmp ("HOSTS", element_name) == 0)
-          set_client_state (CLIENT_CREATE_TARGET_HOSTS);
-        else if (strcasecmp ("PORT_LIST", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &create_target_data->port_list_id);
-            set_client_state (CLIENT_CREATE_TARGET_PORT_LIST);
-          }
-        else if (strcasecmp ("PORT_RANGE", element_name) == 0)
-          {
-            gvm_append_string (&create_target_data->port_range, "");
-            set_client_state (CLIENT_CREATE_TARGET_PORT_RANGE);
-          }
-        else if (strcasecmp ("KRB5_CREDENTIAL", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &create_target_data->krb5_credential_id);
-            set_client_state (CLIENT_CREATE_TARGET_KRB5_CREDENTIAL);
-          }
-        else if (strcasecmp ("SSH_CREDENTIAL", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &create_target_data->ssh_credential_id);
-            set_client_state (CLIENT_CREATE_TARGET_SSH_CREDENTIAL);
-          }
-        else if (strcasecmp ("SSH_LSC_CREDENTIAL", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &create_target_data->ssh_lsc_credential_id);
-            set_client_state (CLIENT_CREATE_TARGET_SSH_LSC_CREDENTIAL);
-          }
-        else if (strcasecmp ("SSH_ELEVATE_CREDENTIAL", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &create_target_data->ssh_elevate_credential_id);
-            set_client_state (CLIENT_CREATE_TARGET_SSH_ELEVATE_CREDENTIAL);
-          }
-        else if (strcasecmp ("SMB_CREDENTIAL", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &create_target_data->smb_credential_id);
-            set_client_state (CLIENT_CREATE_TARGET_SMB_CREDENTIAL);
-          }
-        else if (strcasecmp ("SMB_LSC_CREDENTIAL", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &create_target_data->smb_lsc_credential_id);
-            set_client_state (CLIENT_CREATE_TARGET_SMB_LSC_CREDENTIAL);
-          }
-        else if (strcasecmp ("SNMP_CREDENTIAL", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &create_target_data->snmp_credential_id);
-            set_client_state (CLIENT_CREATE_TARGET_SNMP_CREDENTIAL);
-          }
-        else if (strcasecmp ("NAME", element_name) == 0)
-          {
-            gvm_append_string (&create_target_data->name, "");
-            set_client_state (CLIENT_CREATE_TARGET_NAME);
-          }
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_TARGET_ALIVE_TESTS:
-        if (strcasecmp ("ALIVE_TEST", element_name) == 0)
-          set_client_state (CLIENT_CREATE_TARGET_ALIVE_TESTS_ALIVE_TEST);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_TARGET_SSH_CREDENTIAL:
-        if (strcasecmp ("PORT", element_name) == 0)
-          set_client_state (CLIENT_CREATE_TARGET_SSH_CREDENTIAL_PORT);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_TARGET_SSH_LSC_CREDENTIAL:
-        if (strcasecmp ("PORT", element_name) == 0)
-          set_client_state (CLIENT_CREATE_TARGET_SSH_LSC_CREDENTIAL_PORT);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_TASK:
-        if (strcasecmp ("ALTERABLE", element_name) == 0)
-          set_client_state (CLIENT_CREATE_TASK_ALTERABLE);
-        else if (strcasecmp ("COPY", element_name) == 0)
-          set_client_state (CLIENT_CREATE_TASK_COPY);
-        else if (strcasecmp ("PREFERENCES", element_name) == 0)
-          {
-            create_task_data->preferences = make_array ();
-            set_client_state (CLIENT_CREATE_TASK_PREFERENCES);
-          }
-        else if (strcasecmp ("NAME", element_name) == 0)
-          set_client_state (CLIENT_CREATE_TASK_NAME);
-        else if (strcasecmp ("COMMENT", element_name) == 0)
-          set_client_state (CLIENT_CREATE_TASK_COMMENT);
-        else if (strcasecmp ("SCANNER", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &create_task_data->scanner_id);
-            set_client_state (CLIENT_CREATE_TASK_SCANNER);
-          }
-        else if (strcasecmp ("CONFIG", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &create_task_data->config_id);
-            set_client_state (CLIENT_CREATE_TASK_CONFIG);
-          }
-#if ENABLE_AGENTS
-        else if (strcasecmp ("AGENT_GROUP", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &create_task_data->agent_group_id);
-            set_client_state (CLIENT_CREATE_TASK_AGENT_GROUP);
-          }
-#endif /* ENABLE_AGENTS */
-        else if (strcasecmp ("ALERT", element_name) == 0)
-          {
-            const gchar* attribute;
-            if (find_attribute (attribute_names, attribute_values, "id",
-                                &attribute))
-              array_add (create_task_data->alerts, g_strdup (attribute));
-            set_client_state (CLIENT_CREATE_TASK_ALERT);
-          }
-        else if (strcasecmp ("SCHEDULE", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &create_task_data->schedule_id);
-            set_client_state (CLIENT_CREATE_TASK_SCHEDULE);
-          }
-        else if (strcasecmp ("SCHEDULE_PERIODS", element_name) == 0)
-          set_client_state (CLIENT_CREATE_TASK_SCHEDULE_PERIODS);
-        else if (strcasecmp ("TARGET", element_name) == 0)
-          {
-            append_attribute (attribute_names, attribute_values, "id",
-                              &create_task_data->target_id);
-            set_client_state (CLIENT_CREATE_TASK_TARGET);
-          }
-        else if (strcasecmp ("USAGE_TYPE", element_name) == 0)
-          set_client_state (CLIENT_CREATE_TASK_USAGE_TYPE);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_TASK_PREFERENCES:
-        if (strcasecmp ("PREFERENCE", element_name) == 0)
-          {
-            assert (create_task_data->preference == NULL);
-            create_task_data->preference = g_malloc (sizeof (name_value_t));
-            create_task_data->preference->name = NULL;
-            create_task_data->preference->value = NULL;
-            set_client_state (CLIENT_CREATE_TASK_PREFERENCES_PREFERENCE);
-          }
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_TASK_PREFERENCES_PREFERENCE:
-        if (strcasecmp ("SCANNER_NAME", element_name) == 0)
-          set_client_state (CLIENT_CREATE_TASK_PREFERENCES_PREFERENCE_NAME);
-        else if (strcasecmp ("VALUE", element_name) == 0)
-          set_client_state (CLIENT_CREATE_TASK_PREFERENCES_PREFERENCE_VALUE);
-        ELSE_READ_OVER;
-
-      case CLIENT_CREATE_TLS_CERTIFICATE:
-        create_tls_certificate_element_start (gmp_parser, element_name,
-                                              attribute_names,
-                                              attribute_values);
-        break;
-
-      case CLIENT_CREATE_USER:
-        if (strcasecmp ("COMMENT", element_name) == 0)
-          set_client_state (CLIENT_CREATE_USER_COMMENT);
-        else if (strcasecmp ("COPY", element_name) == 0)
-          set_client_state (CLIENT_CREATE_USER_COPY);
-        else if (strcasecmp ("NAME", element_name) == 0)
-          set_client_state (CLIENT_CREATE_USER_NAME);
-        else if (strcasecmp ("PASSWORD", element_name) == 0)
-          set_client_state (CLIENT_CREATE_USER_PASSWORD);
-        else if (strcasecmp ("SOURCES", element_name) == 0)
-          {
-            create_user_data->sources = make_array ();
-            set_client_state (CLIENT_CREATE_USER_SOURCES);
-          }
-        else
-          set_read_over (gmp_parser);
-        break;
-
-      case CLIENT_CREATE_USER_SOURCES:
-        if (strcasecmp ("SOURCE", element_name) == 0)
-          set_client_state (CLIENT_CREATE_USER_SOURCES_SOURCE);
-        else
-          set_read_over (gmp_parser);
-        break;
-
-#if ENABLE_AGENTS
-      case CLIENT_DELETE_AGENT:
-        delete_agent_element_start (gmp_parser, element_name,
-                                    attribute_names,
-                                    attribute_values);
-        break;
-#endif /* ENABLE_AGENTS */
-
-      case CLIENT_LOGOUT:
-          logout_element_start (gmp_parser, element_name,
-                                attribute_names, attribute_values);
-        break;
-      case CLIENT_MODIFY_LICENSE:
-        modify_license_element_start (gmp_parser, element_name,
-                                      attribute_names, attribute_values);
-        break;
 
       case CLIENT_MODIFY_OVERRIDE:
         if (strcasecmp ("ACTIVE", element_name) == 0)
@@ -12745,40 +10925,16 @@ handle_get_feeds (gmp_parser_t *gmp_parser, GError **error)
       return;
     }
 
-  char *feed_owner_uuid, *feed_roles;
-  gboolean feed_owner_set, feed_import_roles_set, feed_resources_access;
+  char *feed_owner_uuid;
+  gboolean feed_owner_set;
 
-  feed_owner_set = feed_import_roles_set = feed_resources_access = FALSE;
+  feed_owner_set = FALSE;
 
   setting_value (SETTING_UUID_FEED_IMPORT_OWNER, &feed_owner_uuid);
 
   if (feed_owner_uuid != NULL && strlen (feed_owner_uuid) > 0)
     feed_owner_set = TRUE;
 
-  setting_value (SETTING_UUID_FEED_IMPORT_ROLES, &feed_roles);
-
-  if (feed_roles != NULL && strlen (feed_roles) > 0)
-    feed_import_roles_set = TRUE;
-
-  if (feed_owner_uuid != NULL && strcmp (feed_owner_uuid, current_credentials.uuid) == 0)
-    feed_resources_access = TRUE;
-  else if (feed_roles != NULL)
-    {
-      gchar **roles = g_strsplit (feed_roles, ",", -1);
-      gchar **role = roles;
-      while (*role)
-      {
-        if (acl_user_has_role (current_credentials.uuid, *role))
-          {
-            feed_resources_access = TRUE;
-            break;
-          }
-        role++;
-      }
-      g_strfreev (roles);
-    }
-
-  free (feed_roles);
   free (feed_owner_uuid);
 
   SEND_TO_CLIENT_OR_FAIL ("<get_feeds_response"
@@ -12786,11 +10942,8 @@ handle_get_feeds (gmp_parser_t *gmp_parser, GError **error)
                           " status_text=\"" STATUS_OK_TEXT "\">");
 
   SENDF_TO_CLIENT_OR_FAIL ("<feed_owner_set>%s</feed_owner_set>"
-                           "<feed_roles_set>%s</feed_roles_set>"
-                           "<feed_resources_access>%s</feed_resources_access>",
-                           feed_owner_set ? "1" : "0",
-                           feed_import_roles_set ? "1" : "0",
-                           feed_resources_access ? "1" : "0");
+                           "<feed_resources_access>1</feed_resources_access>",
+                           feed_owner_set ? "1" : "0");
 
   if ((get_feeds_data->type == NULL)
       || (strcasecmp (get_feeds_data->type, "nvt") == 0))
@@ -12917,88 +11070,6 @@ handle_get_filters (gmp_parser_t *gmp_parser, GError **error)
   SEND_GET_END ("filter", &get_filters_data->get, count, filtered);
 
   get_filters_data_reset (get_filters_data);
-  set_client_state (CLIENT_AUTHENTIC);
-}
-
-/**
- * @brief Handle end of GET_GROUPS element.
- *
- * @param[in]  gmp_parser   GMP parser.
- * @param[in]  error        Error parameter.
- */
-static void
-handle_get_groups (gmp_parser_t *gmp_parser, GError **error)
-{
-  iterator_t groups;
-  int count, filtered, ret, first;
-
-  INIT_GET (group, Group);
-
-  ret = init_group_iterator (&groups, &get_groups_data->get);
-  if (ret)
-    {
-      switch (ret)
-        {
-          case 1:
-            if (send_find_error_to_client ("get_groups", "group",
-                                           get_groups_data->get.id,
-                                           gmp_parser))
-              {
-                error_send_to_client (error);
-                return;
-              }
-            break;
-          case 2:
-            if (send_find_error_to_client
-                  ("get_groups", "filter", get_groups_data->get.filt_id,
-                   gmp_parser))
-              {
-                error_send_to_client (error);
-                return;
-              }
-            break;
-          case -1:
-            SEND_TO_CLIENT_OR_FAIL
-              (XML_INTERNAL_ERROR ("get_groups"));
-            break;
-        }
-      get_groups_data_reset (get_groups_data);
-      set_client_state (CLIENT_AUTHENTIC);
-      return;
-    }
-
-  SEND_GET_START ("group");
-  while (1)
-    {
-      gchar *users;
-
-      ret = get_next (&groups, &get_groups_data->get, &first, &count,
-                      init_group_iterator);
-      if (ret == 1)
-        break;
-      if (ret == -1)
-        {
-          internal_error_send_to_client (error);
-          return;
-        }
-
-      SEND_GET_COMMON (group, &get_groups_data->get, &groups);
-
-      users = group_users (get_iterator_resource (&groups));
-      SENDF_TO_CLIENT_OR_FAIL ("<users>%s</users>", users ? users : "");
-      g_free (users);
-
-      SEND_TO_CLIENT_OR_FAIL ("</group>");
-
-      count++;
-    }
-  cleanup_iterator (&groups);
-  filtered = get_groups_data->get.id
-              ? 1
-              : group_count (&get_groups_data->get);
-  SEND_GET_END ("group", &get_groups_data->get, count, filtered);
-
-  get_groups_data_reset (get_groups_data);
   set_client_state (CLIENT_AUTHENTIC);
 }
 
@@ -14075,122 +12146,6 @@ handle_get_overrides (gmp_parser_t *gmp_parser, GError **error)
                     filtered);
     }
   get_overrides_data_reset (get_overrides_data);
-  set_client_state (CLIENT_AUTHENTIC);
-}
-
-/**
- * @brief Handle end of GET_PERMISSIONS element.
- *
- * @param[in]  gmp_parser   GMP parser.
- * @param[in]  error        Error parameter.
- */
-static void
-handle_get_permissions (gmp_parser_t *gmp_parser, GError **error)
-{
-  iterator_t permissions;
-  int count, filtered, ret, first;
-
-  INIT_GET (permission, Permission);
-
-  ret = init_permission_iterator (&permissions,
-                                  &get_permissions_data->get);
-  if (ret)
-    {
-      switch (ret)
-        {
-          case 1:
-            if (send_find_error_to_client ("get_permissions",
-                                           "permission",
-                                           get_permissions_data->get.id,
-                                           gmp_parser))
-              {
-                error_send_to_client (error);
-                return;
-              }
-            break;
-          case 2:
-            if (send_find_error_to_client
-                  ("get_permissions", "filter",
-                   get_permissions_data->get.filt_id, gmp_parser))
-              {
-                error_send_to_client (error);
-                return;
-              }
-            break;
-          case -1:
-            SEND_TO_CLIENT_OR_FAIL
-              (XML_INTERNAL_ERROR ("get_permissions"));
-            break;
-        }
-      get_permissions_data_reset (get_permissions_data);
-      set_client_state (CLIENT_AUTHENTIC);
-      return;
-    }
-
-  SEND_GET_START ("permission");
-  while (1)
-    {
-      const char *resource_type;
-
-      ret = get_next (&permissions, &get_permissions_data->get, &first,
-                      &count, init_permission_iterator);
-      if (ret == 1)
-        break;
-      if (ret == -1)
-        {
-          internal_error_send_to_client (error);
-          return;
-        }
-
-      SEND_GET_COMMON (permission, &get_permissions_data->get, &permissions);
-
-      resource_type = permission_iterator_resource_type (&permissions);
-      SENDF_TO_CLIENT_OR_FAIL
-       ("<resource id=\"%s\">"
-        "<name>%s</name>"
-        "<type>%s</type>"
-        "<trash>%i</trash>"
-        "<deleted>%i</deleted>",
-        permission_iterator_resource_uuid (&permissions),
-        resource_type && strcmp (resource_type, "")
-          ? permission_iterator_resource_name (&permissions)
-          : "",
-        permission_iterator_resource_type (&permissions),
-        permission_iterator_resource_in_trash (&permissions),
-        permission_iterator_resource_orphan (&permissions));
-
-      if (permission_iterator_resource_readable (&permissions))
-        SEND_TO_CLIENT_OR_FAIL ("</resource>");
-      else
-        SEND_TO_CLIENT_OR_FAIL ("<permissions/>"
-                                "</resource>");
-
-      SENDF_TO_CLIENT_OR_FAIL
-       ("<subject id=\"%s\">"
-        "<name>%s</name>"
-        "<type>%s</type>"
-        "<trash>%i</trash>",
-        permission_iterator_subject_uuid (&permissions),
-        permission_iterator_subject_name (&permissions),
-        permission_iterator_subject_type (&permissions),
-        permission_iterator_subject_in_trash (&permissions));
-
-      if (permission_iterator_subject_readable (&permissions))
-        SEND_TO_CLIENT_OR_FAIL ("</subject>");
-      else
-        SEND_TO_CLIENT_OR_FAIL ("<permissions/>"
-                                "</subject>");
-
-      SEND_TO_CLIENT_OR_FAIL ("</permission>");
-      count++;
-    }
-  cleanup_iterator (&permissions);
-  filtered = get_permissions_data->get.id
-              ? 1
-              : permission_count (&get_permissions_data->get);
-  SEND_GET_END ("permission", &get_permissions_data->get, count, filtered);
-
-  get_permissions_data_reset (get_permissions_data);
   set_client_state (CLIENT_AUTHENTIC);
 }
 
@@ -15881,17 +13836,9 @@ select_resource_iterator (get_resource_names_data_t *resource_names_data,
     {
       *iterator = (int (*) (iterator_t*, get_data_t *))init_filter_iterator;
     }
-  else if (g_strcmp0 ("group", resource_names_data->type) == 0)
-    {
-      *iterator = (int (*) (iterator_t*, get_data_t *))init_group_iterator;
-    }
   else if (g_strcmp0 ("override", resource_names_data->type) == 0)
     {
       *iterator = init_override_iterator_all;
-    }
-  else if (g_strcmp0 ("permission", resource_names_data->type) == 0)
-    {
-      *iterator = (int (*) (iterator_t*, get_data_t *))init_permission_iterator;
     }
   else if (g_strcmp0 ("port_list", resource_names_data->type) == 0)
     {
@@ -15911,10 +13858,6 @@ select_resource_iterator (get_resource_names_data_t *resource_names_data,
   else if (g_strcmp0 ("report_format", resource_names_data->type) == 0)
     {
       *iterator = (int (*) (iterator_t*, get_data_t *))init_report_format_iterator;
-    }
-  else if (g_strcmp0 ("role", resource_names_data->type) == 0)
-    {
-      *iterator = (int (*) (iterator_t*, get_data_t *))init_role_iterator;
     }
   else if (g_strcmp0 ("config", resource_names_data->type) == 0)
     {
@@ -16348,88 +14291,6 @@ handle_get_results (gmp_parser_t *gmp_parser, GError **error)
     }
 
   get_results_data_reset (get_results_data);
-  set_client_state (CLIENT_AUTHENTIC);
-}
-
-/**
- * @brief Handle end of GET_ROLES element.
- *
- * @param[in]  gmp_parser   GMP parser.
- * @param[in]  error        Error parameter.
- */
-static void
-handle_get_roles (gmp_parser_t *gmp_parser, GError **error)
-{
-  iterator_t roles;
-  int count, filtered, ret, first;
-
-  INIT_GET (role, Role);
-
-  ret = init_role_iterator (&roles, &get_roles_data->get);
-  if (ret)
-    {
-      switch (ret)
-        {
-          case 1:
-            if (send_find_error_to_client ("get_roles", "role",
-                                            get_roles_data->get.id,
-                                            gmp_parser))
-              {
-                error_send_to_client (error);
-                return;
-              }
-            break;
-          case 2:
-            if (send_find_error_to_client
-                  ("get_roles", "filter", get_roles_data->get.filt_id,
-                  gmp_parser))
-              {
-                error_send_to_client (error);
-                return;
-              }
-            break;
-          case -1:
-            SEND_TO_CLIENT_OR_FAIL
-              (XML_INTERNAL_ERROR ("get_roles"));
-            break;
-        }
-      get_roles_data_reset (get_roles_data);
-      set_client_state (CLIENT_AUTHENTIC);
-      return;
-    }
-
-  SEND_GET_START ("role");
-  while (1)
-    {
-      gchar *users;
-
-      ret = get_next (&roles, &get_roles_data->get, &first, &count,
-                      init_role_iterator);
-      if (ret == 1)
-        break;
-      if (ret == -1)
-        {
-          internal_error_send_to_client (error);
-          return;
-        }
-
-      SEND_GET_COMMON (role, &get_roles_data->get, &roles);
-
-      users = role_users (get_iterator_resource (&roles));
-      SENDF_TO_CLIENT_OR_FAIL ("<users>%s</users>", users ? users : "");
-      g_free (users);
-
-      SEND_TO_CLIENT_OR_FAIL ("</role>");
-
-      count++;
-    }
-  cleanup_iterator (&roles);
-  filtered = get_roles_data->get.id
-              ? 1
-              : role_count (&get_roles_data->get);
-  SEND_GET_END ("role", &get_roles_data->get, count, filtered);
-
-  get_roles_data_reset (get_roles_data);
   set_client_state (CLIENT_AUTHENTIC);
 }
 
@@ -20142,9 +18003,7 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
       CASE_DELETE (CONFIG, config, "Config");
       CASE_DELETE (CREDENTIAL, credential, "Credential");
       CASE_DELETE (FILTER, filter, "Filter");
-      CASE_DELETE (GROUP, group, "Group");
       CASE_DELETE (OVERRIDE, override, "Override");
-      CASE_DELETE (PERMISSION, permission, "Permission");
       CASE_DELETE (PORT_LIST, port_list, "Port list");
       CASE_DELETE (PORT_RANGE, port_range, "Port range");
 
@@ -20217,7 +18076,6 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
         break;
 
       CASE_DELETE (REPORT_FORMAT, report_format, "Report format");
-      CASE_DELETE (ROLE, role, "Role");
       CASE_DELETE (SCANNER, scanner, "Scanner");
       CASE_DELETE (SCHEDULE, schedule, "Schedule");
       CASE_DELETE (TAG, tag, "Tag");
@@ -20609,10 +18467,6 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
         handle_get_filters (gmp_parser, error);
         break;
 
-      case CLIENT_GET_GROUPS:
-        handle_get_groups (gmp_parser, error);
-        break;
-
       case CLIENT_GET_INFO:
         handle_get_info (gmp_parser, error);
         break;
@@ -20639,10 +18493,6 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
 
       case CLIENT_GET_OVERRIDES:
         handle_get_overrides (gmp_parser, error);
-        break;
-
-      case CLIENT_GET_PERMISSIONS:
-        handle_get_permissions (gmp_parser, error);
         break;
 
       case CLIENT_GET_PORT_LISTS:
@@ -20689,10 +18539,6 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
 
       case CLIENT_GET_RESULTS:
         handle_get_results (gmp_parser, error);
-        break;
-
-      case CLIENT_GET_ROLES:
-        handle_get_roles (gmp_parser, error);
         break;
 
       case CLIENT_GET_SCANNERS:
@@ -21904,129 +19750,6 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
       CLOSE (CLIENT_CREATE_FILTER, TERM);
       CLOSE (CLIENT_CREATE_FILTER, TYPE);
 
-      case CLIENT_CREATE_GROUP:
-        {
-          group_t new_group;
-
-          assert (create_group_data->users != NULL);
-
-          if (create_group_data->copy)
-            switch (copy_group (create_group_data->name,
-                                create_group_data->comment,
-                                create_group_data->copy,
-                                &new_group))
-              {
-                case 0:
-                  {
-                    char *uuid;
-                    uuid = group_uuid (new_group);
-                    SENDF_TO_CLIENT_OR_FAIL (XML_OK_CREATED_ID ("create_group"),
-                                             uuid);
-                    log_event ("group", "Group", uuid, "created");
-                    free (uuid);
-                    break;
-                  }
-                case 1:
-                  SEND_TO_CLIENT_OR_FAIL
-                   (XML_ERROR_SYNTAX ("create_group",
-                                      "Group exists already"));
-                  log_event_fail ("group", "Group", NULL, "created");
-                  break;
-                case 2:
-                  if (send_find_error_to_client ("create_group", "group",
-                                                 create_group_data->copy,
-                                                 gmp_parser))
-                    {
-                      error_send_to_client (error);
-                      return;
-                    }
-                  log_event_fail ("group", "Group", NULL, "created");
-                  break;
-                case 4:
-                  SEND_TO_CLIENT_OR_FAIL
-                   (XML_ERROR_SYNTAX ("create_group",
-                                      "Syntax error in group name"));
-                  log_event_fail ("group", "Group", NULL, "created");
-                  break;
-                case 99:
-                  SEND_TO_CLIENT_OR_FAIL
-                   (XML_ERROR_SYNTAX ("create_group",
-                                      "Permission denied"));
-                  log_event_fail ("group", "Group", NULL, "created");
-                  break;
-                case -1:
-                default:
-                  SEND_TO_CLIENT_OR_FAIL
-                   (XML_INTERNAL_ERROR ("create_group"));
-                  log_event_fail ("group", "Group", NULL, "created");
-                  break;
-              }
-          else if (create_group_data->name == NULL)
-            SEND_TO_CLIENT_OR_FAIL
-             (XML_ERROR_SYNTAX ("create_group",
-                                "A NAME is required"));
-          else if (strlen (create_group_data->name) == 0)
-            SEND_TO_CLIENT_OR_FAIL
-             (XML_ERROR_SYNTAX ("create_group",
-                                "Name must be at"
-                                " least one character long"));
-          else switch (create_group
-                        (create_group_data->name,
-                         create_group_data->comment,
-                         create_group_data->users,
-                         create_group_data->special_full,
-                         &new_group))
-            {
-              case 0:
-                {
-                  char *uuid = group_uuid (new_group);
-                  SENDF_TO_CLIENT_OR_FAIL (XML_OK_CREATED_ID ("create_group"),
-                                           uuid);
-                  log_event ("group", "Group", uuid, "created");
-                  free (uuid);
-                  break;
-                }
-              case 1:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("create_group",
-                                    "Group exists already"));
-                log_event_fail ("group", "Group", NULL, "created");
-                break;
-              case 2:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("create_group",
-                                    "Failed to find user"));
-                log_event_fail ("group", "Group", NULL, "created");
-                break;
-              case 4:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("create_group",
-                                    "Error in user name"));
-                log_event_fail ("group", "Group", NULL, "created");
-                break;
-              case 99:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("create_group",
-                                    "Permission denied"));
-                log_event_fail ("group", "Group", NULL, "created");
-                break;
-              default:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_INTERNAL_ERROR ("create_group"));
-                log_event_fail ("group", "Group", NULL, "created");
-                break;
-            }
-
-          create_group_data_reset (create_group_data);
-          set_client_state (CLIENT_AUTHENTIC);
-          break;
-        }
-      CLOSE (CLIENT_CREATE_GROUP, COMMENT);
-      CLOSE (CLIENT_CREATE_GROUP, COPY);
-      CLOSE (CLIENT_CREATE_GROUP, NAME);
-      CLOSE (CLIENT_CREATE_GROUP, SPECIALS);
-      CLOSE (CLIENT_CREATE_GROUP_SPECIALS, FULL);
-      CLOSE (CLIENT_CREATE_GROUP, USERS);
 
       case CLIENT_CREATE_OVERRIDE:
         {
@@ -22209,159 +19932,6 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
       CLOSE (CLIENT_CREATE_OVERRIDE, TEXT);
       CLOSE (CLIENT_CREATE_OVERRIDE, THREAT);
 
-      case CLIENT_CREATE_PERMISSION:
-        {
-          permission_t new_permission;
-
-          if (create_permission_data->copy)
-            switch (copy_permission (create_permission_data->comment,
-                                     create_permission_data->copy,
-                                     &new_permission))
-              {
-                case 0:
-                  {
-                    char *uuid;
-                    uuid = permission_uuid (new_permission);
-                    SENDF_TO_CLIENT_OR_FAIL (XML_OK_CREATED_ID ("create_permission"),
-                                             uuid);
-                    log_event ("permission", "Permission", uuid, "created");
-                    free (uuid);
-                    break;
-                  }
-                case 1:
-                  SEND_TO_CLIENT_OR_FAIL
-                   (XML_ERROR_SYNTAX ("create_permission",
-                                      "Permission exists already"));
-                  log_event_fail ("permission", "Permission", NULL, "created");
-                  break;
-                case 2:
-                  if (send_find_error_to_client ("create_permission",
-                                                 "permission",
-                                                 create_permission_data->copy,
-                                                 gmp_parser))
-                    {
-                      error_send_to_client (error);
-                      return;
-                    }
-                  log_event_fail ("permission", "Permission", NULL, "created");
-                  break;
-                case 99:
-                  SEND_TO_CLIENT_OR_FAIL
-                   (XML_ERROR_SYNTAX ("create_permission",
-                                      "Permission denied"));
-                  log_event_fail ("permission", "Permission", NULL, "created");
-                  break;
-                case -1:
-                default:
-                  SEND_TO_CLIENT_OR_FAIL
-                   (XML_INTERNAL_ERROR ("create_permission"));
-                  log_event_fail ("permission", "Permission", NULL, "created");
-                  break;
-              }
-          else if (create_permission_data->name == NULL)
-            SEND_TO_CLIENT_OR_FAIL
-             (XML_ERROR_SYNTAX ("create_permission",
-                                "A NAME is required"));
-          else if (strlen (create_permission_data->name) == 0)
-            SEND_TO_CLIENT_OR_FAIL
-             (XML_ERROR_SYNTAX ("create_permission",
-                                "Name must be at"
-                                " least one character long"));
-          else switch (create_permission
-                        (create_permission_data->name,
-                         create_permission_data->comment,
-                         create_permission_data->resource_type,
-                         create_permission_data->resource_id,
-                         create_permission_data->subject_type,
-                         create_permission_data->subject_id,
-                         &new_permission))
-            {
-              case 0:
-                {
-                  char *uuid = permission_uuid (new_permission);
-                  SENDF_TO_CLIENT_OR_FAIL (XML_OK_CREATED_ID
-                                            ("create_permission"),
-                                           uuid);
-                  log_event ("permission", "Permission", uuid, "created");
-                  free (uuid);
-                  break;
-                }
-              case 2:
-                if (send_find_error_to_client
-                     ("create_permission", "subject",
-                      create_permission_data->subject_id, gmp_parser))
-                  {
-                    error_send_to_client (error);
-                    return;
-                  }
-                log_event_fail ("permission", "Permission", NULL, "created");
-                break;
-              case 3:
-                if (send_find_error_to_client
-                     ("create_permission", "resource",
-                      create_permission_data->resource_id, gmp_parser))
-                  {
-                    error_send_to_client (error);
-                    return;
-                  }
-                log_event_fail ("permission", "Permission", NULL, "created");
-                break;
-              case 5:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("create_permission",
-                                    "Error in RESOURCE"));
-                log_event_fail ("permission", "Permission", NULL, "created");
-                break;
-              case 6:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("create_permission",
-                                    "Error in SUBJECT"));
-                log_event_fail ("permission", "Permission", NULL, "created");
-                break;
-              case 7:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("create_permission",
-                                    "Error in NAME"));
-                log_event_fail ("permission", "Permission", NULL, "created");
-                break;
-              case 8:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("create_permission",
-                                    "Attempt to create permission on"
-                                    " permission"));
-                log_event_fail ("permission", "Permission", NULL, "created");
-                break;
-              case 9:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("create_permission",
-                                    "Permission does not accept a resource"));
-                log_event_fail ("permission", "Permission", NULL, "created");
-                break;
-              case 99:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("create_permission",
-                                    "Permission denied"));
-                log_event_fail ("permission", "Permission", NULL, "created");
-                break;
-              case -1:
-              default:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_INTERNAL_ERROR ("create_permission"));
-                log_event_fail ("permission", "Permission", NULL, "created");
-                break;
-            }
-
-          create_permission_data_reset (create_permission_data);
-          set_client_state (CLIENT_AUTHENTIC);
-          break;
-        }
-      CLOSE (CLIENT_CREATE_PERMISSION, COMMENT);
-      CLOSE (CLIENT_CREATE_PERMISSION, COPY);
-      CLOSE (CLIENT_CREATE_PERMISSION, NAME);
-      CLOSE (CLIENT_CREATE_PERMISSION, RESOURCE);
-      CLOSE (CLIENT_CREATE_PERMISSION_RESOURCE, TYPE);
-      CLOSE (CLIENT_CREATE_PERMISSION, SUBJECT);
-      CLOSE (CLIENT_CREATE_PERMISSION_SUBJECT, TYPE);
 
       case CLIENT_CREATE_PORT_LIST:
         if (create_port_list_element_end (gmp_parser, error, element_name))
@@ -22759,125 +20329,6 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
           set_client_state (CLIENT_AUTHENTIC);
         break;
 
-      case CLIENT_CREATE_ROLE:
-        {
-          role_t new_role;
-
-          assert (create_role_data->users != NULL);
-
-          if (create_role_data->copy)
-            switch (copy_role (create_role_data->name,
-                                create_role_data->comment,
-                                create_role_data->copy,
-                                &new_role))
-              {
-                case 0:
-                  {
-                    char *uuid;
-                    uuid = role_uuid (new_role);
-                    SENDF_TO_CLIENT_OR_FAIL (XML_OK_CREATED_ID ("create_role"),
-                                             uuid);
-                    log_event ("role", "Role", uuid, "created");
-                    free (uuid);
-                    break;
-                  }
-                case 1:
-                  SEND_TO_CLIENT_OR_FAIL
-                   (XML_ERROR_SYNTAX ("create_role",
-                                      "Role exists already"));
-                  log_event_fail ("role", "Role", NULL, "created");
-                  break;
-                case 2:
-                  if (send_find_error_to_client ("create_role", "role",
-                                                 create_role_data->copy,
-                                                 gmp_parser))
-                    {
-                      error_send_to_client (error);
-                      return;
-                    }
-                  log_event_fail ("role", "Role", NULL, "created");
-                  break;
-                case 4:
-                  SEND_TO_CLIENT_OR_FAIL
-                   (XML_ERROR_SYNTAX ("create_role",
-                                      "Syntax error in role name"));
-                  log_event_fail ("role", "Role", NULL, "created");
-                  break;
-                case 99:
-                  SEND_TO_CLIENT_OR_FAIL
-                   (XML_ERROR_SYNTAX ("create_role",
-                                      "Permission denied"));
-                  log_event_fail ("role", "Role", NULL, "created");
-                  break;
-                case -1:
-                  SEND_TO_CLIENT_OR_FAIL
-                   (XML_INTERNAL_ERROR ("create_role"));
-                  log_event_fail ("role", "Role", NULL, "created");
-                  break;
-              }
-          else if (create_role_data->name == NULL)
-            SEND_TO_CLIENT_OR_FAIL
-             (XML_ERROR_SYNTAX ("create_role",
-                                "A NAME is required"));
-          else if (strlen (create_role_data->name) == 0)
-            SEND_TO_CLIENT_OR_FAIL
-             (XML_ERROR_SYNTAX ("create_role",
-                                "Name must be at"
-                                " least one character long"));
-          else switch (create_role
-                        (create_role_data->name,
-                         create_role_data->comment,
-                         create_role_data->users,
-                         &new_role))
-            {
-              case 0:
-                {
-                  char *uuid = role_uuid (new_role);
-                  SENDF_TO_CLIENT_OR_FAIL (XML_OK_CREATED_ID ("create_role"),
-                                           uuid);
-                  log_event ("role", "Role", NULL, "created");
-                  free (uuid);
-                  break;
-                }
-              case 1:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("create_role",
-                                    "Role exists already"));
-                log_event_fail ("role", "Role", NULL, "created");
-                break;
-              case 2:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("create_role",
-                                    "Failed to find user"));
-                log_event_fail ("role", "Role", NULL, "created");
-                break;
-              case 4:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("create_role",
-                                    "Error in user name"));
-                log_event_fail ("group", "Group", NULL, "created");
-                break;
-              case 99:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("create_role",
-                                    "Permission denied"));
-                log_event_fail ("role", "Role", NULL, "created");
-                break;
-              default:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_INTERNAL_ERROR ("create_role"));
-                log_event_fail ("role", "Role", NULL, "created");
-                break;
-            }
-
-          create_role_data_reset (create_role_data);
-          set_client_state (CLIENT_AUTHENTIC);
-          break;
-        }
-      CLOSE (CLIENT_CREATE_ROLE, COMMENT);
-      CLOSE (CLIENT_CREATE_ROLE, COPY);
-      CLOSE (CLIENT_CREATE_ROLE, NAME);
-      CLOSE (CLIENT_CREATE_ROLE, USERS);
 
       case CLIENT_CREATE_SCANNER:
         handle_create_scanner (gmp_parser, error);
@@ -23898,7 +21349,6 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
       case CLIENT_CREATE_USER:
         {
           gchar *errdesc;
-          gchar *fail_group_id, *fail_role_id;
           user_t new_user;
 
           errdesc = NULL;
@@ -23959,16 +21409,9 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
                         ? create_user_data->password : "",
                       create_user_data->comment
                         ? create_user_data->comment : "",
-                      NULL,
-                      0,
                       create_user_data->sources,
-                      NULL,
-                      &fail_group_id,
-                      NULL,
-                      &fail_role_id,
                       &errdesc,
-                      &new_user,
-                      1))
+                      &new_user))
               {
                 case 0:
                   {
@@ -23980,30 +21423,6 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
                     free (uuid);
                     break;
                   }
-                case 1:
-                  if (send_find_error_to_client
-                       ("create_user", "group", fail_group_id, gmp_parser))
-                    {
-                      error_send_to_client (error);
-                      return;
-                    }
-                  log_event_fail ("user", "User", NULL, "created");
-                  break;
-                case 2:
-                  if (send_find_error_to_client
-                       ("create_user", "role", fail_role_id, gmp_parser))
-                    {
-                      error_send_to_client (error);
-                      return;
-                    }
-                  log_event_fail ("user", "User", NULL, "created");
-                  break;
-                case 3:
-                  SEND_TO_CLIENT_OR_FAIL
-                   (XML_ERROR_SYNTAX ("create_user",
-                                      "Error in host specification"));
-                  log_event_fail ("user", "User", NULL, "created");
-                  break;
                 case 99:
                   SEND_TO_CLIENT_OR_FAIL
                    (XML_ERROR_SYNTAX ("create_user",
@@ -25040,80 +22459,6 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
       CLOSE (CLIENT_MODIFY_FILTER, TYPE);
       CLOSE (CLIENT_MODIFY_FILTER, TERM);
 
-      case CLIENT_MODIFY_GROUP:
-        {
-          switch (modify_group
-                   (modify_group_data->group_id,
-                    modify_group_data->name,
-                    modify_group_data->comment,
-                    modify_group_data->users))
-            {
-              case 0:
-                SENDF_TO_CLIENT_OR_FAIL (XML_OK ("modify_group"));
-                log_event ("group", "Group", modify_group_data->group_id,
-                           "modified");
-                break;
-              case 1:
-                if (send_find_error_to_client ("modify_group", "group",
-                                               modify_group_data->group_id,
-                                               gmp_parser))
-                  {
-                    error_send_to_client (error);
-                    return;
-                  }
-                log_event_fail ("group", "Group",
-                                modify_group_data->group_id, "modified");
-                break;
-              case 2:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("modify_group",
-                                    "Failed to find user"));
-                log_event_fail ("group", "Group",
-                                modify_group_data->group_id, "modified");
-                break;
-              case 3:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("modify_group",
-                                    "A group_id attribute is required"));
-                log_event_fail ("group", "Group",
-                                modify_group_data->group_id, "modified");
-                break;
-              case 4:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("modify_group",
-                                    "Error in user name"));
-                log_event_fail ("group", "Group",
-                                modify_group_data->group_id, "modified");
-                break;
-              case 5:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("modify_group",
-                                    "Group with new name exists already"));
-                log_event_fail ("group", "Group",
-                                modify_group_data->group_id, "modified");
-                break;
-              case 99:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("modify_group",
-                                    "Permission denied"));
-                log_event_fail ("group", "Group",
-                                modify_group_data->group_id, "modified");
-                break;
-              default:
-              case -1:
-                SEND_TO_CLIENT_OR_FAIL (XML_INTERNAL_ERROR ("modify_group"));
-                log_event_fail ("group", "Group",
-                                modify_group_data->group_id, "modified");
-                break;
-            }
-
-          modify_group_data_reset (modify_group_data);
-          set_client_state (CLIENT_AUTHENTIC);
-          break;
-        }
-      CLOSE (CLIENT_MODIFY_GROUP, COMMENT);
-      CLOSE (CLIENT_MODIFY_GROUP, NAME);
-      CLOSE (CLIENT_MODIFY_GROUP, USERS);
 
 
     case CLIENT_MODIFY_INTEGRATION_CONFIG:
@@ -25303,135 +22648,6 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
       CLOSE (CLIENT_MODIFY_OVERRIDE, THREAT);
       CLOSE (CLIENT_MODIFY_OVERRIDE, NVT);
 
-      case CLIENT_MODIFY_PERMISSION:
-        {
-          if (modify_permission_data->permission_id == NULL)
-            SEND_TO_CLIENT_OR_FAIL
-             (XML_ERROR_SYNTAX ("modify_permission",
-                                "A permission_id attribute is required"));
-          else switch (modify_permission
-                        (modify_permission_data->permission_id,
-                         modify_permission_data->name,
-                         modify_permission_data->comment,
-                         modify_permission_data->resource_id,
-                         modify_permission_data->resource_type,
-                         modify_permission_data->subject_type,
-                         modify_permission_data->subject_id))
-            {
-              case 1:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("modify_permission",
-                                    "Permission exists already"));
-                log_event_fail ("permission", "Permission",
-                                modify_permission_data->permission_id,
-                                "modified");
-                break;
-              case 2:
-                if (send_find_error_to_client
-                     ("modify_permission", "subject",
-                      modify_permission_data->subject_id, gmp_parser))
-                  {
-                    error_send_to_client (error);
-                    return;
-                  }
-                log_event_fail ("permission", "Permission",
-                                modify_permission_data->permission_id,
-                                "modified");
-                break;
-              case 3:
-                if (send_find_error_to_client
-                     ("modify_permission", "resource",
-                      modify_permission_data->resource_id, gmp_parser))
-                  {
-                    error_send_to_client (error);
-                    return;
-                  }
-                log_event_fail ("permission", "Permission",
-                                modify_permission_data->permission_id,
-                                "modified");
-                break;
-              case 4:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("modify_permission",
-                                    "A PERMISSION"
-                                    " ID is required"));
-                log_event_fail ("permission", "Permission",
-                                modify_permission_data->permission_id,
-                                "modified");
-                break;
-              case 5:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("modify_permission",
-                                    "Error in RESOURCE"));
-                log_event_fail ("permission", "Permission",
-                                modify_permission_data->permission_id,
-                                "modified");
-                break;
-              case 6:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("modify_permission",
-                                    "Error in SUBJECT"));
-                log_event_fail ("permission", "Permission",
-                                modify_permission_data->permission_id,
-                                "modified");
-                break;
-              case 7:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("modify_permission",
-                                    "Error in NAME"));
-                log_event_fail ("permission", "Permission",
-                                modify_permission_data->permission_id,
-                                "modified");
-                break;
-              case 8:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("modify_permission",
-                                    "NAME required to find resource"));
-                log_event_fail ("permission", "Permission",
-                                modify_permission_data->permission_id,
-                                "modified");
-                break;
-              case 9:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("modify_permission",
-                                    "Permission does not accept a resource"));
-                log_event_fail ("permission", "Permission", NULL, "modified");
-                break;
-              case 99:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("modify_permission",
-                                    "Permission denied"));
-                log_event_fail ("permission", "Permission",
-                                modify_permission_data->permission_id,
-                                "modified");
-                break;
-              case -1:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_INTERNAL_ERROR ("modify_permission"));
-                log_event_fail ("permission", "Permission",
-                                modify_permission_data->permission_id,
-                                "modified");
-                break;
-              default:
-                {
-                  SENDF_TO_CLIENT_OR_FAIL (XML_OK ("modify_permission"));
-                  log_event ("permission", "Permission",
-                             modify_permission_data->permission_id, "modified");
-                  break;
-                }
-            }
-
-          modify_permission_data_reset (modify_permission_data);
-          set_client_state (CLIENT_AUTHENTIC);
-          break;
-        }
-      CLOSE (CLIENT_MODIFY_PERMISSION, COMMENT);
-      CLOSE (CLIENT_MODIFY_PERMISSION, SUBJECT);
-      CLOSE (CLIENT_MODIFY_PERMISSION_SUBJECT, TYPE);
-      CLOSE (CLIENT_MODIFY_PERMISSION, NAME);
-      CLOSE (CLIENT_MODIFY_PERMISSION, RESOURCE);
-      CLOSE (CLIENT_MODIFY_PERMISSION_RESOURCE, TYPE);
-
       case CLIENT_MODIFY_PORT_LIST:
         {
           switch (modify_port_list
@@ -25586,82 +22802,6 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
       case CLIENT_MODIFY_REPORT_CONFIG:
         modify_report_config_element_end (gmp_parser, error, element_name);
         break;
-
-      case CLIENT_MODIFY_ROLE:
-        {
-          switch (modify_role
-                   (modify_role_data->role_id,
-                    modify_role_data->name,
-                    modify_role_data->comment,
-                    modify_role_data->users))
-            {
-              case 0:
-                SENDF_TO_CLIENT_OR_FAIL (XML_OK ("modify_role"));
-                log_event ("role", "Role", modify_role_data->role_id,
-                           "modified");
-                break;
-              case 1:
-                if (send_find_error_to_client ("modify_role", "role",
-                                               modify_role_data->role_id,
-                                               gmp_parser))
-                  {
-                    error_send_to_client (error);
-                    return;
-                  }
-                log_event_fail ("role", "Role",
-                                modify_role_data->role_id, "modified");
-                break;
-              case 2:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("modify_role",
-                                    "Failed to find user"));
-                log_event_fail ("role", "Role",
-                                modify_role_data->role_id, "modified");
-                break;
-              case 3:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("modify_role",
-                                    "A role_id"
-                                    " attribute is required"));
-                log_event_fail ("role", "Role",
-                                modify_role_data->role_id, "modified");
-                break;
-              case 4:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("modify_role",
-                                    "Error in user name"));
-                log_event_fail ("role", "Role",
-                                modify_role_data->role_id, "modified");
-                break;
-              case 5:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("modify_role",
-                                    "Role with new name exists already"));
-                log_event_fail ("role", "Role",
-                                modify_role_data->role_id, "modified");
-                break;
-              case 99:
-                SEND_TO_CLIENT_OR_FAIL
-                 (XML_ERROR_SYNTAX ("modify_role",
-                                    "Permission denied"));
-                log_event_fail ("role", "Role",
-                                modify_role_data->role_id, "modified");
-                break;
-              default:
-              case -1:
-                SEND_TO_CLIENT_OR_FAIL (XML_INTERNAL_ERROR ("modify_role"));
-                log_event_fail ("role", "Role",
-                                modify_role_data->role_id, "modified");
-                break;
-            }
-
-          modify_role_data_reset (modify_role_data);
-          set_client_state (CLIENT_AUTHENTIC);
-          break;
-        }
-      CLOSE (CLIENT_MODIFY_ROLE, COMMENT);
-      CLOSE (CLIENT_MODIFY_ROLE, NAME);
-      CLOSE (CLIENT_MODIFY_ROLE, USERS);
 
       case CLIENT_MODIFY_SCANNER:
         handle_modify_scanner (gmp_parser, error);
@@ -26266,7 +23406,7 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
 
         if (modify_task_data->task_id)
           {
-            gchar *fail_alert_id, *fail_group_id;
+            gchar *fail_alert_id;
 
             if (modify_task_data->action && (modify_task_data->comment
                                              || modify_task_data->alerts->len
@@ -26360,13 +23500,11 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
                                       NULL,
                                       modify_task_data->alerts,
                                       modify_task_data->alterable,
-                                      NULL,
                                       modify_task_data->schedule_id,
                                       modify_task_data->schedule_periods,
                                       modify_task_data->preferences,
                                       modify_task_data->agent_group_id,
-                                      &fail_alert_id,
-                                      &fail_group_id))
+                                      &fail_alert_id))
               {
                 case 0:
                   log_event ("task", "Task", modify_task_data->task_id,
@@ -26437,17 +23575,6 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
                    (XML_ERROR_SYNTAX ("modify_task",
                                       "Task must be New to modify"
                                       " Alterable state"));
-                  log_event_fail ("task", "Task",
-                                  modify_task_data->task_id,
-                                  "modified");
-                  break;
-                case 10:
-                  if (send_find_error_to_client ("modify_task", "group",
-                                                 fail_group_id, gmp_parser))
-                    {
-                      error_send_to_client (error);
-                      return;
-                    }
                   log_event_fail ("task", "Task",
                                   modify_task_data->task_id,
                                   "modified");
@@ -26604,7 +23731,7 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
                                      "A NAME or user_id is required"));
           else
             {
-              gchar *fail_group_id, *fail_role_id, *errdesc;
+              gchar *errdesc;
 
               errdesc = NULL;
 
@@ -26612,29 +23739,15 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
                       (modify_user_data->user_id,
                        &modify_user_data->name,
                        modify_user_data->new_name,
-                       ((modify_user_data->modify_password
-                         && modify_user_data->password)
-                         ? modify_user_data->password
-                         /* Leave the password as it is. */
-                         : NULL),
+                       (modify_user_data->password
+                         /* Leave the password as it is when omitted. */
+                         ? modify_user_data->password : NULL),
                        modify_user_data->comment,
-                       NULL,
-                       0,
                        modify_user_data->sources,
-                       NULL, &fail_group_id,
-                       NULL, &fail_role_id,
                        &errdesc))
                 {
                   case 0:
                     SEND_TO_CLIENT_OR_FAIL (XML_OK ("modify_user"));
-                    break;
-                  case 1:
-                    if (send_find_error_to_client
-                         ("modify_user", "group", fail_group_id, gmp_parser))
-                      {
-                        error_send_to_client (error);
-                        return;
-                      }
                     break;
                   case 2:
                     if (send_find_error_to_client
@@ -26645,30 +23758,6 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
                         error_send_to_client (error);
                         return;
                       }
-                    break;
-                  case 3:
-                    SEND_TO_CLIENT_OR_FAIL (XML_OK ("modify_user"));
-                    log_event ("user", "User", modify_user_data->name,
-                               "raised to Admin role");
-                    break;
-                  case 4:
-                    SEND_TO_CLIENT_OR_FAIL (XML_OK ("modify_user"));
-                    log_event ("user", "User", modify_user_data->name,
-                               "downgraded from Admin role");
-                    break;
-                  case 5:
-                    if (send_find_error_to_client
-                         ("modify_user", "role", fail_role_id, gmp_parser))
-                      {
-                        error_send_to_client (error);
-                        return;
-                      }
-                    break;
-                  case 6:
-                    SEND_TO_CLIENT_OR_FAIL
-                     (XML_ERROR_SYNTAX ("modify_user",
-                                        "Error in host specification"));
-                    log_event_fail ("user", "User", NULL, "modified");
                     break;
                   case 7:
                     SEND_TO_CLIENT_OR_FAIL
@@ -26686,10 +23775,6 @@ gmp_xml_handle_end_element (/* unused */ GMarkupParseContext* context,
                     SEND_TO_CLIENT_OR_FAIL
                      (XML_ERROR_SYNTAX ("modify_user",
                                         "Permission denied"));
-                    break;
-                  case -2:
-                    SEND_TO_CLIENT_OR_FAIL (XML_ERROR_SYNTAX
-                                            ("modify_user", "Unknown role"));
                     break;
                   case -3:
                   case -4:
@@ -27854,17 +24939,9 @@ gmp_xml_handle_text (/* unused */ GMarkupParseContext* context,
               &create_filter_data->type);
 
 
-      APPEND (CLIENT_CREATE_GROUP_COMMENT,
-              &create_group_data->comment);
 
-      APPEND (CLIENT_CREATE_GROUP_COPY,
-              &create_group_data->copy);
 
-      APPEND (CLIENT_CREATE_GROUP_NAME,
-              &create_group_data->name);
 
-      APPEND (CLIENT_CREATE_GROUP_USERS,
-              &create_group_data->users);
 
 
 
@@ -27895,20 +24972,10 @@ gmp_xml_handle_text (/* unused */ GMarkupParseContext* context,
       APPEND (CLIENT_CREATE_OVERRIDE_THREAT,
               &create_override_data->threat);
 
-      APPEND (CLIENT_CREATE_PERMISSION_COMMENT,
-              &create_permission_data->comment);
 
-      APPEND (CLIENT_CREATE_PERMISSION_COPY,
-              &create_permission_data->copy);
 
-      APPEND (CLIENT_CREATE_PERMISSION_NAME,
-              &create_permission_data->name);
 
-      APPEND (CLIENT_CREATE_PERMISSION_RESOURCE_TYPE,
-              &create_permission_data->resource_type);
 
-      APPEND (CLIENT_CREATE_PERMISSION_SUBJECT_TYPE,
-              &create_permission_data->subject_type);
 
 
       case CLIENT_CREATE_PORT_LIST:
@@ -28081,17 +25148,9 @@ gmp_xml_handle_text (/* unused */ GMarkupParseContext* context,
         break;
 
 
-      APPEND (CLIENT_CREATE_ROLE_COMMENT,
-              &create_role_data->comment);
 
-      APPEND (CLIENT_CREATE_ROLE_COPY,
-              &create_role_data->copy);
 
-      APPEND (CLIENT_CREATE_ROLE_NAME,
-              &create_role_data->name);
 
-      APPEND (CLIENT_CREATE_ROLE_USERS,
-              &create_role_data->users);
 
       APPEND (CLIENT_CREATE_SCANNER_NAME,
               &create_scanner_data->name);
@@ -28341,14 +25400,8 @@ gmp_xml_handle_text (/* unused */ GMarkupParseContext* context,
               &modify_filter_data->type);
 
 
-      APPEND (CLIENT_MODIFY_GROUP_COMMENT,
-              &modify_group_data->comment);
 
-      APPEND (CLIENT_MODIFY_GROUP_NAME,
-              &modify_group_data->name);
 
-      APPEND (CLIENT_MODIFY_GROUP_USERS,
-              &modify_group_data->users);
 
       case CLIENT_MODIFY_INTEGRATION_CONFIG:
         modify_integration_config_element_text (text, text_len);
@@ -28385,17 +25438,9 @@ gmp_xml_handle_text (/* unused */ GMarkupParseContext* context,
               &modify_override_data->threat);
 
 
-      APPEND (CLIENT_MODIFY_PERMISSION_COMMENT,
-              &modify_permission_data->comment);
 
-      APPEND (CLIENT_MODIFY_PERMISSION_NAME,
-              &modify_permission_data->name);
 
-      APPEND (CLIENT_MODIFY_PERMISSION_RESOURCE_TYPE,
-              &modify_permission_data->resource_type);
 
-      APPEND (CLIENT_MODIFY_PERMISSION_SUBJECT_TYPE,
-              &modify_permission_data->subject_type);
 
 
       APPEND (CLIENT_MODIFY_PORT_LIST_COMMENT,
@@ -28405,14 +25450,8 @@ gmp_xml_handle_text (/* unused */ GMarkupParseContext* context,
               &modify_port_list_data->name);
 
 
-      APPEND (CLIENT_MODIFY_ROLE_COMMENT,
-              &modify_role_data->comment);
 
-      APPEND (CLIENT_MODIFY_ROLE_NAME,
-              &modify_role_data->name);
 
-      APPEND (CLIENT_MODIFY_ROLE_USERS,
-              &modify_role_data->users);
 
       APPEND (CLIENT_MODIFY_SCANNER_COMMENT,
               &modify_scanner_data->comment);

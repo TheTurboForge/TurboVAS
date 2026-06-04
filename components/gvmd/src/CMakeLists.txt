@@ -168,7 +168,6 @@ set(
   manage_filter_utils.c
   manage_commands.c
   manage_get.c
-  manage_groups.c
   manage_http_scanner.c
   manage_integration_configs.c
   manage_license.c
@@ -191,7 +190,6 @@ set(
   manage_report_ports.c
   manage_report_tls_certificates.c
   manage_report_vulns.c
-  manage_roles.c
   manage_runtime_flags.c
   manage_authentication.c
   manage_settings.c
@@ -237,7 +235,6 @@ set(
   manage_sql_assets.c
   manage_sql_events.c
   manage_sql_filters.c
-  manage_sql_groups.c
   manage_sql_integration_configs.c
   manage_sql_nvts.c
   manage_sql_secinfo.c
@@ -256,7 +253,6 @@ set(
   manage_sql_report_operating_systems.c
   manage_sql_report_ports.c
   manage_sql_report_tls_certificates.c
-  manage_sql_roles.c
   manage_sql_scanner_relays.c
   manage_sql_schedules.c
   manage_sql_settings.c

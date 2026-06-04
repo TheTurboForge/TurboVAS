@@ -45,7 +45,6 @@ export interface FeedStatusElement extends XmlResponseData {
       feed: FeedElement | FeedElement[];
       feed_owner_set?: YesNo;
       feed_resources_access?: YesNo;
-      feed_roles_set?: YesNo;
     };
   };
 }

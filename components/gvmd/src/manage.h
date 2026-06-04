@@ -694,9 +694,6 @@ void
 set_task_alterable (task_t, int);
 
 int
-set_task_groups (task_t, array_t*, gchar**);
-
-int
 set_task_schedule (task_t, schedule_t, int);
 
 int
@@ -807,8 +804,8 @@ manage_task_remove_file (const gchar *, const char *);
 int
 modify_task (const gchar *, const gchar *, const gchar *, const gchar *,
              const gchar *, const gchar *, const gchar *, array_t *,
-             const gchar *, array_t *, const gchar *, const gchar *, array_t *,
-             const gchar *, gchar **, gchar **);
+             const gchar *, const gchar *, const gchar *, array_t *,
+             const gchar *, gchar **);
 
 void
 init_config_file_iterator (iterator_t*, const char*, const char*);

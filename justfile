@@ -111,11 +111,11 @@ feed-cache-sync *args:
 feed-copy-to-runtime *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl feed-copy-to-runtime "$@"
 
-runtime-status:
-    @tools/turbovasctl runtime-status
+runtime-status *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-status "$@"
 
-runtime-smoke:
-    @tools/turbovasctl runtime-smoke
+runtime-smoke *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-smoke "$@"
 
 runtime-app-up:
     @tools/turbovasctl runtime-app-up

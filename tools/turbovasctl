@@ -126,6 +126,7 @@ POSTGRES_DEFAULTS = {
     "password": "turbovas-dev",
     "database": "turbovas",
 }
+POSTGRES_COLLATION_BASE_DATABASES = ("postgres", "template1")
 PG_GVM_CONTROL = "pg-gvm.control"
 PG_GVM_LIBRARY = "libpg-gvm.so"
 PG_GVM_EXTENSION = "pg-gvm"
@@ -1199,28 +1200,60 @@ def wait_for_ospd_vts_version(repo_root: Path, timeout_seconds: int = 180) -> tu
     return None, last_output
 
 
-def ensure_postgres_collation(repo_root: Path, refresh_empty: bool = True) -> dict[str, Any]:
-    result = psql(repo_root, "SELECT datcollversion || '|' || pg_database_collation_actual_version(oid) FROM pg_database WHERE datname = current_database();")
+def postgres_collation_databases(repo_root: Path) -> tuple[str, ...]:
+    return tuple(dict.fromkeys((postgres_database(repo_root), *POSTGRES_COLLATION_BASE_DATABASES)))
+
+
+def postgres_collation_connection_database(repo_root: Path, target_database: str) -> str:
+    for candidate in postgres_collation_databases(repo_root):
+        if candidate != target_database:
+            return candidate
+    return target_database
+
+
+def postgres_user_relation_count_query() -> str:
+    return (
+        "SELECT count(*) FROM pg_class "
+        "WHERE relkind IN ('r','i','S','v','m') "
+        "AND relnamespace NOT IN ("
+        "SELECT oid FROM pg_namespace "
+        "WHERE nspname LIKE 'pg_%' OR nspname = 'information_schema'"
+        ");"
+    )
+
+
+def ensure_postgres_database_collation(repo_root: Path, database: str, refresh_empty: bool = True) -> dict[str, Any]:
+    result = psql(repo_root, "SELECT datcollversion || '|' || pg_database_collation_actual_version(oid) FROM pg_database WHERE datname = current_database();", database=database)
     if result.returncode != 0:
-        return finding("fail", "postgres.collation", f"Collation version check exit code {result.returncode}.", details={"output_tail": result.stdout.splitlines()[-40:]})
+        return finding("fail", "postgres.collation", f"{database}: collation version check exit code {result.returncode}.", details={"database": database, "output_tail": result.stdout.splitlines()[-40:]})
     value = psql_value(result)
     if "|" not in value:
-        return finding("warn", "postgres.collation", "Could not parse database collation version check.", details={"output_tail": result.stdout.splitlines()[-40:]})
+        return finding("warn", "postgres.collation", f"{database}: could not parse database collation version check.", details={"database": database, "output_tail": result.stdout.splitlines()[-40:]})
     recorded, actual = value.split("|", 1)
     if recorded == actual:
-        return finding("pass", "postgres.collation", f"Database collation version is current: {actual}.", details={"recorded": recorded, "actual": actual})
+        return finding("pass", "postgres.collation", f"{database}: database collation version is current: {actual}.", details={"database": database, "recorded": recorded, "actual": actual})
 
-    count_result = psql(repo_root, "SELECT count(*) FROM pg_class WHERE relkind IN ('r','i','S','v','m') AND relnamespace NOT IN (SELECT oid FROM pg_namespace WHERE nspname LIKE 'pg_%' OR nspname = 'information_schema');")
+    count_result = psql(repo_root, postgres_user_relation_count_query(), database=database)
     if count_result.returncode != 0:
-        return finding("fail", "postgres.collation", f"Collation mismatch {recorded} != {actual}; relation-count check failed.", details={"output_tail": count_result.stdout.splitlines()[-40:]})
+        return finding("fail", "postgres.collation", f"{database}: collation mismatch {recorded} != {actual}; relation-count check failed.", details={"database": database, "recorded": recorded, "actual": actual, "output_tail": count_result.stdout.splitlines()[-40:]})
     relation_count = psql_value(count_result)
     if relation_count == "0" and refresh_empty:
-        refresh = psql(repo_root, f"ALTER DATABASE {sql_identifier(postgres_database(repo_root))} REFRESH COLLATION VERSION;")
-        return finding("pass" if refresh.returncode == 0 else "fail", "postgres.collation", f"Refreshed empty development database collation version from {recorded} to {actual}.", details={"recorded": recorded, "actual": actual, "relation_count": relation_count, "output_tail": refresh.stdout.splitlines()[-40:]})
+        refresh = psql(
+            repo_root,
+            f"ALTER DATABASE {sql_identifier(database)} REFRESH COLLATION VERSION;",
+            database=postgres_collation_connection_database(repo_root, database),
+        )
+        return finding("pass" if refresh.returncode == 0 else "fail", "postgres.collation", f"{database}: refreshed empty development database collation version from {recorded} to {actual}.", details={"database": database, "recorded": recorded, "actual": actual, "relation_count": relation_count, "output_tail": refresh.stdout.splitlines()[-40:]})
     if relation_count == "0":
-        return finding("warn", "postgres.collation", f"Database collation version mismatch {recorded} != {actual}; runtime-init can refresh this empty development database.", details={"recorded": recorded, "actual": actual, "relation_count": relation_count})
-    return finding("warn", "postgres.collation", f"Database collation version mismatch {recorded} != {actual}; manual review required before refreshing a database with objects.", details={"recorded": recorded, "actual": actual, "relation_count": relation_count})
+        return finding("warn", "postgres.collation", f"{database}: database collation version mismatch {recorded} != {actual}; runtime-init can refresh this empty development database.", details={"database": database, "recorded": recorded, "actual": actual, "relation_count": relation_count})
+    return finding("warn", "postgres.collation", f"{database}: database collation version mismatch {recorded} != {actual}; manual review required before refreshing a database with objects.", details={"database": database, "recorded": recorded, "actual": actual, "relation_count": relation_count})
 
+
+def ensure_postgres_collation(repo_root: Path, refresh_empty: bool = True) -> list[dict[str, Any]]:
+    return [
+        ensure_postgres_database_collation(repo_root, database, refresh_empty=refresh_empty)
+        for database in postgres_collation_databases(repo_root)
+    ]
 
 def pg_gvm_artifacts(repo_root: Path) -> tuple[list[dict[str, Any]], dict[str, Path]]:
     prefix = repo_root / "build" / "prefix"
@@ -1805,7 +1838,7 @@ def command_runtime_init(repo_root: Path) -> dict[str, Any]:
     if aggregate_status(findings) == "fail":
         return make_result("runtime-init", repo_root, "Runtime initialization stopped before database setup.", findings)
 
-    findings.append(ensure_postgres_collation(repo_root))
+    findings.extend(ensure_postgres_collation(repo_root))
     if aggregate_status(findings) == "fail":
         return make_result("runtime-init", repo_root, "Runtime initialization stopped at Postgres collation check.", findings)
 
@@ -2164,7 +2197,6 @@ def command_runtime_feed_import_init(repo_root: Path) -> dict[str, Any]:
     import_steps.extend([
         ("gvmd.rebuild-gvmd-data", ["--rebuild-gvmd-data=all"]),
         ("gvmd.rebuild-scap", ["--rebuild-scap"]),
-        ("gvmd.optimize-feed-permissions", ["--optimize=add-feed-permissions"]),
     ])
     import_failed = False
     for check, args in import_steps:
@@ -2672,7 +2704,7 @@ def command_runtime_status(repo_root: Path) -> dict[str, Any]:
     if container_running(repo_root, "postgres"):
         ready = postgres_ready(repo_root)
         findings.append(finding("pass" if ready.returncode == 0 else "warn", "postgres.ready", f"pg_isready exit code {ready.returncode}.", details={"output_tail": ready.stdout.splitlines()[-20:]}))
-        findings.append(ensure_postgres_collation(repo_root, refresh_empty=False))
+        findings.extend(ensure_postgres_collation(repo_root, refresh_empty=False))
         dba = psql(repo_root, "SELECT EXISTS (SELECT FROM pg_roles WHERE rolname = 'dba');")
         dba_value = psql_value(dba)
         findings.append(finding("pass" if dba.returncode == 0 and dba_value == "t" else "warn", "postgres.role.dba", f"dba role exists: {dba_value or 'unknown'}.", details={"output_tail": dba.stdout.splitlines()[-20:]}))
@@ -2703,11 +2735,11 @@ def command_runtime_smoke(repo_root: Path) -> dict[str, Any]:
     if container_running(repo_root, "postgres"):
         result = postgres_ready(repo_root)
         findings.append(finding("pass" if result.returncode == 0 else "fail", "postgres.ready", f"pg_isready exit code {result.returncode}.", details={"output_tail": result.stdout.splitlines()[-20:]}))
-        collation = ensure_postgres_collation(repo_root, refresh_empty=False)
-        if collation["status"] == "warn":
-            collation = dict(collation)
-            collation["status"] = "fail"
-        findings.append(collation)
+        for collation in ensure_postgres_collation(repo_root, refresh_empty=False):
+            if collation["status"] == "warn":
+                collation = dict(collation)
+                collation["status"] = "fail"
+            findings.append(collation)
         extension = pg_gvm_extension_status(repo_root)
         if extension["status"] == "warn":
             extension = dict(extension)

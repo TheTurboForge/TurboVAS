@@ -537,6 +537,61 @@ class TurboVASCtlTests(unittest.TestCase):
             self.assertIn("Persistent Docker runtime plan", result["summary"])
             self.assertIn(str(root.parent / "TurboVAS-runtime"), result["artifacts"])
 
+    def test_postgres_collation_databases_include_runtime_and_defaults(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            root.mkdir()
+            self.assertEqual(turbovasctl.postgres_collation_databases(root), ("turbovas", "postgres", "template1"))
+
+    def test_postgres_collation_checks_all_development_databases(self):
+        calls = []
+        original_psql = turbovasctl.psql
+
+        def fake_psql(_root, sql, database=None):
+            calls.append((sql, database))
+            return turbovasctl.subprocess.CompletedProcess([], 0, "2.41|2.41\n", "")
+
+        try:
+            turbovasctl.psql = fake_psql
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp) / "TurboVAS"
+                root.mkdir()
+                findings = turbovasctl.ensure_postgres_collation(root, refresh_empty=False)
+        finally:
+            turbovasctl.psql = original_psql
+
+        self.assertEqual([finding["details"]["database"] for finding in findings], ["turbovas", "postgres", "template1"])
+        self.assertTrue(all(finding["status"] == "pass" for finding in findings))
+        self.assertEqual([call[1] for call in calls], ["turbovas", "postgres", "template1"])
+
+    def test_postgres_collation_refreshes_empty_database_from_alternate_connection(self):
+        calls = []
+        original_psql = turbovasctl.psql
+
+        def fake_psql(_root, sql, database=None):
+            calls.append((sql, database))
+            if "datcollversion" in sql:
+                return turbovasctl.subprocess.CompletedProcess([], 0, "2.36|2.41\n", "")
+            if "count(*) FROM pg_class" in sql:
+                return turbovasctl.subprocess.CompletedProcess([], 0, "0\n", "")
+            if "ALTER DATABASE" in sql:
+                return turbovasctl.subprocess.CompletedProcess([], 0, "ALTER DATABASE\n", "")
+            return turbovasctl.subprocess.CompletedProcess([], 1, "unexpected\n", "")
+
+        try:
+            turbovasctl.psql = fake_psql
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp) / "TurboVAS"
+                root.mkdir()
+                finding = turbovasctl.ensure_postgres_database_collation(root, "template1", refresh_empty=True)
+        finally:
+            turbovasctl.psql = original_psql
+
+        self.assertEqual(finding["status"], "pass")
+        self.assertEqual(finding["details"]["database"], "template1")
+        self.assertEqual(calls[-1][1], "turbovas")
+        self.assertIn('ALTER DATABASE "template1" REFRESH COLLATION VERSION', calls[-1][0])
+
     def test_sql_escaping_helpers(self):
         self.assertEqual(turbovasctl.sql_identifier('a"b'), '"a""b"')
         self.assertEqual(turbovasctl.sql_literal("a'b"), "'a''b'")

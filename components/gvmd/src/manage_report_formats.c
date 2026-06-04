@@ -14,7 +14,6 @@
 #include "gmp_report_formats.h"
 #include "manage_settings.h"
 #include "manage_sql.h"
-#include "manage_sql_permissions.h"
 #include "manage_sql_report_formats.h"
 #include "manage_sql_resources.h"
 #include "manage_users.h"
@@ -419,52 +418,6 @@ update_report_format_from_file (report_format_t report_format,
 }
 
 /**
- * @brief Grant 'Feed Import Roles' access to a report format.
- *
- * @param[in]  report_format_id  UUID of report format.
- */
-static void
-create_feed_report_format_permissions (const gchar *report_format_id)
-{
-  gchar *roles, **split, **point;
-
-  setting_value (SETTING_UUID_FEED_IMPORT_ROLES, &roles);
-
-  if (roles == NULL || strlen (roles) == 0)
-    {
-      g_debug ("%s: no 'Feed Import Roles', so not creating permissions",
-               __func__);
-      g_free (roles);
-      return;
-    }
-
-  point = split = g_strsplit (roles, ",", 0);
-  while (*point)
-    {
-      permission_t permission;
-
-      if (create_permission_no_acl ("get_report_formats",
-                                    "Automatically created for report format"
-                                    " from feed",
-                                    NULL,
-                                    report_format_id,
-                                    "role",
-                                    g_strstrip (*point),
-                                    &permission))
-        /* Keep going because we aren't strict about checking the value
-         * of the setting, and because we don't adjust the setting when
-         * roles are removed. */
-        g_warning ("%s: failed to create permission for role '%s'",
-                   __func__, g_strstrip (*point));
-
-      point++;
-    }
-  g_strfreev (split);
-
-  g_free (roles);
-}
-
-/**
  * @brief Create a report format from an XML file.
  *
  * @param[in]  path  Path to report format XML.
@@ -527,9 +480,6 @@ create_report_format_from_file (const gchar *path)
 
           uuid = report_format_uuid (new_report_format);
           log_event ("report_format", "Report format", uuid, "created");
-
-          /* Create permissions. */
-          create_feed_report_format_permissions (uuid);
 
           g_free (uuid);
           break;

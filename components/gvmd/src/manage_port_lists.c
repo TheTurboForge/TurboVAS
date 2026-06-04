@@ -14,7 +14,6 @@
 #include "gmp_port_lists.h"
 #include "manage_settings.h"
 #include "manage_sql.h"
-#include "manage_sql_permissions.h"
 #include "manage_sql_port_lists.h"
 #include "manage_users.h"
 #include "utils.h"
@@ -45,52 +44,6 @@ feed_dir_port_lists ()
                              "port-lists",
                              NULL);
   return path;
-}
-
-/**
- * @brief Grant 'Feed Import Roles' access to a port list.
- *
- * @param[in]  port_list_id  UUID of port list.
- */
-static void
-create_feed_port_list_permissions (const gchar *port_list_id)
-{
-  gchar *roles, **split, **point;
-
-  setting_value (SETTING_UUID_FEED_IMPORT_ROLES, &roles);
-
-  if (roles == NULL || strlen (roles) == 0)
-    {
-      g_debug ("%s: no 'Feed Import Roles', so not creating permissions",
-               __func__);
-      g_free (roles);
-      return;
-    }
-
-  point = split = g_strsplit (roles, ",", 0);
-  while (*point)
-    {
-      permission_t permission;
-
-      if (create_permission_no_acl ("get_port_lists",
-                                    "Automatically created for port_list"
-                                    " from feed",
-                                    NULL,
-                                    port_list_id,
-                                    "role",
-                                    g_strstrip (*point),
-                                    &permission))
-        /* Keep going because we aren't strict about checking the value
-         * of the setting, and because we don't adjust the setting when
-         * roles are removed. */
-        g_warning ("%s: failed to create permission for role '%s'",
-                   __func__, g_strstrip (*point));
-
-      point++;
-    }
-  g_strfreev (split);
-
-  g_free (roles);
 }
 
 /**
@@ -146,9 +99,6 @@ create_port_list_from_file (const gchar *path)
 
           uuid = port_list_uuid (new_port_list);
           log_event ("port_list", "Port list", uuid, "created");
-
-          /* Create permissions. */
-          create_feed_port_list_permissions (uuid);
 
           g_free (uuid);
           break;

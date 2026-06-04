@@ -9,7 +9,6 @@
 #include "manage_sql.h"
 #include "manage_sql_filters.h"
 #if ENABLE_AGENTS
-#include "manage_sql_groups.h"
 #endif
 #include "manage_asset_keys.h"
 #include "manage_report_hosts.h"

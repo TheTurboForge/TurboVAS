@@ -358,8 +358,8 @@ SPDX-License-Identifier: AGPL-3.0-or-later
     <option>
       <p><opt>--optimize=<arg>NAME</arg></opt></p>
       <optdesc>
-        <p>Run an optimization: vacuum, add-feed-permissions, analyze,
-           cleanup-config-prefs, cleanup-feed-permissions,
+        <p>Run an optimization: vacuum, analyze,
+           cleanup-config-prefs,
            cleanup-port-names, cleanup-report-formats, cleanup-result-nvts,
            cleanup-result-severities, cleanup-schedule-times, cleanup-sequences,
            cleanup-tls-certificate-encoding,
@@ -514,7 +514,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
         <p>Number of auto retries if scanner connection is lost
            in a running task.</p>
       </optdesc>
-    </option>    
+    </option>
     <option>
       <p><opt>--schedule-timeout=<arg>TIME</arg></opt></p>
       <optdesc>

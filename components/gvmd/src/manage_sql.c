@@ -30,10 +30,8 @@
 #include "manage_alerts.h"
 #include "manage_assets.h"
 #include "manage_filters.h"
-#include "manage_groups.h"
 #include "manage_port_lists.h"
 #include "manage_report_formats.h"
-#include "manage_roles.h"
 #include "manage_runtime_flags.h"
 #include "manage_scanner_relays.h"
 #include "manage_sql_credential_stores.h"
@@ -46,7 +44,6 @@
 #include "manage_sql_assets.h"
 #include "manage_sql_configs.h"
 #include "manage_sql_filters.h"
-#include "manage_sql_groups.h"
 #include "manage_sql_overrides.h"
 #include "manage_sql_permissions.h"
 #include "manage_sql_permissions_cache.h"
@@ -55,7 +52,6 @@
 #include "manage_sql_report_errors.h"
 #include "manage_sql_report_formats.h"
 #include "manage_sql_resources.h"
-#include "manage_sql_roles.h"
 #include "manage_sql_scanner_relays.h"
 #include "manage_sql_schedules.h"
 #include "manage_sql_settings.h"
@@ -3589,16 +3585,7 @@ check_db_settings ()
          "  'Maintainer email address used in generated Debian LSC packages.',"
          "  '');");
 
-  if (sql_int ("SELECT count(*) FROM settings"
-               " WHERE uuid = '" SETTING_UUID_FEED_IMPORT_ROLES "'"
-               " AND " ACL_IS_GLOBAL () ";")
-      == 0)
-    sql ("INSERT into settings (uuid, owner, name, comment, value)"
-         " VALUES"
-         " ('" SETTING_UUID_FEED_IMPORT_ROLES "', NULL,"
-         "  'Feed Import Roles',"
-         "  'Roles given access to new resources from feed.',"
-         "  '" ROLE_UUID_ADMIN "," ROLE_UUID_USER "');");
+  sql ("DELETE FROM settings WHERE uuid = 'ff000362-338f-11ea-9051-28d24461215b';");
 
   if (sql_int ("SELECT count(*) FROM settings"
                " WHERE uuid = '" SETTING_UUID_SECINFO_SQL_BUFFER_THRESHOLD "'"
@@ -6125,75 +6112,6 @@ set_task_alterable (task_t task, int alterable)
   sql ("UPDATE tasks SET alterable = %i WHERE id = %llu;",
        alterable,
        task);
-}
-
-/**
- * @brief Set observer groups on a task, removing any previous groups.
- *
- * @param[in]  task    Task.
- * @param[in]  groups  Groups.
- * @param[out] group_id_return  ID of group on "failed to find" error.
- *
- * @return 0 success, -1 error, 1 failed to find group.
- */
-int
-set_task_groups (task_t task, array_t *groups, gchar **group_id_return)
-{
-  group_t group = 0;
-  guint index;
-
-  sql_begin_immediate ();
-
-  sql ("DELETE FROM permissions"
-       " WHERE resource_type = 'task'"
-       " AND resource = %llu"
-       " AND subject_type = 'group'"
-       " AND name = 'get';",
-       task);
-
-  index = 0;
-  while (index < groups->len)
-    {
-      gchar *group_id;
-
-      group_id = (gchar*) g_ptr_array_index (groups, index);
-      if (strcmp (group_id, "0") == 0)
-        {
-          index++;
-          continue;
-        }
-
-      if (find_group_with_permission (group_id, &group, "modify_group"))
-        {
-          sql_rollback ();
-          return -1;
-        }
-
-      if (group == 0)
-        {
-          sql_rollback ();
-          if (group_id_return) *group_id_return = group_id;
-          return 1;
-        }
-
-      sql ("INSERT INTO permissions"
-           " (uuid, owner, name, comment, resource_type, resource,"
-           "  resource_uuid, resource_location, subject_type, subject,"
-           "  subject_location, creation_time, modification_time)"
-           " VALUES"
-           " (make_uuid (),"
-           "  (SELECT id FROM users WHERE users.uuid = '%s'),"
-           "  'get_tasks', '', 'task', %llu,"
-           "  (SELECT uuid FROM tasks WHERE tasks.id = %llu),"
-           "  " G_STRINGIFY (LOCATION_TABLE) ", 'group', %llu,"
-           "  " G_STRINGIFY (LOCATION_TABLE) ", m_now (), m_now ());",
-           current_credentials.uuid, task, task, group);
-
-      index++;
-    }
-
-  sql_commit ();
-  return 0;
 }
 
 /**
@@ -17419,19 +17337,17 @@ manage_task_remove_file (const gchar *task_id, const char *name)
  * @param[in]  observers   Observers.
  * @param[in]  alerts      Alerts.
  * @param[in]  alterable   Alterable.
- * @param[in]  groups      Groups.
  * @param[in]  schedule_id  Schedule.
  * @param[in]  schedule_periods  Period of schedule.
  * @param[in]  preferences       Preferences.
  * @param[in]  agent_group_id    Agent group.
  * @param[out] fail_alert_id     Alert when failed to find alert.
- * @param[out] fail_group_id     Group when failed to find group.
  *
  * @return 0 success, 1 failed to find task, 2 status must be new to edit
  *         scanner, 3 failed to find scanner, 4 failed to find config, 5 status
  *         must be new to edit config, 6 user name validation failed, 7 failed
  *         to find user, 8 failed to find alert, 9 task must be new to modify
- *         alterable state, 10 failed to find group, 11 failed to find schedule,
+ *         alterable state, 11 failed to find schedule,
  *         12 failed to find target, 13 invalid auto_delete value, 14 auto
  *         delete count out of range, 15 config and scanner types mismatch,
  *         16 status must be new to edit target, 17 for import tasks only
@@ -17443,13 +17359,11 @@ modify_task (const gchar *task_id, const gchar *name,
              const gchar *comment, const gchar *scanner_id,
              const gchar *target_id, const gchar *config_id,
              const gchar *observers, array_t *alerts,
-             const gchar *alterable, array_t *groups,
-             const gchar *schedule_id,
+             const gchar *alterable, const gchar *schedule_id,
              const gchar *schedule_periods,
              array_t *preferences,
              const gchar *agent_group_id,
-             gchar **fail_alert_id,
-             gchar **fail_group_id)
+             gchar **fail_alert_id)
 {
   task_t task;
   int type_of_scanner;
@@ -17574,20 +17488,6 @@ modify_task (const gchar *task_id, const gchar *name,
       if (task_run_status (task) != TASK_STATUS_NEW)
         return 9;
       set_task_alterable (task, strcmp (alterable, "0"));
-    }
-
-  if (groups->len)
-    {
-      switch (set_task_groups (task, groups, fail_group_id))
-        {
-          case 0:
-            break;
-          case 1:
-            return 10;
-          case -1:
-          default:
-            return -1;
-        }
     }
 
   if (schedule_id)
@@ -25243,16 +25143,13 @@ type_select_columns (const char *type)
   static column_t cve_columns[] = CVE_INFO_ITERATOR_COLUMNS;
   static column_t dfn_cert_adv_columns[] = DFN_CERT_ADV_INFO_ITERATOR_COLUMNS;
   static column_t filter_columns[] = FILTER_ITERATOR_COLUMNS;
-  static column_t group_columns[] = GROUP_ITERATOR_COLUMNS;
   static column_t host_columns[] = HOST_ITERATOR_COLUMNS;
   static column_t nvt_columns[] = NVT_ITERATOR_COLUMNS;
   static column_t os_columns[] = OS_ITERATOR_COLUMNS;
   static column_t override_columns[] = OVERRIDE_ITERATOR_COLUMNS;
-  static column_t permission_columns[] = PERMISSION_ITERATOR_COLUMNS;
   static column_t report_columns[] = REPORT_ITERATOR_COLUMNS;
   static column_t result_columns[] = RESULT_ITERATOR_COLUMNS;
   static column_t result_columns_no_cert[] = RESULT_ITERATOR_COLUMNS_NO_CERT;
-  static column_t role_columns[] = ROLE_ITERATOR_COLUMNS;
   static column_t scanner_columns[] = SCANNER_ITERATOR_COLUMNS;
   static column_t schedule_columns[] = SCHEDULE_ITERATOR_COLUMNS;
   static column_t tag_columns[] = TAG_ITERATOR_COLUMNS;
@@ -25287,8 +25184,6 @@ type_select_columns (const char *type)
     return dfn_cert_adv_columns;
   if (strcasecmp (type, "FILTER") == 0)
     return filter_columns;
-  if (strcasecmp (type, "GROUP") == 0)
-    return group_columns;
   if (strcasecmp (type, "HOST") == 0)
     return host_columns;
   if (strcasecmp (type, "NVT") == 0)
@@ -25297,8 +25192,6 @@ type_select_columns (const char *type)
     return os_columns;
   if (strcasecmp (type, "OVERRIDE") == 0)
     return override_columns;
-  if (strcasecmp (type, "PERMISSION") == 0)
-    return permission_columns;
   if (strcasecmp (type, "PORT_LIST") == 0)
     return port_list_select_columns ();
   if (strcasecmp (type, "REPORT") == 0)
@@ -25313,8 +25206,6 @@ type_select_columns (const char *type)
         return result_columns;
       return result_columns_no_cert;
     }
-  if (strcasecmp (type, "ROLE") == 0)
-    return role_columns;
   if (strcasecmp (type, "SCANNER") == 0)
     return scanner_columns;
   if (strcasecmp (type, "SCHEDULE") == 0)
@@ -25431,11 +25322,6 @@ type_filter_columns (const char *type)
       static const char *ret[] = FILTER_ITERATOR_FILTER_COLUMNS;
       return ret;
     }
-  if (strcasecmp (type, "GROUP") == 0)
-    {
-      static const char *ret[] = GROUP_ITERATOR_FILTER_COLUMNS;
-      return ret;
-    }
   if (strcasecmp (type, "HOST") == 0)
     {
       static const char *ret[] = HOST_ITERATOR_FILTER_COLUMNS;
@@ -25456,11 +25342,6 @@ type_filter_columns (const char *type)
       static const char *ret[] = OVERRIDE_ITERATOR_FILTER_COLUMNS;
       return ret;
     }
-  if (strcasecmp (type, "PERMISSION") == 0)
-    {
-      static const char *ret[] = PERMISSION_ITERATOR_FILTER_COLUMNS;
-      return ret;
-    }
   if (strcasecmp (type, "PORT_LIST") == 0)
     return port_list_filter_columns ();
   if (strcasecmp (type, "REPORT") == 0)
@@ -25475,11 +25356,6 @@ type_filter_columns (const char *type)
   if (strcasecmp (type, "RESULT") == 0)
     {
       static const char *ret[] = RESULT_ITERATOR_FILTER_COLUMNS;
-      return ret;
-    }
-  if (strcasecmp (type, "ROLE") == 0)
-    {
-      static const char *ret[] = ROLE_ITERATOR_FILTER_COLUMNS;
       return ret;
     }
   if (strcasecmp (type, "SCANNER") == 0)
@@ -25957,11 +25833,6 @@ manage_optimize (GSList *log_config, const db_conn_info_t *database,
                                         (new_size - old_size)
                                           * 100.0 / old_size);
     }
-  else if (strcasecmp (name, "add-feed-permissions") == 0)
-    {
-      success_text = g_strdup_printf ("Optimized: add-feed-permissions."
-                                      " RBAC feed permissions are disabled.");
-    }
   else if (strcasecmp (name, "analyze") == 0)
     {
       sql ("ANALYZE;");
@@ -25999,11 +25870,6 @@ manage_optimize (GSList *log_config, const db_conn_info_t *database,
           "       AND type = 'PLUGINS_PREFS';");
 
       success_text = g_strdup_printf ("Optimized: cleanup-config-prefs.");
-    }
-  else if (strcasecmp (name, "cleanup-feed-permissions") == 0)
-    {
-      success_text = g_strdup_printf ("Optimized: cleanup-feed-permissions."
-                                      " RBAC feed permissions are disabled.");
     }
   else if (strcasecmp (name, "cleanup-port-names") == 0)
     {
