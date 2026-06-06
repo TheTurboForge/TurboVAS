@@ -183,6 +183,8 @@ services:
         --broker-address=mosquitto:1883
         --feed-lock-path=/runtime/run/feed-update.lock
         --disable-scheduling
+        --scan-queue
+        --max-active-scan-handlers=1
         --unix-socket=/runtime/run/gvmd/gvmd.sock
         --listen-mode=0660
 
@@ -191,6 +193,7 @@ services:
     build:
       context: ..
       dockerfile: docker/dev/Dockerfile
+    hostname: turbovas-ospd-openvas
     working_dir: /workspace
     cap_add:
       - NET_RAW
@@ -210,6 +213,7 @@ services:
       TURBOVAS_RUNTIME_DIR: /runtime
       TURBOVAS_UID: ${TURBOVAS_UID:-1000}
       TURBOVAS_GID: ${TURBOVAS_GID:-1000}
+      NMAP_PRIVILEGED: "1"
     volumes:
       - type: bind
         source: ..
@@ -230,6 +234,12 @@ services:
         install -d -m 0770 -o "$${TURBOVAS_UID:-1000}" -g "$${TURBOVAS_GID:-1000}" /runtime/run/ospd /runtime/logs/ospd &&
         install -d -m 0700 -o "$${TURBOVAS_UID:-1000}" -g "$${TURBOVAS_GID:-1000}" /runtime/state/feed-gnupg &&
         mkdir -p /runtime/feeds/notus/advisories &&
+        if command -v setcap >/dev/null 2>&1; then
+          setcap cap_net_raw,cap_net_admin+eip /usr/bin/nmap ||
+          echo "WARN: could not set nmap file capabilities" >&2;
+        else
+          echo "WARN: setcap is unavailable; nmap capability check will fail" >&2;
+        fi &&
         rm -f /runtime/run/ospd/ospd-openvas.sock /runtime/run/ospd/ospd-openvas.pid &&
         exec setpriv
         --reuid "$${TURBOVAS_UID:-1000}"

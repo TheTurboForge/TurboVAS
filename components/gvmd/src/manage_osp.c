@@ -1,4 +1,5 @@
 /* Copyright (C) 2025 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -933,7 +934,8 @@ update_osp_scan (task_t task, report_t report, const char *scan_id,
 
           osp_scan_status = get_osp_scan_status (scan_id, conn_data);
 
-          if (osp_scan_status == OSP_SCAN_STATUS_QUEUED)
+          if (osp_scan_status == OSP_SCAN_STATUS_QUEUED
+              || osp_scan_status == OSP_SCAN_STATUS_INIT)
             {
               if (*queued_status_updated == FALSE)
                 {

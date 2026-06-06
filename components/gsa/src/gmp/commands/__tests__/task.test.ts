@@ -13,7 +13,9 @@ import {
   testing,
 } from '@gsa/testing';
 import FeedStatusCommand from 'gmp/commands/feed-status';
-import TaskCommand from 'gmp/commands/task';
+import TaskCommand, {
+  isTaskStartManagerResponseFailure,
+} from 'gmp/commands/task';
 import {
   createActionResultResponse,
   createHttp,
@@ -44,6 +46,36 @@ afterAll(() => {
 });
 
 describe('TaskCommand tests', () => {
+  test('should enrich manager response failures while starting a task', async () => {
+    const xhr = {
+      status: 500,
+      response: '',
+    } as XMLHttpRequest;
+    const rejection = new ResponseRejection(
+      xhr,
+      'Failure to receive response from manager daemon.',
+    );
+    const feedStatusResponse = createResponse({
+      get_feeds: {
+        get_feeds_response: {
+          feed: [],
+        },
+      },
+    });
+    const fakeHttp = {
+      request: testing
+        .fn()
+        .mockResolvedValueOnce(feedStatusResponse)
+        .mockRejectedValueOnce(rejection),
+    } as unknown as Http;
+
+    const cmd = new TaskCommand(fakeHttp);
+    await expect(cmd.start({id: 'task1'})).rejects.toThrow(
+      'Refresh the task status and check the latest report before retrying.',
+    );
+    expect(isTaskStartManagerResponseFailure(rejection)).toEqual(true);
+  });
+
   test('should create new task', async () => {
     const response = createActionResultResponse();
     const fakeHttp = createHttp(response);

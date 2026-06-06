@@ -81,6 +81,9 @@ runtime-scanner-register:
 runtime-scanner-capability-check *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-scanner-capability-check "$@"
 
+runtime-nmap-capability-check *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-nmap-capability-check "$@"
+
 runtime-feed-keyring-init *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-feed-keyring-init "$@"
 

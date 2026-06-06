@@ -88,7 +88,12 @@ const TaskRow = ({
   ...props
 }: TaskRowProps) => {
   const [_] = useTranslation();
-  const {scanner, last_report: lastReport} = entity;
+  const {
+    current_report: currentReport,
+    scanner,
+    last_report: lastReport,
+  } = entity;
+  const displayedReport = currentReport ?? lastReport;
 
   return (
     <TableRow>
@@ -128,10 +133,10 @@ const TaskRow = ({
         <TaskReportTotal links={links} task={entity} />
       </TableData>
       <TableData>
-        <TaskReport links={links} report={lastReport} />
+        <TaskReport links={links} report={displayedReport} />
       </TableData>
       <TableData>
-        {!entity.isImport() && isDefined(lastReport) && (
+        {!entity.isImport() && !isDefined(currentReport) && isDefined(lastReport) && (
           <SeverityBar severity={lastReport.severity} />
         )}
       </TableData>

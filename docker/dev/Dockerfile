@@ -21,7 +21,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
       uuid-dev libjson-glib-dev libksba-dev libbsd-dev krb5-multidev \
       libmagic-dev libsnmp-dev gcc-mingw-w64 heimdal-dev libpopt-dev \
       libunistring-dev postgresql-server-dev-all libical-dev xsltproc \
-      libmicrohttpd-dev libbrotli-dev redis-tools mosquitto-clients \
+      libmicrohttpd-dev libbrotli-dev redis-tools mosquitto-clients libcap2-bin \
       nmap pnscan python3-impacket && \
     rm -rf /var/lib/apt/lists/*
 

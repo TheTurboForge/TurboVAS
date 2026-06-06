@@ -296,6 +296,12 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(turbovasctl.missing_required_caps("0000000000003000"), [])
         self.assertEqual(turbovasctl.missing_required_caps("0000000000001000"), ["NET_RAW"])
 
+    def test_scanner_hostname_guard_rejects_docker_short_ids(self):
+        self.assertEqual(turbovasctl.OSPD_STABLE_HOSTNAME, "turbovas-ospd-openvas")
+        self.assertTrue(turbovasctl.hostname_looks_like_docker_short_id("b758d8ce41ff"))
+        self.assertFalse(turbovasctl.hostname_looks_like_docker_short_id("turbovas-ospd-openvas"))
+        self.assertFalse(turbovasctl.hostname_looks_like_docker_short_id("scan-node-01"))
+
     def test_proc_status_helpers_parse_ids(self):
         values = turbovasctl.parse_proc_status("Uid:\t1000\t1000\t1000\t1000\nGid:\t1000\t1000\t1000\t1000\n")
         self.assertEqual(turbovasctl.first_proc_status_id(values["Uid"]), "1000")
@@ -310,6 +316,25 @@ class TurboVASCtlTests(unittest.TestCase):
             self.assertIn("--ambient-caps", command)
             self.assertIn("+net_raw,+net_admin", command)
             self.assertIn("socket.SOCK_RAW", command[-1])
+
+    def test_ospd_setpriv_nmap_probes_use_privileged_env_and_non_root_caps(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            root.mkdir()
+            probes = turbovasctl.ospd_setpriv_nmap_probe_commands(root)
+            self.assertEqual([check for check, _ in probes], ["nmap.raw-syn", "nmap.os-detection"])
+            for _, command in probes:
+                self.assertEqual(command[:2], ["setpriv", "--reuid"])
+                self.assertIn("--ambient-caps", command)
+                self.assertIn("+net_raw,+net_admin", command)
+                self.assertIn("NMAP_PRIVILEGED=1", command[-1])
+                self.assertIn("127.0.0.1", command[-1])
+            self.assertIn("http.server 18080", probes[1][1][-1])
+            self.assertIn("18080", probes[1][1][-1])
+
+    def test_nmap_privilege_warning_detection(self):
+        self.assertTrue(turbovasctl.nmap_privilege_warning_present("You requested a scan type which requires root privileges."))
+        self.assertFalse(turbovasctl.nmap_privilege_warning_present("Nmap done: 1 IP address scanned."))
 
     def test_gsa_static_staging_writes_browser_relative_config(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -640,6 +665,159 @@ class TurboVASCtlTests(unittest.TestCase):
             self.assertIn("--confirm-authorized-lan", payload["summary"])
             self.assertTrue((Path(tmp) / "start-refused.json").is_file())
 
+    def test_full_test_scan_start_records_broken_pipe_during_poll(self):
+        class FakeGMP:
+            broken = False
+
+            def _raise_if_broken(self):
+                if self.broken:
+                    raise BrokenPipeError(32, "Broken pipe")
+
+            def get_scan_configs(self):
+                self._raise_if_broken()
+                return (
+                    "<get_configs_response>"
+                    f"<config id=\"{runtime_full_test_scan.FULL_AND_FAST_SCAN_CONFIG_ID}\"><name>Full and fast</name></config>"
+                    "</get_configs_response>"
+                )
+
+            def get_port_lists(self):
+                self._raise_if_broken()
+                return (
+                    "<get_port_lists_response>"
+                    f"<port_list id=\"{runtime_full_test_scan.IANA_TCP_UDP_PORT_LIST_ID}\"><name>All IANA assigned TCP and UDP</name></port_list>"
+                    "</get_port_lists_response>"
+                )
+
+            def get_scanners(self, details=True):
+                self._raise_if_broken()
+                return (
+                    "<get_scanners_response>"
+                    f"<scanner id=\"scanner-1\"><name>{runtime_full_test_scan.OPENVAS_SCANNER_NAME}</name></scanner>"
+                    "</get_scanners_response>"
+                )
+
+            def get_targets(self, tasks=True):
+                self._raise_if_broken()
+                return (
+                    "<get_targets_response>"
+                    f"<target id=\"target-1\"><name>{runtime_full_test_scan.FULL_TEST_TARGET_NAME}</name></target>"
+                    "</get_targets_response>"
+                )
+
+            def get_tasks(self, details=True, ignore_pagination=True):
+                self._raise_if_broken()
+                return (
+                    "<get_tasks_response>"
+                    f"<task id=\"task-1\"><name>{runtime_full_test_scan.FULL_TEST_TASK_NAME}</name><status>Done</status></task>"
+                    "</get_tasks_response>"
+                )
+
+            def get_reports(self, filter_string=None, details=True, ignore_pagination=True):
+                self._raise_if_broken()
+                return "<get_reports_response/>"
+
+            def start_task(self, task_id):
+                self.broken = True
+                raise BrokenPipeError(32, "Broken pipe")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            payload = runtime_full_test_scan.command_start(
+                FakeGMP(),
+                Path(tmp),
+                confirm_authorized_lan=True,
+                poll_seconds=1,
+                poll_interval=0,
+            )
+            artifact_exists = (Path(tmp) / "start-failed.json").is_file()
+        self.assertEqual(payload["status"], "fail")
+        self.assertIn("before scanner handoff", payload["summary"])
+        self.assertIn("BrokenPipeError", payload["details"]["start_error"])
+        self.assertIn("BrokenPipeError", payload["details"]["observed_state"]["poll_error"])
+        self.assertTrue(artifact_exists)
+
+    def test_full_test_scan_start_reconnects_after_closed_start_response(self):
+        class BaseFakeGMP:
+            def get_scan_configs(self):
+                return (
+                    "<get_configs_response>"
+                    f"<config id=\"{runtime_full_test_scan.FULL_AND_FAST_SCAN_CONFIG_ID}\"><name>Full and fast</name></config>"
+                    "</get_configs_response>"
+                )
+
+            def get_port_lists(self):
+                return (
+                    "<get_port_lists_response>"
+                    f"<port_list id=\"{runtime_full_test_scan.IANA_TCP_UDP_PORT_LIST_ID}\"><name>All IANA assigned TCP and UDP</name></port_list>"
+                    "</get_port_lists_response>"
+                )
+
+            def get_scanners(self, details=True):
+                return (
+                    "<get_scanners_response>"
+                    f"<scanner id=\"scanner-1\"><name>{runtime_full_test_scan.OPENVAS_SCANNER_NAME}</name></scanner>"
+                    "</get_scanners_response>"
+                )
+
+            def get_targets(self, tasks=True):
+                return (
+                    "<get_targets_response>"
+                    f"<target id=\"target-1\"><name>{runtime_full_test_scan.FULL_TEST_TARGET_NAME}</name></target>"
+                    "</get_targets_response>"
+                )
+
+            def get_reports(self, filter_string=None, details=True, ignore_pagination=True):
+                return "<get_reports_response/>"
+
+        class InitialGMP(BaseFakeGMP):
+            def get_tasks(self, details=True, ignore_pagination=True):
+                return (
+                    "<get_tasks_response>"
+                    f"<task id=\"task-1\"><name>{runtime_full_test_scan.FULL_TEST_TASK_NAME}</name><status>Done</status></task>"
+                    "</get_tasks_response>"
+                )
+
+            def start_task(self, task_id):
+                raise RuntimeError("Remote closed the connection")
+
+        class ReconnectedGMP(BaseFakeGMP):
+            def get_tasks(self, details=True, ignore_pagination=True):
+                return (
+                    "<get_tasks_response>"
+                    f"<task id=\"task-1\"><name>{runtime_full_test_scan.FULL_TEST_TASK_NAME}</name><status>Queued</status><progress>0</progress></task>"
+                    "</get_tasks_response>"
+                )
+
+            def get_reports(self, filter_string=None, details=True, ignore_pagination=True):
+                return (
+                    "<get_reports_response>"
+                    "<report id=\"report-new\"><task id=\"task-1\"/>"
+                    "<report id=\"report-new\"><scan_run_status>Queued</scan_run_status></report>"
+                    "</report>"
+                    "</get_reports_response>"
+                )
+
+        reconnect_count = 0
+
+        def reconnect():
+            nonlocal reconnect_count
+            reconnect_count += 1
+            return ReconnectedGMP()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            payload = runtime_full_test_scan.command_start(
+                InitialGMP(),
+                Path(tmp),
+                confirm_authorized_lan=True,
+                poll_seconds=1,
+                poll_interval=0,
+                reconnect_gmp=reconnect,
+            )
+        self.assertEqual(payload["status"], "pass")
+        self.assertIn("Remote closed", payload["details"]["start_error"])
+        self.assertEqual(payload["details"]["observed_report"]["id"], "report-new")
+        self.assertEqual(reconnect_count, 1)
+
     def test_full_test_scan_preflight_parses_required_objects(self):
         state = {
             "scan_configs": [{"id": runtime_full_test_scan.FULL_AND_FAST_SCAN_CONFIG_ID, "name": "Full and fast"}],
@@ -664,6 +842,17 @@ class TurboVASCtlTests(unittest.TestCase):
         row = runtime_full_test_scan.object_rows(response, "task")[0]
         self.assertEqual(row["progress"], "42")
         self.assertEqual(row["report_id"], "report-1")
+
+    def test_full_test_scan_response_id_reads_start_task_report_id(self):
+        response = "<start_task_response status=\"202\"><report_id>report-1</report_id></start_task_response>"
+        self.assertEqual(runtime_full_test_scan.response_id(response), "report-1")
+
+    def test_full_test_scan_report_handoff_excludes_requested_only(self):
+        self.assertFalse(runtime_full_test_scan.report_handoff_observed({"scan_run_status": "Requested"}))
+        self.assertTrue(runtime_full_test_scan.report_handoff_observed({"scan_run_status": "Queued"}))
+        self.assertTrue(runtime_full_test_scan.report_handoff_observed({"scan_run_status": "Running"}))
+        self.assertFalse(runtime_full_test_scan.report_handoff_observed({"scan_run_status": "Done"}))
+        self.assertTrue(runtime_full_test_scan.report_handoff_observed({"scan_run_status": "Done", "scan_start": "2026-06-06T20:05:00Z"}))
 
     def test_full_test_scan_report_rows_parse_inner_report_summary(self):
         response = (
@@ -693,6 +882,23 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(row["result_count"], "23")
         self.assertEqual(row["hosts_count"], "4")
         self.assertEqual(row["vulns_count"], "6")
+
+    def test_full_test_scan_detects_interrupted_report_before_handoff(self):
+        report = {
+            "id": "report-1",
+            "task_id": "task-1",
+            "scan_run_status": "Interrupted",
+            "scan_start": None,
+            "scan_end": None,
+            "result_count": "0",
+            "hosts_count": "0",
+            "vulns_count": "0",
+            "cves_count": "0",
+            "os_count": "0",
+        }
+        self.assertTrue(runtime_full_test_scan.interrupted_before_scanner_handoff(report))
+        report["scan_start"] = "2026-06-04T17:00:00Z"
+        self.assertFalse(runtime_full_test_scan.interrupted_before_scanner_handoff(report))
 
     def test_full_test_scan_status_includes_latest_report(self):
         class FakeGMP:
@@ -726,6 +932,7 @@ class TurboVASCtlTests(unittest.TestCase):
                     "<task id=\"task-1\"/>"
                     "<report id=\"report-1\">"
                     "<scan_run_status>Done</scan_run_status>"
+                    "<scan_start>2026-06-06T19:25:56Z</scan_start>"
                     "<result_count><full>23</full></result_count>"
                     "</report>"
                     "</report>"
@@ -739,6 +946,49 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(payload["details"]["latest_report"]["id"], "report-1")
         self.assertEqual(payload["details"]["latest_report"]["result_count"], "23")
         self.assertIn("task_id=task-1", fake.filter_string)
+
+    def test_full_test_scan_status_separates_no_start_completed_report(self):
+        class FakeGMP:
+            def get_scan_configs(self):
+                return "<get_configs_response/>"
+
+            def get_port_lists(self):
+                return "<get_port_lists_response/>"
+
+            def get_scanners(self, details=True):
+                return "<get_scanners_response/>"
+
+            def get_targets(self, tasks=True):
+                return "<get_targets_response/>"
+
+            def get_tasks(self, details=True, ignore_pagination=True):
+                return (
+                    "<get_tasks_response>"
+                    "<task id=\"task-1\">"
+                    f"<name>{runtime_full_test_scan.FULL_TEST_TASK_NAME}</name>"
+                    "<status>Done</status>"
+                    "</task>"
+                    "</get_tasks_response>"
+                )
+
+            def get_reports(self, filter_string=None, details=True, ignore_pagination=True):
+                return (
+                    "<get_reports_response>"
+                    "<report id=\"report-bad\"><task id=\"task-1\"/>"
+                    "<report id=\"report-bad\"><scan_run_status>Done</scan_run_status>"
+                    "<result_count><full>0</full></result_count></report></report>"
+                    "<report id=\"report-good\"><task id=\"task-1\"/>"
+                    "<report id=\"report-good\"><scan_run_status>Done</scan_run_status>"
+                    "<scan_start>2026-06-06T19:25:56Z</scan_start>"
+                    "<result_count><full>42</full></result_count></report></report>"
+                    "</get_reports_response>"
+                )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            payload = runtime_full_test_scan.command_status(FakeGMP(), Path(tmp))
+        self.assertEqual(payload["details"]["latest_report"]["id"], "report-bad")
+        self.assertEqual(payload["details"]["latest_completed_report"]["id"], "report-good")
+        self.assertEqual(payload["details"]["latest_no_start_completed_report"]["id"], "report-bad")
 
 
 
@@ -812,13 +1062,13 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(parsed["top_results"][0]["id"], "result-low")
         self.assertEqual(parsed["result_filter"], "apply_overrides=0 min_qod=0 first=1 rows=100 sort-reverse=severity")
 
-    def test_runtime_report_summary_defaults_to_latest_full_test_report(self):
+    def test_runtime_report_summary_defaults_to_latest_completed_full_test_report(self):
         report_response = (
             "<get_reports_response>"
-            "<report id=\"report-1\">"
+            "<report id=\"report-done\">"
             "<name>2026-06-02T15:59:28Z</name>"
             "<task id=\"task-1\"><name>scan task</name></task>"
-            "<report id=\"report-1\">"
+            "<report id=\"report-done\">"
             "<scan_run_status>Done</scan_run_status>"
             "<scan_start>2026-06-02T15:59:50Z</scan_start>"
             "<scan_end>2026-06-02T16:02:15Z</scan_end>"
@@ -860,9 +1110,17 @@ class TurboVASCtlTests(unittest.TestCase):
                 self.latest_filter = filter_string
                 return (
                     "<get_reports_response>"
-                    "<report id=\"report-1\">"
+                    "<report id=\"report-interrupted\">"
                     "<task id=\"task-1\"/>"
-                    "<report id=\"report-1\"><scan_run_status>Done</scan_run_status><result_count><full>1</full></result_count></report>"
+                    "<report id=\"report-interrupted\"><scan_run_status>Interrupted</scan_run_status><result_count><full>0</full></result_count></report>"
+                    "</report>"
+                    "<report id=\"report-done-no-start\">"
+                    "<task id=\"task-1\"/>"
+                    "<report id=\"report-done-no-start\"><scan_run_status>Done</scan_run_status><result_count><full>0</full></result_count></report>"
+                    "</report>"
+                    "<report id=\"report-done\">"
+                    "<task id=\"task-1\"/>"
+                    "<report id=\"report-done\"><scan_run_status>Done</scan_run_status><scan_start>2026-06-02T15:59:50Z</scan_start><result_count><full>1</full></result_count></report>"
                     "</report>"
                     "</get_reports_response>"
                 )
@@ -877,9 +1135,9 @@ class TurboVASCtlTests(unittest.TestCase):
             payload = runtime_report.command_summary(fake, Path(tmp), report_id=None, max_results=100, top_results_limit=1)
             artifact_exists = (Path(tmp) / "summary.json").is_file()
         self.assertEqual(payload["status"], "pass")
-        self.assertEqual(payload["details"]["report"]["id"], "report-1")
+        self.assertEqual(payload["details"]["report"]["id"], "report-done")
         self.assertEqual(payload["details"]["top_results"][0]["id"], "result-1")
-        self.assertEqual(fake.report_id, "report-1")
+        self.assertEqual(fake.report_id, "report-done")
         self.assertIn("task_id=task-1", fake.latest_filter)
         self.assertIn("rows=100", fake.report_filter)
         self.assertTrue(artifact_exists)

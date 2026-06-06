@@ -10841,7 +10841,7 @@ init_result_get_iterator_severity (iterator_t* iterator, const get_data_t *get,
 
   if (apply_overrides)
     {
-      gchar *owned_clause, *overrides_with;
+      gchar *owned_clause, *overrides_with, *with_prefix;
       char *user_id;
 
       user_id = sql_string ("SELECT id FROM users WHERE uuid = '%s';",
@@ -10853,8 +10853,12 @@ init_result_get_iterator_severity (iterator_t* iterator, const get_data_t *get,
                                               &overrides_with);
       free (user_id);
 
+      with_prefix = overrides_with
+                      ? g_strdup_printf (" %s,", overrides_with + strlen ("WITH "))
+                      : g_strdup ("");
+
       with_clause = g_strdup_printf
-                      (" %s,"
+                      ("%s"
                        " valid_overrides"
                        " AS (SELECT result_nvt, hosts, new_severity, port,"
                        "            severity, result"
@@ -10873,10 +10877,11 @@ init_result_get_iterator_severity (iterator_t* iterator, const get_data_t *get,
                        "     ORDER BY result DESC, task DESC, port DESC,"
                        "              severity ASC, creation_time DESC)"
                        " ",
-                       overrides_with + strlen ("WITH "),
+                       with_prefix,
                        owned_clause,
                        report,
                        report);
+      g_free (with_prefix);
       g_free (overrides_with);
       g_free (owned_clause);
     }

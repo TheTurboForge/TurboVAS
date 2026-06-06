@@ -357,8 +357,11 @@ describe('TaskRow tests', () => {
     );
 
     // Last Report
-    expect(detailsLinks.length).toBe(1);
-    // because there is no last report yet
+    expect(detailsLinks.length).toBe(2);
+    expect(detailsLinks[1]).toHaveTextContent(
+      'Wed, Jul 10, 2019 2:51 PM Central European Summer Time',
+    );
+    expect(detailsLinks[1]).toHaveAttribute('href', '/report/5678');
 
     // Severity
     expect(bars.length).toBe(1);
@@ -470,11 +473,11 @@ describe('TaskRow tests', () => {
     expect(detailsLinks[1]).toHaveTextContent(
       'Wed, Jul 10, 2019 2:51 PM Central European Summer Time',
     );
-    expect(detailsLinks[1]).toHaveAttribute('href', '/report/1234');
+    expect(detailsLinks[1]).toHaveAttribute('href', '/report/5678');
 
     // Severity
-    expect(bars[1]).toHaveAttribute('title', 'Medium');
-    expect(bars[1]).toHaveTextContent('5.0 (Medium)');
+    expect(bars.length).toBe(1);
+    // because current reports do not expose stable severity yet
 
     // Actions
     const startIcon = screen.getByTestId('start-icon');

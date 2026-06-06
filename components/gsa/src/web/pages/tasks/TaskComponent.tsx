@@ -6,6 +6,7 @@
 
 import React, {useState, useEffect, useCallback} from 'react';
 import {useDispatch} from 'react-redux';
+import {isTaskStartManagerResponseFailure} from 'gmp/commands/task';
 import type Rejection from 'gmp/http/rejection';
 import type Response from 'gmp/http/response';
 import {type XmlMeta} from 'gmp/http/transform/fast-xml';
@@ -368,12 +369,19 @@ const TaskComponent = ({
   };
 
   const handleTaskStart = (task: Task) => {
+    const handleStartError = (error: Rejection) => {
+      if (isTaskStartManagerResponseFailure(error)) {
+        onStarted?.();
+      }
+      onStartError?.(error);
+    };
+
     return actionFunction<void, Rejection>(
       // @ts-expect-error
       gmp.task.start(task),
       {
         onSuccess: onStarted,
-        onError: onStartError,
+        onError: handleStartError,
         successMessage: _('Task {{- name}} started successfully.', {
           name: task.name as string,
         }),

@@ -274,12 +274,27 @@ def select_report(gmp: Any, report_id: str | None) -> tuple[dict[str, str | None
         return None, task_error
     if not task or not task.get("id"):
         return None, "Full-test task does not exist yet."
-    latest, report_error = runtime_full_test_scan.latest_report_for_task(gmp, task["id"])
+    reports, report_error = runtime_full_test_scan.reports_for_task(gmp, task["id"], rows=20)
     if report_error:
         return None, report_error
+    latest_completed = next(
+        (
+            report
+            for report in reports
+            if report.get("scan_run_status") == runtime_full_test_scan.COMPLETED_REPORT_STATUS and report.get("scan_start")
+        ),
+        None,
+    )
+    if latest_completed and latest_completed.get("id"):
+        return latest_completed, None
+    latest = reports[0] if reports else None
     if not latest or not latest.get("id"):
         return None, "No report found for the full-test task."
-    return latest, None
+    return None, (
+        "No completed report found for the full-test task. "
+        f"Latest report {latest.get('id')} has status {latest.get('scan_run_status') or 'unknown'}; "
+        "pass --report-id to inspect it explicitly."
+    )
 
 
 def fetch_report(gmp: Any, report_id: str, max_results: int) -> Any:
@@ -341,7 +356,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--username", required=True, help="GMP username")
     parser.add_argument("--password-file", required=True, help="file containing the GMP password")
     parser.add_argument("--artifact-dir", required=True, help="directory for report artifacts")
-    parser.add_argument("--report-id", help="optional report id; defaults to the latest full-test scan report")
+    parser.add_argument("--report-id", help="optional report id; defaults to the latest completed full-test scan report")
     parser.add_argument("--max-results", type=int, default=DEFAULT_MAX_RESULTS, help="maximum results to fetch from the selected report")
     parser.add_argument("--top-results", type=int, default=DEFAULT_TOP_RESULTS, help="number of top results to include in the summary")
     parser.add_argument("--timeout", type=int, default=60, help="socket timeout in seconds")

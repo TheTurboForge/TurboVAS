@@ -10,6 +10,7 @@ import EntityCommand, {type EntityCommandParams} from 'gmp/commands/entity';
 import FeedStatusCommand, {feedStatusRejection} from 'gmp/commands/feed-status';
 import type Http from 'gmp/http/http';
 import {type ResponseRejection} from 'gmp/http/rejection';
+import _ from 'gmp/locale';
 import logger from 'gmp/log';
 import {type Element} from 'gmp/models/model';
 import {type ScannerType} from 'gmp/models/scanner';
@@ -106,6 +107,33 @@ interface TaskCommandSaveImportTaskParams {
 const log = logger.getLogger('gmp.commands.tasks');
 
 const NO_VALUE_ID = String(NO_VALUE);
+const MANAGER_DAEMON_RESPONSE_FAILURE =
+  'Failure to receive response from manager daemon';
+const TASK_START_RESPONSE_FOLLOWUP = _(
+  'The task start request may have changed scan state before the manager response failed. Refresh the task status and check the latest report before retrying.',
+);
+
+export const isTaskStartManagerResponseFailure = (error: unknown) =>
+  error instanceof Error &&
+  error.message.includes(MANAGER_DAEMON_RESPONSE_FAILURE);
+
+const enrichTaskStartManagerResponseFailure = (error: unknown) => {
+  if (
+    !isTaskStartManagerResponseFailure(error) ||
+    (error as Error).message.includes(TASK_START_RESPONSE_FOLLOWUP)
+  ) {
+    return;
+  }
+  const message = `${(error as Error).message}\n${TASK_START_RESPONSE_FOLLOWUP}`;
+  if (
+    typeof (error as {setMessage?: (message: string) => unknown}).setMessage ===
+    'function'
+  ) {
+    (error as {setMessage: (message: string) => unknown}).setMessage(message);
+  } else {
+    (error as Error).message = message;
+  }
+};
 
 class TaskCommand extends EntityCommand<Task, TaskElement> {
   constructor(http: Http) {
@@ -131,6 +159,7 @@ class TaskCommand extends EntityCommand<Task, TaskElement> {
 
       log.debug('Started task');
     } catch (error) {
+      enrichTaskStartManagerResponseFailure(error);
       log.error('An error occurred while starting the task', id, error);
       throw error;
     }

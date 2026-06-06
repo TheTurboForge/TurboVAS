@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 import xml.etree.ElementTree as ET
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -26,6 +28,10 @@ ACTIVE_TASK_STATUSES = {
     "Stop Requested",
     "Resume Requested",
 }
+HANDOFF_TASK_STATUSES = {"Queued", "Running", "Done"}
+COMPLETED_REPORT_STATUS = "Done"
+INTERRUPTED_REPORT_STATUS = "Interrupted"
+ZERO_PROGRESS_COUNTS = ("result_count", "hosts_count", "vulns_count", "cves_count", "os_count")
 
 
 def now_iso() -> str:
@@ -140,19 +146,117 @@ def report_rows(response: Any) -> list[dict[str, str | None]]:
     return rows
 
 
-def latest_report_for_task(gmp: Any, task_id: str) -> tuple[dict[str, str | None] | None, str | None]:
+def reports_for_task(gmp: Any, task_id: str, rows: int = 10) -> tuple[list[dict[str, str | None]], str | None]:
     try:
         response = gmp.get_reports(
-            filter_string=f"task_id={task_id} rows=10 sort-reverse=date",
+            filter_string=f"task_id={task_id} rows={rows} sort-reverse=date",
             details=True,
             ignore_pagination=True,
         )
     except Exception as error:  # pylint: disable=broad-except
-        return None, f"{type(error).__name__}: {error}"
-    for row in report_rows(response):
-        if row.get("task_id") == task_id:
-            return row, None
-    return None, None
+        return [], f"{type(error).__name__}: {error}"
+    return [row for row in report_rows(response) if row.get("task_id") == task_id], None
+
+
+def latest_report_for_task(gmp: Any, task_id: str) -> tuple[dict[str, str | None] | None, str | None]:
+    reports, error = reports_for_task(gmp, task_id, rows=10)
+    return (reports[0] if reports else None), error
+
+
+def first_report_with_status(reports: list[dict[str, str | None]], status: str) -> dict[str, str | None] | None:
+    for report in reports:
+        if report.get("scan_run_status") == status:
+            return report
+    return None
+
+
+def first_completed_report_with_start(reports: list[dict[str, str | None]]) -> dict[str, str | None] | None:
+    for report in reports:
+        if report.get("scan_run_status") == COMPLETED_REPORT_STATUS and report.get("scan_start"):
+            return report
+    return None
+
+
+def first_no_start_completed_report(reports: list[dict[str, str | None]]) -> dict[str, str | None] | None:
+    for report in reports:
+        if report.get("scan_run_status") == COMPLETED_REPORT_STATUS and not report.get("scan_start"):
+            return report
+    return None
+
+
+def parse_count(value: str | None) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+
+def interrupted_before_scanner_handoff(report: dict[str, str | None] | None) -> bool:
+    if not report or report.get("scan_run_status") != INTERRUPTED_REPORT_STATUS:
+        return False
+    if report.get("scan_start") or report.get("scan_end"):
+        return False
+    return all(parse_count(report.get(key)) in (None, 0) for key in ZERO_PROGRESS_COUNTS)
+
+
+def report_handoff_observed(report: dict[str, str | None] | None) -> bool:
+    if not report:
+        return False
+    if report.get("scan_run_status") == COMPLETED_REPORT_STATUS and report.get("scan_start"):
+        return True
+    if report.get("scan_start"):
+        return True
+    return report.get("scan_run_status") in {"Queued", "Running"}
+
+
+def ospd_handoff_evidence(log_file: Path | None, report_id: str | None, task_id: str | None) -> dict[str, Any]:
+    if log_file is None:
+        return {"checked": False, "reason": "no OSPD log file was supplied"}
+    if not log_file.is_file():
+        return {"checked": True, "log_file": str(log_file), "matched": False, "reason": "log file is missing"}
+    needles = [value for value in (report_id, task_id) if value]
+    try:
+        lines = log_file.read_text(encoding="utf-8", errors="replace").splitlines()[-1000:]
+    except OSError as error:
+        return {"checked": True, "log_file": str(log_file), "matched": False, "reason": str(error)}
+    matches = [line for line in lines if any(needle in line for needle in needles)] if needles else []
+    return {
+        "checked": True,
+        "log_file": str(log_file),
+        "matched": bool(matches),
+        "needles": needles,
+        "matched_lines": matches[-20:],
+        "checked_tail_lines": len(lines),
+    }
+
+
+def task_status_snapshot(gmp: Any, task: dict[str, str | None], ospd_log_file: Path | None = None) -> dict[str, Any]:
+    reports, report_error = reports_for_task(gmp, task["id"] or "") if task.get("id") else ([], None)
+    latest_report = reports[0] if reports else None
+    latest_completed_report = first_completed_report_with_start(reports)
+    latest_no_start_completed_report = first_no_start_completed_report(reports)
+    latest_interrupted_report = first_report_with_status(reports, INTERRUPTED_REPORT_STATUS)
+    return {
+        "task": task,
+        "latest_report": latest_report,
+        "latest_completed_report": latest_completed_report,
+        "latest_no_start_completed_report": latest_no_start_completed_report,
+        "latest_interrupted_report": latest_interrupted_report,
+        "reports_checked": len(reports),
+        "report_lookup_error": report_error,
+        "latest_report_no_start": bool(latest_report and not latest_report.get("scan_start")),
+        "latest_report_zero_progress": all(parse_count(latest_report.get(key)) in (None, 0) for key in ZERO_PROGRESS_COUNTS) if latest_report else None,
+        "latest_report_interrupted_before_scanner_handoff": interrupted_before_scanner_handoff(latest_report),
+        "latest_interrupted_before_scanner_handoff": interrupted_before_scanner_handoff(latest_interrupted_report),
+        "ospd_handoff_evidence": ospd_handoff_evidence(ospd_log_file, latest_report.get("id") if latest_report else None, task.get("id")),
+    }
+
+
+def current_full_test_task(gmp: Any) -> tuple[dict[str, str | None] | None, str | None]:
+    state = load_state(gmp)
+    return single_named(state["tasks"], FULL_TEST_TASK_NAME)
 
 
 def response_id(response: Any) -> str | None:
@@ -161,6 +265,9 @@ def response_id(response: Any) -> str | None:
         return None
     if root.get("id"):
         return root.get("id")
+    report_id = child_text(root, "report_id")
+    if report_id:
+        return report_id
     for child in root.iter():
         if child.get("id"):
             return child.get("id")
@@ -287,7 +394,15 @@ def command_preflight(gmp: Any, artifact_dir: Path) -> dict[str, Any]:
     return payload
 
 
-def command_start(gmp: Any, artifact_dir: Path, confirm_authorized_lan: bool) -> dict[str, Any]:
+def command_start(
+    gmp: Any,
+    artifact_dir: Path,
+    confirm_authorized_lan: bool,
+    poll_seconds: int = 90,
+    poll_interval: int = 5,
+    ospd_log_file: Path | None = None,
+    reconnect_gmp: Callable[[], Any] | None = None,
+) -> dict[str, Any]:
     if not confirm_authorized_lan:
         payload = result("fail", "Full test scan start refused without --confirm-authorized-lan.", target_cidr=AUTHORIZED_TARGET_CIDR)
         payload["artifacts"] = [write_artifact(artifact_dir, "start-refused.json", payload)]
@@ -329,24 +444,110 @@ def command_start(gmp: Any, artifact_dir: Path, confirm_authorized_lan: bool) ->
         payload["artifacts"] = [write_artifact(artifact_dir, "start-refused.json", payload)]
         return payload
 
-    start_response = gmp.start_task(task_id)
-    report_id = response_id(start_response)
+    pre_start_reports, _ = reports_for_task(gmp, task_id, rows=20)
+    pre_start_report_ids = {report["id"] for report in pre_start_reports if report.get("id")}
+    start_error: str | None = None
+    report_id: str | None = None
+    try:
+        start_response = gmp.start_task(task_id)
+        report_id = response_id(start_response)
+    except Exception as error:  # pylint: disable=broad-except
+        start_error = f"{type(error).__name__}: {error}"
+        if reconnect_gmp is not None:
+            try:
+                gmp = reconnect_gmp()
+            except Exception as reconnect_error:  # pylint: disable=broad-except
+                start_error = f"{start_error}; reconnect failed: {type(reconnect_error).__name__}: {reconnect_error}"
+
+    deadline = time.monotonic() + poll_seconds
+    observed: dict[str, Any] | None = None
+    observed_report: dict[str, str | None] | None = None
+    poll_errors: list[str] = []
+    while time.monotonic() <= deadline:
+        try:
+            task, task_error = current_full_test_task(gmp)
+            if task_error:
+                observed = {"task_lookup_error": task_error}
+                break
+            if not task:
+                observed = {"task_lookup_error": "full test task disappeared after start request"}
+                break
+            observed = task_status_snapshot(gmp, task, ospd_log_file=ospd_log_file)
+            reports, _ = reports_for_task(gmp, task_id, rows=10)
+        except Exception as error:  # pylint: disable=broad-except
+            poll_errors.append(f"{type(error).__name__}: {error}")
+            if reconnect_gmp is not None:
+                try:
+                    gmp = reconnect_gmp()
+                    continue
+                except Exception as reconnect_error:  # pylint: disable=broad-except
+                    poll_errors.append(f"reconnect failed: {type(reconnect_error).__name__}: {reconnect_error}")
+            observed = {"poll_error": poll_errors[-1], "poll_errors": poll_errors}
+            break
+        new_reports = [report for report in reports if report.get("id") and report["id"] not in pre_start_report_ids]
+        if report_id:
+            observed_report = next((report for report in reports if report.get("id") == report_id), None)
+        else:
+            observed_report = new_reports[0] if new_reports else (reports[0] if start_error is None and reports else None)
+        evidence = observed.get("ospd_handoff_evidence", {})
+        if interrupted_before_scanner_handoff(observed_report):
+            break
+        if task.get("status") in HANDOFF_TASK_STATUSES or report_handoff_observed(observed_report) or evidence.get("matched"):
+            break
+        if task.get("status") in HANDOFF_TASK_STATUSES and report_id and observed_report and observed_report.get("scan_run_status") != INTERRUPTED_REPORT_STATUS:
+            break
+        time.sleep(poll_interval)
+
+    interrupted_before_handoff = interrupted_before_scanner_handoff(observed_report)
+    handoff_evidence = observed.get("ospd_handoff_evidence", {}) if observed else {}
+    handoff_observed = bool(
+        observed
+        and (
+            observed.get("task", {}).get("status") in HANDOFF_TASK_STATUSES
+            or report_handoff_observed(observed_report)
+            or handoff_evidence.get("matched")
+        )
+    )
+    if interrupted_before_handoff:
+        status = "fail"
+        summary = "Full test scan start failed: the new report interrupted before scanner handoff."
+        artifact_name = "start-failed.json"
+    elif start_error and not handoff_observed:
+        status = "fail"
+        summary = "Full test scan start failed before scanner handoff could be verified."
+        artifact_name = "start-failed.json"
+    elif handoff_observed:
+        status = "pass"
+        summary = "Full test scan start was accepted and scanner handoff/progress was observed."
+        artifact_name = "start.json"
+    else:
+        status = "warn"
+        summary = "Full test scan start was submitted, but scanner handoff was not observed before the polling timeout."
+        artifact_name = "start.json"
+
     payload = result(
-        "pass",
-        "Full test scan started.",
+        status,
+        summary,
         target_cidr=AUTHORIZED_TARGET_CIDR,
         target_id=target_id,
         task_id=task_id,
         report_id=report_id,
+        observed_report=observed_report,
+        observed_state=observed,
+        poll_errors=poll_errors,
+        pre_start_report_ids=sorted(pre_start_report_ids),
+        start_error=start_error,
+        poll_seconds=poll_seconds,
+        poll_interval=poll_interval,
         scan_config_id=FULL_AND_FAST_SCAN_CONFIG_ID,
         port_list_id=IANA_TCP_UDP_PORT_LIST_ID,
         scanner_id=scanner_id,
     )
-    payload["artifacts"] = [write_artifact(artifact_dir, "start.json", payload)]
+    payload["artifacts"] = [write_artifact(artifact_dir, artifact_name, payload)]
     return payload
 
 
-def command_status(gmp: Any, artifact_dir: Path) -> dict[str, Any]:
+def command_status(gmp: Any, artifact_dir: Path, ospd_log_file: Path | None = None) -> dict[str, Any]:
     state = load_state(gmp)
     task, task_error = single_named(state["tasks"], FULL_TEST_TASK_NAME)
     if task_error:
@@ -354,8 +555,7 @@ def command_status(gmp: Any, artifact_dir: Path) -> dict[str, Any]:
     elif not task:
         payload = result("warn", "Full test scan task does not exist yet.", target_cidr=AUTHORIZED_TARGET_CIDR)
     else:
-        latest_report, report_error = latest_report_for_task(gmp, task["id"]) if task.get("id") else (None, None)
-        payload = result("pass", "Full test scan status read.", target_cidr=AUTHORIZED_TARGET_CIDR, task=task, latest_report=latest_report, report_lookup_error=report_error)
+        payload = result("pass", "Full test scan status read.", target_cidr=AUTHORIZED_TARGET_CIDR, **task_status_snapshot(gmp, task, ospd_log_file=ospd_log_file))
     payload["artifacts"] = [write_artifact(artifact_dir, "status.json", payload)]
     return payload
 
@@ -368,6 +568,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--password-file", required=True, help="file containing the GMP password")
     parser.add_argument("--artifact-dir", required=True, help="directory for scan artifacts")
     parser.add_argument("--timeout", type=int, default=60, help="socket timeout in seconds")
+    parser.add_argument("--poll-seconds", type=int, default=90, help="seconds to poll after start_task before accepting start state")
+    parser.add_argument("--poll-interval", type=int, default=5, help="seconds between post-start status polls")
+    parser.add_argument("--ospd-log-file", help="optional OSPD log file used to find scanner handoff evidence")
     parser.add_argument("--confirm-authorized-lan", action="store_true", help="required for start; confirms authorization for 192.168.178.0/24")
     return parser
 
@@ -375,19 +578,34 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     password = ""
-    gmp = None
+    gmp_connections = []
+
+    def open_gmp_connection():
+        nonlocal password
+        gmp_connection, password = connect_gmp(Path(args.socket), args.username, Path(args.password_file), args.timeout)
+        gmp_connections.append(gmp_connection)
+        return gmp_connection
+
     try:
-        gmp, password = connect_gmp(Path(args.socket), args.username, Path(args.password_file), args.timeout)
+        gmp = open_gmp_connection()
         if args.command == "preflight":
             payload = command_preflight(gmp, Path(args.artifact_dir))
         elif args.command == "start":
-            payload = command_start(gmp, Path(args.artifact_dir), args.confirm_authorized_lan)
+            payload = command_start(
+                gmp,
+                Path(args.artifact_dir),
+                args.confirm_authorized_lan,
+                poll_seconds=args.poll_seconds,
+                poll_interval=args.poll_interval,
+                ospd_log_file=Path(args.ospd_log_file) if args.ospd_log_file else None,
+                reconnect_gmp=open_gmp_connection,
+            )
         else:
-            payload = command_status(gmp, Path(args.artifact_dir))
+            payload = command_status(gmp, Path(args.artifact_dir), ospd_log_file=Path(args.ospd_log_file) if args.ospd_log_file else None)
     except Exception as error:  # pylint: disable=broad-except
         payload = result("fail", "Full test scan helper failed.", error_type=type(error).__name__, error=str(error).replace(password, "[redacted]"))
     finally:
-        if gmp is not None:
+        for gmp in reversed(gmp_connections):
             try:
                 gmp.disconnect()
             except Exception:

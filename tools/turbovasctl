@@ -148,6 +148,15 @@ FULL_AND_FAST_SCAN_CONFIG_ID = "daba56c8-73ec-11df-a475-002264764cea"
 IANA_TCP_UDP_PORT_LIST_ID = "4a4717fe-57d2-11e1-9a26-406186ea4fc5"
 GVMD_IMPORT_TIMEOUT_SECONDS = 7200
 OSPD_REQUIRED_CAPS = {"NET_ADMIN": 12, "NET_RAW": 13}
+OSPD_STABLE_HOSTNAME = "turbovas-ospd-openvas"
+DOCKER_HEX_HOSTNAME_PATTERN = re.compile(r"^[0-9a-f]{12}$", re.IGNORECASE)
+NMAP_PRIVILEGED_ENV = "NMAP_PRIVILEGED"
+NMAP_PRIVILEGE_WARNING_PATTERNS = (
+    "requires root privileges",
+    "requires root",
+    "you requested a scan type which requires root privileges",
+    "raw scans require root privileges",
+)
 
 
 @dataclass(frozen=True)
@@ -1073,6 +1082,10 @@ def missing_required_caps(mask_hex: str | None) -> list[str]:
     return [name for name, bit in OSPD_REQUIRED_CAPS.items() if not cap_hex_has(mask_hex, bit)]
 
 
+def hostname_looks_like_docker_short_id(hostname: str | None) -> bool:
+    return bool(hostname and DOCKER_HEX_HOSTNAME_PATTERN.fullmatch(hostname.strip()))
+
+
 def ospd_setpriv_raw_socket_probe_command(repo_root: Path) -> list[str]:
     env = runtime_env(repo_root)
     uid = env["TURBOVAS_UID"]
@@ -1093,6 +1106,51 @@ def ospd_setpriv_raw_socket_probe_command(repo_root: Path) -> list[str]:
         "-c",
         probe,
     ]
+
+
+def ospd_setpriv_nmap_probe_commands(repo_root: Path) -> list[tuple[str, list[str]]]:
+    env = runtime_env(repo_root)
+    uid = env["TURBOVAS_UID"]
+    gid = env["TURBOVAS_GID"]
+    prefix = [
+        "setpriv",
+        "--reuid",
+        uid,
+        "--regid",
+        gid,
+        "--clear-groups",
+        "--inh-caps",
+        "+net_raw,+net_admin",
+        "--ambient-caps",
+        "+net_raw,+net_admin",
+        "sh",
+        "-lc",
+    ]
+    return [
+        (
+            "nmap.raw-syn",
+            [
+                *prefix,
+                f"{NMAP_PRIVILEGED_ENV}=1 nmap -sS -Pn -n --max-retries 0 --host-timeout 15s -p 9 127.0.0.1",
+            ],
+        ),
+        (
+            "nmap.os-detection",
+            [
+                *prefix,
+                "python3 -m http.server 18080 --bind 127.0.0.1 >/tmp/turbovas-nmap-probe.log 2>&1 & "
+                "pid=$!; "
+                "trap 'kill $pid 2>/dev/null || true' EXIT; "
+                "sleep 1; "
+                f"{NMAP_PRIVILEGED_ENV}=1 nmap -O -Pn -n --max-retries 0 --host-timeout 25s -p 9,18080 127.0.0.1",
+            ],
+        ),
+    ]
+
+
+def nmap_privilege_warning_present(output: str) -> bool:
+    lowered = output.lower()
+    return any(pattern in lowered for pattern in NMAP_PRIVILEGE_WARNING_PATTERNS)
 
 
 def output_tail(output: str, lines: int = 80, secrets_to_redact: Iterable[str] = ()) -> list[str]:
@@ -2269,6 +2327,19 @@ def command_runtime_scanner_capability_check(repo_root: Path) -> dict[str, Any]:
     findings.append(finding("pass" if actual_uid == expected_uid else "fail", "ospd.uid", f"ospd-openvas PID 1 UID is {actual_uid}; expected {expected_uid}.", details={"uid_line": values.get("Uid"), "expected": expected_uid}))
     findings.append(finding("pass" if actual_gid == expected_gid else "fail", "ospd.gid", f"ospd-openvas PID 1 GID is {actual_gid}; expected {expected_gid}.", details={"gid_line": values.get("Gid"), "expected": expected_gid}))
 
+    hostname_probe = exec_in_service(repo_root, service, ["sh", "-lc", "hostname; getent hosts $(hostname)"])
+    hostname_lines = hostname_probe.stdout.strip().splitlines()
+    scanner_hostname = hostname_lines[0].strip() if hostname_lines else ""
+    hostname_ok = hostname_probe.returncode == 0 and scanner_hostname == OSPD_STABLE_HOSTNAME and not hostname_looks_like_docker_short_id(scanner_hostname)
+    findings.append(
+        finding(
+            "pass" if hostname_ok else "fail",
+            "ospd.hostname",
+            f"ospd-openvas hostname is the stable value {OSPD_STABLE_HOSTNAME}." if hostname_ok else f"ospd-openvas hostname is {scanner_hostname or 'unreadable'}; expected {OSPD_STABLE_HOSTNAME}.",
+            details={"hostname": scanner_hostname, "expected": OSPD_STABLE_HOSTNAME, "output_tail": output_tail(hostname_probe.stdout, 20)},
+        )
+    )
+
     for cap_field in ("CapPrm", "CapEff", "CapAmb"):
         missing = missing_required_caps(values.get(cap_field))
         findings.append(
@@ -2283,6 +2354,56 @@ def command_runtime_scanner_capability_check(repo_root: Path) -> dict[str, Any]:
     raw_probe = exec_in_service(repo_root, service, ospd_setpriv_raw_socket_probe_command(repo_root))
     findings.append(finding("pass" if raw_probe.returncode == 0 and "raw-ok" in raw_probe.stdout else "fail", "ospd.raw-socket-probe", f"Service-user raw ICMP socket probe exit code {raw_probe.returncode}.", details={"output_tail": output_tail(raw_probe.stdout, 40)}))
     return make_result("runtime-scanner-capability-check", repo_root, "Scanner capability check completed.", findings)
+
+
+def command_runtime_nmap_capability_check(repo_root: Path) -> dict[str, Any]:
+    findings: list[dict[str, Any]] = []
+    service = "ospd-openvas"
+    running = container_running(repo_root, service)
+    findings.append(finding("pass" if running else "fail", "ospd.running", "ospd-openvas container is running." if running else "ospd-openvas container is not running; run just runtime-app-up.", details={"service": service}))
+    if not running:
+        return make_result("runtime-nmap-capability-check", repo_root, "Nmap capability check stopped because ospd-openvas is not running.", findings)
+
+    nmap_path = exec_in_service(repo_root, service, ["sh", "-lc", "command -v nmap"])
+    path = nmap_path.stdout.strip().splitlines()[-1] if nmap_path.stdout.strip() else ""
+    findings.append(finding("pass" if nmap_path.returncode == 0 and path else "fail", "nmap.path", f"nmap path probe exit code {nmap_path.returncode}.", details={"path": path, "output_tail": output_tail(nmap_path.stdout, 20)}))
+
+    getcap = exec_in_service(repo_root, service, ["sh", "-lc", "command -v getcap >/dev/null 2>&1 && getcap /usr/bin/nmap || true"])
+    caps_output = getcap.stdout.strip()
+    file_caps_ok = "cap_net_raw" in caps_output and "cap_net_admin" in caps_output
+    findings.append(
+        finding(
+            "pass" if getcap.returncode == 0 and file_caps_ok else "fail",
+            "nmap.file-capabilities",
+            "nmap has file capabilities for NET_RAW and NET_ADMIN." if file_caps_ok else "nmap is missing expected NET_RAW/NET_ADMIN file capabilities.",
+            details={"output_tail": output_tail(getcap.stdout, 40)},
+        )
+    )
+
+    env_probe = exec_in_service(repo_root, service, ["sh", "-lc", f"printf '%s' \"${{{NMAP_PRIVILEGED_ENV}:-}}\""])
+    env_ok = env_probe.returncode == 0 and env_probe.stdout.strip() == "1"
+    findings.append(
+        finding(
+            "pass" if env_ok else "fail",
+            "nmap.env",
+            f"{NMAP_PRIVILEGED_ENV}=1 is present in the scanner service environment." if env_ok else f"{NMAP_PRIVILEGED_ENV}=1 is missing from the scanner service environment.",
+            details={"output_tail": output_tail(env_probe.stdout, 20)},
+        )
+    )
+
+    for check, command in ospd_setpriv_nmap_probe_commands(repo_root):
+        probe = exec_in_service(repo_root, service, command)
+        privilege_warning = nmap_privilege_warning_present(probe.stdout)
+        findings.append(
+            finding(
+                "pass" if probe.returncode == 0 and not privilege_warning else "fail",
+                check,
+                f"{check} probe exit code {probe.returncode}." if not privilege_warning else f"{check} probe still reports that root privileges are required.",
+                details={"privilege_warning": privilege_warning, "output_tail": output_tail(probe.stdout, 80)},
+            )
+        )
+
+    return make_result("runtime-nmap-capability-check", repo_root, "Nmap capability check completed.", findings)
 
 
 def command_runtime_full_test_scan(repo_root: Path, action: str, confirm_authorized_lan: bool = False) -> dict[str, Any]:
@@ -2304,6 +2425,8 @@ def command_runtime_full_test_scan(repo_root: Path, action: str, confirm_authori
     if action in {"preflight", "start"}:
         capability = command_runtime_scanner_capability_check(repo_root)
         findings.append(finding(capability["status"], "ospd.capability-check", capability["summary"], details={"status": capability["status"], "findings": capability["findings"]}))
+        nmap_capability = command_runtime_nmap_capability_check(repo_root)
+        findings.append(finding(nmap_capability["status"], "nmap.capability-check", nmap_capability["summary"], details={"status": nmap_capability["status"], "findings": nmap_capability["findings"]}))
 
     command_name = f"runtime-full-test-scan-{action}"
     if aggregate_status(findings) == "fail":
@@ -2321,6 +2444,8 @@ def command_runtime_full_test_scan(repo_root: Path, action: str, confirm_authori
         str(secret_path),
         "--artifact-dir",
         str(artifact_dir),
+        "--ospd-log-file",
+        str(runtime_path(repo_root, "logs", "ospd", "ospd-openvas.log")),
     ]
     if confirm_authorized_lan:
         args.append("--confirm-authorized-lan")
@@ -2671,6 +2796,8 @@ def command_runtime_app_smoke(repo_root: Path) -> dict[str, Any]:
     if container_running(repo_root, "ospd-openvas"):
         capability = command_runtime_scanner_capability_check(repo_root)
         findings.append(finding(capability["status"], "ospd.capability-check", capability["summary"], details={"status": capability["status"], "findings": capability["findings"]}))
+        nmap_capability = command_runtime_nmap_capability_check(repo_root)
+        findings.append(finding(nmap_capability["status"], "nmap.capability-check", nmap_capability["summary"], details={"status": nmap_capability["status"], "findings": nmap_capability["findings"]}))
         ospd_logs = service_log_tail(repo_root, "ospd-openvas", lines=120)
         ospd_errors = [line for line in ospd_logs if "ERROR" in line]
         ospd_feed_errors = feed_signature_log_errors(ospd_logs)
@@ -2866,7 +2993,7 @@ def command_doctor(repo_root: Path) -> dict[str, Any]:
     license_result = command_license_report(repo_root)
     findings.append(finding(license_result["status"], "license.compliance", license_result["summary"], details={"status": license_result["status"], "findings": license_result["findings"]}))
     findings.append(finding("pass", "surface.available", "Build readiness surface is available.", details={"commands": ["just deps", "just configure", "just build", "just build-core-c", "just build-c-services", "just build-ui", "just build-python", "just build-baseline"]}))
-    findings.append(finding("pass" if compose_file(repo_root).is_file() else "warn", "surface.available", "Runtime infrastructure command surface is available." if compose_file(repo_root).is_file() else "Runtime infrastructure command surface is not available.", details={"commands": ["just runtime-plan", "just up", "just down", "just logs", "just runtime-init", "just runtime-certs-init", "just runtime-manager-init", "just runtime-scanner-redis-init", "just runtime-gmp-smoke", "just runtime-scanner-register", "just runtime-scanner-capability-check", "just runtime-feed-keyring-init", "just runtime-feed-import-init", "just runtime-full-test-scan-preflight", "just runtime-full-test-scan-start", "just runtime-full-test-scan-status", "just runtime-report-summary", "just runtime-report-export", "just runtime-rbac-smoke", "just feed-state", "just feed-cache-sync", "just feed-copy-to-runtime", "just runtime-status", "just runtime-smoke", "just runtime-app-up", "just runtime-app-smoke", "just runtime-webui-smoke", "just runtime-app-down", "just gvmd-smoke"]}))
+    findings.append(finding("pass" if compose_file(repo_root).is_file() else "warn", "surface.available", "Runtime infrastructure command surface is available." if compose_file(repo_root).is_file() else "Runtime infrastructure command surface is not available.", details={"commands": ["just runtime-plan", "just up", "just down", "just logs", "just runtime-init", "just runtime-certs-init", "just runtime-manager-init", "just runtime-scanner-redis-init", "just runtime-gmp-smoke", "just runtime-scanner-register", "just runtime-scanner-capability-check", "just runtime-nmap-capability-check", "just runtime-feed-keyring-init", "just runtime-feed-import-init", "just runtime-full-test-scan-preflight", "just runtime-full-test-scan-start", "just runtime-full-test-scan-status", "just runtime-report-summary", "just runtime-report-export", "just runtime-rbac-smoke", "just feed-state", "just feed-cache-sync", "just feed-copy-to-runtime", "just runtime-status", "just runtime-smoke", "just runtime-app-up", "just runtime-app-smoke", "just runtime-webui-smoke", "just runtime-app-down", "just gvmd-smoke"]}))
     findings.append(finding("warn", "surface.deferred", "Test command surface is deferred until component checks are mapped.", details={"command": "just test"}))
     findings.append(finding("warn", "surface.deferred", "Full inherited service orchestration remains experimental until feed, scanner registration, and first UI/API connectivity are stabilized.", details={"commands": ["gvmd", "gsad", "ospd-openvas", "notus-scanner"]}))
     return make_result("doctor", repo_root, "Monorepo health checks completed.", findings)
@@ -2925,6 +3052,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("runtime-gmp-smoke", parents=[common], help="run authenticated GMP smoke over the runtime gvmd socket")
     subparsers.add_parser("runtime-scanner-register", parents=[common], help="create or verify the OpenVAS scanner registration")
     subparsers.add_parser("runtime-scanner-capability-check", parents=[common], help="verify non-root OpenVAS raw-socket capabilities")
+    subparsers.add_parser("runtime-nmap-capability-check", parents=[common], help="verify non-root Nmap raw scan capability for Full and fast")
     subparsers.add_parser("runtime-feed-keyring-init", parents=[common], help="initialize the shared feed signature GnuPG keyring")
     subparsers.add_parser("runtime-feed-import-init", parents=[common], help="import runtime feed copies into gvmd/OpenVAS state")
     subparsers.add_parser("runtime-full-test-scan-preflight", parents=[common], help="preflight the fixed authorized full test scan")
@@ -2932,11 +3060,11 @@ def build_parser() -> argparse.ArgumentParser:
     full_test_start.add_argument("--confirm-authorized-lan", action="store_true", help="confirm authorization for 192.168.178.0/24")
     subparsers.add_parser("runtime-full-test-scan-status", parents=[common], help="show the fixed authorized full test scan status")
     report_summary = subparsers.add_parser("runtime-report-summary", parents=[common], help="summarize the latest runtime full-test report")
-    report_summary.add_argument("--report-id", help="optional report id; defaults to the latest full-test report")
+    report_summary.add_argument("--report-id", help="optional report id; defaults to the latest completed full-test report")
     report_summary.add_argument("--max-results", type=int, default=1000, help="maximum results to fetch from the selected report")
     report_summary.add_argument("--top-results", type=int, default=10, help="number of top results to include")
     report_export = subparsers.add_parser("runtime-report-export", parents=[common], help="export parsed runtime full-test report results as JSON")
-    report_export.add_argument("--report-id", help="optional report id; defaults to the latest full-test report")
+    report_export.add_argument("--report-id", help="optional report id; defaults to the latest completed full-test report")
     report_export.add_argument("--max-results", type=int, default=1000, help="maximum results to fetch from the selected report")
     report_export.add_argument("--top-results", type=int, default=10, help="number of top results to include")
     subparsers.add_parser("runtime-scope-smoke", parents=[common], help="verify scope reporting without starting scans")
@@ -3005,6 +3133,8 @@ def main(argv: list[str] | None = None) -> int:
         result = command_runtime_scanner_register(repo_root)
     elif args.command == "runtime-scanner-capability-check":
         result = command_runtime_scanner_capability_check(repo_root)
+    elif args.command == "runtime-nmap-capability-check":
+        result = command_runtime_nmap_capability_check(repo_root)
     elif args.command == "runtime-feed-keyring-init":
         result = command_runtime_feed_keyring_init(repo_root)
     elif args.command == "runtime-feed-import-init":

@@ -60,13 +60,14 @@ TurboVAS provides a small root command surface for repository health checks:
 - `just runtime-gmp-smoke`: run an authenticated GMP smoke check.
 - `just runtime-scanner-register`: create or verify the OpenVAS scanner registration.
 - `just runtime-scanner-capability-check`: verify non-root OpenVAS raw-socket capabilities.
+- `just runtime-nmap-capability-check`: verify non-root Nmap raw scan capability for `Full and fast`.
 - `just runtime-feed-keyring-init`: initialize the shared feed signature GnuPG keyring.
 - `just runtime-feed-import-init`: import the runtime feed copy into gvmd/OpenVAS state.
 - `just runtime-full-test-scan-preflight`: verify readiness for the fixed authorized `192.168.178.0/24` full test scan.
 - `just runtime-full-test-scan-start --confirm-authorized-lan`: start the fixed authorized full test scan.
 - `just runtime-full-test-scan-status`: report the fixed full test scan task status.
-- `just runtime-report-summary`: summarize the latest raw full-test scan report.
-- `just runtime-report-export`: export parsed raw full-test scan report results as JSON.
+- `just runtime-report-summary`: summarize the latest completed raw full-test scan report.
+- `just runtime-report-export`: export parsed raw full-test scan report results as JSON, defaulting to the latest completed full-test report.
 - `just runtime-scope-smoke`: verify scope reporting without starting scans.
 - `just runtime-scope-report-summary`: summarize the latest `Organization` scope report.
 - `just feed-state`: show persistent feed cache and runtime-copy state.

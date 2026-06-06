@@ -51,6 +51,8 @@ Useful development checks include:
 - `just runtime-smoke`
 - `just runtime-app-smoke`
 - `just runtime-webui-smoke --json`
+- `just runtime-scanner-capability-check --json`
+- `just runtime-nmap-capability-check --json`
 - `just feed-state --json`
 - `just runtime-scope-smoke --json`
 - `just runtime-scope-report-summary --json`
@@ -67,10 +69,20 @@ credentials, port lists, alive-test behavior, and scan constraints. A task runs 
 scan against a target with a scan configuration and scanner. Raw task reports
 remain available as technical evidence and provenance.
 
+For `Full and fast` scan fidelity, the development runtime keeps OpenVAS and
+OSPD non-root and grants only the scanner/Nmap capabilities needed for raw
+network probes. The scanner service also uses a stable runtime hostname so NASL
+active checks can build packet-capture filters without Docker short-hostname
+ambiguity. `just runtime-scanner-capability-check --json` and
+`just runtime-nmap-capability-check --json` are the development gates for this
+path. If those checks fail, or if a completed raw report contains Nmap wrapper
+messages saying requested scan types require root privileges, treat the scan as
+incomplete evidence rather than a trustworthy baseline.
+
 TurboVAS does not treat a raw task report as the main operator reporting unit.
 Raw reports are important evidence, but they can be too tightly coupled to
 technical scan boundaries such as subnets, credentials, reachability, or scanner
-constraints.
+constraints, or probe capability limits.
 
 ## Scope Reports
 
