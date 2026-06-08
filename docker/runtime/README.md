@@ -54,6 +54,7 @@ Use the root `justfile` command surface:
 - `just runtime-gmp-smoke`
 - `just runtime-scanner-register`
 - `just runtime-scanner-capability-check`
+- `just runtime-scanner-process-check`
 - `just runtime-nmap-capability-check`
 - `just runtime-feed-keyring-init`
 - `just runtime-feed-import-init`
@@ -89,6 +90,10 @@ the development UID/GID with effective/permitted/ambient `NET_RAW` and
 `NET_ADMIN`, that the scanner service uses a stable non-hex hostname for NASL
 packet-capture filters, and that the same service-user path can open an ICMP raw
 socket.
+
+`runtime-scanner-process-check` verifies scanner process hygiene and fails when
+an idle `ospd-openvas` container has zombie child processes left behind by
+OpenVAS, Nmap, or helper subprocesses.
 
 `runtime-nmap-capability-check` verifies that the scanner image can run
 representative Nmap raw SYN and OS-detection probes as the development UID/GID

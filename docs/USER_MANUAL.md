@@ -84,9 +84,14 @@ Raw reports are important evidence, but they can be too tightly coupled to
 technical scan boundaries such as subnets, credentials, reachability, or scanner
 constraints, or probe capability limits.
 
-## Scope Reports
+## Reports And Scope Reports
 
-The operator-facing `Reports` page lists scope reports.
+The `Reports` page keeps the inherited raw scan-report list. Use it when you
+need to inspect individual technical task reports, unfinished reports, imported
+reports, or evidence from a specific scan run.
+
+Scope reports are reached from `Scopes`, not from the top-level `Reports` page.
+They are the operator-facing aggregation layer for reporting populations.
 
 A scope is a reporting population. It describes the set of assets an operator
 wants to understand, such as an organization, a technology class, an exposure
@@ -112,9 +117,9 @@ snapshot provenance, deduplicates findings, and exposes coverage and freshness
 signals. Candidate hosts discovered in the source reports can be shown so an
 operator can decide whether to add them to a custom scope.
 
-Use `/scopes` to manage scopes, `/scope/:id` to inspect and edit a scope, and
-`/scope-report/:id` to inspect a generated scope report. Raw `/report/:id` pages
-remain reachable from task and scope-report evidence links.
+Use `/scopes` to manage scopes, `/scopes/:id` to inspect and edit a scope, and
+`/scopes/:id/reports/:report_id` to inspect a generated scope report. Raw
+`/reports` and `/report/:id` pages remain available for technical evidence.
 
 See `SCOPE_BASED_REPORTING.md` for the detailed scope model and
 `VULNERABILITY_MANAGEMENT_PRACTICE.md` for the operating model behind it.
@@ -125,8 +130,9 @@ TurboVAS intentionally diverges from inherited OpenVAS behavior when that makes
 the product clearer for scanner operators. Upstream compatibility is not a
 default goal.
 
-Scope-based reporting replaces inherited target/report coupling. Technical
-targets remain evidence-collection units, while scopes define the operational
+Scope-based reporting augments inherited raw scan reports instead of hiding
+them. Technical targets remain evidence-collection units, raw reports remain
+available for individual scan evidence, and scopes define the operational
 population being reported on. This supports environments where one meaningful
 reporting population requires several technical targets.
 

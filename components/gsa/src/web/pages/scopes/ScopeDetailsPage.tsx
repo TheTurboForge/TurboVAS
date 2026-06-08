@@ -55,13 +55,24 @@ const ScopeDetailsPage = () => {
     setError(undefined);
     try {
       const response = await gmp.scopes.getOne(id);
-      setScope(response.data);
-      if (response.data) {
-        setName(response.data.name);
-        setComment(response.data.comment ?? '');
-        setProtectionRequirement(response.data.protectionRequirement);
-        setTargetIds(response.data.targets.map(target => target.id).join('\n'));
-        setHostIds(response.data.hosts.map(host => host.id).join('\n'));
+      const scopeData = response.data;
+      if (scopeData) {
+        const reportsResponse = await gmp.scopereports.get({
+          scopeId: scopeData.id,
+          details: 0,
+        });
+        const enrichedScope = {
+          ...scopeData,
+          scopeReports: reportsResponse.data,
+        };
+        setScope(enrichedScope);
+        setName(scopeData.name);
+        setComment(scopeData.comment ?? '');
+        setProtectionRequirement(scopeData.protectionRequirement);
+        setTargetIds(scopeData.targets.map(target => target.id).join('\n'));
+        setHostIds(scopeData.hosts.map(host => host.id).join('\n'));
+      } else {
+        setScope(undefined);
       }
     } catch (err) {
       setError(String(err));
@@ -284,7 +295,7 @@ const ScopeDetailsPage = () => {
           {scope.scopeReports.map(report => (
             <TableRow key={report.id}>
               <TableData>
-                <Link to={`/scope-report/${report.id}`}>{report.name}</Link>
+                <Link to={`/scopes/${scope.id}/reports/${report.id}`}>{report.name}</Link>
               </TableData>
               <TableData>{formatDate(report.created)}</TableData>
               <TableData>{report.sourceReportCount}</TableData>

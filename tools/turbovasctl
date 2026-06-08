@@ -1153,6 +1153,45 @@ def nmap_privilege_warning_present(output: str) -> bool:
     return any(pattern in lowered for pattern in NMAP_PRIVILEGE_WARNING_PATTERNS)
 
 
+def parse_process_table(output: str) -> list[dict[str, str]]:
+    processes: list[dict[str, str]] = []
+    for line in output.splitlines()[1:]:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        parts = stripped.split(None, 4)
+        if len(parts) < 4:
+            continue
+        pid, ppid, stat, comm = parts[:4]
+        args = parts[4] if len(parts) > 4 else comm
+        processes.append({"pid": pid, "ppid": ppid, "stat": stat, "comm": comm, "args": args})
+    return processes
+
+
+def process_is_zombie(process: dict[str, str]) -> bool:
+    return "Z" in process.get("stat", "")
+
+
+def process_is_active_scanner_child(process: dict[str, str]) -> bool:
+    if process_is_zombie(process):
+        return False
+    comm = process.get("comm", "")
+    return comm in {"openvas", "nmap"}
+
+
+def summarize_scanner_processes(output: str) -> dict[str, Any]:
+    processes = parse_process_table(output)
+    zombies = [process for process in processes if process_is_zombie(process)]
+    active_children = [process for process in processes if process_is_active_scanner_child(process)]
+    return {
+        "process_count": len(processes),
+        "zombie_count": len(zombies),
+        "active_scanner_child_count": len(active_children),
+        "zombies": zombies[:50],
+        "active_scanner_children": active_children[:50],
+    }
+
+
 def output_tail(output: str, lines: int = 80, secrets_to_redact: Iterable[str] = ()) -> list[str]:
     tail = output.splitlines()[-lines:]
     redacted: list[str] = []
@@ -2317,15 +2356,19 @@ def command_runtime_scanner_capability_check(repo_root: Path) -> dict[str, Any]:
     if not running:
         return make_result("runtime-scanner-capability-check", repo_root, "Scanner capability check stopped because ospd-openvas is not running.", findings)
 
-    status = exec_in_service(repo_root, service, ["sh", "-lc", "sed -n 's/^Uid:/Uid:/p; s/^Gid:/Gid:/p; s/^CapInh:/CapInh:/p; s/^CapPrm:/CapPrm:/p; s/^CapEff:/CapEff:/p; s/^CapBnd:/CapBnd:/p; s/^CapAmb:/CapAmb:/p' /proc/1/status"])
+    pid_probe = exec_in_service(repo_root, service, ["sh", "-lc", "ps -eo pid,comm,args | awk '$2 == \"ospd-openvas\" && /--foreground/ { print $1; exit }'"])
+    scanner_pid = pid_probe.stdout.strip().splitlines()[0] if pid_probe.stdout.strip() else ""
+    findings.append(finding("pass" if pid_probe.returncode == 0 and scanner_pid else "fail", "ospd.pid", f"ospd-openvas scanner process PID is {scanner_pid}." if scanner_pid else "ospd-openvas scanner process PID could not be found.", details={"output_tail": output_tail(pid_probe.stdout, 20)}))
+    status_path = f"/proc/{scanner_pid}/status" if scanner_pid else "/proc/1/status"
+    status = exec_in_service(repo_root, service, ["sh", "-lc", f"sed -n 's/^Uid:/Uid:/p; s/^Gid:/Gid:/p; s/^CapInh:/CapInh:/p; s/^CapPrm:/CapPrm:/p; s/^CapEff:/CapEff:/p; s/^CapBnd:/CapBnd:/p; s/^CapAmb:/CapAmb:/p' {shlex.quote(status_path)}"])
     values = parse_proc_status(status.stdout)
     expected_uid = runtime_env(repo_root)["TURBOVAS_UID"]
     expected_gid = runtime_env(repo_root)["TURBOVAS_GID"]
     actual_uid = first_proc_status_id(values.get("Uid"))
     actual_gid = first_proc_status_id(values.get("Gid"))
-    findings.append(finding("pass" if status.returncode == 0 else "fail", "ospd.proc-status", f"/proc/1/status read exit code {status.returncode}.", details={"output_tail": output_tail(status.stdout, 40)}))
-    findings.append(finding("pass" if actual_uid == expected_uid else "fail", "ospd.uid", f"ospd-openvas PID 1 UID is {actual_uid}; expected {expected_uid}.", details={"uid_line": values.get("Uid"), "expected": expected_uid}))
-    findings.append(finding("pass" if actual_gid == expected_gid else "fail", "ospd.gid", f"ospd-openvas PID 1 GID is {actual_gid}; expected {expected_gid}.", details={"gid_line": values.get("Gid"), "expected": expected_gid}))
+    findings.append(finding("pass" if status.returncode == 0 else "fail", "ospd.proc-status", f"{status_path} read exit code {status.returncode}.", details={"output_tail": output_tail(status.stdout, 40)}))
+    findings.append(finding("pass" if actual_uid == expected_uid else "fail", "ospd.uid", f"ospd-openvas scanner process UID is {actual_uid}; expected {expected_uid}.", details={"uid_line": values.get("Uid"), "expected": expected_uid, "pid": scanner_pid}))
+    findings.append(finding("pass" if actual_gid == expected_gid else "fail", "ospd.gid", f"ospd-openvas scanner process GID is {actual_gid}; expected {expected_gid}.", details={"gid_line": values.get("Gid"), "expected": expected_gid, "pid": scanner_pid}))
 
     hostname_probe = exec_in_service(repo_root, service, ["sh", "-lc", "hostname; getent hosts $(hostname)"])
     hostname_lines = hostname_probe.stdout.strip().splitlines()
@@ -2354,6 +2397,41 @@ def command_runtime_scanner_capability_check(repo_root: Path) -> dict[str, Any]:
     raw_probe = exec_in_service(repo_root, service, ospd_setpriv_raw_socket_probe_command(repo_root))
     findings.append(finding("pass" if raw_probe.returncode == 0 and "raw-ok" in raw_probe.stdout else "fail", "ospd.raw-socket-probe", f"Service-user raw ICMP socket probe exit code {raw_probe.returncode}.", details={"output_tail": output_tail(raw_probe.stdout, 40)}))
     return make_result("runtime-scanner-capability-check", repo_root, "Scanner capability check completed.", findings)
+
+
+def command_runtime_scanner_process_check(repo_root: Path) -> dict[str, Any]:
+    findings: list[dict[str, Any]] = []
+    service = "ospd-openvas"
+    running = container_running(repo_root, service)
+    findings.append(finding("pass" if running else "fail", "ospd.running", "ospd-openvas container is running." if running else "ospd-openvas container is not running; run just runtime-app-up.", details={"service": service}))
+    if not running:
+        return make_result("runtime-scanner-process-check", repo_root, "Scanner process check stopped because ospd-openvas is not running.", findings)
+
+    process_probe = exec_in_service(repo_root, service, ["ps", "-eo", "pid,ppid,stat,comm,args"])
+    summary = summarize_scanner_processes(process_probe.stdout)
+    zombie_count = summary["zombie_count"]
+    active_count = summary["active_scanner_child_count"]
+    if process_probe.returncode != 0:
+        status = "fail"
+        message = f"Scanner process table probe exit code {process_probe.returncode}."
+    elif zombie_count and active_count:
+        status = "warn"
+        message = f"ospd-openvas has {zombie_count} zombie child process(es) while scanner children are active."
+    elif zombie_count:
+        status = "fail"
+        message = f"ospd-openvas has {zombie_count} zombie child process(es) with no active scanner children."
+    else:
+        status = "pass"
+        message = "ospd-openvas has no zombie child processes."
+    findings.append(
+        finding(
+            status,
+            "ospd.process-zombies",
+            message,
+            details={"process_summary": summary, "output_tail": output_tail(process_probe.stdout, 80)},
+        )
+    )
+    return make_result("runtime-scanner-process-check", repo_root, "Scanner process check completed.", findings)
 
 
 def command_runtime_nmap_capability_check(repo_root: Path) -> dict[str, Any]:
@@ -2425,6 +2503,8 @@ def command_runtime_full_test_scan(repo_root: Path, action: str, confirm_authori
     if action in {"preflight", "start"}:
         capability = command_runtime_scanner_capability_check(repo_root)
         findings.append(finding(capability["status"], "ospd.capability-check", capability["summary"], details={"status": capability["status"], "findings": capability["findings"]}))
+        process_check = command_runtime_scanner_process_check(repo_root)
+        findings.append(finding(process_check["status"], "ospd.process-check", process_check["summary"], details={"status": process_check["status"], "findings": process_check["findings"]}))
         nmap_capability = command_runtime_nmap_capability_check(repo_root)
         findings.append(finding(nmap_capability["status"], "nmap.capability-check", nmap_capability["summary"], details={"status": nmap_capability["status"], "findings": nmap_capability["findings"]}))
 
@@ -2796,6 +2876,8 @@ def command_runtime_app_smoke(repo_root: Path) -> dict[str, Any]:
     if container_running(repo_root, "ospd-openvas"):
         capability = command_runtime_scanner_capability_check(repo_root)
         findings.append(finding(capability["status"], "ospd.capability-check", capability["summary"], details={"status": capability["status"], "findings": capability["findings"]}))
+        process_check = command_runtime_scanner_process_check(repo_root)
+        findings.append(finding(process_check["status"], "ospd.process-check", process_check["summary"], details={"status": process_check["status"], "findings": process_check["findings"]}))
         nmap_capability = command_runtime_nmap_capability_check(repo_root)
         findings.append(finding(nmap_capability["status"], "nmap.capability-check", nmap_capability["summary"], details={"status": nmap_capability["status"], "findings": nmap_capability["findings"]}))
         ospd_logs = service_log_tail(repo_root, "ospd-openvas", lines=120)
@@ -2993,7 +3075,7 @@ def command_doctor(repo_root: Path) -> dict[str, Any]:
     license_result = command_license_report(repo_root)
     findings.append(finding(license_result["status"], "license.compliance", license_result["summary"], details={"status": license_result["status"], "findings": license_result["findings"]}))
     findings.append(finding("pass", "surface.available", "Build readiness surface is available.", details={"commands": ["just deps", "just configure", "just build", "just build-core-c", "just build-c-services", "just build-ui", "just build-python", "just build-baseline"]}))
-    findings.append(finding("pass" if compose_file(repo_root).is_file() else "warn", "surface.available", "Runtime infrastructure command surface is available." if compose_file(repo_root).is_file() else "Runtime infrastructure command surface is not available.", details={"commands": ["just runtime-plan", "just up", "just down", "just logs", "just runtime-init", "just runtime-certs-init", "just runtime-manager-init", "just runtime-scanner-redis-init", "just runtime-gmp-smoke", "just runtime-scanner-register", "just runtime-scanner-capability-check", "just runtime-nmap-capability-check", "just runtime-feed-keyring-init", "just runtime-feed-import-init", "just runtime-full-test-scan-preflight", "just runtime-full-test-scan-start", "just runtime-full-test-scan-status", "just runtime-report-summary", "just runtime-report-export", "just runtime-rbac-smoke", "just feed-state", "just feed-cache-sync", "just feed-copy-to-runtime", "just runtime-status", "just runtime-smoke", "just runtime-app-up", "just runtime-app-smoke", "just runtime-webui-smoke", "just runtime-app-down", "just gvmd-smoke"]}))
+    findings.append(finding("pass" if compose_file(repo_root).is_file() else "warn", "surface.available", "Runtime infrastructure command surface is available." if compose_file(repo_root).is_file() else "Runtime infrastructure command surface is not available.", details={"commands": ["just runtime-plan", "just up", "just down", "just logs", "just runtime-init", "just runtime-certs-init", "just runtime-manager-init", "just runtime-scanner-redis-init", "just runtime-gmp-smoke", "just runtime-scanner-register", "just runtime-scanner-capability-check", "just runtime-scanner-process-check", "just runtime-nmap-capability-check", "just runtime-feed-keyring-init", "just runtime-feed-import-init", "just runtime-full-test-scan-preflight", "just runtime-full-test-scan-start", "just runtime-full-test-scan-status", "just runtime-report-summary", "just runtime-report-export", "just runtime-rbac-smoke", "just feed-state", "just feed-cache-sync", "just feed-copy-to-runtime", "just runtime-status", "just runtime-smoke", "just runtime-app-up", "just runtime-app-smoke", "just runtime-webui-smoke", "just runtime-app-down", "just gvmd-smoke"]}))
     findings.append(finding("warn", "surface.deferred", "Test command surface is deferred until component checks are mapped.", details={"command": "just test"}))
     findings.append(finding("warn", "surface.deferred", "Full inherited service orchestration remains experimental until feed, scanner registration, and first UI/API connectivity are stabilized.", details={"commands": ["gvmd", "gsad", "ospd-openvas", "notus-scanner"]}))
     return make_result("doctor", repo_root, "Monorepo health checks completed.", findings)
@@ -3052,6 +3134,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("runtime-gmp-smoke", parents=[common], help="run authenticated GMP smoke over the runtime gvmd socket")
     subparsers.add_parser("runtime-scanner-register", parents=[common], help="create or verify the OpenVAS scanner registration")
     subparsers.add_parser("runtime-scanner-capability-check", parents=[common], help="verify non-root OpenVAS raw-socket capabilities")
+    subparsers.add_parser("runtime-scanner-process-check", parents=[common], help="verify ospd-openvas process hygiene")
     subparsers.add_parser("runtime-nmap-capability-check", parents=[common], help="verify non-root Nmap raw scan capability for Full and fast")
     subparsers.add_parser("runtime-feed-keyring-init", parents=[common], help="initialize the shared feed signature GnuPG keyring")
     subparsers.add_parser("runtime-feed-import-init", parents=[common], help="import runtime feed copies into gvmd/OpenVAS state")
@@ -3133,6 +3216,8 @@ def main(argv: list[str] | None = None) -> int:
         result = command_runtime_scanner_register(repo_root)
     elif args.command == "runtime-scanner-capability-check":
         result = command_runtime_scanner_capability_check(repo_root)
+    elif args.command == "runtime-scanner-process-check":
+        result = command_runtime_scanner_process_check(repo_root)
     elif args.command == "runtime-nmap-capability-check":
         result = command_runtime_nmap_capability_check(repo_root)
     elif args.command == "runtime-feed-keyring-init":

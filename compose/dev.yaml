@@ -193,6 +193,7 @@ services:
     build:
       context: ..
       dockerfile: docker/dev/Dockerfile
+    init: true
     hostname: turbovas-ospd-openvas
     working_dir: /workspace
     cap_add:

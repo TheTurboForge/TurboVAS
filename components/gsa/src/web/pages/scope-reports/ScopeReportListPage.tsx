@@ -126,10 +126,12 @@ const ScopeReportListPage = () => {
           {reports.map(report => (
             <TableRow key={report.id}>
               <TableData>
-                <Link to={`/scope-report/${report.id}`}>{report.name}</Link>
+                <Link to={`/scopes/${report.scopeId}/reports/${report.id}`}>
+                  {report.name}
+                </Link>
               </TableData>
               <TableData>
-                <Link to={`/scope/${report.scopeId}`}>{report.scopeName}</Link>
+                <Link to={`/scopes/${report.scopeId}`}>{report.scopeName}</Link>
               </TableData>
               <TableData>{formatDate(report.created)}</TableData>
               <TableData>{formatDate(report.latestEvidenceTime)}</TableData>

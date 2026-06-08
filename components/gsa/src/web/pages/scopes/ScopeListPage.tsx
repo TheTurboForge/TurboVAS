@@ -134,7 +134,7 @@ const ScopeListPage = () => {
           {scopes.map(scope => (
             <TableRow key={scope.id}>
               <TableData>
-                <Link to={`/scope/${scope.id}`}>{scope.name}</Link>
+                <Link to={`/scopes/${scope.id}`}>{scope.name}</Link>
               </TableData>
               <TableData>{scope.protectionRequirementLabel}</TableData>
               <TableData>{scope.targetCount}</TableData>
@@ -147,7 +147,7 @@ const ScopeListPage = () => {
                     title={_('Generate Report')}
                     onClick={() => void generateReport(scope.id)}
                   />
-                  <Link to={`/scope/${scope.id}`}>{_('Open')}</Link>
+                  <Link to={`/scopes/${scope.id}`}>{_('Open')}</Link>
                 </PageActions>
               </TableData>
             </TableRow>

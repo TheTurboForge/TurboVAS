@@ -376,12 +376,19 @@ const loggedInRoutes = [
       {
         path: 'reports',
         lazy: async () => ({
-          Component: (await import('web/pages/scope-reports/ScopeReportListPage'))
-            .default,
+          Component: (await import('web/pages/reports/ReportListPage')).default,
         }),
       },
       {
         path: 'scope-report/:id',
+        lazy: async () => ({
+          Component: (
+            await import('web/pages/scope-reports/ScopeReportDetailsPage')
+          ).default,
+        }),
+      },
+      {
+        path: 'scopes/:scopeId/reports/:id',
         lazy: async () => ({
           Component: (
             await import('web/pages/scope-reports/ScopeReportDetailsPage')
@@ -534,10 +541,16 @@ const loggedInRoutes = [
         }),
       },
       {
-        path: 'scope/:id',
+        path: 'scopes/:id',
         lazy: async () => ({
           Component: (await import('web/pages/scopes/ScopeDetailsPage')).default,
         }),
+      },
+      {
+        path: 'scope/:id',
+        loader: ({params}) => {
+          throw redirect(`/scopes/${params.id}`);
+        },
       },
 
       // Schedule routes

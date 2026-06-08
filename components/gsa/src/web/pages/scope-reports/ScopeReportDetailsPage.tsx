@@ -64,7 +64,7 @@ const ScopeReportDetailsPage = () => {
     setError(undefined);
     try {
       await gmp.scopereports.delete({id: report.id});
-      navigate('/reports');
+      navigate(`/scopes/${report.scopeId}`);
     } catch (err) {
       setError(String(err));
       setLoading(false);
@@ -86,7 +86,7 @@ const ScopeReportDetailsPage = () => {
       <PageTitle title={report.name} />
       <Section title={report.name} />
       <SummaryGrid>
-        <SummaryItem label={_('Scope')} value={<Link to={`/scope/${report.scopeId}`}>{report.scopeName}</Link>} />
+        <SummaryItem label={_('Scope')} value={<Link to={`/scopes/${report.scopeId}`}>{report.scopeName}</Link>} />
         <SummaryItem label={_('Protection Requirement')} value={report.protectionRequirementLabel} />
         <SummaryItem label={_('Latest Evidence')} value={formatDate(report.latestEvidenceTime)} />
         <SummaryItem label={_('Source Reports')} value={report.sourceReportCount} />
@@ -114,7 +114,7 @@ const ScopeReportDetailsPage = () => {
           title={_('Delete')}
           onClick={() => void deleteReport()}
         />
-        <Link to="/reports">{_('Scope Reports')}</Link>
+        <Link to={`/scopes/${report.scopeId}`}>{_('Scope Reports')}</Link>
       </PageActions>
       {error && <ErrorMessage>{error}</ErrorMessage>}
 

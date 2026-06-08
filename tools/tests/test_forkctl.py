@@ -336,6 +336,38 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertTrue(turbovasctl.nmap_privilege_warning_present("You requested a scan type which requires root privileges."))
         self.assertFalse(turbovasctl.nmap_privilege_warning_present("Nmap done: 1 IP address scanned."))
 
+    def test_scanner_process_summary_counts_zombies_and_active_children(self):
+        output = """    PID    PPID STAT COMMAND         COMMAND
+      1       0 Ss   ospd-openvas    /workspace/build/venvs/ospd-openvas/bin/ospd-openvas --foreground
+    115       1 Z    python3         [python3] <defunct>
+    444       1 ZN   nmap            [nmap] <defunct>
+    800       1 SN   nmap            nmap -sS -O 127.0.0.1
+    900       1 S    openvas         openvas --scan-start
+"""
+        summary = turbovasctl.summarize_scanner_processes(output)
+        self.assertEqual(summary["process_count"], 5)
+        self.assertEqual(summary["zombie_count"], 2)
+        self.assertEqual(summary["active_scanner_child_count"], 2)
+        self.assertEqual([process["comm"] for process in summary["zombies"]], ["python3", "nmap"])
+
+    def test_scanner_process_summary_ignores_zombies_as_active_children(self):
+        output = """    PID    PPID STAT COMMAND         COMMAND
+      1       0 Ss   ospd-openvas    /workspace/build/venvs/ospd-openvas/bin/ospd-openvas --foreground
+    444       1 ZN   nmap            [nmap] <defunct>
+"""
+        summary = turbovasctl.summarize_scanner_processes(output)
+        self.assertEqual(summary["zombie_count"], 1)
+        self.assertEqual(summary["active_scanner_child_count"], 0)
+
+    def test_scanner_process_summary_does_not_count_docker_init_as_scanner_child(self):
+        output = """    PID    PPID STAT COMMAND         COMMAND
+      1       0 Ss   docker-init     /sbin/docker-init -- sh -lc exec setpriv /workspace/build/venvs/ospd-openvas/bin/ospd-openvas --foreground
+      7       1 Sl   ospd-openvas    /workspace/build/venvs/ospd-openvas/bin/ospd-openvas --foreground
+"""
+        summary = turbovasctl.summarize_scanner_processes(output)
+        self.assertEqual(summary["zombie_count"], 0)
+        self.assertEqual(summary["active_scanner_child_count"], 0)
+
     def test_gsa_static_staging_writes_browser_relative_config(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "TurboVAS"

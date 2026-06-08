@@ -124,7 +124,9 @@ additional inventory sources can be added later after the basic model is useful.
 
 ## Implemented Behavior
 
-The operator-facing `Reports` page lists scope reports. Raw task reports remain
+The top-level `Reports` page keeps the inherited raw scan-report list. Scope
+reports are reached through `Scopes`, where each scope shows its generated
+scope-report history and links to scope-report details. Raw task reports remain
 available as technical evidence from task, scope, and scope-report detail views.
 
 Scopes manually manage two memberships:
