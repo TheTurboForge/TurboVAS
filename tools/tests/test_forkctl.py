@@ -153,6 +153,25 @@ class TurboVASCtlTests(unittest.TestCase):
             with self.subTest(transition=transition):
                 self.assertIn(transition, start_handler)
 
+    def test_runtime_just_wrappers_forward_args(self):
+        justfile = (Path(__file__).resolve().parents[2] / "justfile").read_text(encoding="utf-8")
+        wrappers = [
+            "runtime-init",
+            "runtime-certs-init",
+            "runtime-manager-init",
+            "runtime-scanner-redis-init",
+            "runtime-gmp-smoke",
+            "runtime-scanner-register",
+            "runtime-app-up",
+            "runtime-app-down",
+            "runtime-app-smoke",
+            "gvmd-smoke",
+        ]
+        for wrapper in wrappers:
+            with self.subTest(wrapper=wrapper):
+                self.assertIn(f"{wrapper} *args:", justfile)
+                self.assertIn(f"tools/turbovasctl {wrapper} \"$@\"", justfile)
+
     def test_license_helpers_detect_modified_imported_notice_gaps(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

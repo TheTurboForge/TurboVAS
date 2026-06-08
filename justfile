@@ -60,23 +60,23 @@ down:
 logs service="":
     @if [ -n "{{service}}" ]; then tools/turbovasctl logs "{{service}}"; else tools/turbovasctl logs; fi
 
-runtime-init:
-    @tools/turbovasctl runtime-init
+runtime-init *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-init "$@"
 
-runtime-certs-init:
-    @tools/turbovasctl runtime-certs-init
+runtime-certs-init *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-certs-init "$@"
 
-runtime-manager-init:
-    @tools/turbovasctl runtime-manager-init
+runtime-manager-init *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-manager-init "$@"
 
-runtime-scanner-redis-init:
-    @tools/turbovasctl runtime-scanner-redis-init
+runtime-scanner-redis-init *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-scanner-redis-init "$@"
 
-runtime-gmp-smoke:
-    @tools/turbovasctl runtime-gmp-smoke
+runtime-gmp-smoke *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-gmp-smoke "$@"
 
-runtime-scanner-register:
-    @tools/turbovasctl runtime-scanner-register
+runtime-scanner-register *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-scanner-register "$@"
 
 runtime-scanner-capability-check *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-scanner-capability-check "$@"
@@ -129,14 +129,14 @@ runtime-status *args:
 runtime-smoke *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-smoke "$@"
 
-runtime-app-up:
-    @tools/turbovasctl runtime-app-up
+runtime-app-up *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-app-up "$@"
 
-runtime-app-down:
-    @tools/turbovasctl runtime-app-down
+runtime-app-down *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-app-down "$@"
 
-runtime-app-smoke:
-    @tools/turbovasctl runtime-app-smoke
+runtime-app-smoke *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-app-smoke "$@"
 
 runtime-webui-smoke *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-webui-smoke "$@"
@@ -144,5 +144,5 @@ runtime-webui-smoke *args:
 runtime-rbac-smoke *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-rbac-smoke "$@"
 
-gvmd-smoke:
-    @tools/turbovasctl gvmd-smoke
+gvmd-smoke *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl gvmd-smoke "$@"
