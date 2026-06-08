@@ -186,7 +186,7 @@ const parseEntityRef = (node: unknown): ScopeTarget | ScopeHost => {
 const parseScopeReportSummary = (node: unknown): ScopeReportSummary => {
   const data = getNode(node);
   const counts = getNode(data.counts);
-  const severity = getNode(counts.severity);
+  const severity = getNode(counts.severity ?? data.severity);
   return {
     id: idOf(data),
     name: text(data.name),

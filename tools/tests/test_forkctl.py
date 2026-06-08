@@ -172,6 +172,25 @@ class TurboVASCtlTests(unittest.TestCase):
                 self.assertIn(f"{wrapper} *args:", justfile)
                 self.assertIn(f"tools/turbovasctl {wrapper} \"$@\"", justfile)
 
+    def test_build_ui_restarts_running_gsad_after_static_stage(self):
+        source = (Path(__file__).resolve().parents[1] / "turbovasctl").read_text(encoding="utf-8")
+        self.assertIn("def restart_gsad_after_static_stage", source)
+        self.assertIn('compose_command(repo_root, "restart", "gsad")', source)
+        self.assertIn("findings.append(restart_gsad_after_static_stage(repo_root))", source)
+
+    def test_scope_report_finding_counts_exclude_scanner_errors(self):
+        source = (Path(__file__).resolve().parents[2] / "components" / "gvmd" / "src" / "manage_sql_scopes.c").read_text(encoding="utf-8")
+        self.assertIn("#include \"manage_utils.h\"", source)
+        self.assertIn("SCOPE_REPORT_FINDING_CLAUSE", source)
+        self.assertIn("SEVERITY_ERROR", source)
+        self.assertIn("SEVERITY_FP", source)
+        self.assertIn("WHERE s.scope_report = %llu AND \" SCOPE_REPORT_FINDING_CLAUSE \" AND", source)
+        self.assertNotIn("append_xml_int64 (buffer, \"false_positive\", 0);", source)
+
+    def test_gsa_scope_report_parser_accepts_top_level_severity(self):
+        source = (Path(__file__).resolve().parents[2] / "components" / "gsa" / "src" / "gmp" / "commands" / "scopes.ts").read_text(encoding="utf-8")
+        self.assertIn("counts.severity ?? data.severity", source)
+
     def test_license_helpers_detect_modified_imported_notice_gaps(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

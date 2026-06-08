@@ -1869,6 +1869,18 @@ def command_build_c_services(repo_root: Path) -> dict[str, Any]:
     return command_build_chain(repo_root, "build-c-services", C_SERVICES_CHAIN)
 
 
+def restart_gsad_after_static_stage(repo_root: Path) -> dict[str, Any]:
+    if not container_running(repo_root, "gsad"):
+        return finding("pass", "gsa.restart-gsad", "gsad is not running; no static-content restart was needed.")
+    result = run_command(compose_command(repo_root, "restart", "gsad"), repo_root, env=runtime_env(repo_root))
+    return finding(
+        "pass" if result.returncode == 0 else "fail",
+        "gsa.restart-gsad",
+        f"gsad static-content process restart exit code {result.returncode}.",
+        details={"output_tail": output_tail(result.stdout, 80)},
+    )
+
+
 def command_build_ui(repo_root: Path) -> dict[str, Any]:
     result = command_build(repo_root, "gsa")
     findings = list(result["findings"])
@@ -1877,6 +1889,7 @@ def command_build_ui(repo_root: Path) -> dict[str, Any]:
         stage_findings = stage_gsa_static(repo_root)
         findings.extend(stage_findings)
         artifacts.append(str(gsad_static_dir(repo_root)))
+        findings.append(restart_gsad_after_static_stage(repo_root))
     return make_result("build-ui", repo_root, "Build and stage web UI completed.", findings, sorted(set(artifacts)))
 
 

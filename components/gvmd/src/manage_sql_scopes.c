@@ -9,6 +9,7 @@
  */
 
 #include "manage_sql_scopes.h"
+#include "manage_utils.h"
 
 #undef G_LOG_DOMAIN
 /**
@@ -17,6 +18,8 @@
 #define G_LOG_DOMAIN "md manage"
 
 #define ORGANIZATION_SCOPE_NAME "Organization"
+#define SCOPE_REPORT_FINDING_CLAUSE \
+  "coalesce (r.severity, 0) != " G_STRINGIFY (SEVERITY_ERROR)
 
 static const char *
 empty_if_null (const char *value)
@@ -508,7 +511,7 @@ update_scope_report_counts (scope_report_t scope_report, scope_t scope,
      "        coalesce (r.nvt, '') AS nvt_key, coalesce (r.port, '') AS port_key"
      " FROM results r"
      " JOIN scope_report_sources s ON s.source_report = r.report"
-     " WHERE s.scope_report = %llu AND "
+     " WHERE s.scope_report = %llu AND " SCOPE_REPORT_FINDING_CLAUSE " AND "
      "       %s"
      ") AS deduped;",
      scope_report, host_clause);
@@ -874,7 +877,9 @@ append_scope_report_severity_xml (GString *buffer, scope_report_t scope_report,
   append_xml_int64 (buffer, "log",
                     scope_report_severity_count (scope_report, host_clause,
                                                  "coalesce (r.severity, 0) = 0"));
-  append_xml_int64 (buffer, "false_positive", 0);
+  append_xml_int64 (buffer, "false_positive",
+                    scope_report_severity_count (scope_report, host_clause,
+                                                 "coalesce (r.severity, 0) = " G_STRINGIFY (SEVERITY_FP)));
   g_string_append (buffer, "</severity>");
   g_free (host_clause);
 }
@@ -901,7 +906,7 @@ append_scope_report_results_xml (GString *buffer, scope_report_t scope_report,
                  "        ) AS rn"
                  " FROM results r"
                  " JOIN scope_report_sources s ON s.source_report = r.report"
-                 " WHERE s.scope_report = %llu AND %s"
+                 " WHERE s.scope_report = %llu AND " SCOPE_REPORT_FINDING_CLAUSE " AND %s"
                  ")"
                  " SELECT uuid, host, port, nvt, severity, qod, date,"
                  "        source_report_uuid, target_uuid"

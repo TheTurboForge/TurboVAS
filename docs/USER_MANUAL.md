@@ -117,6 +117,10 @@ snapshot provenance, deduplicates findings, and exposes coverage and freshness
 signals. Candidate hosts discovered in the source reports can be shown so an
 operator can decide whether to add them to a custom scope.
 
+Scope report finding counts exclude scanner execution error rows, such as VT
+timeout messages. Those rows remain available in the raw technical reports for
+scan-fidelity troubleshooting.
+
 Use `/scopes` to manage scopes, `/scopes/:id` to inspect and edit a scope, and
 `/scopes/:id/reports/:report_id` to inspect a generated scope report. Raw
 `/reports` and `/report/:id` pages remain available for technical evidence.
