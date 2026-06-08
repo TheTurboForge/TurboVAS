@@ -5834,6 +5834,116 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
           set_client_state (CLIENT_CREATE_SCHEDULE_TIMEZONE);
         ELSE_READ_OVER;
 
+      case CLIENT_CREATE_TARGET:
+        if (strcasecmp ("ASSET_HOSTS", element_name) == 0)
+          {
+            append_attribute (attribute_names, attribute_values, "filter",
+                              &create_target_data->asset_hosts_filter);
+            set_client_state (CLIENT_CREATE_TARGET_ASSET_HOSTS);
+          }
+        else if (strcasecmp ("EXCLUDE_HOSTS", element_name) == 0)
+          set_client_state (CLIENT_CREATE_TARGET_EXCLUDE_HOSTS);
+        else if (strcasecmp ("REVERSE_LOOKUP_ONLY", element_name) == 0)
+          set_client_state (CLIENT_CREATE_TARGET_REVERSE_LOOKUP_ONLY);
+        else if (strcasecmp ("REVERSE_LOOKUP_UNIFY", element_name) == 0)
+          set_client_state (CLIENT_CREATE_TARGET_REVERSE_LOOKUP_UNIFY);
+        else if (strcasecmp ("ALIVE_TESTS", element_name) == 0)
+          set_client_state (CLIENT_CREATE_TARGET_ALIVE_TESTS);
+        else if (strcasecmp ("ALLOW_SIMULTANEOUS_IPS", element_name) == 0)
+          set_client_state (CLIENT_CREATE_TARGET_ALLOW_SIMULTANEOUS_IPS);
+        else if (strcasecmp ("COMMENT", element_name) == 0)
+          set_client_state (CLIENT_CREATE_TARGET_COMMENT);
+        else if (strcasecmp ("COPY", element_name) == 0)
+          set_client_state (CLIENT_CREATE_TARGET_COPY);
+        else if (strcasecmp ("ESXI_CREDENTIAL", element_name) == 0)
+          {
+            append_attribute (attribute_names, attribute_values, "id",
+                              &create_target_data->esxi_credential_id);
+            set_client_state (CLIENT_CREATE_TARGET_ESXI_CREDENTIAL);
+          }
+        else if (strcasecmp ("ESXI_LSC_CREDENTIAL", element_name) == 0)
+          {
+            append_attribute (attribute_names, attribute_values, "id",
+                              &create_target_data->esxi_lsc_credential_id);
+            set_client_state (CLIENT_CREATE_TARGET_ESXI_LSC_CREDENTIAL);
+          }
+        else if (strcasecmp ("HOSTS", element_name) == 0)
+          set_client_state (CLIENT_CREATE_TARGET_HOSTS);
+        else if (strcasecmp ("PORT_LIST", element_name) == 0)
+          {
+            append_attribute (attribute_names, attribute_values, "id",
+                              &create_target_data->port_list_id);
+            set_client_state (CLIENT_CREATE_TARGET_PORT_LIST);
+          }
+        else if (strcasecmp ("PORT_RANGE", element_name) == 0)
+          {
+            gvm_append_string (&create_target_data->port_range, "");
+            set_client_state (CLIENT_CREATE_TARGET_PORT_RANGE);
+          }
+        else if (strcasecmp ("KRB5_CREDENTIAL", element_name) == 0)
+          {
+            append_attribute (attribute_names, attribute_values, "id",
+                              &create_target_data->krb5_credential_id);
+            set_client_state (CLIENT_CREATE_TARGET_KRB5_CREDENTIAL);
+          }
+        else if (strcasecmp ("SSH_CREDENTIAL", element_name) == 0)
+          {
+            append_attribute (attribute_names, attribute_values, "id",
+                              &create_target_data->ssh_credential_id);
+            set_client_state (CLIENT_CREATE_TARGET_SSH_CREDENTIAL);
+          }
+        else if (strcasecmp ("SSH_LSC_CREDENTIAL", element_name) == 0)
+          {
+            append_attribute (attribute_names, attribute_values, "id",
+                              &create_target_data->ssh_lsc_credential_id);
+            set_client_state (CLIENT_CREATE_TARGET_SSH_LSC_CREDENTIAL);
+          }
+        else if (strcasecmp ("SSH_ELEVATE_CREDENTIAL", element_name) == 0)
+          {
+            append_attribute (attribute_names, attribute_values, "id",
+                              &create_target_data->ssh_elevate_credential_id);
+            set_client_state (CLIENT_CREATE_TARGET_SSH_ELEVATE_CREDENTIAL);
+          }
+        else if (strcasecmp ("SMB_CREDENTIAL", element_name) == 0)
+          {
+            append_attribute (attribute_names, attribute_values, "id",
+                              &create_target_data->smb_credential_id);
+            set_client_state (CLIENT_CREATE_TARGET_SMB_CREDENTIAL);
+          }
+        else if (strcasecmp ("SMB_LSC_CREDENTIAL", element_name) == 0)
+          {
+            append_attribute (attribute_names, attribute_values, "id",
+                              &create_target_data->smb_lsc_credential_id);
+            set_client_state (CLIENT_CREATE_TARGET_SMB_LSC_CREDENTIAL);
+          }
+        else if (strcasecmp ("SNMP_CREDENTIAL", element_name) == 0)
+          {
+            append_attribute (attribute_names, attribute_values, "id",
+                              &create_target_data->snmp_credential_id);
+            set_client_state (CLIENT_CREATE_TARGET_SNMP_CREDENTIAL);
+          }
+        else if (strcasecmp ("NAME", element_name) == 0)
+          {
+            gvm_append_string (&create_target_data->name, "");
+            set_client_state (CLIENT_CREATE_TARGET_NAME);
+          }
+        ELSE_READ_OVER;
+
+      case CLIENT_CREATE_TARGET_ALIVE_TESTS:
+        if (strcasecmp ("ALIVE_TEST", element_name) == 0)
+          set_client_state (CLIENT_CREATE_TARGET_ALIVE_TESTS_ALIVE_TEST);
+        ELSE_READ_OVER;
+
+      case CLIENT_CREATE_TARGET_SSH_CREDENTIAL:
+        if (strcasecmp ("PORT", element_name) == 0)
+          set_client_state (CLIENT_CREATE_TARGET_SSH_CREDENTIAL_PORT);
+        ELSE_READ_OVER;
+
+      case CLIENT_CREATE_TARGET_SSH_LSC_CREDENTIAL:
+        if (strcasecmp ("PORT", element_name) == 0)
+          set_client_state (CLIENT_CREATE_TARGET_SSH_LSC_CREDENTIAL_PORT);
+        ELSE_READ_OVER;
+
       case CLIENT_GET_AGGREGATES:
         if (strcasecmp ("DATA_COLUMN", element_name) == 0)
           {
@@ -6260,6 +6370,112 @@ gmp_xml_handle_start_element (/* unused */ GMarkupParseContext* context,
                               &modify_override_data->nvt_oid);
             set_client_state (CLIENT_MODIFY_OVERRIDE_NVT);
           }
+        ELSE_READ_OVER;
+
+      case CLIENT_MODIFY_TARGET:
+        if (strcasecmp ("EXCLUDE_HOSTS", element_name) == 0)
+          {
+            gvm_append_string (&modify_target_data->exclude_hosts, "");
+            set_client_state (CLIENT_MODIFY_TARGET_EXCLUDE_HOSTS);
+          }
+        else if (strcasecmp ("REVERSE_LOOKUP_ONLY", element_name) == 0)
+          set_client_state (CLIENT_MODIFY_TARGET_REVERSE_LOOKUP_ONLY);
+        else if (strcasecmp ("REVERSE_LOOKUP_UNIFY", element_name) == 0)
+          set_client_state (CLIENT_MODIFY_TARGET_REVERSE_LOOKUP_UNIFY);
+        else if (strcasecmp ("ALIVE_TESTS", element_name) == 0)
+          set_client_state (CLIENT_MODIFY_TARGET_ALIVE_TESTS);
+        else if (strcasecmp ("ALLOW_SIMULTANEOUS_IPS", element_name) == 0)
+          set_client_state (CLIENT_MODIFY_TARGET_ALLOW_SIMULTANEOUS_IPS);
+        else if (strcasecmp ("COMMENT", element_name) == 0)
+          {
+            gvm_append_string (&modify_target_data->comment, "");
+            set_client_state (CLIENT_MODIFY_TARGET_COMMENT);
+          }
+        else if (strcasecmp ("ESXI_CREDENTIAL", element_name) == 0)
+          {
+            append_attribute (attribute_names, attribute_values, "id",
+                              &modify_target_data->esxi_credential_id);
+            set_client_state (CLIENT_MODIFY_TARGET_ESXI_CREDENTIAL);
+          }
+        else if (strcasecmp ("ESXI_LSC_CREDENTIAL", element_name) == 0)
+          {
+            append_attribute (attribute_names, attribute_values, "id",
+                              &modify_target_data->esxi_lsc_credential_id);
+            set_client_state (CLIENT_MODIFY_TARGET_ESXI_LSC_CREDENTIAL);
+          }
+        else if (strcasecmp ("HOSTS", element_name) == 0)
+          {
+            gvm_append_string (&modify_target_data->hosts, "");
+            set_client_state (CLIENT_MODIFY_TARGET_HOSTS);
+          }
+        else if (strcasecmp ("PORT_LIST", element_name) == 0)
+          {
+            append_attribute (attribute_names, attribute_values, "id",
+                              &modify_target_data->port_list_id);
+            set_client_state (CLIENT_MODIFY_TARGET_PORT_LIST);
+          }
+        else if (strcasecmp ("KRB5_CREDENTIAL", element_name) == 0)
+          {
+            append_attribute (attribute_names, attribute_values, "id",
+                              &modify_target_data->krb5_credential_id);
+            set_client_state (CLIENT_MODIFY_TARGET_KRB5_CREDENTIAL);
+          }
+        else if (strcasecmp ("SSH_CREDENTIAL", element_name) == 0)
+          {
+            append_attribute (attribute_names, attribute_values, "id",
+                              &modify_target_data->ssh_credential_id);
+            set_client_state (CLIENT_MODIFY_TARGET_SSH_CREDENTIAL);
+          }
+        else if (strcasecmp ("SSH_LSC_CREDENTIAL", element_name) == 0)
+          {
+            append_attribute (attribute_names, attribute_values, "id",
+                              &modify_target_data->ssh_lsc_credential_id);
+            set_client_state (CLIENT_MODIFY_TARGET_SSH_LSC_CREDENTIAL);
+          }
+        else if (strcasecmp ("SSH_ELEVATE_CREDENTIAL", element_name) == 0)
+          {
+            append_attribute (attribute_names, attribute_values, "id",
+                              &modify_target_data->ssh_elevate_credential_id);
+            set_client_state (CLIENT_MODIFY_TARGET_SSH_ELEVATE_CREDENTIAL);
+          }
+        else if (strcasecmp ("SMB_CREDENTIAL", element_name) == 0)
+          {
+            append_attribute (attribute_names, attribute_values, "id",
+                              &modify_target_data->smb_credential_id);
+            set_client_state (CLIENT_MODIFY_TARGET_SMB_CREDENTIAL);
+          }
+        else if (strcasecmp ("SMB_LSC_CREDENTIAL", element_name) == 0)
+          {
+            append_attribute (attribute_names, attribute_values, "id",
+                              &modify_target_data->smb_lsc_credential_id);
+            set_client_state (CLIENT_MODIFY_TARGET_SMB_LSC_CREDENTIAL);
+          }
+        else if (strcasecmp ("SNMP_CREDENTIAL", element_name) == 0)
+          {
+            append_attribute (attribute_names, attribute_values, "id",
+                              &modify_target_data->snmp_credential_id);
+            set_client_state (CLIENT_MODIFY_TARGET_SNMP_CREDENTIAL);
+          }
+        else if (strcasecmp ("NAME", element_name) == 0)
+          {
+            gvm_append_string (&modify_target_data->name, "");
+            set_client_state (CLIENT_MODIFY_TARGET_NAME);
+          }
+        ELSE_READ_OVER;
+
+      case CLIENT_MODIFY_TARGET_ALIVE_TESTS:
+        if (strcasecmp ("ALIVE_TEST", element_name) == 0)
+          set_client_state (CLIENT_MODIFY_TARGET_ALIVE_TESTS_ALIVE_TEST);
+        ELSE_READ_OVER;
+
+      case CLIENT_MODIFY_TARGET_SSH_CREDENTIAL:
+        if (strcasecmp ("PORT", element_name) == 0)
+          set_client_state (CLIENT_MODIFY_TARGET_SSH_CREDENTIAL_PORT);
+        ELSE_READ_OVER;
+
+      case CLIENT_MODIFY_TARGET_SSH_LSC_CREDENTIAL:
+        if (strcasecmp ("PORT", element_name) == 0)
+          set_client_state (CLIENT_MODIFY_TARGET_SSH_LSC_CREDENTIAL_PORT);
         ELSE_READ_OVER;
 
       case CLIENT_RUN_WIZARD:
