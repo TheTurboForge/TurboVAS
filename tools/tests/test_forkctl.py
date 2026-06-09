@@ -197,13 +197,19 @@ class TurboVASCtlTests(unittest.TestCase):
         scopes_page = (root / "components" / "gsa" / "src" / "web" / "pages" / "scopes" / "ScopeListPage.tsx").read_text(encoding="utf-8")
         menu = (root / "components" / "gsa" / "src" / "web" / "components" / "menu" / "Menu.tsx").read_text(encoding="utf-8")
         list_page = (root / "components" / "gsa" / "src" / "web" / "pages" / "scope-reports" / "ScopeReportListPage.tsx").read_text(encoding="utf-8")
+        details_page = (root / "components" / "gsa" / "src" / "web" / "pages" / "scope-reports" / "ScopeReportDetailsPage.tsx").read_text(encoding="utf-8")
         self.assertIn("path: 'scopes/reports'", routes)
         self.assertIn("web/pages/scope-reports/ScopeReportListPage", routes)
         self.assertIn('to="/scopes/reports"', scopes_page)
         self.assertIn("to: '/scopes/reports'", menu)
         self.assertIn("_('Scope Reports')", menu)
-        self.assertIn("report.name || report.id", list_page)
+        self.assertIn("<StatusBar status={TASK_STATUS.done} />", list_page)
+        self.assertIn("<SeverityBar severity={report.maxSeverity} />", list_page)
         self.assertIn("report.resultsTotal", list_page)
+        self.assertIn("_('Information')", details_page)
+        self.assertIn("_('Results')", details_page)
+        self.assertIn("_('Evidence Sources')", details_page)
+        self.assertIn("<SeverityBar severity={result.severity} />", details_page)
 
     def test_license_helpers_detect_modified_imported_notice_gaps(self):
         with tempfile.TemporaryDirectory() as tmp:

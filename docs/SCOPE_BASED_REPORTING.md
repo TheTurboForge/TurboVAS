@@ -128,6 +128,12 @@ The top-level `Reports` page keeps the inherited raw scan-report list. Scope
 reports are reached through `Scopes`, where each scope shows its generated
 scope-report history and links to scope-report details. Raw task reports remain
 available as technical evidence from task, scope, and scope-report detail views.
+Scope reports should behave like reports, not like dashboards: the familiar
+report list/detail structure, status/severity presentation, information and
+results tabs, and evidence links should remain recognizable. The core semantic
+difference is the source set: a raw report is produced by one scan run, while a
+scope report aggregates the newest completed raw reports for the targets that
+belong to the scope.
 
 Scopes manually manage two memberships:
 
@@ -150,7 +156,10 @@ candidate hosts excluded from official counts.
 
 Findings are deduplicated by host identity, NVT/OID, port, and result identity.
 The report keeps representative result provenance and links back to the raw scan
-reports used as evidence.
+reports used as evidence. The current implementation exposes a report-like
+scope-report page and representative result rows; the next reporting UX slice
+should make the result collection pageable and filterable through report-like
+APIs instead of treating scope-report results as a bespoke preview payload.
 
 Runtime helpers are available for development validation:
 
@@ -163,6 +172,6 @@ Runtime helpers are available for development validation:
 ## Product Rule
 
 A target defines how TurboVAS collects evidence. A scope defines why that
-evidence matters and how it is reported. A scope report presents deduplicated
-asset and finding state for the scope, while raw target/task reports remain the
-technical evidence trail.
+evidence matters and how it is reported. A scope report is an aggregated report
+over the newest completed evidence for the scope's targets, while raw
+target/task reports remain the technical evidence trail.

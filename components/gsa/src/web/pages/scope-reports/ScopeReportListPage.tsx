@@ -5,6 +5,9 @@
 
 import {useCallback, useEffect, useMemo, useState} from 'react';
 import type {Scope, ScopeReport} from 'gmp/commands/scopes';
+import {TASK_STATUS} from 'gmp/models/task';
+import SeverityBar from 'web/components/bar/SeverityBar';
+import StatusBar from 'web/components/bar/StatusBar';
 import Button from 'web/components/form/Button';
 import Column from 'web/components/layout/Column';
 import PageTitle from 'web/components/layout/PageTitle';
@@ -22,8 +25,6 @@ import {
   ErrorMessage,
   formatDate,
   PageActions,
-  SummaryGrid,
-  SummaryItem,
 } from 'web/pages/scopes/common';
 
 const ScopeReportListPage = () => {
@@ -75,27 +76,10 @@ const ScopeReportListPage = () => {
     }
   }, [gmp, loadReports, organizationScope]);
 
-  const latestReport = reports[0];
-
   return (
     <Column>
       <PageTitle title={_('Scope Reports')} />
       <Section title={_('Scope Reports')} />
-      <SummaryGrid>
-        <SummaryItem label={_('Scope Reports')} value={reports.length} />
-        <SummaryItem
-          label={_('Latest Evidence')}
-          value={formatDate(latestReport?.latestEvidenceTime)}
-        />
-        <SummaryItem
-          label={_('Source Reports')}
-          value={latestReport?.sourceReportCount ?? 0}
-        />
-        <SummaryItem
-          label={_('Vulnerabilities')}
-          value={latestReport?.vulnerabilitiesTotal ?? 0}
-        />
-      </SummaryGrid>
       <PageActions>
         <Button
           disabled={loading || !organizationScope}
@@ -113,39 +97,50 @@ const ScopeReportListPage = () => {
       <Table>
         <TableBody>
           <TableRow>
-            <TableHead>{_('Name')}</TableHead>
+            <TableHead>{_('Date')}</TableHead>
+            <TableHead>{_('Status')}</TableHead>
             <TableHead>{_('Scope')}</TableHead>
-            <TableHead>{_('Created')}</TableHead>
             <TableHead>{_('Latest Evidence')}</TableHead>
+            <TableHead>{_('Severity')}</TableHead>
+            <TableHead>{_('High')}</TableHead>
+            <TableHead>{_('Medium')}</TableHead>
+            <TableHead>{_('Low')}</TableHead>
+            <TableHead>{_('Log')}</TableHead>
+            <TableHead>{_('False Positive')}</TableHead>
             <TableHead>{_('Source Reports')}</TableHead>
             <TableHead>{_('Hosts')}</TableHead>
             <TableHead>{_('Results')}</TableHead>
             <TableHead>{_('Vulnerabilities')}</TableHead>
-            <TableHead>{_('Severity')}</TableHead>
           </TableRow>
-          {reports.length === 0 && <EmptyRow colSpan={9} />}
+          {reports.length === 0 && <EmptyRow colSpan={14} />}
           {reports.map(report => (
             <TableRow key={report.id}>
               <TableData>
                 <Link to={`/scopes/${report.scopeId}/reports/${report.id}`}>
-                  {report.name || report.id}
+                  {formatDate(report.created)}
                 </Link>
+              </TableData>
+              <TableData>
+                <StatusBar status={TASK_STATUS.done} />
               </TableData>
               <TableData>
                 <Link to={`/scopes/${report.scopeId}`}>{report.scopeName}</Link>
               </TableData>
-              <TableData>{formatDate(report.created)}</TableData>
               <TableData>{formatDate(report.latestEvidenceTime)}</TableData>
+              <TableData>
+                <SeverityBar severity={report.maxSeverity} />
+              </TableData>
+              <TableData align="end">{report.severityHigh}</TableData>
+              <TableData align="end">{report.severityMedium}</TableData>
+              <TableData align="end">{report.severityLow}</TableData>
+              <TableData align="end">{report.severityLog}</TableData>
+              <TableData align="end">{report.severityFalsePositive}</TableData>
               <TableData>{report.sourceReportCount}</TableData>
               <TableData>
                 {report.hostsWithEvidence}/{report.hostsTotal}
               </TableData>
               <TableData>{report.resultsTotal}</TableData>
               <TableData>{report.vulnerabilitiesTotal}</TableData>
-              <TableData>
-                H {report.severityHigh} / M {report.severityMedium} / L{' '}
-                {report.severityLow}
-              </TableData>
             </TableRow>
           ))}
         </TableBody>

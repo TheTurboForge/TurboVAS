@@ -91,7 +91,11 @@ need to inspect individual technical task reports, unfinished reports, imported
 reports, or evidence from a specific scan run.
 
 Scope reports are reached from `Scopes`, not from the top-level `Reports` page.
-They are the operator-facing aggregation layer for reporting populations.
+They are report-shaped snapshots for reporting populations. The experience is
+intended to stay close to raw reports: information, results, severity, source
+evidence, and drill-down remain recognizable, while the evidence source changes
+from one technical scan report to the newest completed raw reports for the
+scope's targets.
 
 A scope is a reporting population. It describes the set of assets an operator
 wants to understand, such as an organization, a technology class, an exposure

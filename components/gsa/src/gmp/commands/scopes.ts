@@ -42,6 +42,7 @@ export interface ScopeReportSummary {
   severityLow: number;
   severityLog: number;
   severityFalsePositive: number;
+  maxSeverity: number;
   excludedCandidateHosts: number;
 }
 
@@ -86,6 +87,7 @@ export interface ScopeReportResult {
   nvtName?: string;
   severity: number;
   severityLabel?: string;
+  qod?: number;
   created?: string;
 }
 
@@ -203,6 +205,7 @@ const parseScopeReportSummary = (node: unknown): ScopeReportSummary => {
     severityLow: integer(severity.low),
     severityLog: integer(severity.log),
     severityFalsePositive: integer(severity.false_positive),
+    maxSeverity: decimal(data.max_severity),
     excludedCandidateHosts: countValue(counts, data, 'excluded_candidate_hosts', 'excluded_candidate_host_count'),
   };
 };
@@ -298,6 +301,7 @@ const parseScopeReport = (node: unknown): ScopeReport => {
         nvtName: optionalText(nvt.name) ?? optionalText(resultData.nvt),
         severity: decimal(resultData.severity),
         severityLabel: optionalText(resultData.severity_label),
+        qod: integer(resultData.qod),
         created: optionalText(resultData.created ?? resultData.date),
       };
     }),
