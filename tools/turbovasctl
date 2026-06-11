@@ -50,6 +50,7 @@ MODIFIED_IMPORTED_NO_COMMENT_FILES = {
     "components/gsa/package.json": "JSON package manifest; comments would make the file invalid.",
     "components/gsa/public/locales/gsa-de.json": "JSON locale catalog; comments would make the file invalid.",
     "components/gsa/public/locales/gsa-en.json": "JSON locale catalog; comments would make the file invalid.",
+    "components/gsa/public/locales/gsa-pt_BR.json": "JSON locale catalog; comments would make the file invalid.",
     "components/gsa/public/locales/gsa-zh_CN.json": "JSON locale catalog; comments would make the file invalid.",
     "components/gsa/public/locales/gsa-zh_TW.json": "JSON locale catalog; comments would make the file invalid.",
     "components/gvm-libs/.docker/prod-oldstable.Dockerfile": "Dockerfile syntax/positioning is build-sensitive; a file-level notice could alter build semantics.",
