@@ -64,6 +64,10 @@ the underlying target/task reports as evidence and provenance. A scope report
 should also make coverage and freshness visible, because incomplete or stale
 evidence changes the meaning of the report.
 
+The browser-level regression guard `just runtime-browser-smoke --json` checks
+the raw-report and scope-report reading workflow from the operator perspective.
+It does not start scans or mutate feeds.
+
 ## Why Scopes Are Not Folders
 
 TurboVAS does not model scopes as a strict tree.

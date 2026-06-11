@@ -60,6 +60,7 @@ Use the root `justfile` command surface:
 - `just runtime-feed-import-init`
 - `just runtime-app-smoke`
 - `just runtime-webui-smoke`
+- `just runtime-browser-smoke`
 - `just runtime-app-down`
 - `just down`
 

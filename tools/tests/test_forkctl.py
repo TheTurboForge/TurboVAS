@@ -46,6 +46,13 @@ assert RUNTIME_REPORT_SPEC.loader is not None
 sys.modules["runtime_report"] = runtime_report
 RUNTIME_REPORT_SPEC.loader.exec_module(runtime_report)
 
+BROWSER_SMOKE_PATH = Path(__file__).resolve().parents[1] / "runtime_browser_smoke.py"
+BROWSER_SMOKE_SPEC = importlib.util.spec_from_loader("runtime_browser_smoke", SourceFileLoader("runtime_browser_smoke", str(BROWSER_SMOKE_PATH)))
+runtime_browser_smoke = importlib.util.module_from_spec(BROWSER_SMOKE_SPEC)
+assert BROWSER_SMOKE_SPEC.loader is not None
+sys.modules["runtime_browser_smoke"] = runtime_browser_smoke
+BROWSER_SMOKE_SPEC.loader.exec_module(runtime_browser_smoke)
+
 
 class TurboVASCtlTests(unittest.TestCase):
     def test_component_registry_has_expected_components(self):
@@ -165,6 +172,7 @@ class TurboVASCtlTests(unittest.TestCase):
             "runtime-app-up",
             "runtime-app-down",
             "runtime-app-smoke",
+            "runtime-browser-smoke",
             "gvmd-smoke",
         ]
         for wrapper in wrappers:
@@ -213,6 +221,20 @@ class TurboVASCtlTests(unittest.TestCase):
         results_tab = (root / "components" / "gsa" / "src" / "web" / "pages" / "scope-reports" / "ScopeReportResultsTab.tsx").read_text(encoding="utf-8")
         self.assertIn("_and_scope_report_id", results_tab)
         self.assertIn("<ResultsTable", results_tab)
+
+    def test_runtime_browser_smoke_is_registered(self):
+        source = (Path(__file__).resolve().parents[1] / "turbovasctl").read_text(encoding="utf-8")
+        justfile = (Path(__file__).resolve().parents[2] / "justfile").read_text(encoding="utf-8")
+        self.assertIn("def command_runtime_browser_smoke", source)
+        self.assertIn("runtime_browser_smoke_probe_path", source)
+        self.assertIn("runtime-browser-smoke", source)
+        self.assertIn("runtime-browser-smoke *args:", justfile)
+        self.assertIn('tools/turbovasctl runtime-browser-smoke "$@"', justfile)
+
+    def test_runtime_browser_smoke_playwright_search_paths(self):
+        candidates = runtime_browser_smoke.PLAYWRIGHT_NODE_PATHS
+        self.assertIn("/home/turboforge/.local/share/turbovas-tools/playwright/node_modules", candidates)
+        self.assertIn("/home/turboforge/.local/nodejs/node-v22.22.3-linux-x64/lib/node_modules", candidates)
 
     def test_license_helpers_detect_modified_imported_notice_gaps(self):
         with tempfile.TemporaryDirectory() as tmp:
