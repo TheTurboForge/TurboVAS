@@ -9698,97 +9698,6 @@ where_qod (int min_qod)
   }
 
 /**
- * @brief Delta result iterator columns.
- */
-#define DELTA_RESULT_COLUMNS                                                  \
-    { "comparison.state", "delta_state", KEYWORD_TYPE_STRING },               \
-    { "comparison.delta_description", NULL, KEYWORD_TYPE_STRING },            \
-    { "comparison.delta_severity", NULL, KEYWORD_TYPE_DOUBLE },               \
-    { "comparison.delta_qod", NULL, KEYWORD_TYPE_INTEGER },                   \
-    { "comparison.delta_uuid", NULL, KEYWORD_TYPE_STRING },                   \
-    { "delta_qod_type", NULL, KEYWORD_TYPE_STRING },                          \
-    { "delta_date",                                                           \
-      "delta_creation_time",                                                  \
-      KEYWORD_TYPE_INTEGER },                                                 \
-    { "delta_date",                                                           \
-      "delta_modification_time",                                              \
-      KEYWORD_TYPE_INTEGER },                                                 \
-    { "delta_task", NULL, KEYWORD_TYPE_INTEGER },                             \
-    { "delta_report", NULL, KEYWORD_TYPE_INTEGER },                           \
-    { "(SELECT name FROM users WHERE users.id = results.owner)",              \
-      "_owner",                                                               \
-      KEYWORD_TYPE_STRING },                                                  \
-    { "delta_path", NULL, KEYWORD_TYPE_STRING },                              \
-    { "(SELECT CASE WHEN delta_host IS NULL"                                  \
-      "             THEN NULL"                                                \
-      "             ELSE (SELECT uuid FROM hosts"                             \
-      "                   WHERE id = (SELECT host FROM host_identifiers"      \
-      "                               WHERE source_type = 'Report Host'"      \
-      "                               AND name = 'ip'"                        \
-      "                               AND source_id"                          \
-      "                                   = (SELECT uuid"                     \
-      "                                      FROM reports"                    \
-      "                                      WHERE id = results.report)"      \
-      "                               AND value = delta_host"                 \
-      "                               LIMIT 1))"                              \
-      "             END)",                                                    \
-      NULL,                                                                   \
-      KEYWORD_TYPE_STRING },                                                  \
-    { "delta_nvt_version", NULL, KEYWORD_TYPE_STRING },                       \
-    { "result2_id", NULL, KEYWORD_TYPE_INTEGER },                             \
-    { "0", NULL, KEYWORD_TYPE_INTEGER },                                  \
-    { "(SELECT CASE"                                                          \
-      "        WHEN EXISTS (SELECT * FROM overrides"                          \
-      "                     WHERE (result = result2_id"                       \
-      "                            OR (result = 0 AND nvt = results.nvt))"    \
-      "                     AND (task = 0 OR task = delta_task))"             \
-      "        THEN 1"                                                        \
-      "        ELSE 0"                                                        \
-      "        END)",                                                         \
-      NULL,                                                                   \
-      KEYWORD_TYPE_INTEGER },                                                 \
-    { "0", NULL, KEYWORD_TYPE_INTEGER },                                      \
-    { "delta_hostname", NULL, KEYWORD_TYPE_STRING },                          \
-    { "delta_new_severity", NULL, KEYWORD_TYPE_DOUBLE },                      \
-    { "coalesce(lower(substring(comparison.delta_description,"                \
-      "          '^Compliant:[\\s]*([A-Z_]*)')),"                             \
-      "         'undefined')",                                                \
-      "compliant",                                                            \
-      KEYWORD_TYPE_STRING },
-
-/**
- * @brief Delta result iterator columns.
- */
-#define DELTA_RESULT_ITERATOR_COLUMNS                                         \
-  {                                                                           \
-    BASE_RESULT_ITERATOR_COLUMNS                                              \
-    { SECINFO_SQL_RESULT_CERT_BUNDS,                                          \
-      NULL,                                                                   \
-      KEYWORD_TYPE_INTEGER },                                                 \
-    { SECINFO_SQL_RESULT_DFN_CERTS,                                           \
-      NULL,                                                                   \
-      KEYWORD_TYPE_INTEGER },                                                 \
-    DELTA_RESULT_COLUMNS                                                      \
-    { NULL, NULL, KEYWORD_TYPE_UNKNOWN }                                      \
-  }
-
-/**
- * @brief Result iterator columns, when CERT db is not loaded.
- */
-#define DELTA_RESULT_ITERATOR_COLUMNS_NO_CERT                                 \
-  {                                                                           \
-    BASE_RESULT_ITERATOR_COLUMNS                                              \
-    { "0",                                                                    \
-      NULL,                                                                   \
-      KEYWORD_TYPE_INTEGER },                                                 \
-    { "0",                                                                    \
-      NULL,                                                                   \
-      KEYWORD_TYPE_INTEGER },                                                 \
-      DELTA_RESULT_COLUMNS                                                    \
-    { NULL, NULL, KEYWORD_TYPE_UNKNOWN }                                      \
-  }
-
-/**
  * @brief Result iterator columns, when CERT db is not loaded.
  */
 #define RESULT_ITERATOR_COLUMNS_NO_CERT                                       \
@@ -11171,361 +11080,6 @@ result_iterator_nvt_solution_method (iterator_t *iterator)
 }
 
 /**
- * @brief Get delta reports state from a result iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return delta reports state if any, else NULL.
- */
-const char *
-result_iterator_delta_state (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_string (iterator, RESULT_ITERATOR_DELTA_COLUMN_OFFSET);
-}
-
-/**
- * @brief Get delta description from a result iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return delta description if any, else NULL.
- */
-const char *
-result_iterator_delta_description (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_string (iterator, RESULT_ITERATOR_DELTA_COLUMN_OFFSET + 1);
-}
-
-/**
- * @brief Get delta severity from a result iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return delta severity if any, else NULL.
- */
-const char *
-result_iterator_delta_original_severity (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_string (iterator, RESULT_ITERATOR_DELTA_COLUMN_OFFSET + 2);
-}
-
-/**
- * @brief Get delta severity (double) from a result iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return delta severity (double) if any, else 0.
- */
-double
-result_iterator_delta_original_severity_double (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_double (iterator, RESULT_ITERATOR_DELTA_COLUMN_OFFSET + 2);
-}
-
-/**
- * @brief Get the severity/threat level from a delta result iterator.
- *
- * This is the the original level.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return The threat level of the delta result.  Caller must only use before
- *         calling cleanup_iterator.
- */
-const char*
-result_iterator_delta_original_level (iterator_t* iterator)
-{
-  double severity;
-  const char* ret;
-
-  if (iterator->done)
-    return "";
-
-  /* new_severity */
-  if (iterator_null (iterator, RESULT_ITERATOR_DELTA_COLUMN_OFFSET + 2))
-    return "";
-
-  severity = iterator_double (iterator, RESULT_ITERATOR_DELTA_COLUMN_OFFSET + 2);
-
-  ret = severity_to_level (severity, 0);
-  return ret ? ret : "";
-}
-
-/**
- * @brief Get delta qod from a result iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return delta qod if any, else NULL.
- */
-const char *
-result_iterator_delta_qod (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_string (iterator, RESULT_ITERATOR_DELTA_COLUMN_OFFSET + 3);
-}
-
-/**
- * @brief Get delta uuid from a result iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return delta uuid if any, else NULL.
- */
-const char *
-result_iterator_delta_uuid (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_string (iterator, RESULT_ITERATOR_DELTA_COLUMN_OFFSET + 4);
-}
-
-
-/**
- * @brief Get delta qod type from a result iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return delta qod type if any, else NULL.
- */
-const char *
-result_iterator_delta_qod_type (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_string (iterator, RESULT_ITERATOR_DELTA_COLUMN_OFFSET + 5);
-}
-
-/**
- * @brief Get delta creation time from a result iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return Time, or 0 if iteration is complete.
- */
-time_t
-result_iterator_delta_creation_time (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_int64 (iterator, RESULT_ITERATOR_DELTA_COLUMN_OFFSET + 6);
-}
-
-/**
- * @brief Get delta modification time from a result iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return Time, or 0 if iteration is complete.
- */
-time_t
-result_iterator_delta_modification_time (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_int64 (iterator, RESULT_ITERATOR_DELTA_COLUMN_OFFSET + 7);
-}
-
-/**
- * @brief Get delta task from a result iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return delta task if any, else 0.
- */
-task_t
-result_iterator_delta_task (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_int64 (iterator, RESULT_ITERATOR_DELTA_COLUMN_OFFSET + 8);
-}
-
-/**
- * @brief Get delta report from a result iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return delta report if any, else 0.
- */
-report_t
-result_iterator_delta_report (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_int64 (iterator, RESULT_ITERATOR_DELTA_COLUMN_OFFSET + 9);
-}
-
-/**
- * @brief Get delta owner from a result iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return delta owner if any, else NULL.
- */
-const char *
-result_iterator_delta_owner_name (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_string (iterator, RESULT_ITERATOR_DELTA_COLUMN_OFFSET + 10);
-}
-
-/**
- * @brief Get delta path from a result iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return delta path if any, else NULL.
- */
-const char *
-result_iterator_delta_path (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_string (iterator, RESULT_ITERATOR_DELTA_COLUMN_OFFSET + 11);
-}
-
-/**
- * @brief Get delta host asset id from a result iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return delta host asset id if any, else NULL.
- */
-const char *
-result_iterator_delta_host_asset_id (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_string (iterator, RESULT_ITERATOR_DELTA_COLUMN_OFFSET + 12);
-}
-
-/**
- * @brief Get delta nvt version from a result iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return delta nvt version if any, else NULL.
- */
-const char *
-result_iterator_delta_nvt_version (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_string (iterator, RESULT_ITERATOR_DELTA_COLUMN_OFFSET + 13);
-}
-
-/**
- * @brief Get delta result from a result iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return delta result if any, else 0.
- */
-result_t
-result_iterator_delta_result (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_int64 (iterator, RESULT_ITERATOR_DELTA_COLUMN_OFFSET + 14);
-}
-
-/**
- * @brief Get whether there are overrides for the delta result from the iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return whether there are overrides.
- */
-int
-result_iterator_delta_may_have_overrides (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_int (iterator, RESULT_ITERATOR_DELTA_COLUMN_OFFSET + 16);
-}
-
-/**
- * @brief Get delta hostname from a result iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return delta hostname if any, else NULL.
- */
-const char *
-result_iterator_delta_hostname (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_string (iterator, RESULT_ITERATOR_DELTA_COLUMN_OFFSET + 18);
-}
-
-
-/**
- * @brief Get delta severity from a result iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return delta severity if any, else NULL.
- */
-const char *
-result_iterator_delta_severity (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_string (iterator, RESULT_ITERATOR_DELTA_COLUMN_OFFSET + 19);
-}
-
-/**
- * @brief Get delta severity (double) from a result iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return delta severity (double) if any, else 0.
- */
-double
-result_iterator_delta_severity_double (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_double (iterator, RESULT_ITERATOR_DELTA_COLUMN_OFFSET + 19);
-}
-
-/**
- * @brief Get delta compliance from a result iterator.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return delta compliance if any, else NULL.
- */
-const char *
-result_iterator_delta_compliance (iterator_t* iterator)
-{
-  if (iterator->done) return 0;
-  return iterator_string (iterator, RESULT_ITERATOR_DELTA_COLUMN_OFFSET + 20);
-}
-
-/**
- * @brief Get the severity/threat level from a delta result iterator.
- *
- * This is the the overridden level.
- *
- * @param[in]  iterator  Iterator.
- *
- * @return The threat level of the delta result.  Caller must only use before
- *         calling cleanup_iterator.
- */
-const char*
-result_iterator_delta_level (iterator_t* iterator)
-{
-  double severity;
-  const char* ret;
-
-  if (iterator->done)
-    return "";
-
-  /* new_severity */
-  if (iterator_null (iterator, RESULT_ITERATOR_DELTA_COLUMN_OFFSET + 19))
-    return "";
-
-  severity = iterator_double (iterator, RESULT_ITERATOR_DELTA_COLUMN_OFFSET + 19);
-
-  ret = severity_to_level (severity, 0);
-  return ret ? ret : "";
-}
-
-
-/**
  * @brief Append an NVT's references to an XML string buffer.
  *
  * @param[in]  xml       The buffer where to append to.
@@ -12889,8 +12443,7 @@ trim_partial_report (report_t report)
 
 /** @todo Defined in gmp.c! */
 void buffer_results_xml (GString *, iterator_t *, task_t, int, int, int,
-                         int, int, const char *, iterator_t *, int, int, int,
-                         int);
+                         int, int, int, int);
 
 /**
  * @brief Write XML to a file or close stream and return.
@@ -12908,318 +12461,6 @@ void buffer_results_xml (GString *, iterator_t *, task_t, int, int, int,
         }                                                                    \
     }                                                                        \
   while (0)
-
-/**
- * @brief Add a port to a port tree.
- *
- * @param[in]  ports    The tree.
- * @param[in]  results  Result iterator on result whose port to add.
- */
-static void
-add_port (GTree *ports, iterator_t *results)
-{
-  const char *port, *host;
-  double *old_severity, *severity;
-  GTree *host_ports;
-
-  /* Ensure there's an inner tree for the host. */
-
-  host = result_iterator_host (results);
-  host_ports = g_tree_lookup (ports, host);
-  if (host_ports == NULL)
-    {
-      host_ports = g_tree_new_full ((GCompareDataFunc) strcmp, NULL, g_free,
-                                    g_free);
-      g_tree_insert (ports, g_strdup (host), host_ports);
-    }
-
-  /* Ensure the highest threat is recorded for the port in the inner tree. */
-
-  port = result_iterator_port (results);
-  severity = g_malloc (sizeof (double));
-  *severity = result_iterator_severity_double (results);
-
-  old_severity = g_tree_lookup (host_ports, port);
-  g_debug ("   delta: %s: adding %s severity %1.1f on host %s", __func__,
-          port, *severity, host);
-  if (old_severity == NULL)
-    g_tree_insert (host_ports, g_strdup (port), severity);
-  else if (severity > old_severity)
-    {
-      *old_severity = *severity;
-      g_free (severity);
-    }
-  else
-    {
-      g_free (severity);
-    }
-}
-
-/**
- * @brief Print delta host ports.
- *
- * @param[in]  key     Port.
- * @param[in]  value   Threat.
- * @param[in]  data    Host and stream.
- *
- * @return Always FALSE.
- */
-static gboolean
-print_host_port (gpointer key, gpointer value, gpointer data)
-{
-  gpointer *host_and_stream;
-  host_and_stream = (gpointer*) data;
-  g_debug ("   delta: %s: host %s port %s", __func__,
-          (gchar*) host_and_stream[0], (gchar*) key);
-  fprintf ((FILE*) host_and_stream[1],
-           "<port>"
-           "<host>%s</host>"
-           "%s"
-           "<severity>%1.1f</severity>"
-           "<threat>%s</threat>"
-           "</port>",
-           (gchar*) host_and_stream[0],
-           (gchar*) key,
-           *((double*) value),
-           severity_to_level (*((double*) value), 0));
-  return FALSE;
-}
-
-/**
- * @brief Print delta ports.
- *
- * @param[in]  key     Host.
- * @param[in]  value   Port tree.
- * @param[in]  stream  Stream.
- *
- * @return Always FALSE.
- */
-static gboolean
-print_host_ports (gpointer key, gpointer value, gpointer stream)
-{
-  gpointer host_and_stream[2];
-  host_and_stream[0] = key;
-  host_and_stream[1] = stream;
-  g_debug ("   delta: %s: host %s", __func__, (gchar*) key);
-  g_tree_foreach ((GTree*) value, print_host_port, host_and_stream);
-  return FALSE;
-}
-
-/**
- * @brief Add port to ports array.
- *
- * @param[in]  key     Port.
- * @param[in]  value   Threat.
- * @param[in]  ports   Ports array.
- *
- * @return Always FALSE.
- */
-static gboolean
-array_add_port (gpointer key, gpointer value, gpointer ports)
-{
-  gpointer *port_threat;
-  port_threat = g_malloc (2 * sizeof (gpointer));
-  port_threat[0] = key;
-  port_threat[1] = value;
-  array_add ((array_t*) ports, port_threat);
-  return FALSE;
-}
-
-/**
- * @brief Print delta ports, in descending order.
- *
- * @param[in]  key     Host.
- * @param[in]  value   Port tree.
- * @param[in]  stream  Stream.
- *
- * @return Always FALSE.
- */
-static gboolean
-print_host_ports_desc (gpointer key, gpointer value, gpointer stream)
-{
-  guint index;
-  array_t *ports;
-
-  g_debug ("   delta: %s: host %s", __func__, (gchar*) key);
-
-  /* Convert tree to array. */
-
-  ports = make_array ();
-  g_tree_foreach ((GTree*) value, array_add_port, ports);
-
-  /* Print the array backwards. */
-
-  index = ports->len;
-  while (index--)
-    {
-      gpointer *port_threat;
-      port_threat = g_ptr_array_index (ports, index);
-      fprintf ((FILE*) stream,
-               "<port>"
-               "<host>%s</host>"
-               "%s"
-               "<severity>%1.1f</severity>"
-               "<threat>%s</threat>"
-               "</port>",
-               (gchar*) key,
-               (gchar*) port_threat[0],
-               *((double*) port_threat[1]),
-               severity_to_level (*((double*) port_threat[1]), 0));
-    }
-
-  array_free (ports);
-
-  return FALSE;
-}
-
-/**
- * @brief Compare port severities, ascending.
- *
- * @param[in]  one  First.
- * @param[in]  two  Second.
- *
- * @return 1 one greater, -1 two greater, 0 equal.
- */
-static gint
-compare_ports_severity (gconstpointer one, gconstpointer two)
-{
-  gpointer *port_threat_one, *port_threat_two;
-  port_threat_one = *((gpointer**) one);
-  port_threat_two = *((gpointer**) two);
-  if (*((double*) port_threat_one[1]) > *((double*) port_threat_two[1]))
-    return 1;
-  else if (*((double*) port_threat_one[1]) < *((double*) port_threat_two[1]))
-    return -1;
-  else
-    return 0;
-}
-
-/**
- * @brief Compare port severities, descending.
- *
- * @param[in]  one  First.
- * @param[in]  two  Second.
- *
- * @return 1 one less, -1 two less, 0 equal.
- */
-static gint
-compare_ports_severity_desc (gconstpointer one, gconstpointer two)
-{
-  gpointer *port_threat_one, *port_threat_two;
-  port_threat_one = *((gpointer**) one);
-  port_threat_two = *((gpointer**) two);
-  if (*((double*) port_threat_one[1]) < *((double*) port_threat_two[1]))
-    return 1;
-  else if (*((double*) port_threat_one[1]) > *((double*) port_threat_two[1]))
-    return -1;
-  else
-    return 0;
-}
-
-/**
- * @brief Print delta ports, ordering by severity.
- *
- * @param[in]  key        Host.
- * @param[in]  value      Port tree.
- * @param[in]  stream     Stream.
- * @param[in]  ascending  Ascending or descending.
- *
- * @return Always FALSE.
- */
-static gboolean
-print_host_ports_by_severity (gpointer key, gpointer value, gpointer stream,
-                              int ascending)
-{
-  guint index, len;
-  array_t *ports;
-
-  g_debug ("   delta: %s: host %s", __func__, (gchar*) key);
-
-  /* Convert tree to array. */
-
-  ports = make_array ();
-  g_tree_foreach ((GTree*) value, array_add_port, ports);
-
-  /* Sort the array. */
-
-  if (ascending)
-    g_ptr_array_sort (ports, compare_ports_severity);
-  else
-    g_ptr_array_sort (ports, compare_ports_severity_desc);
-
-  /* Print the sorted array. */
-
-  index = 0;
-  len = ports->len;
-  while (index < len)
-    {
-      gpointer *port_threat;
-      port_threat = g_ptr_array_index (ports, index);
-      fprintf ((FILE*) stream,
-               "<port>"
-               "<host>%s</host>"
-               "%s"
-               "<severity>%1.1f</severity>"
-               "<threat>%s</threat>"
-               "</port>",
-               (gchar*) key,
-               (gchar*) port_threat[0],
-               *((double*) port_threat[1]),
-               severity_to_level (*((double*) port_threat[1]), 0));
-      index++;
-    }
-
-  array_free (ports);
-
-  return FALSE;
-}
-
-/**
- * @brief Print delta ports, ordering by severity descending.
- *
- * @param[in]  key     Host.
- * @param[in]  value   Port tree.
- * @param[in]  stream  Stream.
- *
- * @return Always FALSE.
- */
-static gboolean
-print_host_ports_by_severity_desc (gpointer key, gpointer value,
-                                   gpointer stream)
-{
-  return print_host_ports_by_severity (key, value, stream, 0);
-}
-
-/**
- * @brief Print delta ports, ordering by severity ascending.
- *
- * @param[in]  key     Host.
- * @param[in]  value   Port tree.
- * @param[in]  stream  Stream.
- *
- * @return Always FALSE.
- */
-static gboolean
-print_host_ports_by_severity_asc (gpointer key, gpointer value,
-                                  gpointer stream)
-{
-  return print_host_ports_by_severity (key, value, stream, 1);
-}
-
-/**
- * @brief Free delta host ports.
- *
- * @param[in]  host_ports  Ports.
- * @param[in]  dummy       Dummy.
- *
- * @return Always FALSE.
- */
-static gboolean
-free_host_ports (GTree *host_ports, gpointer dummy)
-{
-  g_tree_destroy (host_ports);
-  return FALSE;
-}
 
 /**
  * @brief Get N'th last report_host given a host.
@@ -13489,391 +12730,6 @@ tz_revert (gchar *zone, char *tz, char *old_tz_override)
 }
 
 /**
- * @brief Init delta iterator for print_report_xml.
- *
- * @param[in]  report         The report.
- * @param[in]  results        Report result iterator.
- * @param[in]  delta          Delta report.
- * @param[in]  get            GET command data.
- * @param[in]  term           Filter term.
- * @param[out] sort_field     Sort field.
- *
- * @return 0 on success, -1 error.
- */
-static int
-init_delta_iterator (report_t report, iterator_t *results, report_t delta,
-                     const get_data_t *get, const char *term,
-                     const char *sort_field)
-{
-  int ret;
-  static const char *filter_columns[] = RESULT_ITERATOR_FILTER_COLUMNS;
-  static column_t columns_no_cert[] = DELTA_RESULT_ITERATOR_COLUMNS_NO_CERT;
-  static column_t columns[] = DELTA_RESULT_ITERATOR_COLUMNS;
-
-
-  gchar *filter, *extra_tables, *extra_where, *extra_where_single;
-  gchar *opts_tables, *extra_with, *lateral_clause, *with_lateral;
-  int apply_overrides, dynamic_severity;
-  column_t *actual_columns;
-
-  g_debug ("%s", __func__);
-
-  if (report == -1)
-    {
-      init_iterator (results, "SELECT NULL WHERE false;");
-      return 0;
-    }
-
-  if (get->filt_id && strcmp (get->filt_id, FILT_ID_NONE))
-    {
-      filter = filter_term (get->filt_id);
-      if (filter == NULL)
-        return 2;
-    }
-  else
-    filter = NULL;
-
-  apply_overrides
-    = filter_term_apply_overrides (filter ? filter : get->filter);
-  dynamic_severity = setting_dynamic_severity_int ();
-
-  if (manage_cert_loaded ())
-    actual_columns = columns;
-  else
-    actual_columns = columns_no_cert;
-
-  opts_tables = result_iterator_opts_table (apply_overrides, dynamic_severity);
-
-  lateral_clause = result_iterator_lateral (apply_overrides,
-                                            dynamic_severity,
-                                            "results",
-                                            "nvts");
-
-  extra_tables = g_strdup_printf (" JOIN comparison "
-                                  " ON results.id = COALESCE (result1_id,"
-                                  "                           result2_id)"
-                                  " LEFT OUTER JOIN result_vt_epss"
-                                  " ON results.nvt = result_vt_epss.vt_id"
-                                  " LEFT OUTER JOIN nvts"
-                                  " ON results.nvt = nvts.oid %s,"
-                                  " LATERAL %s AS lateral_new_severity",
-                                  opts_tables,
-                                  lateral_clause);
-
-  g_free (lateral_clause);
-
-  extra_where = results_extra_where (get->trash, 0, NULL,
-                                     apply_overrides, dynamic_severity,
-                                     filter ? filter : get->filter,
-                                     NULL);
-
-  extra_where_single = results_extra_where (get->trash, 0, NULL,
-                                            apply_overrides,
-                                            dynamic_severity,
-                                            "min_qod=0",
-                                            NULL);
-
-  free (filter);
-
-  with_lateral = result_iterator_lateral (apply_overrides,
-                                          dynamic_severity,
-                                          "results",
-                                          "nvts_cols");
-
-  extra_with = g_strdup_printf(" comparison AS ("
-    " WITH r1a as (SELECT results.id, description, host, report, port,"
-    "              severity, nvt, results.qod, results.uuid, hostname,"
-    "              path, r1_lateral.new_severity as new_severity "
-    "       FROM results "
-    "       LEFT JOIN (SELECT cvss_base, oid AS nvts_oid FROM nvts)"
-    "       AS nvts_cols"
-    "       ON nvts_cols.nvts_oid = results.nvt"
-    "       %s, LATERAL %s AS r1_lateral"
-    "       WHERE report = %llu),"
-    " r2a as (SELECT results.*, r2_lateral.new_severity AS new_severity"
-    "        FROM results"
-    "        LEFT JOIN (SELECT cvss_base, oid AS nvts_oid FROM nvts)"
-    "        AS nvts_cols"
-    "        ON nvts_cols.nvts_oid = results.nvt"
-    "        %s, LATERAL %s AS r2_lateral"
-    "        WHERE report = %llu),"
-    " r1 as (SELECT DISTINCT ON (r1a.id) r1a.*, r2a.id as r2id, row_number() over w1 as r1_rank"
-    "        FROM r1a LEFT JOIN r2a ON r1a.host = r2a.host"
-    "        AND normalize_port(r1a.port) = normalize_port(r2a.port)"
-    "        AND r1a.nvt = r2a.nvt "
-    "        AND (r1a.new_severity = 0) = (r2a.new_severity = 0)"
-    "        AND (r1a.description = r2a.description)"
-    "        WINDOW w1 AS (PARTITION BY r1a.host, normalize_port(r1a.port),"
-    "                      r1a.nvt, r1a.new_severity = 0, r2a.id is null ORDER BY r1a.description, r2a.id)"
-    "        ORDER BY r1a.id),"
-    " r2 as (SELECT DISTINCT ON (r2a.id) r2a.*, r1a.id as r1id, row_number() over w2 as r2_rank"
-    "        FROM r2a LEFT JOIN r1a ON r2a.host = r1a.host"
-    "        AND normalize_port(r2a.port) = normalize_port(r1a.port)"
-    "        AND r2a.nvt = r1a.nvt "
-    "        AND (r2a.new_severity = 0) = (r1a.new_severity = 0)"
-    "        AND (r2a.description = r1a.description)"
-    "        WINDOW w2 AS (PARTITION BY r2a.host, normalize_port(r2a.port),"
-    "                      r2a.nvt, r2a.new_severity = 0, r1a.id is null ORDER BY r2a.description, r1a.id)"
-    "        ORDER BY r2a.id)"
-    " (SELECT r1.id AS result1_id,"
-    " r2.id AS result2_id,"
-    " compare_results("
-    "  r1.description,"
-    "  r2.description,"
-    "  r1.new_severity::double precision,"
-    "  r2.new_severity::double precision,"
-    "  r1.qod::integer,"
-    "  r2.qod::integer,"
-       RESULT_HOSTNAME_SQL("r1.hostname", "r1.host", "r1.report")","
-       RESULT_HOSTNAME_SQL("r2.hostname", "r2.host", "r2.report")","
-    "  r1.path,"
-    "  r2.path) AS state,"
-    " r2.description AS delta_description,"
-    " r2.new_severity AS delta_new_severity,"
-    " r2.severity AS delta_severity,"
-    " r2.qod AS delta_qod,"
-    " r2.qod_type AS delta_qod_type,"
-    " r2.uuid AS delta_uuid,"
-    " r2.date AS delta_date,"
-    " r2.task AS delta_task,"
-    " r2.report AS delta_report,"
-    " r2.owner AS delta_owner,"
-    " r2.path AS delta_path,"
-    " r2.host AS delta_host,"
-      RESULT_HOSTNAME_SQL("r2.hostname", "r2.host", "r2.report")
-    "   AS delta_hostname,"
-    " r2.nvt_version AS delta_nvt_version"
-    " FROM r1"
-    " FULL OUTER JOIN r2"
-    " ON r1.host = r2.host"
-    " AND normalize_port(r1.port) = normalize_port(r2.port)"
-    " AND r1.nvt = r2.nvt "
-    " AND (r1.new_severity = 0) = (r2.new_severity = 0)"
-    " AND ((r1id IS NULL AND r2id IS NULL) OR"
-    "      r2id = r2.id OR r1id = r1.id)"
-    " AND r1_rank = r2_rank"
-    " ) ) ",
-    opts_tables,
-    with_lateral,
-    report,
-    opts_tables,
-    with_lateral,
-    delta);
-
-  ret = init_get_iterator2_with (results,
-                                "result",
-                                get,
-                                /* SELECT columns. */
-                                actual_columns,
-                                NULL,
-                                /* Filterable columns not in SELECT columns. */
-                                NULL,
-                                NULL,
-                                filter_columns,
-                                0,
-                                extra_tables,
-                                extra_where,
-                                extra_where_single,
-                                TRUE,
-                                report ? TRUE : FALSE,
-                                NULL,
-                                extra_with,
-                                0,
-                                0);
-  g_free (extra_tables);
-  g_free (extra_where);
-  g_free (extra_where_single);
-  g_free (with_lateral);
-  g_free (opts_tables);
-
-  g_debug ("%s: done", __func__);
-
-  return ret;
-}
-
-/**
- * @brief Print delta results for print_report_xml.
- *
- * @param[in]  out            File stream to write to.
- * @param[in]  results        Report result iterator.
- * @param[in]  delta_states   String describing delta states to include in count
- *                            (for example, "sngc" Same, New, Gone and Changed).
- *                            All levels if NULL.
- * @param[in]  first_result   First result.
- * @param[in]  max_results    Max results.
- * @param[in]  task           The task.
- * @param[in]  overrides          Whether to include overrides.
- * @param[in]  overrides_details  Whether to include override details.
- * @param[in]  sort_order         Sort order.
- * @param[in]  sort_field         Sort field.
- * @param[in]  result_hosts_only  Whether to only include hosts with results.
- * @param[in]  orig_filtered_result_count  Result count.
- * @param[in]  filtered_result_count       Result count.
- * @param[in]  orig_f_criticals            Result count.
- * @param[in]  f_criticals                 Result count.
- * @param[in]  orig_f_holes                Result count.
- * @param[in]  f_holes                     Result count.
- * @param[in]  orig_f_infos                Result count.
- * @param[in]  f_infos                     Result count.
- * @param[in]  orig_f_logs                 Result count.
- * @param[in]  f_logs                      Result count.
- * @param[in]  orig_f_warnings             Result count.
- * @param[in]  f_warnings                  Result count.
- * @param[in]  orig_f_false_positives      Result count.
- * @param[in]  f_false_positives           Result count.
- * @param[in]  f_compliance_yes            filtered compliant count.
- * @param[in]  f_compliance_no             filtered incompliant count.
- * @param[in]  f_compliance_incomplete     filtered incomplete count.
- * @param[in]  f_compliance_undefined      filtered undefined count.
- * @param[in]  f_compliance_count          total filtered compliance count.
- * @param[in]  result_hosts                Result hosts.
- *
- * @return 0 on success, -1 error.
- */
-static int
-print_report_delta_xml (FILE *out, iterator_t *results,
-                        const char *delta_states,
-                        int first_result, int max_results, task_t task,
-                        int overrides, int overrides_details, int sort_order,
-                        const char *sort_field, int result_hosts_only,
-                        int *orig_filtered_result_count,
-                        int *filtered_result_count,
-                        int *orig_f_criticals, int *f_criticals,
-                        int *orig_f_holes, int *f_holes,
-                        int *orig_f_infos, int *f_infos,
-                        int *orig_f_logs, int *f_logs,
-                        int *orig_f_warnings, int *f_warnings,
-                        int *orig_f_false_positives, int *f_false_positives,
-                        int *f_compliance_yes, int *f_compliance_no,
-                        int *f_compliance_incomplete,
-                        int *f_compliance_undefined, int *f_compliance_count,
-                        array_t *result_hosts)
-{
-  GString *buffer = g_string_new ("");
-  GTree *ports;
-  *orig_f_holes = *f_holes;
-  *orig_f_criticals = *f_criticals;
-  *orig_f_infos = *f_infos;
-  *orig_f_logs = *f_logs;
-  *orig_f_warnings = *f_warnings;
-  *orig_f_false_positives = *f_false_positives;
-  *orig_filtered_result_count = *filtered_result_count;
-
-  ports = g_tree_new_full ((GCompareDataFunc) strcmp, NULL, g_free,
-                           (GDestroyNotify) free_host_ports);
-
-  while (next (results)) {
-
-    const char *state = result_iterator_delta_state (results);
-
-    if (strchr (delta_states, state[0]) == NULL) continue;
-
-    const char *level;
-    /* Increase the result count. */
-    level = result_iterator_level (results);
-    (*orig_filtered_result_count)++;
-    (*filtered_result_count)++;
-    if (strcmp (level, "Critical") == 0)
-      {
-        (*orig_f_criticals)++;
-        (*f_criticals)++;
-      }
-    if (strcmp (level, "High") == 0)
-      {
-        (*orig_f_holes)++;
-        (*f_holes)++;
-      }
-    else if (strcmp (level, "Medium") == 0)
-      {
-        (*orig_f_warnings)++;
-        (*f_warnings)++;
-      }
-    else if (strcmp (level, "Low") == 0)
-      {
-        (*orig_f_infos)++;
-        (*f_infos)++;
-      }
-    else if (strcmp (level, "Log") == 0)
-      {
-        (*orig_f_logs)++;
-        (*f_logs)++;
-      }
-    else if (strcmp (level, "False Positive") == 0)
-      {
-        (*orig_f_false_positives)++;
-        (*f_false_positives)++;
-      }
-
-    buffer_results_xml (buffer,
-                        results,
-                        task,
-                        overrides,
-                        overrides_details,
-                        0,
-                        0,
-                        0,
-                        state,
-                        NULL,
-                        (strcmp (state, "changed") == 0),
-                        -1,
-                        0,  /* Lean. */
-                        0); /* Delta fields. */
-
-    if (fprintf (out, "%s", buffer->str) < 0)
-      {
-        g_string_free (buffer, TRUE);
-        g_tree_destroy (ports);
-        return -1;
-      }
-    if (result_hosts_only)
-      array_add_new_string (result_hosts,
-                            result_iterator_host (results));
-    add_port (ports, results);
-    g_string_truncate (buffer, 0);
-  }
-  g_string_free (buffer, TRUE);
-
-  if (fprintf (out, "</results>") < 0)
-    {
-      g_tree_destroy (ports);
-      return -1;
-    }
-
-  gchar *msg;
-  msg = g_markup_printf_escaped ("<ports"
-                                 " start=\"%i\""
-                                 " max=\"%i\">",
-                                 /* Add 1 for 1 indexing. */
-                                 first_result + 1,
-                                 max_results);
-  if (fprintf (out, "%s", msg) < 0)
-    {
-      g_tree_destroy (ports);
-      g_free (msg);
-      return -1;
-    }
-  g_free (msg);
-  if (sort_field == NULL || strcmp (sort_field, "port"))
-    {
-      if (sort_order)
-        g_tree_foreach (ports, print_host_ports_by_severity_asc, out);
-      else
-        g_tree_foreach (ports, print_host_ports_by_severity_desc, out);
-    }
-  else if (sort_order)
-    g_tree_foreach (ports, print_host_ports, out);
-  else
-    g_tree_foreach (ports, print_host_ports_desc, out);
-  g_tree_destroy (ports);
-  if (fprintf (out, "</ports>") < 0)
-    {
-      return -1;
-    }
-
-  return 0;
-}
-
-/**
  * @brief Ensure a filter string has min_qod and apply_overrides.
  *
  * @param[in]  clean  Filter string.
@@ -13981,24 +12837,21 @@ print_report_init_zone (print_report_context_t *ctx)
 static void
 print_report_get_totals (print_report_context_t *ctx)
 {
-  if (ctx->delta == 0)
-    {
-      int total_criticals = 0, total_holes, total_infos, total_logs;
-      int total_warnings, total_false_positives;
-      get_data_t *all_results_get;
+  int total_criticals = 0, total_holes, total_infos, total_logs;
+  int total_warnings, total_false_positives;
+  get_data_t *all_results_get;
 
-      all_results_get = report_results_get_data (1, -1, 0, 0);
+  all_results_get = report_results_get_data (1, -1, 0, 0);
 
-      report_counts_id (ctx->report, &total_criticals, &total_holes,
-                        &total_infos, &total_logs, &total_warnings,
-                        &total_false_positives, NULL, all_results_get, NULL);
+  report_counts_id (ctx->report, &total_criticals, &total_holes,
+                    &total_infos, &total_logs, &total_warnings,
+                    &total_false_positives, NULL, all_results_get, NULL);
 
-      ctx->total_result_count = total_criticals + total_holes
-                                + total_infos + total_logs
-                                + total_warnings + total_false_positives;
-      get_data_reset (all_results_get);
-      free (all_results_get);
-    }
+  ctx->total_result_count = total_criticals + total_holes
+                            + total_infos + total_logs
+                            + total_warnings + total_false_positives;
+  get_data_reset (all_results_get);
+  free (all_results_get);
 
   /* Get total counts of filtered results. */
 
@@ -14027,7 +12880,6 @@ print_report_get_totals (print_report_context_t *ctx)
  * @brief Print the main XML content for a report to a file.
  *
  * @param[in]  report      The report.
- * @param[in]  delta       Report to compare with the report.
  * @param[in]  task        Task associated with report.
  * @param[in]  xml_start   File name.
  * @param[in]  get         GET command data.
@@ -14042,7 +12894,7 @@ print_report_get_totals (print_report_context_t *ctx)
  * @return 0 on success, -1 error, 2 failed to find filter (before any printing).
  */
 static int
-print_report_xml_start (report_t report, report_t delta, task_t task,
+print_report_xml_start (report_t report, task_t task,
                         gchar* xml_start, const get_data_t *get,
                         int overrides_details, int result_tags,
                         int ignore_pagination, int lean,
@@ -14057,22 +12909,17 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
   FILE *out;
   gchar *term, *sort_field, *levels, *search_phrase;
   gchar *min_qod;
-  gchar *delta_states, *timestamp;
+  gchar *timestamp;
   int min_qod_int;
   char *uuid, *tsk_uuid = NULL, *start_time, *end_time;
   array_t *result_hosts;
   int reuse_result_iterator;
-  iterator_t results, delta_results;
+  iterator_t results;
   int f_criticals = 0, f_holes, f_infos, f_logs, f_warnings, f_false_positives;
-  int orig_f_criticals, orig_f_holes, orig_f_infos, orig_f_logs;
-  int orig_f_warnings, orig_f_false_positives, orig_filtered_result_count;
   int search_phrase_exact, apply_overrides;
   double severity, f_severity;
   GString *filters_buffer, *filters_extra_buffer, *host_summary_buffer;
   task_status_t run_status;
-  int f_compliance_yes, f_compliance_no;
-  int f_compliance_incomplete, f_compliance_undefined;
-  int f_compliance_count;
   print_report_context_t ctx = {0};
 
   gboolean include_result_hostname = FALSE;
@@ -14080,16 +12927,10 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
   /* Init some vars to prevent warnings from older compilers. */
   max_results = -1;
   levels = NULL;
-  delta_states = NULL;
   min_qod = NULL;
   search_phrase = NULL;
-  f_compliance_count = 0;
-  orig_filtered_result_count = 0;
-  orig_f_false_positives = orig_f_warnings = orig_f_logs = orig_f_infos = 0;
-  orig_f_holes = orig_f_criticals = 0;
   host_summary_buffer = NULL;
 
-  ctx.delta = delta;
   ctx.get = get;
   ctx.report = report;
 
@@ -14132,7 +12973,6 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
                                                     &min_qod,
                                                     &levels,
                                                     NULL,
-                                                    &delta_states,
                                                     &search_phrase,
                                                     &search_phrase_exact,
                                                     &overrides,
@@ -14155,7 +12995,6 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
       g_free (levels);
       g_free (search_phrase);
       g_free (min_qod);
-      g_free (delta_states);
       return -1;
     }
 
@@ -14165,68 +13004,13 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
       return -1;
     }
 
-  if (delta && report)
-    {
-      uuid = report_uuid (report);
-      PRINT (out, "<report type=\"delta\" id=\"%s\">", uuid);
-      free (uuid);
-    }
-  else
-    {
-      uuid = report_uuid (report);
-      PRINT (out, "<report id=\"%s\">", uuid);
-      free (uuid);
-    }
+  uuid = report_uuid (report);
+  PRINT (out, "<report id=\"%s\">", uuid);
+  free (uuid);
 
   PRINT (out, "<gmp><version>%s</version></gmp>", GMP_VERSION);
 
-  if (delta)
-    {
-      delta_states = delta_states ? delta_states : g_strdup ("cgns");
-      report_scan_run_status (delta, &run_status);
-
-      uuid = report_uuid (delta);
-      PRINT (out,
-             "<delta>"
-             "<report id=\"%s\">"
-             "<scan_run_status>%s</scan_run_status>",
-             uuid,
-             run_status_name (run_status
-                               ? run_status
-                               : TASK_STATUS_INTERRUPTED));
-
-      if (report_timestamp (uuid, &timestamp))
-        {
-          free (uuid);
-          g_free (levels);
-          g_free (search_phrase);
-          g_free (min_qod);
-          g_free (delta_states);
-          goto fail;
-        }
-      PRINT (out,
-             "<timestamp>%s</timestamp>",
-             timestamp);
-      g_free (timestamp);
-
-      start_time = scan_start_time (delta);
-      PRINT (out,
-             "<scan_start>%s</scan_start>",
-             start_time);
-      free (start_time);
-
-      end_time = scan_end_time (delta);
-      PRINT (out,
-             "<scan_end>%s</scan_end>",
-             end_time);
-      free (end_time);
-
-      PRINT (out,
-             "</report>"
-             "</delta>");
-    }
-
-  ctx.count_filtered = (delta || (ignore_pagination && get->details));
+  ctx.count_filtered = (ignore_pagination && get->details);
 
   if (report)
     {
@@ -14263,24 +13047,6 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
   if (strchr (levels, 'f'))
     g_string_append (filters_extra_buffer, "<filter>False Positive</filter>");
 
-  if (delta)
-    {
-      gchar *escaped_delta_states = g_markup_escape_text (delta_states, -1);
-      g_string_append_printf (filters_extra_buffer,
-                              "<delta>"
-                              "%s"
-                              "<changed>%i</changed>"
-                              "<gone>%i</gone>"
-                              "<new>%i</new>"
-                              "<same>%i</same>"
-                              "</delta>",
-                              escaped_delta_states,
-                              strchr (delta_states, 'c') != NULL,
-                              strchr (delta_states, 'g') != NULL,
-                              strchr (delta_states, 'n') != NULL,
-                              strchr (delta_states, 's') != NULL);
-      g_free (escaped_delta_states);
-    }
 
   filters_buffer = g_string_new ("");
   buffer_get_filter_xml (filters_buffer, "result", get, term,
@@ -14525,7 +13291,7 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
                                             g_free, NULL);
 
   reuse_result_iterator = 0;
-  if (get->details && (delta == 0))
+  if (get->details)
     {
       reuse_result_iterator = 1;
       if (print_report_port_xml (&ctx, report, out, get, first_result,
@@ -14564,16 +13330,7 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
   if (min_qod == NULL || sscanf (min_qod, "%d", &min_qod_int) != 1)
     min_qod_int = MIN_QOD_DEFAULT;
 
-  if (delta && get->details)
-    {
-      if (init_delta_iterator (report, &results, delta,
-                                  get, term, sort_field))
-        {
-          g_free (term);
-          goto fail;
-        }
-    }
-  else if (get->details)
+  if (get->details)
     {
       int res;
       g_free (term);
@@ -14605,33 +13362,7 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
 
   print_report_init_f_hosts (&ctx);
 
-  if (delta && get->details)
-    {
-      if (print_report_delta_xml (out, &results, delta_states,
-                                  ignore_pagination ? 0 : first_result,
-                                  ignore_pagination ? -1 : max_results,
-                                  task, overrides, overrides_details,
-                                  sort_order,
-                                  sort_field, result_hosts_only,
-                                  &orig_filtered_result_count,
-                                  &ctx.filtered_result_count,
-                                  &orig_f_criticals, &f_criticals,
-                                  &orig_f_holes, &f_holes,
-                                  &orig_f_infos, &f_infos,
-                                  &orig_f_logs, &f_logs,
-                                  &orig_f_warnings, &f_warnings,
-                                  &orig_f_false_positives,
-                                  &f_false_positives,
-                                  &f_compliance_yes,
-                                  &f_compliance_no,
-                                  &f_compliance_incomplete,
-                                  &f_compliance_undefined,
-                                  &f_compliance_count,
-                                  result_hosts))
-
-        goto failed_delta_report;
-    }
-  else if (get->details)
+  if (get->details)
     {
       int cert_loaded;
 
@@ -14650,12 +13381,8 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
                               result_tags,
                               1,
                               0,
-                              NULL,
-                              NULL,
-                              0,
                               cert_loaded,
-                              lean,
-                              0); /* Delta fields. */
+                              lean);
           PRINT_XML (out, buffer->str);
           g_string_free (buffer, TRUE);
 
@@ -14730,35 +13457,7 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
 
   /* Print result counts and severity. */
 
-  if (delta)
-        /** @todo The f_holes, etc. vars are setup to give the page count. */
-        PRINT (out,
-              "<result_count>"
-              "<filtered>%i</filtered>"
-              "<critical><filtered>%i</filtered></critical>"
-              "<hole deprecated='1'><filtered>%i</filtered></hole>"
-              "<high><filtered>%i</filtered></high>"
-              "<info deprecated='1'><filtered>%i</filtered></info>"
-              "<low><filtered>%i</filtered></low>"
-              "<log><filtered>%i</filtered></log>"
-              "<warning deprecated='1'><filtered>%i</filtered></warning>"
-              "<medium><filtered>%i</filtered></medium>"
-              "<false_positive>"
-              "<filtered>%i</filtered>"
-              "</false_positive>"
-              "</result_count>",
-              orig_filtered_result_count,
-              (strchr (levels, 'c') ? orig_f_criticals : 0),
-              (strchr (levels, 'h') ? orig_f_holes : 0),
-              (strchr (levels, 'h') ? orig_f_holes : 0),
-              (strchr (levels, 'l') ? orig_f_infos : 0),
-              (strchr (levels, 'l') ? orig_f_infos : 0),
-              (strchr (levels, 'g') ? orig_f_logs : 0),
-              (strchr (levels, 'm') ? orig_f_warnings : 0),
-              (strchr (levels, 'm') ? orig_f_warnings : 0),
-              (strchr (levels, 'f') ? orig_f_false_positives : 0));
-      else
-        {
+  {
           if (ctx.count_filtered)
             ctx.filtered_result_count = f_criticals + f_holes + f_infos + f_logs
                                         + f_warnings + f_false_positives;
@@ -14860,7 +13559,7 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
            end_time);
   free (end_time);
 
-  if (delta == 0 && print_report_errors_xml (report, out))
+  if (print_report_errors_xml (report, out))
     {
       if (host_summary_buffer)
         g_string_free (host_summary_buffer, TRUE);
@@ -14871,7 +13570,6 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
   g_free (levels);
   g_free (search_phrase);
   g_free (min_qod);
-  g_free (delta_states);
 
   if (host_summary && host_summary_buffer)
     *host_summary = g_string_free (host_summary_buffer, FALSE);
@@ -14888,14 +13586,6 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
 
   return 0;
 
-  failed_delta_report:
-    g_free (sort_field);
-    g_free (levels);
-    g_free (search_phrase);
-    g_free (min_qod);
-    g_free (delta_states);
-    cleanup_iterator (&results);
-    cleanup_iterator (&delta_results);
   failed_print_report_host:
     if (host_summary_buffer)
         g_string_free (host_summary_buffer, TRUE);
@@ -14911,7 +13601,6 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
  * @brief Generate a report.
  *
  * @param[in]  report             Report.
- * @param[in]  delta_report       Report to compare with.
  * @param[in]  get                GET data for report.
  * @param[in]  report_format      Report format.
  * @param[in]  report_config      Report config.
@@ -14928,7 +13617,7 @@ print_report_xml_start (report_t report, report_t delta, task_t task,
  * @return Contents of report on success, NULL on error.
  */
 gchar *
-manage_report (report_t report, report_t delta_report, const get_data_t *get,
+manage_report (report_t report, const get_data_t *get,
                const report_format_t report_format,
                const report_config_t report_config,
                int overrides_details, gsize *output_length, gchar **extension,
@@ -14963,7 +13652,7 @@ manage_report (report_t report, report_t delta_report, const get_data_t *get,
     }
 
   xml_start = g_strdup_printf ("%s/report-start.xml", xml_dir);
-  ret = print_report_xml_start (report, delta_report, task, xml_start, get,
+  ret = print_report_xml_start (report, task, xml_start, get,
                                 overrides_details, 1 /* result_tags */,
                                 0 /* ignore_pagination */,
                                 0 /* lean */,
@@ -15070,7 +13759,6 @@ manage_report (report_t report, report_t delta_report, const get_data_t *get,
  * @brief Generate a report.
  *
  * @param[in]  report             Report.
- * @param[in]  delta_report       Report to compare with.
  * @param[in]  report_format      Report format.
  * @param[in]  report_config      Report config.
  * @param[in]  get                GET command data.
@@ -15092,7 +13780,7 @@ manage_report (report_t report, report_t delta_report, const get_data_t *get,
  *         2 failed to find filter (before anything sent to client).
  */
 int
-manage_send_report (report_t report, report_t delta_report,
+manage_send_report (report_t report,
                     report_format_t report_format,
                     report_config_t report_config,
                     const get_data_t *get,
@@ -15170,7 +13858,7 @@ manage_send_report (report_t report, report_t delta_report,
     }
 
   xml_start = g_strdup_printf ("%s/report-start.xml", xml_dir);
-  ret = print_report_xml_start (report, delta_report, task, xml_start, get,
+  ret = print_report_xml_start (report, task, xml_start, get,
                                 overrides_details, result_tags,
                                 ignore_pagination, lean, NULL, NULL, NULL);
   if (ret)

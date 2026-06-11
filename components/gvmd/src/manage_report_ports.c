@@ -52,7 +52,6 @@ manage_send_report_ports (report_t report,
   gchar *term;
   gchar *sort_field;
   gchar *levels;
-  gchar *delta_states;
   gchar *search_phrase;
   char xml_dir[] = "/tmp/gvmd_XXXXXX";
   gboolean xml_dir_created = FALSE;
@@ -68,7 +67,6 @@ manage_send_report_ports (report_t report,
   term = NULL;
   sort_field = NULL;
   levels = NULL;
-  delta_states = NULL;
   search_phrase = NULL;
   xml_file = NULL;
   stream = NULL;
@@ -89,7 +87,6 @@ manage_send_report_ports (report_t report,
                                                 &max_results,
                                                 &sort_field,
                                                 &sort_order,
-                                                NULL,
                                                 NULL,
                                                 NULL,
                                                 NULL,
@@ -209,7 +206,6 @@ cleanup:
   g_free (term);
   g_free (sort_field);
   g_free (levels);
-  g_free (delta_states);
   g_free (search_phrase);
 
   print_report_context_cleanup (&ctx);

@@ -218,9 +218,6 @@ filter_control_str (keyword_t **point, const char *column, gchar **string)
  *                             "i" for "incomplete" and "u" for "undefined"
  *                              (without compliance information).
  *                              All levels if NULL.
- * @param[out]  delta_states   String describing delta states to include in count
- *                             (for example, "sngc" Same, New, Gone and Changed).
- *                             All levels if NULL.
  * @param[out]  search_phrase      Phrase that results must include.  All results
  *                                 if NULL or "".
  * @param[out]  search_phrase_exact  Whether search phrase is exact.
@@ -233,7 +230,7 @@ manage_report_filter_controls (const gchar *filter, int *first, int *max,
                                gchar **sort_field, int *sort_order,
                                int *result_hosts_only, gchar **min_qod,
                                gchar **levels, gchar **compliance_levels,
-                               gchar **delta_states, gchar **search_phrase,
+                               gchar **search_phrase,
                                int *search_phrase_exact, int *overrides,
                                int *apply_overrides, gchar **zone)
 {
@@ -395,15 +392,6 @@ manage_report_filter_controls (const gchar *filter, int *first, int *max,
         *compliance_levels = string;
     }
 
-  if (delta_states)
-    {
-      if (filter_control_str ((keyword_t **) split->pdata,
-                              "delta_states",
-                              &string))
-        *delta_states = NULL;
-      else
-        *delta_states = string;
-    }
 
   if (levels)
     {
@@ -455,7 +443,6 @@ manage_report_filter_controls (const gchar *filter, int *first, int *max,
  * @param[out] min_qod              Minimum QoD.
  * @param[out] levels               Severity levels filter.
  * @param[out] compliance_levels    Compliance levels filter.
- * @param[out] delta_states         Delta states filter.
  * @param[out] search_phrase        Search phrase.
  * @param[out] search_phrase_exact  Whether search phrase must match exactly.
  * @param[out] overrides            Whether overrides are enabled.
@@ -475,7 +462,6 @@ manage_report_filter_controls_from_get (const get_data_t *get,
                                         gchar **min_qod,
                                         gchar **levels,
                                         gchar **compliance_levels,
-                                        gchar **delta_states,
                                         gchar **search_phrase,
                                         int *search_phrase_exact,
                                         int *overrides,
@@ -514,7 +500,6 @@ manage_report_filter_controls_from_get (const get_data_t *get,
                                      min_qod,
                                      levels,
                                      compliance_levels,
-                                     delta_states,
                                      search_phrase,
                                      search_phrase_exact,
                                      overrides,
@@ -534,7 +519,6 @@ manage_report_filter_controls_from_get (const get_data_t *get,
                                      min_qod,
                                      levels,
                                      compliance_levels,
-                                     delta_states,
                                      search_phrase,
                                      search_phrase_exact,
                                      overrides,

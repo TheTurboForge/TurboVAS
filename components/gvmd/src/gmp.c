@@ -158,7 +158,7 @@
 /** @todo Exported for manage_sql.c. */
 void
 buffer_results_xml (GString *, iterator_t *, task_t, int, int, int,
-                    int, int, const char *, iterator_t *, int, int, int, int);
+                    int, int, int, int);
 
 
 
@@ -6545,12 +6545,8 @@ buffer_override_xml (GString *buffer, iterator_t *overrides,
                                 0,  /* Tags. */
                                 0,  /* Tag details. */
                                 0,  /* Result details. */
-                                NULL,
-                                NULL,
-                                0,
                                 -1,
-                                0,   /* Lean. */
-                                0);  /* Delta fields. */
+                                0);  /* Lean. */
           cleanup_iterator (&results);
         }
       else
@@ -6719,148 +6715,6 @@ buffer_config_preference_xml (GString *buffer, iterator_t *prefs,
   g_free (value);
   g_free (nvt);
   g_free (oid);
-}
-
-/**
- * @brief Compare two string with the "diff" command.
- *
- * @param[in]  one     First string.
- * @param[in]  two     Second string.
- *
- * @return Output of "diff", or NULL on error.
- */
-static gchar *
-strdiff (const gchar *one, const gchar *two)
-{
-  gchar **cmd, *ret, *one_file, *two_file, *old_lc_all, *old_language;
-  gint exit_status;
-  gchar *standard_out = NULL;
-  gchar *standard_err = NULL;
-  char dir[] = "/tmp/gvmd-strdiff-XXXXXX";
-  GError *error = NULL;
-  gchar *c_one, *c_two;
-
-  if (mkdtemp (dir) == NULL)
-    return NULL;
-
-  one_file = g_build_filename (dir, "Report 1", NULL);
-
-  c_one = g_strdup_printf ("%s\n", one);
-
-  g_file_set_contents (one_file, c_one, strlen (c_one), &error);
-
-  g_free (c_one);
-
-  if (error)
-    {
-      g_warning ("%s", error->message);
-      g_error_free (error);
-      gvm_file_remove_recurse (dir);
-      g_free (one_file);
-      return NULL;
-    }
-
-  two_file = g_build_filename (dir, "Report 2", NULL);
-
-  c_two = g_strdup_printf ("%s\n", two);
-
-  g_file_set_contents (two_file, c_two, strlen (c_two), &error);
-
-  g_free (c_two);
-
-  if (error)
-    {
-      g_warning ("%s", error->message);
-      g_error_free (error);
-      gvm_file_remove_recurse (dir);
-      g_free (one_file);
-      g_free (two_file);
-      return NULL;
-    }
-
-  old_lc_all = getenv ("LC_ALL") ? g_strdup (getenv ("LC_ALL")) : NULL;
-  if (setenv ("LC_ALL", "C", 1) == -1)
-    {
-      g_warning ("%s: failed to set LC_ALL", __func__);
-      return NULL;
-    }
-
-  old_language = getenv ("LANGUAGE") ? g_strdup (getenv ("LANGUAGE")) : NULL;
-  if (setenv ("LANGUAGE", "C", 1) == -1)
-    {
-      g_warning ("%s: failed to set LANGUAGE", __func__);
-      return NULL;
-    }
-
-  cmd = (gchar **) g_malloc (7 * sizeof (gchar *));
-
-  cmd[0] = g_strdup ("diff");
-  cmd[1] = g_strdup ("--ignore-all-space");
-  cmd[2] = g_strdup ("--ignore-blank-lines");
-  cmd[3] = g_strdup ("-u");
-  cmd[4] = g_strdup ("Report 1");
-  cmd[5] = g_strdup ("Report 2");
-  cmd[6] = NULL;
-  g_debug ("%s: Spawning in %s: %s \"%s\" \"%s\"",
-           __func__, dir,
-           cmd[0], cmd[1], cmd[2]);
-  if ((g_spawn_sync (dir,
-                     cmd,
-                     NULL,                 /* Environment. */
-                     G_SPAWN_SEARCH_PATH,
-                     NULL,                 /* Setup func. */
-                     NULL,
-                     &standard_out,
-                     &standard_err,
-                     &exit_status,
-                     NULL) == FALSE)
-      || (WIFEXITED (exit_status) == 0)
-      || WEXITSTATUS (exit_status))
-    {
-      if (WEXITSTATUS (exit_status) == 1)
-        ret = standard_out;
-      else
-        {
-          g_debug ("%s: failed to run diff: %d (WIF %i, WEX %i)",
-                   __func__,
-                   exit_status,
-                   WIFEXITED (exit_status),
-                   WEXITSTATUS (exit_status));
-          g_debug ("%s: stdout: %s", __func__, standard_out);
-          g_debug ("%s: stderr: %s", __func__, standard_err);
-          ret = NULL;
-          g_free (standard_out);
-        }
-    }
-  else
-    ret = standard_out;
-
-  if (old_lc_all && (setenv ("LC_ALL", old_lc_all, 1) == -1))
-    {
-      g_warning ("%s: failed to reset LC_ALL", __func__);
-      ret = NULL;
-    }
-  else if (old_language && (setenv ("LANGUAGE", old_language, 1) == -1))
-    {
-      g_warning ("%s: failed to reset LANGUAGE", __func__);
-      ret = NULL;
-    }
-
-  g_free (old_lc_all);
-  g_free (old_language);
-  g_free (cmd[0]);
-  g_free (cmd[1]);
-  g_free (cmd[2]);
-  g_free (cmd[3]);
-  g_free (cmd[4]);
-  g_free (cmd[5]);
-  g_free (cmd);
-  g_free (standard_err);
-  g_free (one_file);
-  g_free (two_file);
-  gvm_file_remove_recurse (dir);
-
-  return ret;
 }
 
 /**
@@ -7239,42 +7093,6 @@ results_xml_append_nvt (iterator_t *results, GString *buffer, int cert_loaded)
   buffer_xml_append_printf (buffer, "</nvt>");
 }
 
-/**
- * @brief Append a diff of the two result descriptions to an XML buffer.
- *
- * @param[in]  buffer         Buffer.
- * @param[in]  descr          First result description.
- * @param[in]  delta_descr    Second result description.
- *
- */
-void
-buffer_diff(GString *buffer, const char *descr, const char *delta_descr)
-{
-
-  gchar *diff = strdiff (descr ? descr : "",
-                  delta_descr ? delta_descr : "");
-  if (diff)
-    {
-      gchar **split, *diff_xml;
-      /* Remove the leading filename lines. */
-      split = g_strsplit ((gchar*) diff, "\n", 3);
-      if (split[0] && split[1] && split[2])
-        diff_xml = xml_escape_text_truncated (split[2],
-                                              TRUNCATE_TEXT_LENGTH,
-                                              TRUNCATE_TEXT_SUFFIX);
-      else
-        diff_xml = xml_escape_text_truncated (diff,
-                                              TRUNCATE_TEXT_LENGTH,
-                                              TRUNCATE_TEXT_SUFFIX);
-      g_strfreev (split);
-      g_string_append_printf (buffer, "<diff>%s</diff>", diff_xml);
-      g_free (diff_xml);
-      g_free (diff);
-    }
-  else
-    g_string_append (buffer, "<diff>Error creating diff.</diff>");
-}
-
 /** @todo Exported for manage_sql.c. */
 /**
  * @brief Buffer XML for some results.
@@ -7290,22 +7108,16 @@ buffer_diff(GString *buffer, const char *descr, const char *delta_descr)
  * @param[in]  include_tags           Whether to include user tag count.
  * @param[in]  include_tags_details   Whether to include details of tags.
  * @param[in]  include_details        Whether to include details of the result.
- * @param[in]  delta_state            Delta state of result, or NULL.
- * @param[in]  delta_results          Iterator for delta result to include, or
- *                                    NULL.
- * @param[in]  changed                Whether the result is a "changed" delta.
  * @param[in]  cert_loaded            Whether the CERT db is loaded.  0 not loaded,
  *                                    -1 needs to be checked, else loaded.
  * @param[in]  lean                   Whether to include less info.
- * @param[in]  use_delta_fields       Whether to use delta result fields.
  */
 void
 buffer_results_xml (GString *buffer, iterator_t *results, task_t task,
                     int include_overrides, int include_overrides_details,
                     int include_tags, int include_tags_details,
                     int include_details,
-                    const char *delta_state, iterator_t *delta_results,
-                    int changed, int cert_loaded, int lean, int use_delta_fields)
+                    int cert_loaded, int lean)
 {
 
   const char *descr, *name, *comment;
@@ -7326,44 +7138,22 @@ buffer_results_xml (GString *buffer, iterator_t *results, task_t task,
   port = result_iterator_port (results);
   asset_id = NULL;
 
-  if (use_delta_fields)
-    {
-      descr = result_iterator_delta_description (results);
-      severity = result_iterator_delta_severity (results);
-      severity_double = result_iterator_delta_severity_double (results);
-      original_severity = result_iterator_delta_original_severity (results);
-      original_level = result_iterator_delta_original_level (results);
-      qod = result_iterator_delta_qod (results);
-      qod_type = result_iterator_delta_qod_type (results);
-      result = result_iterator_delta_result (results);
-      creation_time = result_iterator_delta_creation_time (results);
-      result_id = result_iterator_delta_uuid (results);
-      path = result_iterator_delta_path (results);
-      report = result_iterator_delta_report (results);
-      hostname = result_iterator_delta_hostname (results);
-      if (host)
-        asset_id = result_iterator_delta_host_asset_id (results);
-      compliance = result_iterator_delta_compliance (results);
-    }
-  else
-    {
-      descr = result_iterator_descr (results);
-      severity = result_iterator_severity (results);
-      severity_double = result_iterator_severity_double (results);
-      original_severity = result_iterator_original_severity (results);
-      original_level = result_iterator_original_level (results);
-      qod = result_iterator_qod (results);
-      qod_type = result_iterator_qod_type (results);
-      result = result_iterator_result (results);
-      creation_time = get_iterator_creation_time (results);
-      result_id = get_iterator_uuid (results);
-      path = result_iterator_path (results);
-      report = result_iterator_report (results);
-      hostname = result_iterator_hostname (results);
-      if (host)
-        asset_id = result_iterator_asset_host_id (results);
-      compliance = result_iterator_compliance (results);
-    }
+  descr = result_iterator_descr (results);
+  severity = result_iterator_severity (results);
+  severity_double = result_iterator_severity_double (results);
+  original_severity = result_iterator_original_severity (results);
+  original_level = result_iterator_original_level (results);
+  qod = result_iterator_qod (results);
+  qod_type = result_iterator_qod_type (results);
+  result = result_iterator_result (results);
+  creation_time = get_iterator_creation_time (results);
+  result_id = get_iterator_uuid (results);
+  path = result_iterator_path (results);
+  report = result_iterator_report (results);
+  hostname = result_iterator_hostname (results);
+  if (host)
+    asset_id = result_iterator_asset_host_id (results);
+  compliance = result_iterator_compliance (results);
 
 
   if (descr)
@@ -7396,16 +7186,8 @@ buffer_results_xml (GString *buffer, iterator_t *results, task_t task,
       const char *owner_name;
       time_t modification_time;
 
-      if (use_delta_fields)
-        {
-          owner_name = result_iterator_delta_owner_name (results);
-          modification_time = result_iterator_delta_modification_time (results);
-        }
-      else
-        {
-          owner_name = get_iterator_owner_name (results);
-          modification_time = get_iterator_modification_time (results);
-        }
+      owner_name = get_iterator_owner_name (results);
+      modification_time = get_iterator_modification_time (results);
 
       if (owner_name)
         buffer_xml_append_printf (buffer,
@@ -7433,22 +7215,11 @@ buffer_results_xml (GString *buffer, iterator_t *results, task_t task,
     {
       char *result_report_id, *result_task_id, *result_task_name;
 
-      if(use_delta_fields)
-        {
-          if (task == 0)
-            selected_task = result_iterator_delta_task (results);
+      if (task == 0)
+        selected_task = result_iterator_task (results);
 
-          result_task_name = task_name(result_iterator_delta_task (results));
-          result_report_id = report_uuid(result_iterator_delta_report (results));
-        }
-      else
-        {
-          if (task == 0)
-            selected_task = result_iterator_task (results);
-
-          result_task_name = task_name (result_iterator_task (results));
-          result_report_id = report_uuid (result_iterator_report (results));
-        }
+      result_task_name = task_name (result_iterator_task (results));
+      result_report_id = report_uuid (result_iterator_report (results));
       task_uuid (selected_task, &result_task_id);
       buffer_xml_append_printf (buffer,
                                 "<report id=\"%s\"/>"
@@ -7565,16 +7336,8 @@ buffer_results_xml (GString *buffer, iterator_t *results, task_t task,
   if (lean == 0)
     {
       const char *nvt_version, *level;
-      if (use_delta_fields)
-        {
-          nvt_version = result_iterator_delta_nvt_version (results);
-          level = result_iterator_delta_level (results);
-        }
-      else
-        {
-          nvt_version = result_iterator_scan_nvt_version (results);
-          level = result_iterator_level (results);
-        }
+      nvt_version = result_iterator_scan_nvt_version (results);
+      level = result_iterator_level (results);
       buffer_xml_append_printf
       (buffer,
         "<scan_nvt_version>%s</scan_nvt_version>"
@@ -7622,68 +7385,11 @@ buffer_results_xml (GString *buffer, iterator_t *results, task_t task,
   buffer_xml_append_printf (buffer, "<compliance>%s</compliance>", compliance);
 
   if (include_overrides
-      && (use_delta_fields
-          ? result_iterator_delta_may_have_overrides (results)
-          : result_iterator_may_have_overrides (results)))
+      && result_iterator_may_have_overrides (results))
     buffer_result_overrides_xml (buffer, result,
                                  selected_task, include_overrides_details,
                                  lean);
 
-  if (delta_state && use_delta_fields == 0)
-    {
-      g_string_append (buffer, "<delta>");
-      if (delta_state)
-        g_string_append_printf (buffer, "%s", delta_state);
-
-      if(delta_results) {
-        /* delta reports version 1 */
-        if (changed)
-          {
-            gchar *delta_nl_descr;
-            const char *delta_descr;
-            buffer_results_xml (buffer, delta_results, selected_task,
-                                include_overrides, include_overrides_details,
-                                include_tags, include_tags_details,
-                                include_details, delta_state, NULL, 0, -1,
-                                lean, 0);
-            delta_descr = result_iterator_descr (delta_results);
-            delta_nl_descr = delta_descr ? convert_to_newlines (delta_descr)
-                                        : NULL;
-            strip_control_chars (nl_descr);
-            buffer_diff (buffer, nl_descr, delta_nl_descr);
-            g_free (delta_nl_descr);
-          }
-      } else {
-        /* delta reports version 2 */
-        if (changed)
-          {
-            gchar *delta_nl_descr;
-            const char *delta_descr;
-            buffer_results_xml (buffer, results, selected_task,
-                                include_overrides, include_overrides_details,
-                                include_tags, include_tags_details,
-                                include_details, delta_state, NULL, 0, -1,
-                                lean, 1);
-            delta_descr = result_iterator_delta_description (results);
-            delta_nl_descr = delta_descr ? convert_to_newlines (delta_descr)
-                                        : NULL;
-            strip_control_chars (nl_descr);
-            buffer_diff (buffer, delta_nl_descr, nl_descr);
-            g_free (delta_nl_descr);
-          }
-      }
-
-      if (delta_results)
-        {
-          if (include_overrides)
-            buffer_result_overrides_xml (buffer,
-                                         result_iterator_result (delta_results),
-                                         selected_task,
-                                         include_overrides_details,
-                                         lean);
-        }
-      g_string_append (buffer, "</delta>");
-    }
 
   if (descr)
     {
@@ -13006,7 +12712,6 @@ handle_get_reports (gmp_parser_t *gmp_parser, GError **error)
         init_alert_get_data(get_reports_data->alert_id, &get_reports_data->get);
 
       ret = manage_send_report (report,
-                                0,
                                 no_report_format ? -1 : report_format,
                                 report_config,
                                 &get_reports_data->get,
@@ -14244,7 +13949,6 @@ handle_get_results (gmp_parser_t *gmp_parser, GError **error)
                                       NULL, /* min_qod */
                                       NULL, /* levels */
                                       NULL, /* compliance_levels */
-                                      NULL, /* delta_states */
                                       NULL, /* search_phrase */
                                       NULL, /* search_phrase_exact */
                                       &overrides,
@@ -14280,12 +13984,8 @@ handle_get_results (gmp_parser_t *gmp_parser, GError **error)
                                   /* show tag details if selected by ID */
                                   get_results_data->get.id != NULL,
                                   get_results_data->get.details,
-                                  NULL,
-                                  NULL,
-                                  0,
                                   -1,
-                                  0,  /* Lean. */
-                                  0); /* Delta fields. */
+                                  0); /* Lean. */
               SEND_TO_CLIENT_OR_FAIL (buffer->str);
               g_string_free (buffer, TRUE);
               count ++;

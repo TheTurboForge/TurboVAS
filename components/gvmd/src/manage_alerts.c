@@ -3902,7 +3902,6 @@ report_content_for_alert (alert_t alert, report_t report, task_t task,
   // Generate report content
 
   report_content = manage_report (report,
-                                  0,
                                   alert_filter_get ? alert_filter_get : get,
                                   report_format,
                                   report_config,
@@ -4101,7 +4100,6 @@ trigger_to_vfire (alert_t alert, task_t task, report_t report, event_t event,
           alert_report_item = g_malloc0 (sizeof (alert_report_data_t));
 
           report_content = manage_report (report,
-                                          0,
                                           alert_filter_get
                                             ? alert_filter_get
                                             : get,

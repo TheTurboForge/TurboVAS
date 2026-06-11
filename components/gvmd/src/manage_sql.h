@@ -148,10 +148,6 @@
 
 /* Iterator definitions. */
 
-/**
- * @brief Delta results columns offset for result iterator.
- */
-#define RESULT_ITERATOR_DELTA_COLUMN_OFFSET GET_ITERATOR_COLUMN_COUNT + 51
 
 /**
  * @brief Struct to be sent as user data to the GFunc for adding results
@@ -186,7 +182,6 @@ struct report_aux {
 struct print_report_context
 {
  int count_filtered;         ///< Whether to count filtered results.
- report_t delta;             ///< Report to compare with.
  int filtered_result_count;  ///< Filtered result count.
  const get_data_t *get;      ///< GET command data.
  gchar *tz;                  ///< TZ.

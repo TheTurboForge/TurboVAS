@@ -366,8 +366,7 @@ cleanup_keyword (keyword_t *keyword)
         }
       keyword->relation = KEYWORD_RELATION_COLUMN_EQUAL;
     }
-  else if (strcasecmp (keyword->column, "delta_states") == 0
-           || strcasecmp (keyword->column, "levels") == 0
+  else if (strcasecmp (keyword->column, "levels") == 0
            || strcasecmp (keyword->column, "sort") == 0
            || strcasecmp (keyword->column, "sort-reverse") == 0)
     {
@@ -454,20 +453,6 @@ keyword_applies (array_t *array, const keyword_t *keyword)
         }
     }
 
-  if (keyword->column
-      && (strcmp (keyword->column, "delta_states") == 0))
-    {
-      int index;
-
-      index = array->len;
-      while (index--)
-        {
-          keyword_t *item;
-          item = (keyword_t*) g_ptr_array_index (array, index);
-          if (item->column && (strcmp (item->column, "delta_states") == 0))
-            return 0;
-        }
-    }
 
   if (keyword->column
       && (strcmp (keyword->column, "levels") == 0))

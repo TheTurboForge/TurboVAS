@@ -1121,7 +1121,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
     </ele>
     <ele>
       <name>user_tags</name>
-      <summary>Info on tags attached to the result (not in delta results)</summary>
+      <summary>Info on tags attached to the result</summary>
       <pattern>
         <e>count</e>
         <any><e>tag</e></any>
@@ -1474,38 +1474,6 @@ SPDX-License-Identifier: AGPL-3.0-or-later
       <pattern>text</pattern>
     </ele>
     <ele>
-      <name>delta</name>
-      <summary>Delta state</summary>
-      <pattern>
-        <o><e>result</e></o>
-        <o><e>diff</e></o>
-        <o><e>overrides</e></o>
-        text
-      </pattern>
-      <ele>
-        <name>result</name>
-        <summary>Delta result</summary>
-        <type>result</type>
-      </ele>
-      <ele>
-        <name>diff</name>
-        <summary>Comparison between descriptions</summary>
-        <type>text</type>
-      </ele>
-      <ele>
-        <name>overrides</name>
-        <name>overrides</name>
-        <summary>List of overrides on the result</summary>
-        <pattern>
-          <any><e>override</e></any>
-        </pattern>
-        <ele>
-          <name>override</name>
-          <type>override</type>
-        </ele>
-      </ele>
-    </ele>
-    <ele>
       <name>detection</name>
       <summary>Detection details</summary>
       <pattern><e>result</e></pattern>
@@ -1726,7 +1694,6 @@ SPDX-License-Identifier: AGPL-3.0-or-later
         <e>report_format</e>
         <e>sort</e>
         <e>filters</e>
-        <o><e>delta</e></o>
         <o>
           <g>
             <e>timezone</e>
@@ -1901,37 +1868,6 @@ SPDX-License-Identifier: AGPL-3.0-or-later
               <alt>Log</alt>
             </alts>
           </pattern>
-        </ele>
-        <ele>
-          <name>delta</name>
-          <summary>Delta states</summary>
-          <pattern>
-            text
-            <e>changed</e>
-            <e>gone</e>
-            <e>new</e>
-            <e>same</e>
-          </pattern>
-          <ele>
-            <name>changed</name>
-            <summary>Whether changed results are included</summary>
-            <pattern><t>boolean</t></pattern>
-          </ele>
-          <ele>
-            <name>gone</name>
-            <summary>Whether results that have vanished are included</summary>
-            <pattern><t>boolean</t></pattern>
-          </ele>
-          <ele>
-            <name>new</name>
-            <summary>Whether new results are included</summary>
-            <pattern><t>boolean</t></pattern>
-          </ele>
-          <ele>
-            <name>same</name>
-            <summary>Whether results that are equal are included</summary>
-            <pattern><t>boolean</t></pattern>
-          </ele>
         </ele>
       </ele>
       <ele>
@@ -27729,13 +27665,6 @@ END:VCALENDAR
       <p>
         On the response side REPORT/REPORT/HOST_COUNT has been removed,
         as this was only returned by the assets reports.
-      </p>
-      <p>
-        At the same time the element REPORT/REPORT/FILTERS/HOST has been
-        removed.  This element was left behind during the switch to named
-        filters very long ago.  It originally showed the host being filtered
-        for delta reports, but this information is in the filter keywords
-        these days.
       </p>
     </description>
     <version>9.0</version>
