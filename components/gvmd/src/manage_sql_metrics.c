@@ -359,9 +359,10 @@ append_vulnerability_rows_xml_from_query (GString *buffer, const char *query)
 }
 
 static void
-append_summary_from_system_query (GString *buffer, const char *system_query)
+append_summary_from_queries (GString *buffer, const char *system_query,
+                             const char *vulnerability_query)
 {
-  iterator_t systems;
+  iterator_t systems, vulnerabilities;
   long long alive_count = 0, vulnerability_count = 0;
   long long authenticated_count = 0, auth_failed_count = 0;
   long long no_credential_path_count = 0, unknown_count = 0;
@@ -374,7 +375,6 @@ append_summary_from_system_query (GString *buffer, const char *system_query)
 
       alive_count++;
       total_load += iterator_double (&systems, 1);
-      vulnerability_count += iterator_int64 (&systems, 3);
       state = iterator_string (&systems, 4);
       if (g_strcmp0 (state, "authenticated") == 0)
         authenticated_count++;
@@ -386,6 +386,11 @@ append_summary_from_system_query (GString *buffer, const char *system_query)
         unknown_count++;
     }
   cleanup_iterator (&systems);
+
+  init_iterator (&vulnerabilities, "%s", vulnerability_query);
+  while (next (&vulnerabilities))
+    vulnerability_count++;
+  cleanup_iterator (&vulnerabilities);
 
   append_metric_summary_xml (buffer, alive_count, total_load,
                              alive_count > 0 ? total_load / alive_count : 0,
@@ -519,7 +524,7 @@ buffer_report_metrics_xml (GString *buffer, const char *report_uuid)
 
   g_string_append_printf (buffer, "<report_metrics id=\"%s\">",
                           report_uuid);
-  append_summary_from_system_query (buffer, system_query);
+  append_summary_from_queries (buffer, system_query, vuln_query);
   append_system_rows_xml_from_query (buffer, system_query);
   append_vulnerability_rows_xml_from_query (buffer, vuln_query);
   g_string_append (buffer, "</report_metrics>");
@@ -572,8 +577,8 @@ buffer_scope_report_metrics_xml (GString *buffer, const char *scope_report_uuid)
      " WHERE id = %llu;",
      scope_report);
   vulnerability_count = sql_int64_0
-    ("SELECT coalesce (sum (vulnerability_count), 0)"
-     " FROM scope_report_system_metrics WHERE scope_report = %llu;",
+    ("SELECT count (*)"
+     " FROM scope_report_vulnerability_metrics WHERE scope_report = %llu;",
      scope_report);
 
   g_string_append_printf (buffer, "<scope_report_metrics id=\"%s\">",

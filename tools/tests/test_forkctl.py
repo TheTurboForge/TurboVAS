@@ -11,6 +11,129 @@ from importlib.machinery import SourceFileLoader
 from pathlib import Path
 
 
+METRIC_FIXTURE_HOSTS = [
+    {"host": "192.0.2.10", "credential_path": True, "auth_success": True, "auth_failure": True, "source_reports": {"raw-a"}},
+    {"host": "192.0.2.11", "credential_path": True, "auth_success": False, "auth_failure": True, "source_reports": {"raw-b"}},
+    {"host": "192.0.2.12", "credential_path": True, "auth_success": False, "auth_failure": False, "source_reports": {"raw-b"}},
+    {"host": "192.0.2.13", "credential_path": False, "auth_success": False, "auth_failure": False, "source_reports": {"raw-c"}},
+    {"host": "192.0.2.99", "credential_path": True, "auth_success": True, "auth_failure": False, "source_reports": {"raw-extra"}},
+]
+
+METRIC_FIXTURE_RESULTS = [
+    {"host": "192.0.2.10", "nvt": "nvt-a", "name": "Shared high finding", "severity": 7.0, "source_report": "raw-a", "port": "80/tcp"},
+    {"host": "192.0.2.10", "nvt": "nvt-a", "name": "Shared high finding", "severity": 7.0, "source_report": "raw-a", "port": "443/tcp"},
+    {"host": "192.0.2.10", "nvt": "nvt-b", "name": "Single medium finding", "severity": 4.0, "source_report": "raw-a", "port": "22/tcp"},
+    {"host": "192.0.2.10", "nvt": "nvt-log", "name": "Log row", "severity": 0.0, "source_report": "raw-a", "port": "general/tcp"},
+    {"host": "192.0.2.10", "nvt": "nvt-error", "name": "Scanner execution error", "severity": 9.0, "source_report": "raw-a", "scanner_error": True},
+    {"host": "192.0.2.10", "nvt": "nvt-fp", "name": "False positive row", "severity": 9.0, "source_report": "raw-a", "false_positive": True},
+    {"host": "192.0.2.11", "nvt": "nvt-a", "name": "Shared high finding", "severity": 7.0, "source_report": "raw-b", "port": "80/tcp"},
+    {"host": "192.0.2.12", "nvt": "nvt-c", "name": "Low finding", "severity": 1.0, "source_report": "raw-b", "port": "161/udp"},
+    {"host": "192.0.2.99", "nvt": "nvt-d", "name": "Global-only finding", "severity": 10.0, "source_report": "raw-extra", "port": "443/tcp"},
+]
+
+
+def metric_contract(scope_hosts=None):
+    scope = {host.lower() for host in scope_hosts} if scope_hosts is not None else None
+
+    def included_host(host):
+        return scope is None or host.lower() in scope
+
+    hosts = [host for host in METRIC_FIXTURE_HOSTS if included_host(host["host"])]
+    findings = [
+        result
+        for result in METRIC_FIXTURE_RESULTS
+        if included_host(result["host"])
+        and result.get("severity", 0) > 0
+        and not result.get("scanner_error", False)
+        and not result.get("false_positive", False)
+    ]
+
+    by_system = {host["host"].lower(): {} for host in hosts}
+    for result in findings:
+        host_key = result["host"].lower()
+        nvt = result["nvt"]
+        current = by_system.setdefault(host_key, {}).get(nvt)
+        if current is None or result["severity"] > current["severity"]:
+            by_system[host_key][nvt] = {
+                "name": result["name"],
+                "severity": result["severity"],
+                "source_reports": {result["source_report"]},
+            }
+        else:
+            current["source_reports"].add(result["source_report"])
+
+    systems = []
+    for host in hosts:
+        host_key = host["host"].lower()
+        vulns = by_system.get(host_key, {})
+        if host["auth_success"]:
+            auth_state = "authenticated"
+        elif host["auth_failure"]:
+            auth_state = "authentication_failed"
+        elif host["credential_path"]:
+            auth_state = "unknown"
+        else:
+            auth_state = "no_credential_path"
+        systems.append(
+            {
+                "host": host["host"],
+                "cvss_load": sum(item["severity"] for item in vulns.values()),
+                "max_cvss": max([item["severity"] for item in vulns.values()] or [0.0]),
+                "vulnerability_count": len(vulns),
+                "authentication_state": auth_state,
+                "source_report_count": len(host["source_reports"]),
+            }
+        )
+
+    vulnerability_map = {}
+    for host_key, vulns in by_system.items():
+        for nvt, item in vulns.items():
+            entry = vulnerability_map.setdefault(
+                nvt,
+                {"nvt": nvt, "name": item["name"], "cvss_score": item["severity"], "hosts": set(), "source_reports": set()},
+            )
+            entry["cvss_score"] = max(entry["cvss_score"], item["severity"])
+            entry["hosts"].add(host_key)
+            entry["source_reports"].update(item["source_reports"])
+
+    alive_count = len(systems)
+    vulnerabilities = []
+    for entry in vulnerability_map.values():
+        affected = len(entry["hosts"])
+        cvss_load = entry["cvss_score"] * affected
+        vulnerabilities.append(
+            {
+                "nvt": entry["nvt"],
+                "name": entry["name"],
+                "cvss_score": entry["cvss_score"],
+                "affected_system_count": affected,
+                "cvss_load": cvss_load,
+                "average_contribution": cvss_load / alive_count if alive_count else 0.0,
+                "source_report_count": len(entry["source_reports"]),
+            }
+        )
+
+    systems.sort(key=lambda system: (-system["cvss_load"], system["host"]))
+    vulnerabilities.sort(key=lambda vuln: (-vuln["cvss_load"], -vuln["cvss_score"], vuln["name"]))
+    auth_counts = {state: sum(1 for system in systems if system["authentication_state"] == state) for state in ("authenticated", "authentication_failed", "no_credential_path", "unknown")}
+    total_load = sum(system["cvss_load"] for system in systems)
+    return {
+        "summary": {
+            "alive_system_count": alive_count,
+            "total_system_cvss_load": total_load,
+            "average_system_cvss_load": total_load / alive_count if alive_count else 0.0,
+            "vulnerability_count": len(vulnerabilities),
+            "authenticated_system_count": auth_counts["authenticated"],
+            "authentication_failed_system_count": auth_counts["authentication_failed"],
+            "no_credential_path_system_count": auth_counts["no_credential_path"],
+            "unknown_authentication_system_count": auth_counts["unknown"],
+            "authenticated_scan_coverage_percent": (100.0 * auth_counts["authenticated"] / alive_count) if alive_count else 0.0,
+        },
+        "systems": systems,
+        "vulnerabilities": vulnerabilities,
+    }
+
+
 TURBOVASCTL_PATH = Path(__file__).resolve().parents[1] / "turbovasctl"
 SPEC = importlib.util.spec_from_loader("turbovasctl", SourceFileLoader("turbovasctl", str(TURBOVASCTL_PATH)))
 turbovasctl = importlib.util.module_from_spec(SPEC)
@@ -268,6 +391,58 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("targets_login_data", source)
         self.assertIn("no_credential_path", source)
         self.assertIn("authenticated_scan_coverage_percent", source)
+        self.assertIn("append_summary_from_queries", source)
+        self.assertIn("SELECT count (*)", source)
+        self.assertIn("FROM scope_report_vulnerability_metrics", source)
+        self.assertNotIn("SELECT coalesce (sum (vulnerability_count), 0)", source)
+
+    def test_report_metrics_sql_auth_success_precedes_failure(self):
+        source = (Path(__file__).resolve().parents[2] / "components" / "gvmd" / "src" / "manage_sql_metrics.c").read_text(encoding="utf-8")
+        case_expr = source[source.index("CASE WHEN alive.auth_success"):source.index("alive.source_report_count", source.index("CASE WHEN alive.auth_success"))]
+        self.assertLess(case_expr.index("alive.auth_success"), case_expr.index("alive.auth_failure"))
+        self.assertLess(case_expr.index("alive.auth_failure"), case_expr.index("alive.has_credential_path"))
+
+    def test_metric_contract_fixture_custom_scope_counts(self):
+        metrics = metric_contract(scope_hosts=["192.0.2.10", "192.0.2.11", "192.0.2.12", "192.0.2.13"])
+        summary = metrics["summary"]
+        self.assertEqual(summary["alive_system_count"], 4)
+        self.assertEqual(summary["vulnerability_count"], 3)
+        self.assertAlmostEqual(summary["total_system_cvss_load"], 19.0)
+        self.assertAlmostEqual(summary["average_system_cvss_load"], 4.75)
+        self.assertEqual(summary["authenticated_system_count"], 1)
+        self.assertEqual(summary["authentication_failed_system_count"], 1)
+        self.assertEqual(summary["unknown_authentication_system_count"], 1)
+        self.assertEqual(summary["no_credential_path_system_count"], 1)
+        self.assertAlmostEqual(summary["authenticated_scan_coverage_percent"], 25.0)
+
+        systems = {system["host"]: system for system in metrics["systems"]}
+        self.assertAlmostEqual(systems["192.0.2.10"]["cvss_load"], 11.0)
+        self.assertEqual(systems["192.0.2.10"]["vulnerability_count"], 2)
+        self.assertEqual(systems["192.0.2.10"]["authentication_state"], "authenticated")
+        self.assertAlmostEqual(systems["192.0.2.11"]["cvss_load"], 7.0)
+        self.assertEqual(systems["192.0.2.11"]["authentication_state"], "authentication_failed")
+        self.assertEqual(systems["192.0.2.12"]["authentication_state"], "unknown")
+        self.assertEqual(systems["192.0.2.13"]["authentication_state"], "no_credential_path")
+
+        vulnerabilities = {vulnerability["nvt"]: vulnerability for vulnerability in metrics["vulnerabilities"]}
+        self.assertEqual(set(vulnerabilities), {"nvt-a", "nvt-b", "nvt-c"})
+        self.assertEqual(vulnerabilities["nvt-a"]["affected_system_count"], 2)
+        self.assertAlmostEqual(vulnerabilities["nvt-a"]["cvss_load"], 14.0)
+        self.assertAlmostEqual(vulnerabilities["nvt-a"]["average_contribution"], 3.5)
+        self.assertEqual(vulnerabilities["nvt-a"]["source_report_count"], 2)
+
+    def test_metric_contract_fixture_raw_and_organization_scope_agree(self):
+        raw = metric_contract()
+        organization = metric_contract(scope_hosts=None)
+        self.assertEqual(raw, organization)
+        summary = organization["summary"]
+        self.assertEqual(summary["alive_system_count"], 5)
+        self.assertEqual(summary["vulnerability_count"], 4)
+        self.assertAlmostEqual(summary["total_system_cvss_load"], 29.0)
+        self.assertAlmostEqual(summary["average_system_cvss_load"], 5.8)
+        self.assertAlmostEqual(summary["authenticated_scan_coverage_percent"], 40.0)
+        self.assertIn("192.0.2.99", {system["host"] for system in organization["systems"]})
+        self.assertIn("nvt-d", {vulnerability["nvt"] for vulnerability in organization["vulnerabilities"]})
 
     def test_runtime_metrics_parser_preserves_summary_systems_and_vulnerabilities(self):
         xml = """
