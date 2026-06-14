@@ -35,15 +35,21 @@ Keep data outside PostgreSQL when it is not product state:
 `runtime-data-state --json` classifies known runtime paths as:
 
 - `system_of_record`: gvmd/PostgreSQL state;
-- `artifact`: diagnostic/report/smoke outputs under `TurboVAS-runtime/artifacts`;
+- `db_owned_export`: report, scope-report, and metric artifacts generated from
+  gvmd/PostgreSQL state;
+- `diagnostic_artifact`: browser, credential, log-review, quality-gate,
+  full-test-scan, performance, and runtime-log artifacts that explain command or
+  service behavior but are not product truth;
 - `feed_content`: canonical feed cache and runtime feed copy;
-- `log`: Docker/runtime logs;
 - `temporary_runtime_state`: service state such as keyrings, sockets, and
   runtime-local files.
 
 The command also checks current core tables, scope tables, metric snapshot
 tables, row counts where available, and absence of removed inherited feature
-tables.
+tables. Its `product_data_audit` section warns only when a product-looking
+export exists without the expected gvmd/PostgreSQL source tables; diagnostic
+artifacts and feed/runtime state do not produce product-data warnings by
+themselves.
 
 ## Design Guidance
 
@@ -66,3 +72,9 @@ Use `runtime-data-state --json` before major reporting, metrics, scope, or
 inventory work to identify product data that is still outside the database.
 Do not move data merely for tidiness; move it when the product needs durable
 query semantics, provenance, retention, or shared API access.
+
+`runtime-performance-snapshot --json` complements this with thresholdless
+baseline facts: parsed Docker CPU/memory/I/O/PID counters, database size and
+largest relations, known row counts, and static asset size summaries. Those
+facts are instrumentation, not policy; optimization decisions need a later
+hot-path analysis.

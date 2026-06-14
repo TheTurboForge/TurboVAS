@@ -85,8 +85,8 @@ TurboVAS provides a small root command surface for repository health checks:
 - `just runtime-status`: show Docker runtime status.
 - `just runtime-smoke`: run infrastructure smoke checks.
 - `just runtime-log-review`: review recent full-stack runtime logs for high-signal regressions.
-- `just runtime-data-state`: inspect database-centered runtime data state and known non-DB runtime artifacts.
-- `just runtime-performance-snapshot`: capture a lightweight runtime performance baseline.
+- `just runtime-data-state`: inspect database-centered runtime data state, DB-owned exports, and known non-DB runtime artifacts.
+- `just runtime-performance-snapshot`: capture a lightweight numeric runtime performance baseline.
 - `just runtime-app-up`: start experimental inherited application services.
 - `just runtime-app-smoke`: run experimental application service smoke checks.
 - `just runtime-webui-smoke`: verify the staged GSA web UI over `gsad`.

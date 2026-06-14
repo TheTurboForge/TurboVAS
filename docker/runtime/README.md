@@ -72,12 +72,14 @@ Use the root `justfile` command surface:
 
 `runtime-log-review` writes redacted recent log tails and a JSON finding set
 under the runtime artifact tree. `runtime-data-state` reports the current
-database version, expected live tables, removed feature-table absence, and known
-non-database runtime state, including a compact summary of data outside the
-database. `runtime-performance-snapshot` captures Docker, database, artifact,
-and build-size facts for future instrumentation work; it writes a latest JSON
-artifact plus retained timestamped history and does not optimize or mutate
-runtime state. `quality-gate-state` reports retained quality-gate history.
+database version, expected live tables, removed feature-table absence, known
+non-database runtime state, DB-owned exports, and a product-data audit that
+warns only when product-looking data lacks a gvmd/PostgreSQL source of record.
+`runtime-performance-snapshot` captures parsed Docker CPU/memory/I/O/PID
+numbers, database size and largest relations, artifact paths, and build-size
+facts for future instrumentation work; it writes a latest JSON artifact plus
+retained timestamped history and does not optimize or mutate runtime state.
+`quality-gate-state` reports retained quality-gate history.
 `quality-gate-schedule` manages the development user-level systemd timer on
 `turboforge-server`; it does not fall back to cron if user systemd is
 unavailable.

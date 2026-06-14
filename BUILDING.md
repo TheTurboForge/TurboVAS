@@ -108,8 +108,8 @@ just feed-copy-to-runtime
 just runtime-status
 just runtime-smoke
 just runtime-log-review
-just runtime-data-state
-just runtime-performance-snapshot
+just runtime-data-state      # includes DB-owned export classification and product-data audit
+just runtime-performance-snapshot # numeric Docker/DB/static-asset baseline, thresholdless
 just quality-gate-state
 just quality-gate-schedule --status
 just runtime-app-up

@@ -570,15 +570,80 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_data_outside_db_summary_groups_classifications(self):
         summary = turbovasctl.summarize_data_outside_db(
             {
-                "reports": {"classification": "artifact", "exists": True, "file_count": 2, "byte_count": 100},
-                "logs": {"classification": "log", "exists": False, "file_count": 0, "byte_count": 0},
+                "reports": {"classification": "db_owned_export", "exists": True, "file_count": 2, "byte_count": 100},
+                "logs": {"classification": "diagnostic_artifact", "exists": False, "file_count": 0, "byte_count": 0},
                 "feeds": {"classification": "feed_content", "exists": True, "file_count": 3, "byte_count": 200},
             }
         )
         self.assertEqual(summary["total_file_count"], 5)
         self.assertEqual(summary["total_byte_count"], 300)
-        self.assertEqual(summary["by_classification"]["artifact"]["existing_path_count"], 1)
-        self.assertEqual(summary["by_classification"]["log"]["existing_path_count"], 0)
+        self.assertEqual(summary["by_classification"]["db_owned_export"]["existing_path_count"], 1)
+        self.assertEqual(summary["by_classification"]["diagnostic_artifact"]["existing_path_count"], 0)
+
+    def test_product_data_audit_passes_for_db_owned_exports_with_tables(self):
+        audit = turbovasctl.product_data_audit(
+            {
+                "database": {
+                    "core_tables": {
+                        "reports": {"exists": True},
+                        "results": {"exists": True},
+                        "report_hosts": {"exists": True},
+                    },
+                    "scope_tables": {},
+                },
+                "paths": {"reports": {"classification": "db_owned_export", "exists": True, "path": "/tmp/reports"}},
+            }
+        )
+        self.assertEqual(audit["status"], "pass")
+        self.assertEqual(audit["unowned_product_data"], [])
+        self.assertEqual(audit["db_owned_exports"]["reports"]["source_of_record"], "gvmd/postgresql")
+
+    def test_product_data_audit_warns_for_export_without_source_tables(self):
+        audit = turbovasctl.product_data_audit(
+            {
+                "database": {"core_tables": {"reports": {"exists": True}}, "scope_tables": {}},
+                "paths": {"metrics": {"classification": "db_owned_export", "exists": True, "path": "/tmp/metrics"}},
+            }
+        )
+        self.assertEqual(audit["status"], "warn")
+        self.assertEqual(audit["unowned_product_data"][0]["path"], "metrics")
+        self.assertIn("scope_report_system_metrics", audit["unowned_product_data"][0]["missing_tables"])
+
+    def test_performance_parses_docker_percent_and_byte_units(self):
+        self.assertEqual(turbovasctl.parse_percent("40.18%"), 40.18)
+        self.assertEqual(turbovasctl.parse_byte_quantity("60.22MiB"), int(60.22 * 1024 * 1024))
+        self.assertEqual(turbovasctl.parse_byte_quantity("1.53GB"), int(1.53 * 1000 * 1000 * 1000))
+        self.assertIsNone(turbovasctl.parse_byte_quantity("not-a-size"))
+
+    def test_performance_normalizes_docker_stats_row(self):
+        row = turbovasctl.normalize_docker_stat(
+            {
+                "Name": "turbovas-postgres-1",
+                "ID": "abc123",
+                "CPUPerc": "5.39%",
+                "MemPerc": "0.39%",
+                "MemUsage": "62.06MiB / 15.5GiB",
+                "NetIO": "159MB / 1.79GB",
+                "BlockIO": "1.53GB / 222MB",
+                "PIDs": "7",
+            }
+        )
+        self.assertEqual(row["name"], "turbovas-postgres-1")
+        self.assertEqual(row["cpu_percent"], 5.39)
+        self.assertEqual(row["pids"], 7)
+        self.assertEqual(row["memory_usage_bytes"], int(62.06 * 1024 * 1024))
+        self.assertEqual(row["network_tx_bytes"], int(1.79 * 1000 * 1000 * 1000))
+        self.assertEqual(row["block_read_bytes"], int(1.53 * 1000 * 1000 * 1000))
+
+    def test_performance_top_numeric_rows_orders_missing_values_last(self):
+        rows = [{"name": "a", "cpu_percent": None}, {"name": "b", "cpu_percent": 2.0}, {"name": "c", "cpu_percent": 1.0}]
+        self.assertEqual([row["name"] for row in turbovasctl.top_numeric_rows(rows, "cpu_percent")], ["b", "c", "a"])
+
+    def test_parse_relation_size_rows(self):
+        self.assertEqual(
+            turbovasctl.parse_relation_size_rows("results|123\nreports|45\n"),
+            [{"name": "results", "byte_count": 123}, {"name": "reports", "byte_count": 45}],
+        )
 
     def test_quality_gate_systemd_templates_are_present(self):
         root = Path(__file__).resolve().parents[2]
@@ -849,6 +914,40 @@ class TurboVASCtlTests(unittest.TestCase):
             self.assertEqual(secret, "admin")
             secret_path = turbovasctl.runtime_secret_path(root, "example")
             self.assertEqual(secret_path.read_text(encoding="utf-8").strip(), "admin")
+
+    def test_short_secret_redaction_preserves_benign_identifier_names(self):
+        text = '{"admin_uuid":"kept", "created_by":"admin", "check":"runtime.admin-secret", "flag":"admin-secret", "user":"admin"}'
+        redacted = turbovasctl.redact_text(text, ["admin"])
+        self.assertIn('"admin_uuid"', redacted)
+        self.assertIn('"runtime.admin-secret"', redacted)
+        self.assertIn('"admin-secret"', redacted)
+        self.assertIn('"created_by":"[redacted]"', redacted)
+        self.assertIn('"user":"[redacted]"', redacted)
+
+    def test_short_secret_redaction_handles_log_tokens_without_path_mangling(self):
+        text = "login admin failed; username=admin; home=/home/admin; key=admin_uuid"
+        redacted = turbovasctl.redact_text(text, ["admin"])
+        self.assertIn("login [redacted] failed", redacted)
+        self.assertIn("username=[redacted]", redacted)
+        self.assertIn("home=/home/admin", redacted)
+        self.assertIn("key=admin_uuid", redacted)
+
+    def test_long_secret_redaction_replaces_embedded_token(self):
+        secret = "long-generated-token"
+        text = f"prefix-{secret}-suffix token={secret}"
+        redacted = turbovasctl.redact_text(text, [secret])
+        self.assertEqual(redacted.count("[redacted]"), 2)
+        self.assertNotIn(secret, redacted)
+
+    def test_output_tail_uses_safe_secret_redaction(self):
+        output = "first\nadmin_uuid=kept\npassword=admin\n"
+        self.assertEqual(
+            turbovasctl.output_tail(output, lines=2, secrets_to_redact=["admin"]),
+            ["admin_uuid=kept", "password=[redacted]"],
+        )
+
+    def test_redaction_ignores_empty_secrets(self):
+        self.assertEqual(turbovasctl.redact_text("username=admin", [""]), "username=admin")
 
     def test_runtime_dirs_include_application_state(self):
         self.assertIn("certs/CA", turbovasctl.RUNTIME_DIRS)

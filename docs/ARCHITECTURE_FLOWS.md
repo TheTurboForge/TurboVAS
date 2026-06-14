@@ -93,10 +93,12 @@ Routine foundation commands keep the runtime inspectable:
 ```text
 quality-gate -> retained quality artifacts
 runtime-log-review -> redacted log artifacts
-runtime-data-state -> DB/table/runtime-state classification
-runtime-performance-snapshot -> retained thresholdless baselines
+runtime-data-state -> DB/table/runtime-state classification + product-data audit
+runtime-performance-snapshot -> parsed Docker/DB/static-asset baselines
 ```
 
 Diagnostics should create artifacts outside git under `TurboVAS-runtime`, not
-new product state. Product-relevant durable data discovered in diagnostics
-should be evaluated for migration into gvmd/PostgreSQL.
+new product state. `db_owned_export` artifacts are generated from gvmd/PostgreSQL
+and should not become hidden sources of truth. Product-relevant durable data
+discovered in diagnostics should be evaluated for migration into
+gvmd/PostgreSQL.

@@ -24,6 +24,11 @@ from typing import Any, Iterable
 
 
 STATUSES = ("pass", "warn", "fail")
+SHORT_SECRET_BOUNDARY_CHARS = r"A-Za-z0-9_./-"
+LONG_SECRET_MIN_LENGTH = 12
+DECIMAL_BYTE_UNITS = {"B": 1, "KB": 1000, "kB": 1000, "MB": 1000**2, "GB": 1000**3, "TB": 1000**4}
+BINARY_BYTE_UNITS = {"KiB": 1024, "MiB": 1024**2, "GiB": 1024**3, "TiB": 1024**4}
+BYTE_UNITS = {**DECIMAL_BYTE_UNITS, **BINARY_BYTE_UNITS}
 EXPECTED_ROOT_DOCS = ("README.md", "UPSTREAMS.md", "LICENSE_AUDIT.md")
 IMPORT_BASELINE_COMMIT = "def84d156dd45c27cad0a75bc2302ce151585d3c"
 TURBOVAS_MODIFICATION_NOTICE = "Modified by TurboVAS contributors, 2026."
@@ -225,20 +230,25 @@ DATABASE_REMOVED_TABLES = (
     "audit_reports",
 )
 DATA_STATE_ARTIFACT_PATHS = (
-    ("reports", "artifact", ("artifacts", "reports"), True),
-    ("scope-reports", "artifact", ("artifacts", "scope-reports"), True),
-    ("metrics", "artifact", ("artifacts", "metrics"), True),
-    ("browser-smoke", "artifact", ("artifacts", "browser-smoke"), True),
-    ("credential-smoke", "artifact", ("artifacts", "credential-smoke"), True),
-    ("full-test-scan", "artifact", ("artifacts", "full-test-scan"), True),
-    ("log-review", "artifact", ("artifacts", "log-review"), True),
-    ("quality-gate", "artifact", ("artifacts", "quality-gate"), True),
-    ("performance", "artifact", ("artifacts", "performance"), True),
+    ("reports", "db_owned_export", ("artifacts", "reports"), True),
+    ("scope-reports", "db_owned_export", ("artifacts", "scope-reports"), True),
+    ("metrics", "db_owned_export", ("artifacts", "metrics"), True),
+    ("browser-smoke", "diagnostic_artifact", ("artifacts", "browser-smoke"), True),
+    ("credential-smoke", "diagnostic_artifact", ("artifacts", "credential-smoke"), True),
+    ("full-test-scan", "diagnostic_artifact", ("artifacts", "full-test-scan"), True),
+    ("log-review", "diagnostic_artifact", ("artifacts", "log-review"), True),
+    ("quality-gate", "diagnostic_artifact", ("artifacts", "quality-gate"), True),
+    ("performance", "diagnostic_artifact", ("artifacts", "performance"), True),
     ("runtime-feeds", "feed_content", ("feeds",), False),
     ("feed-cache", "feed_content", ("feed-cache",), False),
-    ("runtime-logs", "log", ("logs",), False),
+    ("runtime-logs", "diagnostic_artifact", ("logs",), False),
     ("runtime-state", "temporary_runtime_state", ("state",), False),
 )
+DATA_STATE_DB_OWNED_EXPORT_SOURCES = {
+    "reports": ("reports", "results", "report_hosts"),
+    "scope-reports": ("scope_reports", "scope_report_sources"),
+    "metrics": ("reports", "results", "report_hosts", "scope_report_system_metrics", "scope_report_vulnerability_metrics"),
+}
 
 
 @dataclass(frozen=True)
@@ -1474,14 +1484,7 @@ def summarize_scanner_processes(output: str) -> dict[str, Any]:
 
 def output_tail(output: str, lines: int = 80, secrets_to_redact: Iterable[str] = ()) -> list[str]:
     tail = output.splitlines()[-lines:]
-    redacted: list[str] = []
-    for line in tail:
-        clean = line
-        for secret in secrets_to_redact:
-            if secret:
-                clean = clean.replace(secret, "[redacted]")
-        redacted.append(clean)
-    return redacted
+    return [redact_text(line, secrets_to_redact) for line in tail]
 
 
 def path_tree_summary(path: Path, recursive: bool = True) -> dict[str, Any]:
@@ -1531,6 +1534,99 @@ def path_tree_summary(path: Path, recursive: bool = True) -> dict[str, Any]:
     return summary
 
 
+def parse_percent(value: str | None) -> float | None:
+    if value is None:
+        return None
+    value = value.strip()
+    if not value.endswith("%"):
+        return None
+    try:
+        return float(value[:-1])
+    except ValueError:
+        return None
+
+
+def parse_byte_quantity(value: str | None) -> int | None:
+    if value is None:
+        return None
+    value = value.strip()
+    match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z]+)", value)
+    if not match:
+        return None
+    number, unit = match.groups()
+    multiplier = BYTE_UNITS.get(unit)
+    if multiplier is None:
+        return None
+    return int(float(number) * multiplier)
+
+
+def parse_byte_pair(value: str | None, first_key: str, second_key: str) -> dict[str, int | None]:
+    if value is None or "/" not in value:
+        return {first_key: None, second_key: None}
+    first, second = value.split("/", 1)
+    return {first_key: parse_byte_quantity(first), second_key: parse_byte_quantity(second)}
+
+
+def normalize_docker_stat(row: dict[str, str]) -> dict[str, Any]:
+    normalized: dict[str, Any] = {
+        "name": row.get("Name"),
+        "id": row.get("ID"),
+        "cpu_percent": parse_percent(row.get("CPUPerc")),
+        "memory_percent": parse_percent(row.get("MemPerc")),
+        "pids": None,
+    }
+    try:
+        normalized["pids"] = int(row.get("PIDs", ""))
+    except ValueError:
+        normalized["pids"] = None
+    normalized.update(parse_byte_pair(row.get("MemUsage"), "memory_usage_bytes", "memory_limit_bytes"))
+    normalized.update(parse_byte_pair(row.get("NetIO"), "network_rx_bytes", "network_tx_bytes"))
+    normalized.update(parse_byte_pair(row.get("BlockIO"), "block_read_bytes", "block_write_bytes"))
+    return normalized
+
+
+def top_numeric_rows(rows: list[dict[str, Any]], key: str, limit: int = 5) -> list[dict[str, Any]]:
+    return sorted(rows, key=lambda row: row.get(key) if row.get(key) is not None else -1, reverse=True)[:limit]
+
+
+def largest_files(path: Path, limit: int = 10) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    files: list[dict[str, Any]] = []
+    if path.is_file():
+        try:
+            return [{"path": str(path), "byte_count": path.stat().st_size}]
+        except OSError:
+            return []
+    for root, _, filenames in os.walk(path):
+        for filename in filenames:
+            candidate = Path(root) / filename
+            try:
+                size = candidate.stat().st_size
+            except OSError:
+                continue
+            try:
+                display_path = str(candidate.relative_to(path))
+            except ValueError:
+                display_path = str(candidate)
+            files.append({"path": display_path, "byte_count": size})
+    return sorted(files, key=lambda item: item["byte_count"], reverse=True)[:limit]
+
+
+def parse_relation_size_rows(output: str) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for line in output.splitlines():
+        if "|" not in line:
+            continue
+        name, size = line.strip().split("|", 1)
+        try:
+            byte_count: int | None = int(size)
+        except ValueError:
+            byte_count = None
+        rows.append({"name": name, "byte_count": byte_count})
+    return rows
+
+
 def summarize_data_outside_db(paths: dict[str, dict[str, Any]]) -> dict[str, Any]:
     summary: dict[str, Any] = {"by_classification": {}, "total_byte_count": 0, "total_file_count": 0}
     for name, path_summary in paths.items():
@@ -1548,6 +1644,40 @@ def summarize_data_outside_db(paths: dict[str, dict[str, Any]]) -> dict[str, Any
         summary["total_file_count"] += int(path_summary.get("file_count") or 0)
         summary["total_byte_count"] += int(path_summary.get("byte_count") or 0)
     return summary
+
+
+def database_table_exists(database: dict[str, Any], table: str) -> bool:
+    for group in ("core_tables", "scope_tables"):
+        table_info = database.get(group, {}).get(table, {})
+        if table_info.get("exists") is True:
+            return True
+    return False
+
+
+def product_data_audit(details: dict[str, Any]) -> dict[str, Any]:
+    database = details.get("database", {})
+    paths = details.get("paths", {})
+    audit: dict[str, Any] = {
+        "db_owned_exports": {},
+        "unowned_product_data": [],
+    }
+    for name, path_summary in paths.items():
+        if path_summary.get("classification") != "db_owned_export":
+            continue
+        required_tables = DATA_STATE_DB_OWNED_EXPORT_SOURCES.get(name, ())
+        missing_tables = [table for table in required_tables if not database_table_exists(database, table)]
+        export = {
+            "exists": bool(path_summary.get("exists")),
+            "path": path_summary.get("path"),
+            "source_of_record": "gvmd/postgresql",
+            "required_tables": list(required_tables),
+            "missing_tables": missing_tables,
+        }
+        audit["db_owned_exports"][name] = export
+        if export["exists"] and missing_tables:
+            audit["unowned_product_data"].append({"path": name, "missing_tables": missing_tables})
+    audit["status"] = "warn" if audit["unowned_product_data"] else "pass"
+    return audit
 
 
 def process_step_finding(status: str, check: str, message: str, result: subprocess.CompletedProcess[str], command: list[str] | None = None) -> dict[str, Any]:
@@ -1622,9 +1752,20 @@ def runtime_secret_redactions(repo_root: Path) -> list[str]:
 def redact_text(text: str, secrets_to_redact: Iterable[str]) -> str:
     redacted = text
     for secret in secrets_to_redact:
-        if secret:
-            redacted = redacted.replace(secret, "[redacted]")
+        redacted = redact_secret_value(redacted, secret)
     return redacted
+
+
+def redact_secret_value(text: str, secret: str) -> str:
+    if not secret:
+        return text
+    if len(secret) >= LONG_SECRET_MIN_LENGTH:
+        return text.replace(secret, "[redacted]")
+    escaped = re.escape(secret)
+    token_pattern = re.compile(
+        rf"(?<![{SHORT_SECRET_BOUNDARY_CHARS}]){escaped}(?![{SHORT_SECRET_BOUNDARY_CHARS}])(?![\"']\s*:)",
+    )
+    return token_pattern.sub("[redacted]", text)
 
 
 def postgres_user(repo_root: Path) -> str:
@@ -3713,6 +3854,12 @@ def command_runtime_data_state(repo_root: Path) -> dict[str, Any]:
         findings.append(finding("pass" if summary["exists"] else "warn", "data-state.path", f"{name} classified as {classification}.", summary["path"], {"summary": summary}))
     details["data_outside_db"] = summarize_data_outside_db(details["paths"])
     findings.append(finding("pass", "data-state.outside-db", "Non-database runtime state summary captured.", details={"summary": details["data_outside_db"]}))
+    details["product_data_audit"] = product_data_audit(details)
+    audit_status = details["product_data_audit"].get("status", "warn")
+    audit_message = "Product data exports have database sources of record."
+    if audit_status != "pass":
+        audit_message = "Product data exports are missing expected database sources of record."
+    findings.append(finding(audit_status, "data-state.product-data-audit", audit_message, details={"audit": details["product_data_audit"]}))
 
     result = make_result("runtime-data-state", repo_root, "Runtime data-state diagnostic completed.", findings, [str(artifact_dir / "data-state.json")])
     result["details"] = details
@@ -3733,7 +3880,19 @@ def command_runtime_performance_snapshot(repo_root: Path) -> dict[str, Any]:
                 details["docker_stats"].append(json.loads(line))
             except json.JSONDecodeError:
                 continue
+    details["docker_stats_numeric"] = [normalize_docker_stat(row) for row in details["docker_stats"]]
+    details["docker_top"] = {
+        "cpu_percent": top_numeric_rows(details["docker_stats_numeric"], "cpu_percent"),
+        "memory_usage_bytes": top_numeric_rows(details["docker_stats_numeric"], "memory_usage_bytes"),
+        "network_rx_bytes": top_numeric_rows(details["docker_stats_numeric"], "network_rx_bytes"),
+        "network_tx_bytes": top_numeric_rows(details["docker_stats_numeric"], "network_tx_bytes"),
+        "block_read_bytes": top_numeric_rows(details["docker_stats_numeric"], "block_read_bytes"),
+        "block_write_bytes": top_numeric_rows(details["docker_stats_numeric"], "block_write_bytes"),
+        "pids": top_numeric_rows(details["docker_stats_numeric"], "pids"),
+    }
     findings.append(process_step_finding("pass" if stats.returncode == 0 else "warn", "performance.docker-stats", f"docker stats snapshot exit code {stats.returncode}.", stats, ["docker", "stats", "--no-stream", "--format", "json"]))
+    if stats.returncode == 0:
+        findings.append(finding("pass", "performance.docker-stats-numeric", "Docker stats numeric summary captured.", details={"container_count": len(details["docker_stats_numeric"]), "top": details["docker_top"]}))
 
     if container_running(repo_root, "postgres"):
         db_size = psql(repo_root, "SELECT pg_database_size(current_database());")
@@ -3745,6 +3904,12 @@ def command_runtime_performance_snapshot(repo_root: Path) -> dict[str, Any]:
             findings.append(finding("pass", "performance.table-row-counts", "Database row-count estimates captured for known tables.", details={"table_count": len(details["database"]["row_counts"])}))
         else:
             findings.append(finding("warn", "performance.table-row-counts", "Could not inspect database row counts.", details={"output_tail": output_tail(table_query.stdout, 80)}))
+        largest_relations = psql(
+            repo_root,
+            "SELECT relname || '|' || pg_total_relation_size(c.oid) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind IN ('r','m','i','t') ORDER BY pg_total_relation_size(c.oid) DESC LIMIT 10;",
+        )
+        details["database"]["largest_relations"] = parse_relation_size_rows(largest_relations.stdout) if largest_relations.returncode == 0 else []
+        findings.append(finding("pass" if largest_relations.returncode == 0 else "warn", "performance.database-largest-relations", "Largest database relations captured." if largest_relations.returncode == 0 else "Largest database relation query failed.", details={"relations": details["database"].get("largest_relations", []), "output_tail": output_tail(largest_relations.stdout, 80)}))
     else:
         findings.append(finding("warn", "performance.database", "Postgres is not running; database size and row counts are unavailable."))
 
@@ -3755,6 +3920,8 @@ def command_runtime_performance_snapshot(repo_root: Path) -> dict[str, Any]:
         ("build-prefix", repo_root / "build" / "prefix", False),
     ):
         summary = path_tree_summary(path, recursive=recursive)
+        if name == "gsa-static":
+            summary["largest_files"] = largest_files(path)
         details["paths"][name] = summary
         findings.append(finding("pass" if summary["exists"] else "warn", "performance.path", f"{name} size snapshot captured." if summary["exists"] else f"{name} path is missing.", summary["path"], {"summary": summary}))
 
