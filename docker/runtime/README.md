@@ -82,6 +82,11 @@ runtime state. `quality-gate-state` reports retained quality-gate history.
 `turboforge-server`; it does not fall back to cron if user systemd is
 unavailable.
 
+The GitHub Actions quality-gate workflow is deliberately source-only. It shares
+the same `tools/turbovasctl quality-gate --json` contract, but does not start
+Docker runtime services, scans, feed sync/copy commands, or public-release
+gates. Runtime-aware continuous checking belongs to the server-side timer.
+
 `runtime-certs-init` uses inherited `gvm-manage-certs` with persistent runtime
 certificate directories and does not rotate existing certificates.
 

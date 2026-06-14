@@ -590,6 +590,37 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertNotIn("TURBOVAS_RUNTIME_DIR", service_text)
         self.assertIn("OnCalendar=*-*-* 03:30:00", timer.read_text(encoding="utf-8"))
 
+    def test_github_quality_gate_workflow_is_source_only(self):
+        root = Path(__file__).resolve().parents[2]
+        workflow = root / ".github" / "workflows" / "quality-gate.yml"
+        self.assertTrue(workflow.is_file())
+        text = workflow.read_text(encoding="utf-8")
+        required = [
+            "SPDX-License-Identifier: GPL-3.0-or-later",
+            "push:",
+            "pull_request:",
+            "workflow_dispatch:",
+            "ubuntu-24.04",
+            "python-version: \"3.12\"",
+            "node-version: \"22\"",
+            "cache-dependency-path: components/gsa/package-lock.json",
+            "npm ci",
+            "TURBOVAS_RUNTIME_DIR=\"$RUNNER_TEMP/turbovas-runtime\"",
+            "tools/turbovasctl quality-gate --json",
+            "actions/upload-artifact@v4",
+        ]
+        for needle in required:
+            self.assertIn(needle, text)
+        forbidden = [
+            "runtime-full-test-scan-start",
+            "feed-cache-sync",
+            "feed-copy-to-runtime",
+            "docker compose up",
+            "license-public-release-gate",
+        ]
+        for needle in forbidden:
+            self.assertNotIn(needle, text)
+
     def test_justfile_forwards_common_recipe_arguments(self):
         justfile = (Path(__file__).resolve().parents[2] / "justfile").read_text(encoding="utf-8")
         for recipe in (

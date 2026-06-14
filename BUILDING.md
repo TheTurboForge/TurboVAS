@@ -55,6 +55,20 @@ tools/turbovasctl quality-gate-state --json
 `tools/forkctl` remains as a temporary compatibility wrapper during the command
 rename.
 
+## Quality Gates
+
+`just quality-gate` and `tools/turbovasctl quality-gate --json` are the local
+source-quality contract. They run the routine license report, doctor checks,
+Python unit tests, Python compile checks, Docker Compose config validation, GSA
+type-checking, and the fast GSA web test suite.
+
+`.github/workflows/quality-gate.yml` runs that same source-only contract in
+GitHub Actions on pushes to `main`, pull requests, and manual dispatch. Hosted
+CI intentionally does not start app runtime services, start scans, mutate feeds,
+or run the stricter public-release license gate. Runtime-aware continuous
+checking remains on the development server through the `quality-gate-schedule`
+systemd timer and retained runtime artifacts.
+
 ## Notes
 
 The server baseline uses the Ubuntu `libcurl4-gnutls-dev` package because the scanner build expects the GnuTLS curl variant.

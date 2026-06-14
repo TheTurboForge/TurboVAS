@@ -107,4 +107,12 @@ tools/turbovasctl doctor --json
 `tools/forkctl` remains as a temporary compatibility wrapper during the command
 rename.
 
+GitHub Actions also runs the source-only quality gate in
+`.github/workflows/quality-gate.yml` on pushes to `main`, pull requests, and
+manual dispatch. That hosted gate uses the same
+`tools/turbovasctl quality-gate --json` contract as local development, but it
+does not start runtime services, run scans, sync/copy feeds, or perform public
+release gating. The server-side systemd timer remains the runtime-capable daily
+development gate.
+
 See `BUILDING.md` for the current build baseline and `docker/runtime/README.md` for the current runtime groundwork.
