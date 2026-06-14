@@ -600,7 +600,9 @@ class TurboVASCtlTests(unittest.TestCase):
             "push:",
             "pull_request:",
             "workflow_dispatch:",
-            "FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: \"true\"",
+            "actions/checkout@v5",
+            "actions/setup-python@v6",
+            "actions/setup-node@v5",
             "ubuntu-24.04",
             "fetch-depth: 0",
             "python-version: \"3.12\"",
@@ -609,7 +611,7 @@ class TurboVASCtlTests(unittest.TestCase):
             "npm ci",
             "TURBOVAS_RUNTIME_DIR=\"$RUNNER_TEMP/turbovas-runtime\"",
             "tools/turbovasctl quality-gate --json",
-            "actions/upload-artifact@v4",
+            "actions/upload-artifact@v7",
         ]
         for needle in required:
             self.assertIn(needle, text)
