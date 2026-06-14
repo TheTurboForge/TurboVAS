@@ -3,6 +3,7 @@
 
 import importlib.util
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -539,7 +540,7 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_technical_foundation_commands_are_registered(self):
         source = (Path(__file__).resolve().parents[1] / "turbovasctl").read_text(encoding="utf-8")
         justfile = (Path(__file__).resolve().parents[2] / "justfile").read_text(encoding="utf-8")
-        for command in ("runtime-log-review", "runtime-data-state", "runtime-performance-snapshot", "quality-gate"):
+        for command in ("runtime-log-review", "runtime-data-state", "runtime-performance-snapshot", "quality-gate", "quality-gate-state", "quality-gate-schedule"):
             with self.subTest(command=command):
                 self.assertIn(command, source)
                 self.assertIn(f"{command} *args:", justfile)
@@ -548,6 +549,46 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("def command_runtime_data_state", source)
         self.assertIn("def command_runtime_performance_snapshot", source)
         self.assertIn("def command_quality_gate", source)
+        self.assertIn("def command_quality_gate_state", source)
+        self.assertIn("def command_quality_gate_schedule", source)
+
+    def test_retained_json_artifacts_write_latest_history_and_prune(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            artifact_dir = Path(tmp)
+            latest, first = turbovasctl.retained_json_artifact_paths(artifact_dir, "quality-gate", "quality-gate.json")
+            turbovasctl.write_retained_json_artifact(latest, first, {"status": "pass", "summary": "first", "metadata": {"generated_at": "one"}}, "quality-gate", 1)
+            latest, second = turbovasctl.retained_json_artifact_paths(artifact_dir, "quality-gate", "quality-gate.json")
+            turbovasctl.write_retained_json_artifact(latest, second, {"status": "fail", "summary": "second", "metadata": {"generated_at": "two"}}, "quality-gate", 1)
+
+            self.assertTrue((artifact_dir / "quality-gate.json").is_file())
+            history = turbovasctl.json_artifact_history(artifact_dir, "quality-gate")
+            self.assertEqual(len(history), 1)
+            self.assertEqual(history[0]["status"], "fail")
+            self.assertFalse(first.exists())
+            self.assertTrue(second.exists())
+
+    def test_data_outside_db_summary_groups_classifications(self):
+        summary = turbovasctl.summarize_data_outside_db(
+            {
+                "reports": {"classification": "artifact", "exists": True, "file_count": 2, "byte_count": 100},
+                "logs": {"classification": "log", "exists": False, "file_count": 0, "byte_count": 0},
+                "feeds": {"classification": "feed_content", "exists": True, "file_count": 3, "byte_count": 200},
+            }
+        )
+        self.assertEqual(summary["total_file_count"], 5)
+        self.assertEqual(summary["total_byte_count"], 300)
+        self.assertEqual(summary["by_classification"]["artifact"]["existing_path_count"], 1)
+        self.assertEqual(summary["by_classification"]["log"]["existing_path_count"], 0)
+
+    def test_quality_gate_systemd_templates_are_present(self):
+        root = Path(__file__).resolve().parents[2]
+        service = root / "ops" / "systemd" / "turbovas-quality-gate.service.in"
+        timer = root / "ops" / "systemd" / "turbovas-quality-gate.timer.in"
+        service_text = service.read_text(encoding="utf-8")
+        self.assertIn("SPDX-License-Identifier", service_text)
+        self.assertIn("tools/turbovasctl quality-gate --json", service_text)
+        self.assertNotIn("TURBOVAS_RUNTIME_DIR", service_text)
+        self.assertIn("OnCalendar=*-*-* 03:30:00", timer.read_text(encoding="utf-8"))
 
     def test_justfile_forwards_common_recipe_arguments(self):
         justfile = (Path(__file__).resolve().parents[2] / "justfile").read_text(encoding="utf-8")
@@ -620,6 +661,21 @@ class TurboVASCtlTests(unittest.TestCase):
         )
         self.assertEqual(status, "warn")
         self.assertEqual(summary, "Monorepo health checks completed.")
+
+    def test_quality_gate_unit_env_ignores_runtime_dir_override(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            root.mkdir()
+            previous = os.environ.get("TURBOVAS_RUNTIME_DIR")
+            os.environ["TURBOVAS_RUNTIME_DIR"] = "/tmp/not-the-test-runtime"
+            try:
+                env = turbovasctl.quality_gate_unit_env(root)
+            finally:
+                if previous is None:
+                    os.environ.pop("TURBOVAS_RUNTIME_DIR", None)
+                else:
+                    os.environ["TURBOVAS_RUNTIME_DIR"] = previous
+            self.assertNotIn("TURBOVAS_RUNTIME_DIR", env)
 
     def test_runtime_credential_smoke_uses_existing_playwright_paths(self):
         self.assertEqual(

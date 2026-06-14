@@ -53,6 +53,8 @@ Use the root `justfile` command surface:
 - `just runtime-log-review`
 - `just runtime-data-state`
 - `just runtime-performance-snapshot`
+- `just quality-gate-state`
+- `just quality-gate-schedule --status`
 - `just runtime-app-up`
 - `just runtime-gmp-smoke`
 - `just runtime-scanner-register`
@@ -71,9 +73,14 @@ Use the root `justfile` command surface:
 `runtime-log-review` writes redacted recent log tails and a JSON finding set
 under the runtime artifact tree. `runtime-data-state` reports the current
 database version, expected live tables, removed feature-table absence, and known
-non-database runtime state. `runtime-performance-snapshot` captures Docker,
-database, artifact, and build-size facts for future instrumentation work; it is
-diagnostic only and does not optimize or mutate runtime state.
+non-database runtime state, including a compact summary of data outside the
+database. `runtime-performance-snapshot` captures Docker, database, artifact,
+and build-size facts for future instrumentation work; it writes a latest JSON
+artifact plus retained timestamped history and does not optimize or mutate
+runtime state. `quality-gate-state` reports retained quality-gate history.
+`quality-gate-schedule` manages the development user-level systemd timer on
+`turboforge-server`; it does not fall back to cron if user systemd is
+unavailable.
 
 `runtime-certs-init` uses inherited `gvm-manage-certs` with persistent runtime
 certificate directories and does not rotate existing certificates.

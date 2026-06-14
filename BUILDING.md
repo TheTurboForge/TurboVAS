@@ -40,6 +40,8 @@ just build-ui
 just build-python
 just build-baseline
 just quality-gate
+just quality-gate-state
+just quality-gate-schedule --status
 ```
 
 Machine-readable output is available through `tools/turbovasctl`, for example:
@@ -47,6 +49,7 @@ Machine-readable output is available through `tools/turbovasctl`, for example:
 ```sh
 tools/turbovasctl deps --json
 tools/turbovasctl build-baseline --json
+tools/turbovasctl quality-gate-state --json
 ```
 
 `tools/forkctl` remains as a temporary compatibility wrapper during the command
@@ -93,6 +96,8 @@ just runtime-smoke
 just runtime-log-review
 just runtime-data-state
 just runtime-performance-snapshot
+just quality-gate-state
+just quality-gate-schedule --status
 just runtime-app-up
 just runtime-app-smoke
 just runtime-webui-smoke

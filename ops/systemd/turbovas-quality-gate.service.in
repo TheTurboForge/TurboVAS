@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 TurboVAS contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[Unit]
+Description=TurboVAS local quality gate
+Documentation=file:@REPO_ROOT@/README.md
+
+[Service]
+Type=oneshot
+WorkingDirectory=@REPO_ROOT@
+ExecStart=@PYTHON@ tools/turbovasctl quality-gate --json
+StandardOutput=append:@QUALITY_GATE_LOG_DIR@/quality-gate.log
+StandardError=append:@QUALITY_GATE_LOG_DIR@/quality-gate.log

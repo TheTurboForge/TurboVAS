@@ -32,6 +32,9 @@ customization. See `docs/VULNERABILITY_MANAGEMENT_PRACTICE.md`.
 TurboVAS also intentionally separates technical scan targets from reporting
 scopes. See `docs/SCOPE_BASED_REPORTING.md`.
 
+For current implementation flow maps and data-placement rules, see
+`docs/ARCHITECTURE_FLOWS.md` and `docs/DATABASE_GRAVITY.md`.
+
 ## Development Commands
 
 TurboVAS provides a small root command surface for repository health checks:
@@ -40,6 +43,8 @@ TurboVAS provides a small root command surface for repository health checks:
 - `just inventory`: list the expected monorepo components.
 - `just doctor`: run structural and environment readiness checks.
 - `just quality-gate`: run the local source quality gate.
+- `just quality-gate-state`: show the latest quality-gate result and retained history.
+- `just quality-gate-schedule`: install, inspect, or disable the server-side development quality-gate timer.
 - `just license-report`: check preserved license and provenance files.
 - `just license-public-release-gate`: fail until public-release license review items are closed.
 - `just deps [component]`: check build dependency readiness.
