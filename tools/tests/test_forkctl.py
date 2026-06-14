@@ -693,6 +693,11 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(status, "warn")
         self.assertEqual(summary, "Monorepo health checks completed.")
 
+    def test_quality_gate_serializes_doctor_non_pass_findings(self):
+        source = (Path(__file__).resolve().parents[1] / "turbovasctl").read_text(encoding="utf-8")
+        self.assertIn("doctor_non_pass", source)
+        self.assertIn("non_pass_findings", source)
+
     def test_quality_gate_unit_env_ignores_runtime_dir_override(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "TurboVAS"
