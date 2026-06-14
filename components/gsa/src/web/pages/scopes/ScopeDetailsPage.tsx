@@ -7,6 +7,7 @@ import {useCallback, useEffect, useState} from 'react';
 import {useNavigate, useParams} from 'react-router';
 import type {ProtectionRequirement, Scope} from 'gmp/commands/scopes';
 import Button from 'web/components/form/Button';
+import MultiSelect from 'web/components/form/MultiSelect';
 import Select from 'web/components/form/Select';
 import TextArea from 'web/components/form/TextArea';
 import TextField from 'web/components/form/TextField';
@@ -27,10 +28,58 @@ import {
   formatDate,
   PageActions,
   protectionRequirementItems,
-  splitIds,
   SummaryGrid,
   SummaryItem,
 } from 'web/pages/scopes/common';
+
+interface EntityOptionSource {
+  id?: string;
+  name?: string;
+  ip?: string;
+  hostname?: string;
+}
+
+interface EntityListCommand {
+  get: (params: {filter: string}) => Promise<{data: EntityOptionSource[]}>;
+}
+
+const entityLabel = (entity: EntityOptionSource): string => {
+  const name = entity.name || entity.hostname || entity.ip || entity.id || '';
+  return entity.id && name !== entity.id ? `${name} (${entity.id})` : name;
+};
+
+const entityItems = (entities: EntityOptionSource[] = []) =>
+  entities
+    .filter(entity => entity.id)
+    .map(entity => ({label: entityLabel(entity), value: entity.id as string}));
+
+const mergeSelectedItems = (
+  items: {label: string; value: string}[],
+  selectedIds: string[],
+  selectedEntities: EntityOptionSource[] = [],
+) => {
+  const itemMap = new Map(items.map(item => [item.value, item]));
+  for (const entity of selectedEntities) {
+    if (entity.id && !itemMap.has(entity.id)) {
+      itemMap.set(entity.id, {label: entityLabel(entity), value: entity.id});
+    }
+  }
+  for (const id of selectedIds) {
+    if (!itemMap.has(id)) {
+      itemMap.set(id, {label: id, value: id});
+    }
+  }
+  return Array.from(itemMap.values()).sort((left, right) =>
+    left.label.localeCompare(right.label),
+  );
+};
+
+const addUnique = (values: string[], value?: string): string[] => {
+  if (!value || values.includes(value)) {
+    return values;
+  }
+  return [...values, value];
+};
 
 const ScopeDetailsPage = () => {
   const [_] = useTranslation();
@@ -42,8 +91,10 @@ const ScopeDetailsPage = () => {
   const [comment, setComment] = useState('');
   const [protectionRequirement, setProtectionRequirement] =
     useState<ProtectionRequirement>('normal');
-  const [targetIds, setTargetIds] = useState('');
-  const [hostIds, setHostIds] = useState('');
+  const [targetIds, setTargetIds] = useState<string[]>([]);
+  const [hostIds, setHostIds] = useState<string[]>([]);
+  const [targetItems, setTargetItems] = useState<{label: string; value: string}[]>([]);
+  const [hostItems, setHostItems] = useState<{label: string; value: string}[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
 
@@ -54,7 +105,13 @@ const ScopeDetailsPage = () => {
     setLoading(true);
     setError(undefined);
     try {
-      const response = await gmp.scopes.getOne(id);
+      const targetsCommand = gmp.targets as unknown as EntityListCommand;
+      const hostsCommand = (gmp as unknown as {hosts: EntityListCommand}).hosts;
+      const [response, targetsResponse, hostsResponse] = await Promise.all([
+        gmp.scopes.getOne(id),
+        targetsCommand.get({filter: 'rows=-1'}),
+        hostsCommand.get({filter: 'rows=-1'}),
+      ]);
       const scopeData = response.data;
       if (scopeData) {
         const reportsResponse = await gmp.scopereports.get({
@@ -69,8 +126,24 @@ const ScopeDetailsPage = () => {
         setName(scopeData.name);
         setComment(scopeData.comment ?? '');
         setProtectionRequirement(scopeData.protectionRequirement);
-        setTargetIds(scopeData.targets.map(target => target.id).join('\n'));
-        setHostIds(scopeData.hosts.map(host => host.id).join('\n'));
+        const currentTargetIds = scopeData.targets.map(target => target.id);
+        const currentHostIds = scopeData.hosts.map(host => host.id);
+        setTargetIds(currentTargetIds);
+        setHostIds(currentHostIds);
+        setTargetItems(
+          mergeSelectedItems(
+            entityItems(targetsResponse.data),
+            currentTargetIds,
+            scopeData.targets,
+          ),
+        );
+        setHostItems(
+          mergeSelectedItems(
+            entityItems(hostsResponse.data),
+            currentHostIds,
+            scopeData.hosts,
+          ),
+        );
       } else {
         setScope(undefined);
       }
@@ -97,8 +170,8 @@ const ScopeDetailsPage = () => {
         name,
         comment,
         protectionRequirement,
-        targetIds: splitIds(targetIds),
-        hostIds: splitIds(hostIds),
+        targetIds,
+        hostIds,
       });
       await loadScope();
     } catch (err) {
@@ -200,17 +273,21 @@ const ScopeDetailsPage = () => {
         value={comment}
         onChange={setComment}
       />
-      <TextArea
+      <MultiSelect
         disabled={loading || scope.global}
-        minRows={4}
-        title={_('Target IDs')}
+        items={targetItems}
+        label={_('Targets')}
+        name="target_ids"
+        placeholder={_('Select scope targets')}
         value={targetIds}
         onChange={setTargetIds}
       />
-      <TextArea
+      <MultiSelect
         disabled={loading || scope.global}
-        minRows={4}
-        title={_('Host IDs')}
+        items={hostItems}
+        label={_('Hosts')}
+        name="host_ids"
+        placeholder={_('Select scope hosts')}
         value={hostIds}
         onChange={setHostIds}
       />
@@ -262,8 +339,9 @@ const ScopeDetailsPage = () => {
             <TableHead>{_('Target')}</TableHead>
             <TableHead>{_('Source Report')}</TableHead>
             <TableHead>{_('Host ID')}</TableHead>
+            <TableHead>{_('Actions')}</TableHead>
           </TableRow>
-          {scope.candidateHosts.length === 0 && <EmptyRow colSpan={4} />}
+          {scope.candidateHosts.length === 0 && <EmptyRow colSpan={5} />}
           {scope.candidateHosts.map(host => (
             <TableRow key={`${host.id}-${host.targetId ?? ''}`}>
               <TableData>{host.name || host.id}</TableData>
@@ -276,6 +354,13 @@ const ScopeDetailsPage = () => {
                 )}
               </TableData>
               <TableData>{host.id}</TableData>
+              <TableData>
+                <Button
+                  disabled={loading || scope.global || hostIds.includes(host.id)}
+                  title={hostIds.includes(host.id) ? _('Added') : _('Add to Scope')}
+                  onClick={() => setHostIds(current => addUnique(current, host.id))}
+                />
+              </TableData>
             </TableRow>
           ))}
         </TableBody>

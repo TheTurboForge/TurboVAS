@@ -150,7 +150,7 @@ def organization_scope(gmp: Any) -> dict[str, Any] | None:
     return None
 
 
-def first_row(gmp: Any, getter_name: str, element_name: str) -> dict[str, Any] | None:
+def entity_rows(gmp: Any, getter_name: str, element_name: str) -> list[dict[str, Any]]:
     getter = getattr(gmp, getter_name)
     try:
         response = getter(filter_string="rows=-1", details=True)
@@ -164,8 +164,17 @@ def first_row(gmp: Any, getter_name: str, element_name: str) -> dict[str, Any] |
         ]
     else:
         rows = [row(element) for element in iter_elements(response, element_name)]
-    rows = [entry for entry in rows if entry.get("id")]
+    return [entry for entry in rows if entry.get("id")]
+
+
+def first_row(gmp: Any, getter_name: str, element_name: str) -> dict[str, Any] | None:
+    rows = entity_rows(gmp, getter_name, element_name)
     return rows[0] if rows else None
+
+
+def scope_details(gmp: Any, scope_id: str) -> dict[str, Any] | None:
+    scopes = [scope_row(element) for element in iter_elements(gmp.get_scope(scope_id, details=True), "scope")]
+    return scopes[0] if scopes else None
 
 
 def write_artifact(artifact_dir: Path, name: str, payload: dict[str, Any]) -> str:
@@ -192,13 +201,18 @@ def command_summary(gmp: Any, artifact_dir: Path) -> dict[str, Any]:
 
 
 def command_smoke(gmp: Any, artifact_dir: Path) -> dict[str, Any]:
-    target = first_row(gmp, "get_targets", "target")
-    host = first_row(gmp, "get_hosts", "host")
+    targets = entity_rows(gmp, "get_targets", "target")
+    hosts = entity_rows(gmp, "get_hosts", "host")
+    target = targets[0] if targets else None
+    host = hosts[0] if hosts else None
     org = organization_scope(gmp)
     if target is None or host is None or org is None:
         payload = result("fail", "Scope smoke prerequisites are missing.", target=target, host=host, organization_scope=org)
         payload["artifacts"] = [write_artifact(artifact_dir, "smoke-failed.json", payload)]
         return payload
+
+    added_target = targets[1] if len(targets) > 1 else target
+    added_host = hosts[1] if len(hosts) > 1 else host
 
     smoke_name = f"{SMOKE_SCOPE_PREFIX} {secrets.token_hex(4)}"
     created_scope_id = None
@@ -220,14 +234,53 @@ def command_smoke(gmp: Any, artifact_dir: Path) -> dict[str, Any]:
         created_scope_id = response_id(create_response)
         if not created_scope_id:
             raise RuntimeError("Scope creation response did not include an id")
+        expanded_target_ids = list(dict.fromkeys([target["id"], added_target["id"]]))
+        expanded_host_ids = list(dict.fromkeys([host["id"], added_host["id"]]))
+        gmp.modify_scope(
+            created_scope_id,
+            name=smoke_name,
+            protection_requirement="high",
+            target_ids=expanded_target_ids,
+            host_ids=expanded_host_ids,
+        )
+        scope_after_add = scope_details(gmp, created_scope_id)
+        gmp.modify_scope(
+            created_scope_id,
+            name=smoke_name,
+            protection_requirement="high",
+            target_ids=[target["id"]],
+            host_ids=[host["id"]],
+        )
+        scope_after_remove = scope_details(gmp, created_scope_id)
         report_response = gmp.generate_scope_report(created_scope_id)
         created_report_id = response_id(report_response)
         if not created_report_id:
             raise RuntimeError("Scope report generation response did not include an id")
         report = scope_reports(gmp, created_scope_id)[0]
-        status = "pass" if report.get("source_report_count", 0) > 0 else "warn"
-        summary = "Scope smoke generated a report without starting a scan."
-        payload = result(status, summary, scope_id=created_scope_id, scope_report=report, target=target, host=host, organization_scope=org, organization_scope_report=organization_report)
+        membership_checked = bool(
+            scope_after_add
+            and scope_after_add.get("target_count", 0) >= len(expanded_target_ids)
+            and scope_after_add.get("host_count", 0) >= len(expanded_host_ids)
+            and scope_after_remove
+            and scope_after_remove.get("target_count") == 1
+            and scope_after_remove.get("host_count") == 1
+        )
+        status = "pass" if report.get("source_report_count", 0) > 0 and membership_checked else "warn"
+        summary = "Scope smoke edited membership and generated a report without starting a scan."
+        payload = result(
+            status,
+            summary,
+            scope_id=created_scope_id,
+            scope_after_add=scope_after_add,
+            scope_after_remove=scope_after_remove,
+            scope_report=report,
+            target=target,
+            added_target=added_target,
+            host=host,
+            added_host=added_host,
+            organization_scope=org,
+            organization_scope_report=organization_report,
+        )
     except Exception as error:  # pylint: disable=broad-except
         payload = result("fail", "Scope smoke failed.", error_type=type(error).__name__, error=str(error), scope_id=created_scope_id, report_id=created_report_id, target=target, host=host)
     finally:
