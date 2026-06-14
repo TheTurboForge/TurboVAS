@@ -1,15 +1,18 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
 import styled from 'styled-components';
-import Logo from 'web/components/img/GreenboneLogo';
+import TurboVASLogo from 'web/components/img/TurboVASLogo';
 import PageTitle from 'web/components/layout/PageTitle';
 import useTranslation from 'web/hooks/useTranslation';
 
-const GreenboneLogo = styled(Logo)`
+const NotFoundLogo = styled(TurboVASLogo)`
   width: 300px;
+  color: #111111;
+  font-size: 42px;
   margin-bottom: 20px;
 `;
 
@@ -30,7 +33,7 @@ const PageNotFound = () => {
     <CenteredDiv>
       <PageTitle title={_('Page Not Found')} />
       <h1>{_('Page Not Found.')}</h1>
-      <GreenboneLogo />
+      <NotFoundLogo />
       <p>
         {_('We are sorry. The page you have requested could not be found.')}
       </p>

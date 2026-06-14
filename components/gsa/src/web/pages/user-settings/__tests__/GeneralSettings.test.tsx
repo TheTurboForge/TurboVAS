@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2025 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -162,7 +163,7 @@ describe('General tab', () => {
     expect(screen.getByText(/Yes/i)).toBeVisible();
 
     expect(
-      screen.getByText('Export Reports to OPENVAS SECURITY INTELLIGENCE'),
+      screen.getByText('Export Reports to Security Intelligence'),
     ).toBeVisible();
     expect(screen.getByText(/No/i)).toBeVisible();
   });
@@ -458,7 +459,7 @@ describe('General tab', () => {
     const rows = screen.getAllByRole('row');
     const securityIntelligenceExportRow = rows.find(row =>
       row.textContent?.includes(
-        'Export Reports to OPENVAS SECURITY INTELLIGENCE',
+        'Export Reports to Security Intelligence',
       ),
     );
     expect(securityIntelligenceExportRow).toBeTruthy();

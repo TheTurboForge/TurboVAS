@@ -1,33 +1,22 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
 import styled from 'styled-components';
-import Image from 'web/components/img/Image';
-import useGmp from 'web/hooks/useGmp';
+import TurboVASLogo from 'web/components/img/TurboVASLogo';
 
-const OPENVAS_LOGO = 'openvasHorizontal.svg';
-const OPENVAS_SCAN_LOGO = 'openvasHorizontal-scan.svg';
-
-const StyledImage = styled(Image)`
-  display: flex;
+const StyledLogo = styled(TurboVASLogo)`
   width: 300px;
+  height: 72px;
+  color: #111111;
+  font-size: 42px;
+  justify-content: flex-start;
 `;
 
 const LoginLogo = () => {
-  const gmp = useGmp();
-  const loginTopLogo = gmp?.settings?.vendorLabel
-    ? OPENVAS_SCAN_LOGO
-    : OPENVAS_LOGO;
-
-  return (
-    <StyledImage
-      alt={gmp.settings.vendorLabel ? 'OPENVAS SCAN' : 'OPENVAS'}
-      data-testid="login-logo"
-      src={loginTopLogo}
-    />
-  );
+  return <StyledLogo data-testid="login-logo" />;
 };
 
 export default LoginLogo;

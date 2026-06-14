@@ -1,103 +1,89 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import {
-  GreenboneWhiteLogo,
-  Enterprise150,
-  Enterprise400,
-  Enterprise450,
-  Enterprise600,
-  Enterprise650,
-  Enterprise5400,
-  Enterprise6500,
-  EnterpriseCeno,
-  EnterpriseDeca,
-  EnterpriseExa,
-  EnterprisePeta,
-  EnterpriseTera,
-  EnterpriseContainer,
-} from 'web/components/icon/GreenboneApplianceLogo';
+import TurboVASLogo from 'web/components/img/TurboVASLogo';
 
 export type ApplianceLogo = keyof typeof APPLIANCE_DATA;
 
 const APPLIANCE_DATA = {
   defaultVendorLabel: {
-    title: 'OPENVAS',
-    component: GreenboneWhiteLogo,
+    title: 'TurboVAS',
+    component: TurboVASLogo,
   },
   'gsm-150_label.svg': {
-    title: 'OPENVAS SCAN - 150',
-    component: Enterprise150,
+    title: 'TurboVAS',
+    component: TurboVASLogo,
   },
   'gsm-400_label.svg': {
-    title: 'OPENVAS SCAN - 400',
-    component: Enterprise400,
+    title: 'TurboVAS',
+    component: TurboVASLogo,
   },
   'gsm-400r2_label.svg': {
-    title: 'OPENVAS SCAN - 400',
-    component: Enterprise400,
+    title: 'TurboVAS',
+    component: TurboVASLogo,
   },
   'gsm-450_label.svg': {
-    title: 'OPENVAS SCAN - 450',
-    component: Enterprise450,
+    title: 'TurboVAS',
+    component: TurboVASLogo,
   },
   'gsm-450r2_label.svg': {
-    title: 'OPENVAS SCAN - 450',
-    component: Enterprise450,
+    title: 'TurboVAS',
+    component: TurboVASLogo,
   },
   'gsm-600_label.svg': {
-    title: 'OPENVAS SCAN - 600',
-    component: Enterprise600,
+    title: 'TurboVAS',
+    component: TurboVASLogo,
   },
   'gsm-600r2_label.svg': {
-    title: 'OPENVAS SCAN - 600',
-    component: Enterprise600,
+    title: 'TurboVAS',
+    component: TurboVASLogo,
   },
   'gsm-650_label.svg': {
-    title: 'OPENVAS SCAN - 650',
-    component: Enterprise650,
+    title: 'TurboVAS',
+    component: TurboVASLogo,
   },
   'gsm-650r2_label.svg': {
-    title: 'OPENVAS SCAN - 650',
-    component: Enterprise650,
+    title: 'TurboVAS',
+    component: TurboVASLogo,
   },
   'gsm-5400_label.svg': {
-    title: 'OPENVAS SCAN - 5400',
-    component: Enterprise5400,
+    title: 'TurboVAS',
+    component: TurboVASLogo,
   },
   'gsm-6500_label.svg': {
-    title: 'OPENVAS SCAN - 6500',
-    component: Enterprise6500,
+    title: 'TurboVAS',
+    component: TurboVASLogo,
   },
   'gsm-ceno_label.svg': {
-    title: 'OPENVAS SCAN - CENO',
-    component: EnterpriseCeno,
+    title: 'TurboVAS',
+    component: TurboVASLogo,
   },
   'gsm-deca_label.svg': {
-    title: 'OPENVAS SCAN - DECA',
-    component: EnterpriseDeca,
+    title: 'TurboVAS',
+    component: TurboVASLogo,
   },
   'gsm-exa_label.svg': {
-    title: 'OPENVAS SCAN - EXA',
-    component: EnterpriseExa,
+    title: 'TurboVAS',
+    component: TurboVASLogo,
   },
   'gsm-peta_label.svg': {
-    title: 'OPENVAS SCAN - PETA',
-    component: EnterprisePeta,
+    title: 'TurboVAS',
+    component: TurboVASLogo,
   },
   'gsm-tera_label.svg': {
-    title: 'OPENVAS SCAN - TERA',
-    component: EnterpriseTera,
+    title: 'TurboVAS',
+    component: TurboVASLogo,
   },
   'enterprise-container.svg': {
-    title: 'OPENVAS SCAN - CONTAINER',
-    component: EnterpriseContainer,
+    title: 'TurboVAS',
+    component: TurboVASLogo,
   },
   'gsm-unknown_label.svg': {
-    title: 'OPENVAS',
-    component: GreenboneWhiteLogo,
+    title: 'TurboVAS',
+    component: TurboVASLogo,
   },
 };
 

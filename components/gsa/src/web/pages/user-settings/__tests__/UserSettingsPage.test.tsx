@@ -277,7 +277,7 @@ describe('UserSettingsPage', () => {
       expect(screen.getByText('Yes')).toBeVisible();
 
       expect(
-        screen.getByText('Export Reports to OPENVAS SECURITY INTELLIGENCE'),
+        screen.getByText('Export Reports to Security Intelligence'),
       ).toBeVisible();
       expect(screen.getByText(/No/i)).toBeVisible();
     });

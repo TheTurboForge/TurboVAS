@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -10,30 +11,31 @@ import {type ApplianceLogo} from 'web/utils/appliance-data';
 
 describe('getLogo', () => {
   const testCases = [
-    ['gsm-150_label.svg', 'Enterprise150'],
-    ['gsm-400_label.svg', 'Enterprise400'],
-    ['gsm-400r2_label.svg', 'Enterprise400'],
-    ['gsm-450_label.svg', 'Enterprise450'],
-    ['gsm-450r2_label.svg', 'Enterprise450'],
-    ['gsm-600_label.svg', 'Enterprise600'],
-    ['gsm-600r2_label.svg', 'Enterprise600'],
-    ['gsm-650_label.svg', 'Enterprise650'],
-    ['gsm-650r2_label.svg', 'Enterprise650'],
-    ['gsm-5400_label.svg', 'Enterprise5400'],
-    ['gsm-6500_label.svg', 'Enterprise6500'],
-    ['gsm-ceno_label.svg', 'EnterpriseCeno'],
-    ['gsm-deca_label.svg', 'EnterpriseDeca'],
-    ['gsm-exa_label.svg', 'EnterpriseExa'],
-    ['gsm-peta_label.svg', 'EnterprisePeta'],
-    ['gsm-tera_label.svg', 'EnterpriseTera'],
-    ['gsm-unknown_label.svg', 'GreenboneWhiteLogo'],
-    ['defaultVendorLabel', 'GreenboneWhiteLogo'],
+    'gsm-150_label.svg',
+    'gsm-400_label.svg',
+    'gsm-400r2_label.svg',
+    'gsm-450_label.svg',
+    'gsm-450r2_label.svg',
+    'gsm-600_label.svg',
+    'gsm-600r2_label.svg',
+    'gsm-650_label.svg',
+    'gsm-650r2_label.svg',
+    'gsm-5400_label.svg',
+    'gsm-6500_label.svg',
+    'gsm-ceno_label.svg',
+    'gsm-deca_label.svg',
+    'gsm-exa_label.svg',
+    'gsm-peta_label.svg',
+    'gsm-tera_label.svg',
+    'gsm-unknown_label.svg',
+    'defaultVendorLabel',
   ];
 
-  test.each(testCases)('returns %s for %s', async (logo, expectedTestId) => {
+  test.each(testCases)('returns TurboVAS branding for %s', async logo => {
     render(getLogo(logo as ApplianceLogo));
     await waitFor(() => {
-      expect(screen.getByTestId(expectedTestId)).toBeInTheDocument();
+      expect(screen.getByTestId('TurboVASLogo')).toBeInTheDocument();
+      expect(screen.getByText('TurboVAS')).toBeInTheDocument();
     });
   });
 });

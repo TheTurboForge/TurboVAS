@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -14,19 +15,17 @@ describe('LoginLogo tests', () => {
     });
     const {element} = render(<LoginLogo />);
 
-    expect(element).toHaveAttribute('alt', 'OPENVAS');
+    expect(element).toHaveTextContent('TurboVAS');
     expect(element).toHaveAttribute('data-testid', 'login-logo');
-    expect(element).toHaveAttribute('src', '/img/openvasHorizontal.svg');
   });
 
-  test('should render scan logo when vendorLabel is set', () => {
+  test('should render TurboVAS logo when vendorLabel is set', () => {
     const {render} = rendererWith({
       gmp: {settings: {vendorLabel: 'test'}},
     });
     const {element} = render(<LoginLogo />);
 
-    expect(element).toHaveAttribute('alt', 'OPENVAS SCAN');
+    expect(element).toHaveTextContent('TurboVAS');
     expect(element).toHaveAttribute('data-testid', 'login-logo');
-    expect(element).toHaveAttribute('src', '/img/openvasHorizontal-scan.svg');
   });
 });

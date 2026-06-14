@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -861,14 +862,14 @@ const GeneralSettings = ({disableEditIcon = false}: GeneralSettingsProps) => {
                 }
                 checkedValue={String(YES_VALUE)}
                 name="securityIntelligenceExport"
-                title={_('Export Reports to OPENVAS SECURITY INTELLIGENCE')}
+                title={_('Export Reports to Security Intelligence')}
                 unCheckedValue={String(NO_VALUE)}
                 onChange={handleSecurityIntelligenceExportChange}
               />
             }
             errorMessage={getErrorMessage('securityIntelligenceExport')}
             isEditMode={securityIntelligenceExportEditMode}
-            label={_('Export Reports to OPENVAS SECURITY INTELLIGENCE')}
+            label={_('Export Reports to Security Intelligence')}
             title={securityIntelligenceExport.comment}
             viewComponent={
               <span>{getYesNoValue(securityIntelligenceExport.value)}</span>

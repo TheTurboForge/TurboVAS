@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -8,14 +9,14 @@ import {rendererWith, screen} from 'web/testing';
 import PageNotFound from 'web/pages/NotFoundPage';
 
 const gmp = {
-  settings: {vendorTitle: 'Greenbone'},
+  settings: {vendorTitle: 'TurboVAS'},
 };
 
 describe('PageNotFound tests', () => {
   test('renders the page title', () => {
     const {render} = rendererWith({gmp});
     render(<PageNotFound />);
-    expect(document.title).toEqual('Greenbone - Page Not Found');
+    expect(document.title).toEqual('TurboVAS - Page Not Found');
   });
 
   test('renders the main heading', () => {
@@ -26,10 +27,10 @@ describe('PageNotFound tests', () => {
     );
   });
 
-  test('renders the Greenbone logo', () => {
+  test('renders the TurboVAS logo', () => {
     const {render} = rendererWith({gmp});
     render(<PageNotFound />);
-    expect(screen.getByTestId('greenbone-logo')).toBeInTheDocument();
+    expect(screen.getByTestId('TurboVASLogo')).toBeInTheDocument();
   });
 
   test('renders the error message', () => {

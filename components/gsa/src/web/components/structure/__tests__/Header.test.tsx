@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2025 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -52,7 +53,7 @@ describe('Header tests', () => {
     expect(themeSwitch).not.toBeInTheDocument();
 
     await waitFor(() => {
-      const logo = screen.getByTestId('Enterprise150');
+      const logo = screen.getByTestId('TurboVASLogo');
       expect(logo).toBeVisible();
     });
 

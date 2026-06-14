@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2025 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -25,7 +26,7 @@ const CommunityFeedUsageNotification: React.FC = () => {
       <div aria-label="community-feed-notification">
         <p>
           {_(
-            'You are currently using the free OPENVAS COMMUNITY FEED - this shows only a few vulnerabilities for business critical enterprise software such as MS Exchange, Cisco, VMware, Citrix and many more. Over 60% of all relevant exploits remain hidden.',
+            'This runtime is using the Greenbone Community Feed. Feed content, coverage, and terms are maintained separately from TurboVAS source code and should be reviewed before public release or redistribution.',
           )}
         </p>
         <p>
