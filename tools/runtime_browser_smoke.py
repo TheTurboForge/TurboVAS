@@ -241,6 +241,8 @@ async function runForBaseUrl(baseUrl) {
   page.setDefaultTimeout(config.timeoutMs);
   try {
     await login(page);
+    const shellText = await bodyText(page).catch(() => '');
+    add(/TurboVAS/i.test(shellText) ? 'pass' : 'fail', 'browser.branding', /TurboVAS/i.test(shellText) ? 'Application shell exposes TurboVAS branding.' : 'Application shell does not expose TurboVAS branding.');
 
     await gotoRoute(page, '/reports', 'reports');
     await assertNoForbiddenText(page, 'reports', [/Delta Report/i, /Import Report/i]);
@@ -257,7 +259,7 @@ async function runForBaseUrl(baseUrl) {
     await screenshot(page, 'scope-report-detail');
     await assertNoAppError(page, 'scope-report-detail.app-error');
     const detailText = await bodyText(page);
-    const requiredTabs = ['Information', 'Metrics', 'Results', 'Evidence Sources'];
+    const requiredTabs = ['Information', 'Metrics', 'Results', 'Hosts', 'Ports', 'Applications', 'Operating Systems', 'CVEs', 'TLS Certificates', 'Error Messages', 'Evidence Sources'];
     const missingTabs = requiredTabs.filter(tab => !detailText.includes(tab));
     add(missingTabs.length ? 'fail' : 'pass', 'scope-report-detail.tabs', missingTabs.length ? 'Scope-report detail is missing expected report-like tabs.' : 'Scope-report detail exposes expected report-like tabs.', { missing: missingTabs });
 
@@ -278,6 +280,14 @@ async function runForBaseUrl(baseUrl) {
       await clickFirstResultRow(page);
     } else {
       add('fail', 'scope-report.results-tab', 'Could not activate the Results tab.');
+    }
+
+    await page.goto(detailUrl, { waitUntil: 'networkidle', timeout: config.timeoutMs });
+    if (await clickTab(page, 'Hosts', isScopeReportDetailUrl)) {
+      await screenshot(page, 'scope-report-hosts-tab');
+      await assertNoAppError(page, 'scope-report-hosts-tab.app-error');
+    } else {
+      add('fail', 'scope-report.hosts-tab', 'Could not activate the source-backed Hosts tab.');
     }
 
     await page.goto(detailUrl, { waitUntil: 'networkidle', timeout: config.timeoutMs });

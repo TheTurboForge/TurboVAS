@@ -31,6 +31,7 @@ import TableRow from 'web/components/table/TableRow';
 import useGmp from 'web/hooks/useGmp';
 import useTranslation from 'web/hooks/useTranslation';
 import MetricsTab from 'web/pages/reports/details/MetricsTab';
+import ScopeReportEvidenceTab from 'web/pages/scope-reports/ScopeReportEvidenceTab';
 import ScopeReportResultsTab from 'web/pages/scope-reports/ScopeReportResultsTab';
 import {
   EmptyRow,
@@ -176,6 +177,19 @@ const ScopeReportDetailsPage = () => {
 
   const resultsTab = <ScopeReportResultsTab scopeReportId={report.id} />;
   const metricsTab = <MetricsTab id={report.id} source="scopeReport" />;
+  const hostsTab = <ScopeReportEvidenceTab kind="hosts" report={report} />;
+  const portsTab = <ScopeReportEvidenceTab kind="ports" report={report} />;
+  const applicationsTab = (
+    <ScopeReportEvidenceTab kind="applications" report={report} />
+  );
+  const operatingSystemsTab = (
+    <ScopeReportEvidenceTab kind="operatingSystems" report={report} />
+  );
+  const cvesTab = <ScopeReportEvidenceTab kind="cves" report={report} />;
+  const tlsCertificatesTab = (
+    <ScopeReportEvidenceTab kind="tlsCertificates" report={report} />
+  );
+  const errorsTab = <ScopeReportEvidenceTab kind="errors" report={report} />;
 
   const sourcesTab = (
     <Table>
@@ -252,6 +266,13 @@ const ScopeReportDetailsPage = () => {
             <TabList align={['start', 'stretch']}>
               <Tab>{_('Information')}</Tab>
               <Tab>{_('Results')}</Tab>
+              <Tab>{_('Hosts')}</Tab>
+              <Tab>{_('Ports')}</Tab>
+              <Tab>{_('Applications')}</Tab>
+              <Tab>{_('Operating Systems')}</Tab>
+              <Tab>{_('CVEs')}</Tab>
+              <Tab>{_('TLS Certificates')}</Tab>
+              <Tab>{_('Error Messages')}</Tab>
               <Tab>{_('Metrics')}</Tab>
               <Tab>{_('Evidence Sources')}</Tab>
             </TabList>
@@ -259,6 +280,13 @@ const ScopeReportDetailsPage = () => {
           <TabPanels>
             <TabPanel>{informationTab}</TabPanel>
             <TabPanel>{resultsTab}</TabPanel>
+            <TabPanel>{hostsTab}</TabPanel>
+            <TabPanel>{portsTab}</TabPanel>
+            <TabPanel>{applicationsTab}</TabPanel>
+            <TabPanel>{operatingSystemsTab}</TabPanel>
+            <TabPanel>{cvesTab}</TabPanel>
+            <TabPanel>{tlsCertificatesTab}</TabPanel>
+            <TabPanel>{errorsTab}</TabPanel>
             <TabPanel>{metricsTab}</TabPanel>
             <TabPanel>{sourcesTab}</TabPanel>
           </TabPanels>
