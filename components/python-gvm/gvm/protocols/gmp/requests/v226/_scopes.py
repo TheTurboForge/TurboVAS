@@ -136,6 +136,7 @@ class Scopes:
         *,
         scope_report_id: EntityID | None = None,
         scope_id: EntityID | None = None,
+        filter_string: str | None = None,
         details: bool | None = None,
     ) -> Request:
         """Request scope reports."""
@@ -144,6 +145,8 @@ class Scopes:
             cmd.set_attribute("scope_report_id", str(scope_report_id))
         if scope_id:
             cmd.set_attribute("scope_id", str(scope_id))
+        if filter_string:
+            cmd.set_attribute("filter", filter_string)
         if details is not None:
             cmd.set_attribute("details", to_bool(details))
         return cmd

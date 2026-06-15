@@ -5,6 +5,8 @@
 
 import {useCallback, useEffect, useMemo, useState} from 'react';
 import type {Scope, ScopeReport} from 'gmp/commands/scopes';
+import CollectionCounts from 'gmp/collection/collection-counts';
+import Filter from 'gmp/models/filter';
 import {TASK_STATUS} from 'gmp/models/task';
 import SeverityBar from 'web/components/bar/SeverityBar';
 import StatusBar from 'web/components/bar/StatusBar';
@@ -33,87 +35,31 @@ const PAGE_SIZE = 25;
 
 type ScopeReportSortField =
   | 'created'
-  | 'status'
   | 'scope'
   | 'latest_evidence'
   | 'severity'
-  | 'high'
-  | 'medium'
-  | 'low'
-  | 'log'
-  | 'false_positive'
   | 'source_reports'
   | 'hosts'
   | 'results'
   | 'vulnerabilities';
 
-const textValue = (value?: string) => value?.toLocaleLowerCase() ?? '';
+const quoteFilterValue = (value: string) =>
+  `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 
-const reportSearchText = (report: ScopeReport) =>
-  [
-    report.name,
-    report.id,
-    report.scopeName,
-    report.scopeId,
-    report.created,
-    report.latestEvidenceTime,
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLocaleLowerCase();
-
-const reportSortValue = (
-  report: ScopeReport,
-  sortBy: ScopeReportSortField,
-): string | number => {
-  switch (sortBy) {
-    case 'created':
-      return report.created ?? '';
-    case 'status':
-      return TASK_STATUS.done;
-    case 'scope':
-      return textValue(report.scopeName);
-    case 'latest_evidence':
-      return report.latestEvidenceTime ?? '';
-    case 'severity':
-      return report.maxSeverity;
-    case 'high':
-      return report.severityHigh;
-    case 'medium':
-      return report.severityMedium;
-    case 'low':
-      return report.severityLow;
-    case 'log':
-      return report.severityLog;
-    case 'false_positive':
-      return report.severityFalsePositive;
-    case 'source_reports':
-      return report.sourceReportCount;
-    case 'hosts':
-      return report.hostsWithEvidence / Math.max(report.hostsTotal, 1);
-    case 'results':
-      return report.resultsTotal;
-    case 'vulnerabilities':
-      return report.vulnerabilitiesTotal;
-    default:
-      return '';
-  }
-};
-
-const compareReports = (
-  left: ScopeReport,
-  right: ScopeReport,
+const scopeReportFilter = (
+  page: number,
   sortBy: ScopeReportSortField,
   sortDir: SortDirectionType,
+  search: string,
 ) => {
-  const leftValue = reportSortValue(left, sortBy);
-  const rightValue = reportSortValue(right, sortBy);
-  const direction = sortDir === SortDirection.ASC ? 1 : -1;
-
-  if (typeof leftValue === 'number' && typeof rightValue === 'number') {
-    return (leftValue - rightValue) * direction;
+  const filter = Filter.fromString(
+    `first=${(page - 1) * PAGE_SIZE + 1} rows=${PAGE_SIZE}`,
+  ).set(sortDir === SortDirection.ASC ? 'sort' : 'sort-reverse', sortBy);
+  const normalizedSearch = search.trim().replace(/\s+/g, ' ');
+  if (normalizedSearch.length > 0) {
+    filter.set('search', quoteFilterValue(normalizedSearch));
   }
-  return String(leftValue).localeCompare(String(rightValue)) * direction;
+  return filter;
 };
 
 const ScopeReportListPage = () => {
@@ -125,8 +71,14 @@ const ScopeReportListPage = () => {
   const [page, setPage] = useState(1);
   const [sortBy, setSortBy] = useState<ScopeReportSortField>('created');
   const [sortDir, setSortDir] = useState<SortDirectionType>(SortDirection.DESC);
+  const [counts, setCounts] = useState(new CollectionCounts());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
+
+  const filter = useMemo(
+    () => scopeReportFilter(page, sortBy, sortDir, filterText),
+    [filterText, page, sortBy, sortDir],
+  );
 
   const organizationScope = useMemo(
     () => scopes.find(scope => scope.global || scope.name === 'Organization'),
@@ -139,37 +91,25 @@ const ScopeReportListPage = () => {
     try {
       const [scopeResponse, reportResponse] = await Promise.all([
         gmp.scopes.get({details: 0}),
-        gmp.scopereports.get({details: 1}),
+        gmp.scopereports.get({details: 1, filter}),
       ]);
       setScopes(scopeResponse.data);
       setReports(reportResponse.data);
+      setCounts(reportResponse.meta.counts ?? new CollectionCounts());
     } catch (err) {
       setError(String(err));
     } finally {
       setLoading(false);
     }
-  }, [gmp]);
+  }, [filter, gmp]);
 
   useEffect(() => {
     void loadReports();
   }, [loadReports]);
 
-  const filteredReports = useMemo(() => {
-    const normalizedFilter = filterText.trim().toLocaleLowerCase();
-    const matchingReports = normalizedFilter
-      ? reports.filter(report => reportSearchText(report).includes(normalizedFilter))
-      : reports;
-    return [...matchingReports].sort((left, right) =>
-      compareReports(left, right, sortBy, sortDir),
-    );
-  }, [filterText, reports, sortBy, sortDir]);
-
-  const pageCount = Math.max(1, Math.ceil(filteredReports.length / PAGE_SIZE));
+  const pageCount = Math.max(1, Math.ceil(counts.filtered / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
-  const pageReports = filteredReports.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE,
-  );
+  const pageReports = reports;
 
   useEffect(() => {
     if (page > pageCount) {
@@ -248,7 +188,7 @@ const ScopeReportListPage = () => {
             page: currentPage,
             pages: pageCount,
           })}{' '}
-          ({filteredReports.length})
+          ({counts.filtered})
         </span>
         <Button
           disabled={currentPage >= pageCount}
@@ -267,13 +207,7 @@ const ScopeReportListPage = () => {
               title={_('Date')}
               onSortChange={handleSortChange}
             />
-            <TableHead
-              currentSortBy={sortBy}
-              currentSortDir={sortDir}
-              sortBy="status"
-              title={_('Status')}
-              onSortChange={handleSortChange}
-            />
+            <TableHead>{_('Status')}</TableHead>
             <TableHead
               currentSortBy={sortBy}
               currentSortDir={sortDir}
@@ -295,41 +229,11 @@ const ScopeReportListPage = () => {
               title={_('Severity')}
               onSortChange={handleSortChange}
             />
-            <TableHead
-              currentSortBy={sortBy}
-              currentSortDir={sortDir}
-              sortBy="high"
-              title={_('High')}
-              onSortChange={handleSortChange}
-            />
-            <TableHead
-              currentSortBy={sortBy}
-              currentSortDir={sortDir}
-              sortBy="medium"
-              title={_('Medium')}
-              onSortChange={handleSortChange}
-            />
-            <TableHead
-              currentSortBy={sortBy}
-              currentSortDir={sortDir}
-              sortBy="low"
-              title={_('Low')}
-              onSortChange={handleSortChange}
-            />
-            <TableHead
-              currentSortBy={sortBy}
-              currentSortDir={sortDir}
-              sortBy="log"
-              title={_('Log')}
-              onSortChange={handleSortChange}
-            />
-            <TableHead
-              currentSortBy={sortBy}
-              currentSortDir={sortDir}
-              sortBy="false_positive"
-              title={_('False Positive')}
-              onSortChange={handleSortChange}
-            />
+            <TableHead>{_('High')}</TableHead>
+            <TableHead>{_('Medium')}</TableHead>
+            <TableHead>{_('Low')}</TableHead>
+            <TableHead>{_('Log')}</TableHead>
+            <TableHead>{_('False Positive')}</TableHead>
             <TableHead
               currentSortBy={sortBy}
               currentSortDir={sortDir}

@@ -15,6 +15,8 @@ as the primary scanner administration boundary.
 ## Minimum Production Questions
 
 - Are default development credentials disabled or rotated before exposure?
+- Is a first-login or password-rotation bootstrap in place instead of relying
+  on the development `admin` / `admin` account?
 - Is GSA exposed only to authorized operator networks?
 - Is TLS configured with trusted certificates for the deployment context?
 - Are runtime secrets stored outside git and outside public artifacts?
@@ -37,5 +39,7 @@ Useful non-destructive checks:
 - `just runtime-app-smoke`
 - `just runtime-browser-smoke --json`
 
-These checks help identify development-runtime drift. Passing them does not make
-the deployment production-ready.
+These checks help identify development-runtime drift. `production-posture-check`
+is expected to fail while first-login/password rotation, trusted TLS, and other
+deployment controls are not implemented. Passing routine development checks does
+not make the deployment production-ready.

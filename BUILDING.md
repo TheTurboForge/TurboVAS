@@ -77,7 +77,7 @@ credentials, development TLS material, and a development-only Docker runtime.
 
 ## Notes
 
-The server baseline uses the Ubuntu `libcurl4-gnutls-dev` package because the scanner build expects the GnuTLS curl variant.
+The server baseline uses the Ubuntu `libcurl4-gnutls-dev` package because the scanner build expects the GnuTLS curl variant. The C service documentation build also expects `xmltoman` and `xmlmantohtml`; `just deps gvmd`, `just deps gsad`, and `just deps openvas-smb` check those tools explicitly so missing manpage-generation dependencies show up before a build.
 
 The scanner build currently passes `-isystem /usr/include/mit-krb5` through
 `turbovasctl` because Ubuntu's `mit-krb5-gssapi` pkg-config metadata exposes the
@@ -113,9 +113,9 @@ just feed-cache-sync
 just feed-copy-to-runtime
 just runtime-status
 just runtime-smoke
-just runtime-log-review
+just runtime-log-review # service-specific high-signal runtime log review
 just runtime-data-state      # includes DB-owned export classification and product-data audit
-just runtime-performance-snapshot # numeric Docker/DB/static-asset baseline, thresholdless
+just runtime-performance-snapshot # numeric Docker/DB/report-workflow/static-asset baseline, thresholdless
 just quality-gate-state
 just quality-gate-schedule --status
 just runtime-app-up

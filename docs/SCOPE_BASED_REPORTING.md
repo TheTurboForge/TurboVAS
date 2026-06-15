@@ -178,21 +178,23 @@ success or failure evidence become `Unknown`. This prevents TurboVAS from
 mistaking intended authenticated scanning for proven authenticated scanning.
 
 Findings are deduplicated by host identity, NVT/OID, port, and result identity.
-The result collection is served through the standard result-query path with a
-TurboVAS scope-report constraint, so operators get the familiar result table,
-filtering, sorting, pagination, severity presentation, and result drill-down.
-The scope report keeps representative result provenance and links back to the
-raw scan reports used as evidence. Raw source reports referenced by a scope
-report are protected from deletion so the snapshot provenance remains intact.
+The scope-report list is served through manager-side filtering, sorting, and
+pagination. The result collection is served through the standard result-query
+path with a TurboVAS scope-report constraint, so operators get the familiar
+result table, filtering, sorting, pagination, severity presentation, and result
+drill-down without browser-side raw-report stitching. The scope report keeps
+representative result provenance and links back to the raw scan reports used as
+evidence. Raw source reports referenced by a scope report are protected from
+deletion so the snapshot provenance remains intact.
 
 The current implementation deliberately focuses on core report reading parity:
 scope report list/detail views, information, results, metrics, evidence sources,
 raw evidence links, and result navigation. Scope report details also expose lazy
 source-backed evidence tabs for hosts, ports, applications, operating systems,
 CVEs, TLS certificates, and error messages. Those tabs load the selected raw
-source reports as evidence. The final backend direction remains to add dedicated
-scope-report collection contracts where that is more efficient than per-source
-raw evidence loading.
+source reports as evidence. The remaining backend direction is to add dedicated
+scope-report collection contracts for those non-result tabs where that is more
+efficient than per-source raw evidence loading.
 
 Raw-only workflows such as import/upload, delta comparison, report-composer
 downloads, alerts, and asset/tag mutation are not scope-report actions;

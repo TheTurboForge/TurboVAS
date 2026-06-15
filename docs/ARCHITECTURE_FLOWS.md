@@ -53,13 +53,16 @@ packaging or redistribution.
 Operator reporting:
 
 ```text
-scope metadata + target membership + host membership -> newest completed raw source reports -> scope report snapshot -> report-like scope report views
+scope metadata + target membership + host membership -> newest completed raw source reports -> scope report snapshot -> gvmd/PostgreSQL-backed scope-report collections -> report-like scope report views
 ```
 
 Scope reports do not start scans. They aggregate existing completed raw reports
 for scope targets while preserving source-report provenance. Raw `/reports`
 remain available as technical evidence; scope reports are reached through
-`/scopes` and `/scopes/reports`.
+`/scopes` and `/scopes/reports`. The scope-report list is filtered, sorted, and
+paged through gvmd/PostgreSQL; result reading uses the standard result query
+path with a hidden scope-report constraint so browser code does not stitch raw
+reports into product truth.
 
 ## Auth And Operator Model
 
@@ -92,9 +95,9 @@ Routine foundation commands keep the runtime inspectable:
 
 ```text
 quality-gate -> retained quality artifacts
-runtime-log-review -> redacted log artifacts
+runtime-log-review -> service-specific redacted log artifacts
 runtime-data-state -> DB/table/runtime-state classification + product-data audit
-runtime-performance-snapshot -> parsed Docker/DB/static-asset baselines
+runtime-performance-snapshot -> parsed Docker/DB/report-workflow/static-asset baselines
 ```
 
 Diagnostics should create artifacts outside git under `TurboVAS-runtime`, not

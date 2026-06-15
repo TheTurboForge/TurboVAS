@@ -49,6 +49,7 @@ PUBLIC_READINESS_LICENSE_ITEMS = (
     "AGPL source-publication procedure for network services",
     "openvas-smb Samba-derived provenance review",
     "Greenbone Community Feed content terms before bundling or redistribution",
+    "Greenbone non-affiliation, trademark, and residual branding review",
     "release-time secret scan, attribution review, and source-offer/publication checklist",
 )
 MODIFIED_IMPORTED_NO_COMMENT_FILES = {
@@ -181,12 +182,34 @@ LOG_REVIEW_PATTERNS: tuple[tuple[str, str, str, str], ...] = (
     ("fail", "nmap-root-privilege", r"requires root privileges|requires root|raw scans require root privileges", "Nmap/root-privilege warning found."),
     ("fail", "postgres-collation", r"collation version mismatch|database .* has a collation version mismatch", "Postgres collation mismatch found."),
     ("fail", "mosquitto-log-file", r"unable to open log file|error: unable to open log file", "Mosquitto file-log permission warning found."),
-    ("fail", "feed-signature", r"gpg|signature|sha256sums\.asc|bad signature|no public key|advisory load", "Feed signature/advisory-load problem found."),
+    ("fail", "feed-signature", r"bad signature|no public key|sha256sums\.asc|advisory load failed", "Feed signature/advisory-load problem found."),
     ("fail", "traceback", r"traceback \(most recent call last\)|uncaught exception|panic:", "Runtime traceback or panic found."),
     ("fail", "crash", r"segmentation fault|core dumped|fatal error|critical", "Crash/critical runtime error found."),
     ("fail", "permission", r"permission denied|operation not permitted", "Permission error found."),
     ("warn", "manager-response", r"failure to receive response from manager daemon", "Manager-response failure found."),
 )
+LOG_REVIEW_SERVICE_PATTERNS: dict[str, tuple[tuple[str, str, str, str], ...]] = {
+    "postgres": (
+        ("fail", "postgres-error", r"\bERROR:\s|\bFATAL:\s|\bPANIC:\s", "Postgres ERROR/FATAL/PANIC found in recent log tail."),
+    ),
+    "gvmd": (
+        ("fail", "gvmd-socket", r"failed to .*socket|cannot .*socket|connection refused|broken pipe", "Manager socket/connection failure found."),
+        ("fail", "gvmd-sql", r"sql error|database query failed|pq:|postgres.*error", "Manager database error found."),
+    ),
+    "gsad": (
+        ("warn", "gsad-manager", r"failure to receive response from manager daemon|manager.*unavailable|connect.*gvmd.*failed", "GSAD manager communication problem found."),
+    ),
+    "ospd-openvas": (
+        ("fail", "ospd-scanner-crash", r"scan.*interrupted|ospd.*exception|openvas.*crash|scanner.*exited", "OSPD/OpenVAS scan or scanner failure found."),
+        ("fail", "ospd-feed-signature", r"gpg.*error|signature.*failed|bad signature|no public key|sha256sums\.asc", "OSPD feed signature problem found."),
+    ),
+    "notus-scanner": (
+        ("fail", "notus-feed", r"gpg.*error|signature.*failed|bad signature|no public key|advisory load.*error|failed.*advisories", "Notus feed signature/advisory problem found."),
+    ),
+    "mosquitto": (
+        ("fail", "mosquitto-error", r"\berror:\s|\bfatal:\s", "Mosquitto error found in recent log tail."),
+    ),
+}
 DATABASE_CORE_TABLES = (
     "meta",
     "users",
@@ -337,8 +360,8 @@ BUILD_META: dict[str, BuildMeta] = {
         "cmake",
         20,
         pkg_config=("gnutls", "heimdal-gssapi", "popt"),
-        programs=("cmake", "ninja", "pkg-config", "gcc", "perl"),
-        package_hints=("gcc-mingw-w64", "heimdal-dev", "libpopt-dev", "libunistring-dev"),
+        programs=("cmake", "ninja", "pkg-config", "gcc", "perl", "xmltoman", "xmlmantohtml"),
+        package_hints=("gcc-mingw-w64", "heimdal-dev", "libpopt-dev", "libunistring-dev", "xmltoman"),
         install_for_dependents=True,
     ),
     "openvas-scanner": BuildMeta(
@@ -364,8 +387,8 @@ BUILD_META: dict[str, BuildMeta] = {
         "cmake",
         40,
         pkg_config=("libcjson", "libgvm_base", "libgvm_util", "libgvm_osp", "libgvm_gmp", "gnutls", "glib-2.0", "libbsd", "libical", "gpgme"),
-        programs=("cmake", "ninja", "pkg-config", "gcc", "pg_config", "xsltproc"),
-        package_hints=("postgresql-server-dev-all", "postgresql-server-dev-16", "libical-dev", "xsltproc"),
+        programs=("cmake", "ninja", "pkg-config", "gcc", "pg_config", "xsltproc", "xmltoman", "xmlmantohtml"),
+        package_hints=("postgresql-server-dev-all", "postgresql-server-dev-16", "libical-dev", "xsltproc", "xmltoman"),
         cmake_args=("-DENABLE_AGENTS=0", "-DENABLE_CREDENTIAL_STORES=0", "-DENABLE_JWT_AUTH=0", "-DENABLE_OPENVASD=0", "-DWITH_LIBTHEIA=0"),
         install_for_dependents=True,
     ),
@@ -374,8 +397,8 @@ BUILD_META: dict[str, BuildMeta] = {
         "cmake",
         50,
         pkg_config=("libmicrohttpd", "libxml-2.0", "glib-2.0", "libgvm_base", "libgvm_util", "libgvm_gmp", "gnutls", "zlib", "libbrotlienc", "libgcrypt"),
-        programs=("cmake", "ninja", "pkg-config", "gcc"),
-        package_hints=("libmicrohttpd-dev", "libbrotli-dev"),
+        programs=("cmake", "ninja", "pkg-config", "gcc", "xmltoman", "xmlmantohtml"),
+        package_hints=("libmicrohttpd-dev", "libbrotli-dev", "xmltoman"),
         install_for_dependents=True,
     ),
     "gsa": BuildMeta(
@@ -1627,6 +1650,19 @@ def parse_relation_size_rows(output: str) -> list[dict[str, Any]]:
     return rows
 
 
+def parse_pipe_int_rows(output: str) -> dict[str, int]:
+    rows: dict[str, int] = {}
+    for line in output.splitlines():
+        if "|" not in line:
+            continue
+        name, value = line.strip().split("|", 1)
+        try:
+            rows[name] = int(value)
+        except ValueError:
+            continue
+    return rows
+
+
 def summarize_data_outside_db(paths: dict[str, dict[str, Any]]) -> dict[str, Any]:
     summary: dict[str, Any] = {"by_classification": {}, "total_byte_count": 0, "total_file_count": 0}
     for name, path_summary in paths.items():
@@ -1687,10 +1723,13 @@ def process_step_finding(status: str, check: str, message: str, result: subproce
     return finding(status, check, message, details=details)
 
 
-def log_review_matches(lines: Iterable[str]) -> list[dict[str, Any]]:
+def log_review_matches(lines: Iterable[str], service: str | None = None) -> list[dict[str, Any]]:
     matches: list[dict[str, Any]] = []
     material = list(lines)
-    for status, key, pattern, message in LOG_REVIEW_PATTERNS:
+    patterns = [*LOG_REVIEW_PATTERNS]
+    if service:
+        patterns.extend(LOG_REVIEW_SERVICE_PATTERNS.get(service, ()))
+    for status, key, pattern, message in patterns:
         regex = re.compile(pattern, re.IGNORECASE)
         matched = [line for line in material if regex.search(line)]
         if matched:
@@ -2523,6 +2562,7 @@ def command_production_posture_check(repo_root: Path) -> dict[str, Any]:
         findings.append(finding("pass", "production.default-credentials", "Development admin password is not the default value.", str(secret_path)))
     else:
         findings.append(finding("warn", "production.default-credentials", "Development admin password secret is not initialized; verify first-login/password-rotation workflow before production.", str(secret_path)))
+    findings.append(finding("fail", "production.first-login-password-rotation", "Production first-login/password-rotation bootstrap is not implemented yet; do not deploy beyond private development."))
 
     hosts = gsad_hosts(repo_root)
     wildcard_hosts = [host for host in hosts if host in {"0.0.0.0", "::", "[::]"}]
@@ -3867,7 +3907,7 @@ def command_runtime_log_review(repo_root: Path) -> dict[str, Any]:
         redacted_logs = subprocess.CompletedProcess(logs.args, logs.returncode, redacted)
         findings.append(process_step_finding("pass" if logs.returncode == 0 else "warn", "log-review.logs", f"Collected recent {service} Docker logs with exit code {logs.returncode}.", redacted_logs, command))
 
-        matches = log_review_matches(redacted.splitlines())
+        matches = log_review_matches(redacted.splitlines(), service=service)
         service_details["matches"] = matches
         if matches:
             for match in matches:
@@ -3980,6 +4020,18 @@ def command_runtime_performance_snapshot(repo_root: Path) -> dict[str, Any]:
         )
         details["database"]["largest_relations"] = parse_relation_size_rows(largest_relations.stdout) if largest_relations.returncode == 0 else []
         findings.append(finding("pass" if largest_relations.returncode == 0 else "warn", "performance.database-largest-relations", "Largest database relations captured." if largest_relations.returncode == 0 else "Largest database relation query failed.", details={"relations": details["database"].get("largest_relations", []), "output_tail": output_tail(largest_relations.stdout, 80)}))
+        report_workflow = psql(
+            repo_root,
+            "SELECT 'reports|' || count (*) FROM reports "
+            "UNION ALL SELECT 'scope_reports|' || count (*) FROM scope_reports "
+            "UNION ALL SELECT 'scope_report_sources|' || count (*) FROM scope_report_sources "
+            "UNION ALL SELECT 'max_sources_per_scope_report|' || coalesce ((SELECT max (source_count) FROM (SELECT count (*) AS source_count FROM scope_report_sources GROUP BY scope_report) x), 0) "
+            "UNION ALL SELECT 'max_results_per_report|' || coalesce ((SELECT max (result_count) FROM (SELECT count (*) AS result_count FROM results GROUP BY report) x), 0) "
+            "UNION ALL SELECT 'max_scope_report_result_count|' || coalesce ((SELECT max (result_count) FROM scope_reports), 0) "
+            "UNION ALL SELECT 'max_scope_report_source_host_count|' || coalesce ((SELECT max (evidence_host_count) FROM scope_reports), 0);",
+        )
+        details["report_workflow"] = parse_pipe_int_rows(report_workflow.stdout) if report_workflow.returncode == 0 else {}
+        findings.append(finding("pass" if report_workflow.returncode == 0 else "warn", "performance.report-workflow", "Report workflow baseline captured." if report_workflow.returncode == 0 else "Report workflow baseline query failed.", details={"report_workflow": details.get("report_workflow", {}), "output_tail": output_tail(report_workflow.stdout, 80)}))
     else:
         findings.append(finding("warn", "performance.database", "Postgres is not running; database size and row counts are unavailable."))
 

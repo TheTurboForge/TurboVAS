@@ -8187,12 +8187,15 @@ scope_get_arguments (params_t *params, const char *scope_id,
                      const char *scope_report_id)
 {
   gmp_arguments_t *arguments;
-  const gchar *details;
+  const gchar *details, *filter;
 
   arguments = gmp_arguments_new ();
   details = params_value (params, "details");
+  filter = params_value (params, "filter");
   if (details && !str_equal (details, ""))
     gmp_arguments_add (arguments, "details", details);
+  if (filter && !str_equal (filter, ""))
+    gmp_arguments_add (arguments, "filter", filter);
   if (scope_id && !str_equal (scope_id, ""))
     gmp_arguments_add (arguments, "scope_id", scope_id);
   if (scope_report_id && !str_equal (scope_report_id, ""))

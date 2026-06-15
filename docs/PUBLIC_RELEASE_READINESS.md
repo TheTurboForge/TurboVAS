@@ -12,6 +12,8 @@ project until the release-readiness gate is explicitly satisfied.
 - Upstream provenance in `UPSTREAMS.md` is current.
 - `LICENSE_AUDIT.md` has no unresolved publication blockers.
 - Greenbone non-affiliation wording is present in public-facing entry points.
+- Greenbone trademark/non-affiliation wording and residual OpenVAS/Greenbone
+  branding have been reviewed for public presentation.
 - Feed-content terms are reviewed for the planned release/distribution model.
 - No feed content, runtime cache, secrets, certificates, or credentials are
   committed or packaged.

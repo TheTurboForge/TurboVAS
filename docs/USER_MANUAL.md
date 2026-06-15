@@ -119,13 +119,14 @@ evidence, and drill-down remain recognizable, while the evidence source changes
 from one technical scan report to the newest completed raw reports for the
 scope's targets.
 
-Scope report result rows use the standard result table behavior for the core
-reading workflow: filtering, sorting, pagination, severity display, and result
-detail expansion. Each row remains linked to the raw scan report evidence it was
-derived from. Raw report management actions that do not fit aggregated snapshots,
-such as report-composer downloads, alerts, and asset/tag mutation, remain
-raw-report workflows rather than scope report actions. Inherited operator-facing
-report upload/import and raw delta-report comparison workflows have been removed.
+Scope report lists and result rows use manager-backed filtering, sorting, and
+pagination for the core reading workflow. Result rows use the standard result
+table behavior: severity display, result detail expansion, and links to the raw
+scan report evidence they were derived from. Raw report management actions that
+do not fit aggregated snapshots, such as report-composer downloads, alerts, and
+asset/tag mutation, remain raw-report workflows rather than scope report actions.
+Inherited operator-facing report upload/import and raw delta-report comparison
+workflows have been removed.
 
 A scope is a reporting population. It describes the set of assets an operator
 wants to understand, such as an organization, a technology class, an exposure
@@ -188,8 +189,10 @@ Raw `/reports` and `/report/:id` pages remain available for technical evidence.
 
 Scope report details include lazy evidence tabs for Hosts, Ports, Applications,
 Operating Systems, CVEs, TLS Certificates, and Error Messages. These tabs load
-the selected raw source reports as evidence rather than copying raw rows into a
-separate truth store.
+the selected raw source reports as evidence. The core list and result-reading
+paths are already backed by gvmd/PostgreSQL queries; future backend work should
+move the remaining heavyweight evidence tabs in the same direction where it
+improves performance or correctness.
 
 See `SCOPE_BASED_REPORTING.md` for the detailed scope model and
 `REPORTING_MODEL.md` for the first reporting loop. See

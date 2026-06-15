@@ -3,7 +3,9 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
+import CollectionCounts from 'gmp/collection/collection-counts';
 import HttpCommand from 'gmp/commands/http';
+import type {EntitiesMeta} from 'gmp/commands/entities';
 import {
   getMetricsNode,
   parseReportMetrics,
@@ -11,6 +13,7 @@ import {
 import type {ReportMetrics} from 'gmp/commands/report-metrics';
 import type Http from 'gmp/http/http';
 import type {XmlResponseData} from 'gmp/http/transform/fast-xml';
+import Filter from 'gmp/models/filter';
 import {isDefined} from 'gmp/utils/identity';
 
 export type ProtectionRequirement = 'normal' | 'high' | 'very_high';
@@ -324,6 +327,26 @@ const responseRoot = (root: XmlResponseData, name: string): XmlNode => {
   return getNode(getNode(root[name])[`${name}_response`]);
 };
 
+const parseScopeReportCounts = (
+  root: XmlNode,
+  reports: XmlNode,
+  reportCount: number,
+) => {
+  const count = getNode(root.scope_report_count);
+  return new CollectionCounts({
+    first: integer(reports._start),
+    rows: integer(reports._max),
+    length: integer(count.page) || reportCount,
+    all: integer(count.__text) || reportCount,
+    filtered: integer(count.filtered) || reportCount,
+  });
+};
+
+const parseScopeReportFilter = (root: XmlNode) => {
+  const filters = getNode(root.filters);
+  return Filter.fromString(text(filters.term));
+};
+
 export class ScopesCommand extends HttpCommand {
   constructor(http: Http) {
     super(http, {cmd: 'get_scopes'});
@@ -385,17 +408,27 @@ export class ScopeReportsCommand extends HttpCommand {
   async get({
     id,
     scopeId,
+    filter,
     details = 1,
-  }: {id?: string; scopeId?: string; details?: number} = {}) {
+  }: {
+    id?: string;
+    scopeId?: string;
+    filter?: Filter | string;
+    details?: number;
+  } = {}) {
     const response = await this.httpGetWithTransform({
       scope_report_id: id,
       scope_id: scopeId,
+      filter,
       details,
     });
     const root = responseRoot(response.data, 'get_scope_reports');
     const reports = getNode(root.scope_reports);
     const parsed = asArray(reports.scope_report).map(parseScopeReport);
-    return response.set<ScopeReport[]>(parsed);
+    return response.set<ScopeReport[], EntitiesMeta>(parsed, {
+      filter: parseScopeReportFilter(root),
+      counts: parseScopeReportCounts(root, reports, parsed.length),
+    });
   }
 
   async getOne(id: string) {

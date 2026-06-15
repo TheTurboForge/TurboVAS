@@ -16,6 +16,8 @@ Put data in gvmd/PostgreSQL when it is part of the product contract:
 - raw reports, results, hosts, ports, applications, operating systems, CVEs,
   TLS certificates, and vulnerability evidence;
 - generated scope reports and their source-report provenance;
+- scope-report list and result-reading collections that operators filter, sort,
+  page, and drill into;
 - snapshot metrics that must remain stable after generation;
 - future inventory/evidence/applicability records that operators query,
   compare, export, or audit.
@@ -75,6 +77,13 @@ query semantics, provenance, retention, or shared API access.
 
 `runtime-performance-snapshot --json` complements this with thresholdless
 baseline facts: parsed Docker CPU/memory/I/O/PID counters, database size and
-largest relations, known row counts, and static asset size summaries. Those
-facts are instrumentation, not policy; optimization decisions need a later
-hot-path analysis.
+largest relations, known row counts, report-workflow counts and largest-report
+indicators, and static asset size summaries. Those facts are instrumentation,
+not policy; optimization decisions need a later hot-path analysis.
+
+The first scope-report data-gravity move is in place: `/scopes/reports` obtains
+its list through filtered, sorted, paged gvmd/PostgreSQL queries, and scope
+report result reading uses the standard result-query path constrained by the
+scope-report snapshot. Browser-side code may still present lazy evidence tabs,
+but product report-reading collections should continue moving toward manager
+queries rather than client-side source-report stitching.

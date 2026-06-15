@@ -9,6 +9,8 @@
  */
 
 #include "manage_sql_scopes.h"
+#include "manage_filters.h"
+#include "manage_filter_utils.h"
 #include "manage_sql_metrics.h"
 #include "manage_utils.h"
 
@@ -260,6 +262,81 @@ replace_scope_hosts (scope_t scope, const char *host_uuids)
     }
 
   g_strfreev (parts);
+}
+
+static const char *
+scope_report_sort_column (const char *sort_field)
+{
+  if (sort_field == NULL || sort_field[0] == 0)
+    return "sr.creation_time";
+  if (g_str_equal (sort_field, "created")
+      || g_str_equal (sort_field, "creation_time"))
+    return "sr.creation_time";
+  if (g_str_equal (sort_field, "name"))
+    return "sr.name";
+  if (g_str_equal (sort_field, "scope"))
+    return "sr.scope_name";
+  if (g_str_equal (sort_field, "latest_evidence")
+      || g_str_equal (sort_field, "latest_evidence_time"))
+    return "sr.latest_evidence_time";
+  if (g_str_equal (sort_field, "severity"))
+    return "sr.max_severity";
+  if (g_str_equal (sort_field, "source_reports"))
+    return "sr.source_report_count";
+  if (g_str_equal (sort_field, "hosts"))
+    return "sr.evidence_host_count";
+  if (g_str_equal (sort_field, "results"))
+    return "sr.result_count";
+  if (g_str_equal (sort_field, "vulnerabilities"))
+    return "sr.vulnerability_count";
+  if (g_str_equal (sort_field, "protection_requirement"))
+    return "sr.protection_requirement";
+  return "sr.creation_time";
+}
+
+static gchar *
+scope_report_filter_where (const char *scope_report_uuid,
+                           const char *scope_uuid, const char *filter)
+{
+  GString *where;
+  gchar *search;
+
+  where = g_string_new ("WHERE 1 = 1");
+  if (scope_report_uuid && scope_report_uuid[0])
+    {
+      gchar *uuid_quoted;
+
+      uuid_quoted = quoted (scope_report_uuid);
+      g_string_append_printf (where, " AND sr.uuid = %s", uuid_quoted);
+      g_free (uuid_quoted);
+    }
+  if (scope_uuid && scope_uuid[0])
+    {
+      gchar *uuid_quoted;
+
+      uuid_quoted = quoted (scope_uuid);
+      g_string_append_printf (where, " AND sr.scope_uuid = %s", uuid_quoted);
+      g_free (uuid_quoted);
+    }
+
+  search = filter_term_value (filter, "search");
+  if (search && search[0])
+    {
+      gchar *pattern, *pattern_quoted;
+
+      pattern = g_strdup_printf ("%%%s%%", search);
+      pattern_quoted = quoted (pattern);
+      g_string_append_printf
+        (where,
+         " AND (sr.name ILIKE %s OR sr.uuid ILIKE %s"
+         " OR sr.scope_name ILIKE %s OR sr.protection_requirement ILIKE %s)",
+         pattern_quoted, pattern_quoted, pattern_quoted, pattern_quoted);
+      g_free (pattern_quoted);
+      g_free (pattern);
+    }
+  g_free (search);
+
+  return g_string_free (where, FALSE);
 }
 
 int
@@ -943,29 +1020,33 @@ append_scope_report_results_xml (GString *buffer, scope_report_t scope_report,
 
 int
 buffer_scope_reports_xml (GString *buffer, const char *scope_report_uuid,
-                          const char *scope_uuid, int details)
+                          const char *scope_uuid, int details,
+                          const char *filter, int *first_return,
+                          int *max_return, int *page_count_return)
 {
   iterator_t reports;
-  gchar *where;
+  gchar *where, *sort_field, *limit_clause;
+  int first, max, sort_order, offset, page_count;
 
-  if (scope_report_uuid && scope_report_uuid[0])
-    {
-      gchar *uuid_quoted;
-
-      uuid_quoted = quoted (scope_report_uuid);
-      where = g_strdup_printf ("WHERE sr.uuid = %s", uuid_quoted);
-      g_free (uuid_quoted);
-    }
-  else if (scope_uuid && scope_uuid[0])
-    {
-      gchar *uuid_quoted;
-
-      uuid_quoted = quoted (scope_uuid);
-      where = g_strdup_printf ("WHERE sr.scope_uuid = %s", uuid_quoted);
-      g_free (uuid_quoted);
-    }
+  sort_field = NULL;
+  if (filter && filter[0])
+    manage_filter_controls (filter, &first, &max, &sort_field, &sort_order);
   else
-    where = g_strdup ("");
+    {
+      first = 1;
+      max = -1;
+      sort_field = g_strdup ("creation_time");
+      sort_order = 0;
+    }
+  if (max == -2)
+    max = 25;
+  if (first < 1)
+    first = 1;
+  offset = first > 1 ? first - 1 : 0;
+  limit_clause = max > 0 ? g_strdup_printf (" LIMIT %i OFFSET %i", max, offset)
+                         : g_strdup ("");
+  where = scope_report_filter_where (scope_report_uuid, scope_uuid, filter);
+  page_count = 0;
 
   init_iterator (&reports,
                  "SELECT sr.id, sr.uuid, sr.scope, sr.scope_uuid, sr.scope_name,"
@@ -978,9 +1059,12 @@ buffer_scope_reports_xml (GString *buffer, const char *scope_report_uuid,
                  "       coalesce (s.is_global, 0)"
                  " FROM scope_reports sr"
                  " LEFT JOIN scopes s ON s.id = sr.scope"
-                 " %s ORDER BY sr.creation_time DESC, sr.id DESC;",
-                 where);
+                 " %s ORDER BY %s %s, sr.id DESC%s;",
+                 where, scope_report_sort_column (sort_field),
+                 sort_order ? "ASC" : "DESC", limit_clause);
   g_free (where);
+  g_free (sort_field);
+  g_free (limit_clause);
 
   while (next (&reports))
     {
@@ -1029,8 +1113,16 @@ buffer_scope_reports_xml (GString *buffer, const char *scope_report_uuid,
 
       g_string_append (buffer, "</scope_report>");
       g_free (escaped_uuid);
+      page_count++;
     }
   cleanup_iterator (&reports);
+
+  if (first_return)
+    *first_return = first;
+  if (max_return)
+    *max_return = max;
+  if (page_count_return)
+    *page_count_return = page_count;
 
   return 0;
 }
@@ -1082,4 +1174,18 @@ scope_report_count (const char *scope_report_uuid, const char *scope_uuid)
     }
 
   return sql_int ("SELECT count (*) FROM scope_reports;");
+}
+
+int
+scope_report_count_filtered (const char *scope_report_uuid,
+                             const char *scope_uuid, const char *filter)
+{
+  gchar *where;
+  int count;
+
+  where = scope_report_filter_where (scope_report_uuid, scope_uuid, filter);
+  count = sql_int ("SELECT count (*) FROM scope_reports sr %s;", where);
+  g_free (where);
+
+  return count;
 }

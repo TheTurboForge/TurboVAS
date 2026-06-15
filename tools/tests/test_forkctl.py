@@ -212,6 +212,14 @@ class TurboVASCtlTests(unittest.TestCase):
         component_names = {component.name for component in turbovasctl.COMPONENTS}
         self.assertEqual(set(turbovasctl.BUILD_META), component_names)
 
+    def test_c_service_doc_generation_dependencies_are_explicit(self):
+        for component in ("openvas-smb", "gvmd", "gsad"):
+            with self.subTest(component=component):
+                meta = turbovasctl.BUILD_META[component]
+                self.assertIn("xmltoman", meta.programs)
+                self.assertIn("xmlmantohtml", meta.programs)
+                self.assertIn("xmltoman", meta.package_hints)
+
     def test_core_c_chain_order_is_stable(self):
         self.assertEqual(turbovasctl.CORE_C_CHAIN, ("gvm-libs", "openvas-smb", "openvas-scanner"))
 
@@ -386,6 +394,10 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("<StatusBar status={TASK_STATUS.done} />", list_page)
         self.assertIn("<SeverityBar severity={report.maxSeverity} />", list_page)
         self.assertIn("report.resultsTotal", list_page)
+        self.assertIn("scopeReportFilter", list_page)
+        self.assertIn("gmp.scopereports.get({details: 1, filter})", list_page)
+        self.assertIn("setCounts(reportResponse.meta.counts", list_page)
+        self.assertNotIn("filteredReports", list_page)
         self.assertIn("_('Information')", details_page)
         self.assertIn("_('Results')", details_page)
         self.assertIn("_('Evidence Sources')", details_page)
@@ -393,6 +405,33 @@ class TurboVASCtlTests(unittest.TestCase):
         results_tab = (root / "components" / "gsa" / "src" / "web" / "pages" / "scope-reports" / "ScopeReportResultsTab.tsx").read_text(encoding="utf-8")
         self.assertIn("_and_scope_report_id", results_tab)
         self.assertIn("<ResultsTable", results_tab)
+
+    def test_scope_report_collection_filtering_is_wired_across_layers(self):
+        root = Path(__file__).resolve().parents[2]
+        gvmd_gmp = (root / "components" / "gvmd" / "src" / "gmp.c").read_text(encoding="utf-8")
+        gvmd_scopes = (root / "components" / "gvmd" / "src" / "manage_sql_scopes.c").read_text(encoding="utf-8")
+        gsad = (root / "components" / "gsad" / "src" / "gsad_gmp.c").read_text(encoding="utf-8")
+        gsa_scopes = (root / "components" / "gsa" / "src" / "gmp" / "commands" / "scopes.ts").read_text(encoding="utf-8")
+        python_scopes = (root / "components" / "python-gvm" / "gvm" / "protocols" / "gmp" / "requests" / "v226" / "_scopes.py").read_text(encoding="utf-8")
+        gvm_tools_list = (root / "components" / "gvm-tools" / "scripts" / "list-scope-reports.gmp.py").read_text(encoding="utf-8")
+        gmp_schema = (root / "components" / "gvmd" / "src" / "schema_formats" / "XML" / "GMP.xml.in").read_text(encoding="utf-8")
+        self.assertIn("data->filter = g_strdup (attribute);", gvmd_gmp)
+        self.assertIn("scope_report_count_filtered", gvmd_gmp)
+        self.assertIn('<scope_reports start=\\"%i\\" max=\\"%i\\">%s', gvmd_gmp)
+        self.assertIn("manage_filter_controls", gvmd_scopes)
+        self.assertIn("filter_term_value (filter, \"search\")", gvmd_scopes)
+        self.assertIn("scope_report_sort_column", gvmd_scopes)
+        self.assertIn("ORDER BY %s %s, sr.id DESC%s", gvmd_scopes)
+        self.assertIn("params_value (params, \"filter\")", gsad)
+        self.assertIn("gmp_arguments_add (arguments, \"filter\", filter)", gsad)
+        self.assertIn("parseScopeReportCounts", gsa_scopes)
+        self.assertIn("response.set<ScopeReport[], EntitiesMeta>", gsa_scopes)
+        self.assertIn("filter_string: str | None = None", python_scopes)
+        self.assertIn('cmd.set_attribute("filter", filter_string)', python_scopes)
+        self.assertIn("DEFAULT_FILTER = \"first=1 rows=25 sort-reverse=created\"", gvm_tools_list)
+        self.assertIn("filter_string=parsed_args.filter", gvm_tools_list)
+        self.assertIn("<name>get_scope_reports</name>", gmp_schema)
+        self.assertIn("Filter term to use for paging, sorting, and searching scope reports", gmp_schema)
 
     def test_report_metrics_commands_are_registered_across_layers(self):
         root = Path(__file__).resolve().parents[2]
@@ -646,6 +685,20 @@ class TurboVASCtlTests(unittest.TestCase):
             [{"name": "results", "byte_count": 123}, {"name": "reports", "byte_count": 45}],
         )
 
+    def test_parse_pipe_int_rows(self):
+        self.assertEqual(
+            turbovasctl.parse_pipe_int_rows("reports|13\nignored|not-int\nscope_reports|23\n"),
+            {"reports": 13, "scope_reports": 23},
+        )
+
+    def test_performance_snapshot_captures_report_workflow_baseline(self):
+        source = (Path(__file__).resolve().parents[1] / "turbovasctl").read_text(encoding="utf-8")
+        self.assertIn("performance.report-workflow", source)
+        self.assertIn("max_sources_per_scope_report", source)
+        self.assertIn("max_results_per_report", source)
+        self.assertIn("max_scope_report_result_count", source)
+        self.assertIn("parse_pipe_int_rows", source)
+
     def test_quality_gate_systemd_templates_are_present(self):
         root = Path(__file__).resolve().parents[2]
         service = root / "ops" / "systemd" / "turbovas-quality-gate.service.in"
@@ -728,6 +781,23 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("postgres-collation", keys)
         self.assertIn("mosquitto-log-file", keys)
         self.assertIn("traceback", keys)
+
+    def test_runtime_log_review_uses_service_specific_patterns(self):
+        postgres_matches = turbovasctl.log_review_matches(
+            ["2026-06-15 10:00:00.000 UTC [42] ERROR:  relation does not exist"],
+            service="postgres",
+        )
+        self.assertIn("postgres-error", {match["key"] for match in postgres_matches})
+        generic_matches = turbovasctl.log_review_matches(
+            ["2026-06-15 10:00:00.000 UTC [42] ERROR:  relation does not exist"],
+            service="redis",
+        )
+        self.assertNotIn("postgres-error", {match["key"] for match in generic_matches})
+        notus_matches = turbovasctl.log_review_matches(
+            ["notus-scanner: GPG error while verifying advisories"],
+            service="notus-scanner",
+        )
+        self.assertIn("notus-feed", {match["key"] for match in notus_matches})
 
     def test_data_state_table_sets_capture_current_schema_expectations(self):
         self.assertIn("reports", turbovasctl.DATABASE_CORE_TABLES)
@@ -834,6 +904,18 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_public_readiness_gate_is_explicit(self):
         self.assertEqual(turbovasctl.public_readiness_finding()["status"], "pass")
         self.assertEqual(turbovasctl.public_readiness_finding(public_release=True)["status"], "fail")
+        self.assertIn("Greenbone non-affiliation", "\n".join(turbovasctl.PUBLIC_READINESS_LICENSE_ITEMS))
+
+    def test_production_posture_tracks_password_rotation_gap(self):
+        source = (Path(__file__).resolve().parents[1] / "turbovasctl").read_text(encoding="utf-8")
+        self.assertIn("production.first-login-password-rotation", source)
+        self.assertIn("Production first-login/password-rotation bootstrap is not implemented yet", source)
+
+    def test_gsa_browser_metadata_uses_turbovas_branding(self):
+        index = (Path(__file__).resolve().parents[2] / "components" / "gsa" / "index.html").read_text(encoding="utf-8")
+        self.assertIn("<title>TurboVAS</title>", index)
+        self.assertIn('href="/img/favicon.svg" type="image/svg+xml"', index)
+        self.assertNotIn("<title>OPENVAS</title>", index)
 
     def test_license_helpers_require_spdx_for_new_turbovas_files(self):
         with tempfile.TemporaryDirectory() as tmp:

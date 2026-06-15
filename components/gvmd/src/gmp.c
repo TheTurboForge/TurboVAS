@@ -2746,6 +2746,7 @@ typedef struct
   char *protection_requirement;    ///< Scope protection requirement.
   char *target_ids;                ///< Comma or whitespace separated targets.
   char *host_ids;                  ///< Comma or whitespace separated hosts.
+  char *filter;                    ///< Optional collection filter.
   int details;                     ///< Whether to include details.
 } scope_command_data_t;
 
@@ -2765,6 +2766,7 @@ scope_command_data_reset (scope_command_data_t *data)
   free (data->protection_requirement);
   free (data->target_ids);
   free (data->host_ids);
+  free (data->filter);
 
   memset (data, 0, sizeof (scope_command_data_t));
 }
@@ -2802,6 +2804,9 @@ scope_command_data_start (scope_command_data_t *data,
   if (find_attribute (attribute_names, attribute_values, "host_ids",
                       &attribute))
     data->host_ids = g_strdup (attribute);
+  if (find_attribute (attribute_names, attribute_values, "filter",
+                      &attribute))
+    data->filter = g_strdup (attribute);
   if (find_attribute (attribute_names, attribute_values, "details",
                       &attribute))
     data->details = strcmp (attribute, "0") != 0;
@@ -17550,23 +17555,33 @@ handle_get_scope_reports_command (gmp_parser_t *gmp_parser, GError **error,
                                   scope_command_data_t *data,
                                   const char *response_name)
 {
-  GString *xml;
-  int count;
+  GString *xml, *rows_xml;
+  gchar *filter_xml;
+  int count, filtered, first, max, page_count;
 
   count = scope_report_count (data->scope_report_id, data->scope_id);
+  filtered = scope_report_count_filtered (data->scope_report_id,
+                                          data->scope_id, data->filter);
+  rows_xml = g_string_new ("");
+  buffer_scope_reports_xml (rows_xml, data->scope_report_id, data->scope_id,
+                            data->details, data->filter, &first, &max,
+                            &page_count);
+  filter_xml = g_markup_escape_text (data->filter ? data->filter : "", -1);
   xml = g_string_new ("");
   g_string_append_printf (xml,
                           "<%s_response status=\"" STATUS_OK "\""
                           " status_text=\"" STATUS_OK_TEXT "\">"
-                          "<scope_reports start=\"1\" max=\"-1\">",
-                          response_name);
-  buffer_scope_reports_xml (xml, data->scope_report_id, data->scope_id,
-                            data->details);
-  g_string_append_printf (xml,
-                          "</scope_reports><scope_report_count>"
+                          "<scope_reports start=\"%i\" max=\"%i\">%s"
+                          "</scope_reports>"
+                          "<filters><term>%s</term></filters>"
+                          "<scope_report_count>"
                           "<filtered>%i</filtered><page>%i</page>%i"
                           "</scope_report_count></%s_response>",
-                          count, count, count, response_name);
+                          response_name, first, max, rows_xml->str,
+                          filter_xml, filtered, page_count, count,
+                          response_name);
+  g_free (filter_xml);
+  g_string_free (rows_xml, TRUE);
 
   SEND_TO_CLIENT_OR_FAIL (xml->str);
   g_string_free (xml, TRUE);
