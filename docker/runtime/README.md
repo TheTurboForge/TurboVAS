@@ -114,7 +114,7 @@ small `python-gvm` probe and calls `get_version` without printing secrets.
 
 `runtime-native-api-smoke` verifies the internal `turbovas-api` sidecar by
 querying `/healthz`, `/api/v1/scope-reports`, and the first scope report's
-DB-backed Hosts, CVEs, Error Messages, and Metrics collections from inside the
+DB-backed Results, Hosts, CVEs, Error Messages, and Metrics collections from inside the
 Docker network. It does not expose a host port and does not use GMP/XML for the
 tested read path.
 

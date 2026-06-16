@@ -423,6 +423,11 @@ components:
           type: string
         severity:
           type: number
+        qod:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
         source_report_id:
           type: string
           format: uuid

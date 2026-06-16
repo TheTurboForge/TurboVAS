@@ -636,6 +636,7 @@ class TurboVASCtlTests(unittest.TestCase):
         endpoints = {item["endpoint"] for item in details["implemented_native_endpoints"]}
         self.assertIn("/api/v1/scope-reports", endpoints)
         self.assertIn("/api/v1/scopes/{scope_id}/reports/{scope_report_id}/hosts", endpoints)
+        self.assertIn("/api/v1/scopes/{scope_id}/reports/{scope_report_id}/results", endpoints)
         self.assertIn("/api/v1/scopes/{scope_id}/reports/{scope_report_id}/cves", endpoints)
         self.assertIn("/api/v1/scopes/{scope_id}/reports/{scope_report_id}/errors", endpoints)
         self.assertIn("/api/v1/scopes/{scope_id}/reports/{scope_report_id}/metrics", endpoints)

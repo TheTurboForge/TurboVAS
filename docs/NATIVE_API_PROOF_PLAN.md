@@ -73,8 +73,8 @@ high-consequence inherited control paths until separately designed and reviewed.
 
 ## Next Proofs
 
-After scope-report Hosts/CVEs/Error Messages/Metrics work, the next candidates are:
+After scope-report Results/Hosts/CVEs/Error Messages/Metrics work, the next candidates are:
 
 1. raw report metrics, replacing the remaining `python-gvm` runtime helper read;
-2. scope-report Results through a typed JSON client, once report-row parity is
-   stable enough to avoid duplicating inherited report behavior.
+2. authenticated same-origin browser access for one low-risk scope-report read
+   workflow, once the boundary design is explicit.

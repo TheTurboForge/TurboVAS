@@ -111,6 +111,20 @@ struct CveItem {
 }
 
 #[derive(Debug, Serialize)]
+struct ResultItem {
+    id: String,
+    host: String,
+    port: String,
+    nvt_oid: String,
+    name: String,
+    severity: f64,
+    qod: i64,
+    created_at: Option<String>,
+    source_report_id: String,
+    raw_evidence_href: String,
+}
+
+#[derive(Debug, Serialize)]
 struct ErrorMessageItem {
     id: String,
     host: String,
@@ -230,6 +244,10 @@ async fn main() -> Result<(), ApiError> {
         .route("/healthz", get(healthz))
         .route("/api/v1/scope-reports", get(scope_reports))
         .route(
+            "/api/v1/scopes/:scope_id/reports/:scope_report_id/results",
+            get(scope_report_results),
+        )
+        .route(
             "/api/v1/scopes/:scope_id/reports/:scope_report_id/hosts",
             get(scope_report_hosts),
         )
@@ -288,6 +306,116 @@ async fn healthz(State(state): State<AppState>) -> Result<Json<HealthResponse>, 
     Ok(Json(HealthResponse {
         status: "ok",
         database: "ok",
+    }))
+}
+
+async fn scope_report_results(
+    State(state): State<AppState>,
+    Path((scope_id, scope_report_id)): Path<(String, String)>,
+    Query(query): Query<CollectionQuery>,
+) -> Result<Json<Collection<ResultItem>>, ApiError> {
+    parse_uuid(&scope_id)?;
+    parse_uuid(&scope_report_id)?;
+    let params = normalize_collection_query(query, "-severity")?;
+    let sort_sql = sort_clause(
+        &params.sort,
+        &[
+            ("id", "id"),
+            ("host", "host"),
+            ("port", "port"),
+            ("nvt_oid", "nvt_oid"),
+            ("name", "name"),
+            ("severity", "severity"),
+            ("qod", "qod"),
+            ("created_at", "created_at_unix"),
+        ],
+    )?;
+    let sql = format!(
+        "WITH selected_scope_report AS (\n\
+             SELECT sr.id, sr.scope, coalesce(s.is_global, 0)::int AS is_global\n\
+               FROM scope_reports sr\n\
+               JOIN scopes s ON s.id = sr.scope\n\
+              WHERE sr.uuid = $1 AND sr.scope_uuid = $2\n\
+         ),\n\
+         selected_hosts AS (\n\
+             SELECT lower(rh.host) AS host_key\n\
+               FROM selected_scope_report sr\n\
+               JOIN scope_report_sources srs ON srs.scope_report = sr.id\n\
+               JOIN report_hosts rh ON rh.report = srs.source_report\n\
+              WHERE sr.is_global = 1 AND coalesce(rh.host, '') <> ''\n\
+              GROUP BY lower(rh.host)\n\
+             UNION\n\
+             SELECT lower(h.name) AS host_key\n\
+               FROM selected_scope_report sr\n\
+               JOIN scope_hosts sh ON sh.scope = sr.scope AND sr.is_global = 0\n\
+               JOIN hosts h ON h.id = sh.host\n\
+              WHERE coalesce(h.name, '') <> ''\n\
+              GROUP BY lower(h.name)\n\
+         ),\n\
+         ranked AS (\n\
+             SELECT r.uuid AS id,\n\
+                    lower(coalesce(nullif(r.host, ''), r.hostname, '')) AS host,\n\
+                    coalesce(r.port, '') AS port,\n\
+                    coalesce(r.nvt, '') AS nvt_oid,\n\
+                    coalesce(n.name, r.nvt, '') AS name,\n\
+                    coalesce(r.severity, 0)::double precision AS severity,\n\
+                    coalesce(r.qod, 0)::bigint AS qod,\n\
+                    coalesce(r.date, 0)::bigint AS created_at_unix,\n\
+                    srs.source_report_uuid AS source_report_id,\n\
+                    row_number () OVER (\n\
+                      PARTITION BY lower(coalesce(nullif(r.host, ''), r.hostname, '')),\n\
+                                   coalesce(r.nvt, ''), coalesce(r.port, '')\n\
+                      ORDER BY coalesce(r.severity, 0) DESC, coalesce(r.date, 0) DESC, r.id DESC\n\
+                    ) AS rn\n\
+               FROM selected_scope_report sr\n\
+               JOIN scope_report_sources srs ON srs.scope_report = sr.id\n\
+               JOIN results r ON r.report = srs.source_report\n\
+               JOIN selected_hosts sh ON sh.host_key = lower(coalesce(nullif(r.host, ''), r.hostname, ''))\n\
+               LEFT JOIN nvts n ON n.oid = r.nvt\n\
+              WHERE coalesce(r.severity, 0) != -3.0\n\
+                AND coalesce(nullif(r.host, ''), r.hostname, '') <> ''\n\
+         ),\n\
+         result_rows AS (\n\
+             SELECT id, host, port, nvt_oid, name, severity, qod, created_at_unix, source_report_id\n\
+               FROM ranked WHERE rn = 1\n\
+         ),\n\
+         filtered AS (\n\
+             SELECT * FROM result_rows\n\
+              WHERE ($3 = ''\n\
+                     OR lower(id) LIKE '%' || lower($3) || '%'\n\
+                     OR lower(host) LIKE '%' || lower($3) || '%'\n\
+                     OR lower(port) LIKE '%' || lower($3) || '%'\n\
+                     OR lower(nvt_oid) LIKE '%' || lower($3) || '%'\n\
+                     OR lower(name) LIKE '%' || lower($3) || '%')\n\
+         )\n\
+         SELECT count(*) OVER()::bigint AS total, * FROM filtered\n\
+          ORDER BY {sort_sql}, created_at_unix DESC, id ASC LIMIT $4 OFFSET $5;"
+    );
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let rows = client
+        .query(
+            &sql,
+            &[
+                &scope_report_id,
+                &scope_id,
+                &params.filter,
+                &params.page_size,
+                &params.offset,
+            ],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "scope report result query failed");
+            ApiError::Database
+        })?;
+    if rows.is_empty() && !scope_report_exists(&client, &scope_report_id, &scope_id).await? {
+        return Err(ApiError::NotFound);
+    }
+    let total = rows.first().map(|row| row.get::<_, i64>(0)).unwrap_or(0);
+    let items = rows.iter().map(result_from_row).collect();
+    Ok(Json(Collection {
+        page: params.page_info(total),
+        items,
     }))
 }
 
@@ -855,6 +983,23 @@ fn cve_from_row(row: &Row) -> CveItem {
         result_count: row.get(3),
         max_severity: row.get(4),
         source_report_ids: row.get(5),
+    }
+}
+
+fn result_from_row(row: &Row) -> ResultItem {
+    let id: String = row.get(1);
+    let source_report_id: String = row.get(9);
+    ResultItem {
+        raw_evidence_href: format!("/report/{source_report_id}/result/{id}"),
+        id,
+        host: row.get(2),
+        port: row.get(3),
+        nvt_oid: row.get(4),
+        name: row.get(5),
+        severity: row.get(6),
+        qod: row.get(7),
+        created_at: unix_ts_to_rfc3339(row.get(8)),
+        source_report_id,
     }
 }
 

@@ -2348,6 +2348,11 @@ def summarize_native_tooling(items: list[dict[str, Any]]) -> dict[str, Any]:
                 "replacement_candidates": ["scope-report Hosts tab", "host evidence reads for scope reports"],
             },
             {
+                "endpoint": "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/results",
+                "status": "implemented_internal",
+                "replacement_candidates": ["scope-report Results tab", "result evidence reads for scope reports"],
+            },
+            {
                 "endpoint": "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/cves",
                 "status": "implemented_internal",
                 "replacement_candidates": ["scope-report CVEs tab", "CVE evidence reads for scope reports"],
@@ -2365,7 +2370,7 @@ def summarize_native_tooling(items: list[dict[str, Any]]) -> dict[str, Any]:
         ],
         "next_replacement_candidates": [
             {"workflow": "raw report metrics runtime helper", "current_dependency": "python-gvm over GMP/XML", "native_target": "/api/v1/reports/{report_id}/metrics"},
-            {"workflow": "scope-report Hosts/CVEs/Error Messages tabs", "current_dependency": "GSA GMP command clients and source-report stitching", "native_target": "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/hosts, /cves, and /errors"},
+            {"workflow": "scope-report browser tabs", "current_dependency": "GSA GMP command clients and source-report stitching", "native_target": "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/results, /hosts, /cves, /errors, and /metrics"},
             {"workflow": "gvm-tools scope/report scripts", "current_dependency": "gvm-tools GMP scripts", "native_target": "turbovasctl or native HTTP/JSON client commands"},
         ],
     }
@@ -4490,6 +4495,20 @@ def command_runtime_native_api_smoke(repo_root: Path) -> dict[str, Any]:
         scope_id = first_report.get("scope", {}).get("id") if isinstance(first_report, dict) else None
         scope_report_id = first_report.get("id") if isinstance(first_report, dict) else None
         if scope_id and scope_report_id:
+            results_path = f"/api/v1/scopes/{scope_id}/reports/{scope_report_id}/results?page_size=5&sort=-severity"
+            results = native_api_curl(repo_root, results_path)
+            results_json = parse_json_output(results)
+            details["results"] = results_json
+            result_items = results_json.get("items", []) if isinstance(results_json, dict) else []
+            findings.append(
+                process_step_finding(
+                    "pass" if results.returncode == 0 and isinstance(result_items, list) else "fail",
+                    "native-api.scope-report-results",
+                    f"Native API scope-report Results probe exit code {results.returncode}.",
+                    results,
+                    compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/scopes/.../reports/.../results?page_size=5"),
+                )
+            )
             hosts_path = f"/api/v1/scopes/{scope_id}/reports/{scope_report_id}/hosts?page_size=5&sort=host"
             hosts = native_api_curl(repo_root, hosts_path)
             hosts_json = parse_json_output(hosts)
@@ -4553,11 +4572,13 @@ def command_runtime_native_api_smoke(repo_root: Path) -> dict[str, Any]:
                 )
             )
         else:
+            findings.append(finding("fail", "native-api.scope-report-results", "Scope-report list did not include a scope/report id pair for the Results probe."))
             findings.append(finding("fail", "native-api.scope-report-hosts", "Scope-report list did not include a scope/report id pair for the host probe."))
             findings.append(finding("fail", "native-api.scope-report-cves", "Scope-report list did not include a scope/report id pair for the CVE probe."))
             findings.append(finding("fail", "native-api.scope-report-errors", "Scope-report list did not include a scope/report id pair for the Error Messages probe."))
             findings.append(finding("fail", "native-api.scope-report-metrics", "Scope-report list did not include a scope/report id pair for the Metrics probe."))
     else:
+        findings.append(finding("warn", "native-api.scope-report-results", "No scope reports exist yet, so the Results probe was skipped."))
         findings.append(finding("warn", "native-api.scope-report-hosts", "No scope reports exist yet, so the host collection probe was skipped."))
         findings.append(finding("warn", "native-api.scope-report-cves", "No scope reports exist yet, so the CVE collection probe was skipped."))
         findings.append(finding("warn", "native-api.scope-report-errors", "No scope reports exist yet, so the Error Messages collection probe was skipped."))
