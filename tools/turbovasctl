@@ -2385,6 +2385,71 @@ def redis_compose_boundaries(repo_root: Path) -> dict[str, Any]:
     }
 
 
+def scanner_redis_cli(repo_root: Path, args: list[str]) -> subprocess.CompletedProcess[str]:
+    return exec_in_service(repo_root, "redis-openvas", ["redis-cli", "-s", "/run/redis-openvas/redis.sock", *args])
+
+
+def parse_redis_info(stdout: str) -> dict[str, int]:
+    keys = {
+        "used_memory",
+        "used_memory_peak",
+        "connected_clients",
+        "blocked_clients",
+        "total_commands_processed",
+        "instantaneous_ops_per_sec",
+        "keyspace_hits",
+        "keyspace_misses",
+    }
+    metrics: dict[str, int] = {}
+    db_key_total = 0
+    for raw_line in stdout.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        if key in keys:
+            try:
+                metrics[key] = int(value)
+            except ValueError:
+                continue
+        elif key.startswith("db"):
+            for part in value.split(","):
+                if part.startswith("keys="):
+                    try:
+                        db_key_total += int(part.split("=", 1)[1])
+                    except ValueError:
+                        pass
+    if db_key_total:
+        metrics["keyspace_keys"] = db_key_total
+    return metrics
+
+
+def parse_redis_dbsize(stdout: str) -> int | None:
+    for line in stdout.splitlines():
+        try:
+            return int(line.strip())
+        except ValueError:
+            continue
+    return None
+
+
+def scanner_redis_metrics(repo_root: Path) -> dict[str, Any]:
+    metrics: dict[str, Any] = {}
+    dbsize = scanner_redis_cli(repo_root, ["DBSIZE"])
+    metrics["dbsize_status"] = "pass" if dbsize.returncode == 0 else "fail"
+    metrics["dbsize"] = parse_redis_dbsize(dbsize.stdout) if dbsize.returncode == 0 else None
+    if dbsize.returncode != 0:
+        metrics["dbsize_output_tail"] = output_tail(dbsize.stdout + dbsize.stderr, 20)
+
+    info = scanner_redis_cli(repo_root, ["INFO"])
+    metrics["info_status"] = "pass" if info.returncode == 0 else "fail"
+    if info.returncode == 0:
+        metrics.update(parse_redis_info(info.stdout))
+    else:
+        metrics["info_output_tail"] = output_tail(info.stdout + info.stderr, 20)
+    return metrics
+
+
 def redis_runtime_probe(repo_root: Path) -> dict[str, Any]:
     details: dict[str, Any] = {
         "redis": {"running": container_running(repo_root, "redis")},
@@ -2396,6 +2461,8 @@ def redis_runtime_probe(repo_root: Path) -> dict[str, Any]:
     if details["redis-openvas"]["running"]:
         ping = scanner_redis_ping(repo_root)
         details["redis-openvas"].update({"ping_status": "pass" if ping.returncode == 0 and "PONG" in ping.stdout else "fail", "output_tail": output_tail(ping.stdout, 20), "socket_exists": scanner_redis_socket_path(repo_root).is_socket()})
+        if ping.returncode == 0 and "PONG" in ping.stdout:
+            details["redis-openvas"]["metrics"] = scanner_redis_metrics(repo_root)
     return details
 
 
@@ -2416,6 +2483,9 @@ def command_runtime_redis_state(repo_root: Path) -> dict[str, Any]:
     if runtime["redis-openvas"].get("running"):
         scanner_ready = runtime["redis-openvas"].get("ping_status") == "pass" and runtime["redis-openvas"].get("socket_exists") is True
         findings.append(finding("pass" if scanner_ready else "fail", "redis-openvas.runtime-ping", "Scanner Redis Unix socket responded to ping." if scanner_ready else "Scanner Redis Unix socket ping failed.", str(scanner_redis_socket_path(repo_root)), runtime["redis-openvas"]))
+        scanner_metrics = runtime["redis-openvas"].get("metrics", {})
+        metrics_ready = scanner_metrics.get("dbsize_status") == "pass" and scanner_metrics.get("info_status") == "pass"
+        findings.append(finding("pass" if metrics_ready else "warn", "redis-openvas.runtime-metrics", "Scanner Redis metrics were collected without exposing key names or values." if metrics_ready else "Scanner Redis metrics could not be fully collected.", str(scanner_redis_socket_path(repo_root)), scanner_metrics))
     else:
         findings.append(finding("warn", "redis-openvas.runtime-ping", "Scanner Redis container is not running; runtime ping skipped.", str(scanner_redis_socket_path(repo_root)), runtime["redis-openvas"]))
     result = make_result("runtime-redis-state", repo_root, "Redis dependency and runtime boundary state collected.", findings)

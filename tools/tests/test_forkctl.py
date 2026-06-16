@@ -634,6 +634,36 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(turbovasctl.redis_reference_category("docker/dev/Dockerfile", "redis-tools libhiredis-dev"), "dependency_build")
         self.assertEqual(turbovasctl.redis_reference_category("docs/ARCHITECTURE_FLOWS.md", "Redis"), "documentation")
 
+    def test_redis_metric_parsers_extract_counts_without_keys(self):
+        info = """
+# Clients
+connected_clients:2
+blocked_clients:0
+# Memory
+used_memory:1024
+used_memory_peak:4096
+# Stats
+total_commands_processed:42
+instantaneous_ops_per_sec:3
+keyspace_hits:10
+keyspace_misses:1
+# Keyspace
+db0:keys=7,expires=2,avg_ttl=1000
+db2:keys=5,expires=0,avg_ttl=0
+"""
+        metrics = turbovasctl.parse_redis_info(info)
+        self.assertEqual(metrics["connected_clients"], 2)
+        self.assertEqual(metrics["blocked_clients"], 0)
+        self.assertEqual(metrics["used_memory"], 1024)
+        self.assertEqual(metrics["used_memory_peak"], 4096)
+        self.assertEqual(metrics["total_commands_processed"], 42)
+        self.assertEqual(metrics["instantaneous_ops_per_sec"], 3)
+        self.assertEqual(metrics["keyspace_hits"], 10)
+        self.assertEqual(metrics["keyspace_misses"], 1)
+        self.assertEqual(metrics["keyspace_keys"], 12)
+        self.assertEqual(turbovasctl.parse_redis_dbsize("5\n"), 5)
+        self.assertIsNone(turbovasctl.parse_redis_dbsize("not-an-int\n"))
+
     def test_redis_compose_boundaries_expect_generic_redis_removed(self):
         root = Path(__file__).resolve().parents[2]
         boundaries = turbovasctl.redis_compose_boundaries(root)
