@@ -28,8 +28,9 @@ native replacements are designed and proven.
 ## Common Contract Rules
 
 - Base path: `/api/v1`.
-- Authentication: same-origin operator session, initially expected to be served
-  behind the existing authenticated web surface when implemented.
+- Authentication: same-origin operator session through the existing `gsad` web
+  boundary when browser access is implemented. See
+  `docs/NATIVE_API_AUTH_BOUNDARY.md`.
 - Response body: JSON objects only; no XML payloads in native product APIs.
 - IDs: UUID strings matching the underlying gvmd resource identifiers.
 - Timestamps: RFC 3339 UTC strings.
@@ -62,6 +63,7 @@ internal DB-backed contract is stable.
 - Do not start scans, sync feeds, or mutate scanner state through this first
   read API.
 - Do not expose the first native API sidecar directly on LAN/Tailscale; it is
-  Docker-internal until a same-origin authenticated web boundary is designed.
+  Docker-internal and browser access must go through the authenticated
+  same-origin boundary in `docs/NATIVE_API_AUTH_BOUNDARY.md`.
 - Do not keep `python-gvm` or `gvm-tools` as permanent TurboVAS product
   dependencies once native replacements exist.

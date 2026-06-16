@@ -17,7 +17,8 @@ The first live proof is the Docker-internal Rust `turbovas-api` sidecar for
 scope-report collections and raw report metrics, currently scope-report list,
 Results, Hosts, CVEs, Error Messages, scope-report Metrics, and raw report
 Metrics. It queries PostgreSQL directly and is intentionally not exposed on a
-host port; same-origin browser access is a later authenticated boundary step.
+host port; same-origin browser access should go through `gsad` as defined in
+`docs/NATIVE_API_AUTH_BOUNDARY.md`.
 
 ## Workflow Retirement Classes
 

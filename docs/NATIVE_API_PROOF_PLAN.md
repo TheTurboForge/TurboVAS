@@ -64,8 +64,8 @@ Implementation commit `c59140a` proved the internal sidecar for scope-report
 list and Hosts. Follow-up B-117/B-125 slices add scope-report Results, CVEs,
 Error Messages, persisted scope-report Metrics, and raw report Metrics with the
 same internal-only, PostgreSQL-backed pattern. Browser smoke through a native
-client remains the next proof step after the authenticated same-origin boundary
-is designed.
+client remains the next proof step, using the authenticated same-origin
+boundary defined in `docs/NATIVE_API_AUTH_BOUNDARY.md`.
 
 ## Not In The First Proof
 
@@ -78,6 +78,6 @@ high-consequence inherited control paths until separately designed and reviewed.
 After scope-report Results/Hosts/CVEs/Error Messages/Metrics and raw report Metrics work, the next candidates are:
 
 1. authenticated same-origin browser access for one low-risk scope-report read
-   workflow, once the boundary design is explicit.
+   workflow through `gsad`, following `docs/NATIVE_API_AUTH_BOUNDARY.md`.
 2. raw report list/detail or scope metadata reads, only if they directly unlock
    helper or browser migration away from GMP/XML.
