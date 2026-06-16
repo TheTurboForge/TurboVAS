@@ -156,6 +156,23 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CveCollection'
+  /scopes/{scope_id}/reports/{scope_report_id}/errors:
+    get:
+      summary: List scope report Error Messages
+      parameters:
+        - $ref: '#/components/parameters/ScopeId'
+        - $ref: '#/components/parameters/ScopeReportId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Filter'
+      responses:
+        '200':
+          description: Scope report Error Message collection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessageCollection'
   /scopes/{scope_id}/reports/{scope_report_id}/metrics:
     get:
       summary: Read scope report metrics
@@ -313,6 +330,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Cve'
+    ErrorMessageCollection:
+      type: object
+      required: [page, items]
+      properties:
+        page:
+          $ref: '#/components/schemas/PageInfo'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ErrorMessage'
     Report:
       type: object
       required: [id, name, status]
@@ -439,6 +466,27 @@ components:
           items:
             type: string
             format: uuid
+    ErrorMessage:
+      type: object
+      required: [id, host, nvt_oid, description, source_report_id]
+      properties:
+        id:
+          type: string
+          format: uuid
+        host:
+          type: string
+        port:
+          type: string
+        nvt_oid:
+          type: string
+        description:
+          type: string
+        source_report_id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
     ReportMetrics:
       type: object
       required: [summary, systems, vulnerabilities]

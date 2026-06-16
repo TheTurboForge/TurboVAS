@@ -14,9 +14,9 @@ tooling paths. They may remain temporarily as compatibility bridges while
 replacement APIs land.
 
 The first live proof is the Docker-internal Rust `turbovas-api` sidecar for
-scope-report collections, currently scope-report list, Hosts, and CVEs. It
-queries PostgreSQL directly and is intentionally not exposed on a host port;
-same-origin browser access is a later authenticated boundary step.
+scope-report collections, currently scope-report list, Hosts, CVEs, and Error
+Messages. It queries PostgreSQL directly and is intentionally not exposed on a
+host port; same-origin browser access is a later authenticated boundary step.
 
 ## Workflow Retirement Classes
 

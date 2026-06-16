@@ -110,6 +110,17 @@ struct CveItem {
     source_report_ids: Vec<String>,
 }
 
+#[derive(Debug, Serialize)]
+struct ErrorMessageItem {
+    id: String,
+    host: String,
+    port: String,
+    nvt_oid: String,
+    description: String,
+    source_report_id: String,
+    created_at: Option<String>,
+}
+
 #[derive(Debug, thiserror::Error)]
 enum ApiError {
     #[error("{0}")]
@@ -184,6 +195,10 @@ async fn main() -> Result<(), ApiError> {
             "/api/v1/scopes/:scope_id/reports/:scope_report_id/cves",
             get(scope_report_cves),
         )
+        .route(
+            "/api/v1/scopes/:scope_id/reports/:scope_report_id/errors",
+            get(scope_report_errors),
+        )
         .with_state(state);
 
     let bind = env::var("TURBOVAS_API_BIND").unwrap_or_else(|_| "0.0.0.0:9080".to_string());
@@ -227,6 +242,101 @@ async fn healthz(State(state): State<AppState>) -> Result<Json<HealthResponse>, 
     Ok(Json(HealthResponse {
         status: "ok",
         database: "ok",
+    }))
+}
+
+async fn scope_report_errors(
+    State(state): State<AppState>,
+    Path((scope_id, scope_report_id)): Path<(String, String)>,
+    Query(query): Query<CollectionQuery>,
+) -> Result<Json<Collection<ErrorMessageItem>>, ApiError> {
+    parse_uuid(&scope_id)?;
+    parse_uuid(&scope_report_id)?;
+    let params = normalize_collection_query(query, "created_at")?;
+    let sort_sql = sort_clause(
+        &params.sort,
+        &[
+            ("id", "id"),
+            ("host", "host"),
+            ("port", "port"),
+            ("nvt_oid", "nvt_oid"),
+            ("created_at", "created_at_unix"),
+        ],
+    )?;
+    let sql = format!(
+        "WITH selected_scope_report AS (\n\
+             SELECT sr.id, sr.scope, coalesce(s.is_global, 0)::int AS is_global\n\
+               FROM scope_reports sr\n\
+               JOIN scopes s ON s.id = sr.scope\n\
+              WHERE sr.uuid = $1 AND sr.scope_uuid = $2\n\
+         ),\n\
+         selected_hosts AS (\n\
+             SELECT lower(rh.host) AS host_key\n\
+               FROM selected_scope_report sr\n\
+               JOIN scope_report_sources srs ON srs.scope_report = sr.id\n\
+               JOIN report_hosts rh ON rh.report = srs.source_report\n\
+              WHERE sr.is_global = 1 AND coalesce(rh.host, '') <> ''\n\
+              GROUP BY lower(rh.host)\n\
+             UNION\n\
+             SELECT lower(h.name) AS host_key\n\
+               FROM selected_scope_report sr\n\
+               JOIN scope_hosts sh ON sh.scope = sr.scope AND sr.is_global = 0\n\
+               JOIN hosts h ON h.id = sh.host\n\
+              WHERE coalesce(h.name, '') <> ''\n\
+              GROUP BY lower(h.name)\n\
+         ),\n\
+         error_rows AS (\n\
+             SELECT r.uuid AS id,\n\
+                    lower(coalesce(nullif(r.host, ''), r.hostname, '')) AS host,\n\
+                    coalesce(r.port, '') AS port,\n\
+                    r.nvt AS nvt_oid,\n\
+                    coalesce(r.description, '') AS description,\n\
+                    srs.source_report_uuid AS source_report_id,\n\
+                    coalesce(r.date, 0)::bigint AS created_at_unix\n\
+               FROM selected_scope_report sr\n\
+               JOIN scope_report_sources srs ON srs.scope_report = sr.id\n\
+               JOIN results r ON r.report = srs.source_report\n\
+               JOIN selected_hosts sh ON sh.host_key = lower(coalesce(nullif(r.host, ''), r.hostname, ''))\n\
+              WHERE (r.type = 'Error Message' OR coalesce(r.severity, 0) = -3)\n\
+                AND coalesce(nullif(r.host, ''), r.hostname, '') <> ''\n\
+         ),\n\
+         filtered AS (\n\
+             SELECT * FROM error_rows\n\
+              WHERE ($3 = ''\n\
+                     OR lower(id) LIKE '%' || lower($3) || '%'\n\
+                     OR lower(host) LIKE '%' || lower($3) || '%'\n\
+                     OR lower(port) LIKE '%' || lower($3) || '%'\n\
+                     OR lower(nvt_oid) LIKE '%' || lower($3) || '%'\n\
+                     OR lower(description) LIKE '%' || lower($3) || '%')\n\
+         )\n\
+         SELECT count(*) OVER()::bigint AS total, * FROM filtered\n\
+          ORDER BY {sort_sql}, id ASC LIMIT $4 OFFSET $5;"
+    );
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let rows = client
+        .query(
+            &sql,
+            &[
+                &scope_report_id,
+                &scope_id,
+                &params.filter,
+                &params.page_size,
+                &params.offset,
+            ],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "scope report error-message query failed");
+            ApiError::Database
+        })?;
+    if rows.is_empty() && !scope_report_exists(&client, &scope_report_id, &scope_id).await? {
+        return Err(ApiError::NotFound);
+    }
+    let total = rows.first().map(|row| row.get::<_, i64>(0)).unwrap_or(0);
+    let items = rows.iter().map(error_message_from_row).collect();
+    Ok(Json(Collection {
+        page: params.page_info(total),
+        items,
     }))
 }
 
@@ -632,6 +742,18 @@ fn cve_from_row(row: &Row) -> CveItem {
         result_count: row.get(3),
         max_severity: row.get(4),
         source_report_ids: row.get(5),
+    }
+}
+
+fn error_message_from_row(row: &Row) -> ErrorMessageItem {
+    ErrorMessageItem {
+        id: row.get(1),
+        host: row.get(2),
+        port: row.get(3),
+        nvt_oid: row.get(4),
+        description: row.get(5),
+        source_report_id: row.get(6),
+        created_at: unix_ts_to_rfc3339(row.get(7)),
     }
 }
 

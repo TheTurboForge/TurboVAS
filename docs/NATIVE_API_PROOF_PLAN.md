@@ -5,8 +5,9 @@
 
 TurboVAS proves the native HTTP/JSON direction with narrow read-only workflows
 before implementing broader endpoint coverage. The first proof started with
-scope-report Hosts and now also covers scope-report CVEs. Scanner control, feed
-state, credentials, and account management remain out of scope for this proof.
+scope-report Hosts and now also covers scope-report CVEs and Error Messages.
+Scanner control, feed state, credentials, and account management remain out of
+scope for this proof.
 
 ## First Proof Candidate
 
@@ -59,7 +60,7 @@ The first endpoint is not complete until it proves:
 - the internal `runtime-native-api-smoke` can load the endpoint without GMP/XML.
 
 Implementation commit `c59140a` proved the internal sidecar for scope-report
-list and Hosts. The follow-up B-117 slice adds the scope-report CVEs collection
+list and Hosts. Follow-up B-117 slices add scope-report CVEs and Error Messages
 with the same internal-only, PostgreSQL-backed pattern. Browser smoke through a
 native client remains the next proof step after the authenticated same-origin
 boundary is designed.
@@ -72,7 +73,7 @@ high-consequence inherited control paths until separately designed and reviewed.
 
 ## Next Proofs
 
-After scope-report Hosts/CVEs work, the next candidates are:
+After scope-report Hosts/CVEs/Error Messages work, the next candidates are:
 
 1. raw and scope-report metrics, replacing `python-gvm` runtime helper reads;
 2. scope-report Results through a typed JSON client, once report-row parity is

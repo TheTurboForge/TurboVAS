@@ -114,8 +114,9 @@ small `python-gvm` probe and calls `get_version` without printing secrets.
 
 `runtime-native-api-smoke` verifies the internal `turbovas-api` sidecar by
 querying `/healthz`, `/api/v1/scope-reports`, and the first scope report's
-DB-backed Hosts and CVEs collections from inside the Docker network. It does
-not expose a host port and does not use GMP/XML for the tested read path.
+DB-backed Hosts, CVEs, and Error Messages collections from inside the Docker
+network. It does not expose a host port and does not use GMP/XML for the tested
+read path.
 
 `runtime-scanner-register` creates or verifies the `OpenVAS Default` scanner
 registration against `/runtime/run/ospd/ospd-openvas.sock` on port `0`.
