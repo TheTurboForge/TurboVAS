@@ -2357,9 +2357,14 @@ def summarize_native_tooling(items: list[dict[str, Any]]) -> dict[str, Any]:
                 "status": "implemented_internal",
                 "replacement_candidates": ["scope-report Error Messages tab", "scan-fidelity evidence reads for scope reports"],
             },
+            {
+                "endpoint": "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/metrics",
+                "status": "implemented_internal",
+                "replacement_candidates": ["runtime-scope-report-metrics helper", "scope-report Metrics tab"],
+            },
         ],
         "next_replacement_candidates": [
-            {"workflow": "raw and scope-report metrics runtime helpers", "current_dependency": "python-gvm over GMP/XML", "native_target": "/api/v1/reports/{report_id}/metrics and /api/v1/scopes/{scope_id}/reports/{scope_report_id}/metrics"},
+            {"workflow": "raw report metrics runtime helper", "current_dependency": "python-gvm over GMP/XML", "native_target": "/api/v1/reports/{report_id}/metrics"},
             {"workflow": "scope-report Hosts/CVEs/Error Messages tabs", "current_dependency": "GSA GMP command clients and source-report stitching", "native_target": "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/hosts, /cves, and /errors"},
             {"workflow": "gvm-tools scope/report scripts", "current_dependency": "gvm-tools GMP scripts", "native_target": "turbovasctl or native HTTP/JSON client commands"},
         ],
@@ -4527,14 +4532,36 @@ def command_runtime_native_api_smoke(repo_root: Path) -> dict[str, Any]:
                     compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/scopes/.../reports/.../errors?page_size=5"),
                 )
             )
+            metrics_path = f"/api/v1/scopes/{scope_id}/reports/{scope_report_id}/metrics"
+            metrics = native_api_curl(repo_root, metrics_path)
+            metrics_json = parse_json_output(metrics)
+            details["metrics"] = metrics_json
+            metrics_ok = (
+                metrics.returncode == 0
+                and isinstance(metrics_json, dict)
+                and isinstance(metrics_json.get("summary"), dict)
+                and isinstance(metrics_json.get("systems"), list)
+                and isinstance(metrics_json.get("vulnerabilities"), list)
+            )
+            findings.append(
+                process_step_finding(
+                    "pass" if metrics_ok else "fail",
+                    "native-api.scope-report-metrics",
+                    f"Native API scope-report Metrics probe exit code {metrics.returncode}.",
+                    metrics,
+                    compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/scopes/.../reports/.../metrics"),
+                )
+            )
         else:
             findings.append(finding("fail", "native-api.scope-report-hosts", "Scope-report list did not include a scope/report id pair for the host probe."))
             findings.append(finding("fail", "native-api.scope-report-cves", "Scope-report list did not include a scope/report id pair for the CVE probe."))
             findings.append(finding("fail", "native-api.scope-report-errors", "Scope-report list did not include a scope/report id pair for the Error Messages probe."))
+            findings.append(finding("fail", "native-api.scope-report-metrics", "Scope-report list did not include a scope/report id pair for the Metrics probe."))
     else:
         findings.append(finding("warn", "native-api.scope-report-hosts", "No scope reports exist yet, so the host collection probe was skipped."))
         findings.append(finding("warn", "native-api.scope-report-cves", "No scope reports exist yet, so the CVE collection probe was skipped."))
         findings.append(finding("warn", "native-api.scope-report-errors", "No scope reports exist yet, so the Error Messages collection probe was skipped."))
+        findings.append(finding("warn", "native-api.scope-report-metrics", "No scope reports exist yet, so the Metrics probe was skipped."))
 
     result = make_result("runtime-native-api-smoke", repo_root, "Native API smoke checks completed.", findings, [str(artifact_dir / "native-api-smoke.json")])
     result["details"] = details

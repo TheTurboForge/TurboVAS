@@ -121,6 +121,48 @@ struct ErrorMessageItem {
     created_at: Option<String>,
 }
 
+#[derive(Debug, Serialize)]
+struct MetricsSummary {
+    total_system_cvss_load: f64,
+    average_system_cvss_load: f64,
+    authenticated_scan_coverage_percent: f64,
+    alive_system_count: i64,
+    vulnerability_count: i64,
+    authenticated_system_count: i64,
+    authentication_failed_system_count: i64,
+    no_credential_path_system_count: i64,
+    unknown_authentication_system_count: i64,
+}
+
+#[derive(Debug, Serialize)]
+struct MetricsSystem {
+    host: String,
+    cvss_load: f64,
+    max_cvss: f64,
+    vulnerability_count: i64,
+    authentication_state: String,
+    source_report_count: i64,
+}
+
+#[derive(Debug, Serialize)]
+struct MetricsVulnerability {
+    nvt_oid: String,
+    name: String,
+    cvss_score: f64,
+    affected_system_count: i64,
+    cvss_load: f64,
+    average_contribution: f64,
+    source_report_count: i64,
+}
+
+#[derive(Debug, Serialize)]
+struct ScopeReportMetrics {
+    id: String,
+    summary: MetricsSummary,
+    systems: Vec<MetricsSystem>,
+    vulnerabilities: Vec<MetricsVulnerability>,
+}
+
 #[derive(Debug, thiserror::Error)]
 enum ApiError {
     #[error("{0}")]
@@ -199,6 +241,10 @@ async fn main() -> Result<(), ApiError> {
             "/api/v1/scopes/:scope_id/reports/:scope_report_id/errors",
             get(scope_report_errors),
         )
+        .route(
+            "/api/v1/scopes/:scope_id/reports/:scope_report_id/metrics",
+            get(scope_report_metrics),
+        )
         .with_state(state);
 
     let bind = env::var("TURBOVAS_API_BIND").unwrap_or_else(|_| "0.0.0.0:9080".to_string());
@@ -242,6 +288,73 @@ async fn healthz(State(state): State<AppState>) -> Result<Json<HealthResponse>, 
     Ok(Json(HealthResponse {
         status: "ok",
         database: "ok",
+    }))
+}
+
+async fn scope_report_metrics(
+    State(state): State<AppState>,
+    Path((scope_id, scope_report_id)): Path<(String, String)>,
+) -> Result<Json<ScopeReportMetrics>, ApiError> {
+    parse_uuid(&scope_id)?;
+    parse_uuid(&scope_report_id)?;
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let summary_row = client
+        .query_opt(
+            "SELECT sr.id, sr.uuid,\n\
+                    coalesce(sr.metric_total_system_cvss_load, 0)::double precision AS total_system_cvss_load,\n\
+                    coalesce(sr.metric_average_system_cvss_load, 0)::double precision AS average_system_cvss_load,\n\
+                    coalesce(sr.metric_authenticated_scan_coverage, 0)::double precision AS authenticated_scan_coverage_percent,\n\
+                    coalesce(sr.metric_alive_system_count, 0)::bigint AS alive_system_count,\n\
+                    (SELECT count(*) FROM scope_report_vulnerability_metrics srvm WHERE srvm.scope_report = sr.id)::bigint AS vulnerability_count,\n\
+                    coalesce(sr.metric_authenticated_system_count, 0)::bigint AS authenticated_system_count,\n\
+                    coalesce(sr.metric_auth_failed_system_count, 0)::bigint AS authentication_failed_system_count,\n\
+                    coalesce(sr.metric_no_credential_path_system_count, 0)::bigint AS no_credential_path_system_count,\n\
+                    coalesce(sr.metric_unknown_authentication_system_count, 0)::bigint AS unknown_authentication_system_count\n\
+               FROM scope_reports sr\n\
+              WHERE sr.uuid = $1 AND sr.scope_uuid = $2;",
+            &[&scope_report_id, &scope_id],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "scope report metrics summary query failed");
+            ApiError::Database
+        })?
+        .ok_or(ApiError::NotFound)?;
+    let internal_id: i32 = summary_row.get(0);
+    let systems_rows = client
+        .query(
+            "SELECT host, cvss_load, max_cvss, vulnerability_count::bigint, authentication_state, source_report_count::bigint\n\
+               FROM scope_report_system_metrics\n\
+              WHERE scope_report = $1\n\
+              ORDER BY cvss_load DESC, host ASC;",
+            &[&internal_id],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "scope report metrics systems query failed");
+            ApiError::Database
+        })?;
+    let vulnerability_rows = client
+        .query(
+            "SELECT nvt_oid, nvt_name, cvss_score, affected_system_count::bigint, cvss_load, average_contribution, source_report_count::bigint\n\
+               FROM scope_report_vulnerability_metrics\n\
+              WHERE scope_report = $1\n\
+              ORDER BY cvss_load DESC, cvss_score DESC, nvt_name ASC;",
+            &[&internal_id],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "scope report metrics vulnerabilities query failed");
+            ApiError::Database
+        })?;
+    Ok(Json(ScopeReportMetrics {
+        id: summary_row.get(1),
+        summary: metrics_summary_from_row(&summary_row),
+        systems: systems_rows.iter().map(metrics_system_from_row).collect(),
+        vulnerabilities: vulnerability_rows
+            .iter()
+            .map(metrics_vulnerability_from_row)
+            .collect(),
     }))
 }
 
@@ -754,6 +867,43 @@ fn error_message_from_row(row: &Row) -> ErrorMessageItem {
         description: row.get(5),
         source_report_id: row.get(6),
         created_at: unix_ts_to_rfc3339(row.get(7)),
+    }
+}
+
+fn metrics_summary_from_row(row: &Row) -> MetricsSummary {
+    MetricsSummary {
+        total_system_cvss_load: row.get(2),
+        average_system_cvss_load: row.get(3),
+        authenticated_scan_coverage_percent: row.get(4),
+        alive_system_count: row.get(5),
+        vulnerability_count: row.get(6),
+        authenticated_system_count: row.get(7),
+        authentication_failed_system_count: row.get(8),
+        no_credential_path_system_count: row.get(9),
+        unknown_authentication_system_count: row.get(10),
+    }
+}
+
+fn metrics_system_from_row(row: &Row) -> MetricsSystem {
+    MetricsSystem {
+        host: row.get(0),
+        cvss_load: row.get(1),
+        max_cvss: row.get(2),
+        vulnerability_count: row.get(3),
+        authentication_state: normalize_authentication_state(&row.get::<_, String>(4)),
+        source_report_count: row.get(5),
+    }
+}
+
+fn metrics_vulnerability_from_row(row: &Row) -> MetricsVulnerability {
+    MetricsVulnerability {
+        nvt_oid: row.get(0),
+        name: row.get(1),
+        cvss_score: row.get(2),
+        affected_system_count: row.get(3),
+        cvss_load: row.get(4),
+        average_contribution: row.get(5),
+        source_report_count: row.get(6),
     }
 }
 

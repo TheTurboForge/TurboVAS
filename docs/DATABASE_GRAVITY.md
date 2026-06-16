@@ -94,7 +94,8 @@ GMP/XML payloads. Contract-first API work must keep raw reports inspectable as
 evidence and must not create a second hidden truth store for report data.
 
 The first native API proof implements that direction as an internal Rust
-sidecar: scope-report list, host evidence, CVE evidence, and Error Message
-collections are queried from gvmd/PostgreSQL and returned as typed JSON, while
-GMP/XML remains available for the inherited browser/control path until that
-workflow is deliberately migrated.
+sidecar: scope-report list, host evidence, CVE evidence, Error Message
+collections, and persisted scope-report metrics are queried from
+gvmd/PostgreSQL and returned as typed JSON, while GMP/XML remains available for
+the inherited browser/control path until that workflow is deliberately
+migrated.

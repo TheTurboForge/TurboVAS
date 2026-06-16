@@ -491,6 +491,9 @@ components:
       type: object
       required: [summary, systems, vulnerabilities]
       properties:
+        id:
+          type: string
+          format: uuid
         summary:
           type: object
           properties:
@@ -503,6 +506,14 @@ components:
             alive_system_count:
               type: integer
             vulnerability_count:
+              type: integer
+            authenticated_system_count:
+              type: integer
+            authentication_failed_system_count:
+              type: integer
+            no_credential_path_system_count:
+              type: integer
+            unknown_authentication_system_count:
               type: integer
         systems:
           type: array
