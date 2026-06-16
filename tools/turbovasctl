@@ -2378,7 +2378,7 @@ def summarize_redis_references(references: list[dict[str, Any]]) -> dict[str, An
 
 
 def path_coupling_category(relative_path: str) -> str:
-    if relative_path.startswith("docs/") or relative_path in {"README.md", "BUILDING.md"}:
+    if relative_path.startswith("docs/") or relative_path.endswith((".md", ".rst", ".txt")) or relative_path in {"README.md", "BUILDING.md"}:
         return "documentation"
     if relative_path.startswith(("compose/", "docker/", "ops/")) or relative_path in {"justfile", "tools/turbovasctl"}:
         return "runtime_tooling"

@@ -610,6 +610,7 @@ class TurboVASCtlTests(unittest.TestCase):
 
     def test_path_coupling_helpers_classify_expected_markers(self):
         self.assertEqual(turbovasctl.path_coupling_category("docs/README.md"), "documentation")
+        self.assertEqual(turbovasctl.path_coupling_category("docker/runtime/README.md"), "documentation")
         self.assertEqual(turbovasctl.path_coupling_category("compose/dev.yaml"), "runtime_tooling")
         markers = turbovasctl.path_coupling_markers("/home/turboforge/Projects/TurboVAS build/prefix /runtime/state")
         self.assertIn("dev_checkout_path", markers)
