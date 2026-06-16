@@ -7,6 +7,9 @@ TurboVAS is a scanner and scanner-management system. Changes that look like
 ordinary refactoring can affect parsing, authentication, scan execution,
 feed trust, service exposure, or release obligations.
 
+`docs/TRUST_BOUNDARIES.md` describes the current trust boundaries that motivate
+this policy.
+
 The path policy in `policy/security-sensitive-paths.toml` is the first small
 guardrail: it identifies high-consequence areas and the checks that should be
 considered when those areas change. It is intentionally practical rather than
