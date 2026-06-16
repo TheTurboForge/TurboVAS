@@ -225,6 +225,17 @@ REDIS_REFERENCE_ROOTS = (
 )
 REDIS_REFERENCE_FILES = {"README.md", "justfile"}
 BRANDING_MARKERS = ("OpenVAS", "OPENVAS", "Greenbone", "greenbone", "GSA")
+BRANDING_LOCALE_TECHNICAL_PHRASES = frozenset(
+    {
+        "Default OpenVAS Scan Config",
+        "Default OpenVAS Scanner",
+        "OpenVAS Scanner",
+        "OpenVASD Scanner",
+        "OpenVASD Sensor",
+        "OPENVAS COMMUNITY FEED",
+        "https://www.greenbone.net/en/feed-comparison/",
+    }
+)
 BRANDING_SCAN_FILES = {
     "README.md",
     "UPSTREAMS.md",
@@ -2494,6 +2505,35 @@ def branding_markers(path: Path) -> list[str]:
     return [marker for marker in BRANDING_MARKERS if marker in text]
 
 
+def branding_locale_line_category(line: str) -> str:
+    if any(phrase in line for phrase in BRANDING_LOCALE_TECHNICAL_PHRASES):
+        return "technical_doc_context"
+    return "active_product_surface"
+
+
+def branding_locale_items(path: Path, relative_path: str) -> list[dict[str, Any]]:
+    try:
+        lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    except OSError:
+        return []
+
+    items: list[dict[str, Any]] = []
+    for line_number, line in enumerate(lines, start=1):
+        markers = [marker for marker in BRANDING_MARKERS if marker in line]
+        if not markers:
+            continue
+        items.append(
+            {
+                "path": relative_path,
+                "line": line_number,
+                "category": branding_locale_line_category(line),
+                "markers": markers,
+                "text": line.strip(),
+            }
+        )
+    return items
+
+
 def branding_category(relative_path: str) -> str:
     if relative_path in BRANDING_PROVENANCE_FILES:
         return "provenance_or_non_affiliation"
@@ -2521,6 +2561,9 @@ def branding_inventory(repo_root: Path) -> list[dict[str, Any]]:
         path = repo_root / relative_path
         if not path.is_file():
             continue
+        if relative_path == "components/gsa/public/locales/gsa-en.json":
+            items.extend(branding_locale_items(path, relative_path))
+            continue
         markers = branding_markers(path)
         if not markers:
             continue
@@ -2533,7 +2576,7 @@ def summarize_branding(items: list[dict[str, Any]]) -> dict[str, Any]:
     by_category: dict[str, dict[str, Any]] = {}
     for category in categories:
         rows = [item for item in items if item["category"] == category]
-        by_category[category] = {"count": len(rows), "paths": [item["path"] for item in rows]}
+        by_category[category] = {"count": len(rows), "paths": sorted({item["path"] for item in rows})}
     return {"total_items": len(items), "by_category": by_category}
 
 
@@ -2544,7 +2587,7 @@ def command_branding_state(repo_root: Path) -> dict[str, Any]:
     unknown_count = summary["by_category"]["unknown"]["count"]
     findings = [
         finding("pass", "branding.inventory", f"Classified {len(items)} branding/identity marker surface(s).", details=summary),
-        finding("warn" if active_count else "pass", "branding.active-product-surface", f"{active_count} active product surface(s) still contain inherited OpenVAS/Greenbone/GSA identity markers." if active_count else "No active product branding residue found in the scanned surfaces.", details={"paths": summary["by_category"]["active_product_surface"]["paths"]}),
+        finding("warn" if active_count else "pass", "branding.active-product-surface", f"{active_count} active product marker(s) still contain inherited OpenVAS/Greenbone/GSA identity wording." if active_count else "No active product branding residue found in the scanned surfaces.", details={"paths": summary["by_category"]["active_product_surface"]["paths"]}),
         finding("warn" if unknown_count else "pass", "branding.unknown", f"{unknown_count} branding marker surface(s) are not classified." if unknown_count else "No branding marker surfaces were left unclassified.", details={"paths": summary["by_category"]["unknown"]["paths"]}),
         finding("pass", "branding.provenance-boundary", "OpenVAS/Greenbone wording remains allowed in provenance, non-affiliation, and technical component contexts."),
     ]

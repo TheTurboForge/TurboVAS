@@ -648,10 +648,24 @@ class TurboVASCtlTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[2]
         result = turbovasctl.command_branding_state(root)
         details = result["details"]
+        active_locale_items = [
+            item
+            for item in details["items"]
+            if item["path"] == "components/gsa/public/locales/gsa-en.json"
+            and item["category"] == "active_product_surface"
+        ]
+        technical_locale_items = [
+            item
+            for item in details["items"]
+            if item["path"] == "components/gsa/public/locales/gsa-en.json"
+            and item["category"] == "technical_doc_context"
+        ]
         self.assertIn(result["status"], {"pass", "warn"})
         self.assertGreater(details["by_category"]["provenance_or_non_affiliation"]["count"], 0)
         self.assertIn("README.md", details["by_category"]["provenance_or_non_affiliation"]["paths"])
         self.assertIn("components/gsa/public/locales/gsa-en.json", details["by_category"]["active_product_surface"]["paths"])
+        self.assertTrue(any("Greenbone Enterprise License" in item["text"] for item in active_locale_items))
+        self.assertTrue(any("OpenVAS Scanner" in item["text"] for item in technical_locale_items))
         self.assertNotIn("components/gsa/package.json", details["by_category"]["active_product_surface"]["paths"])
         self.assertIn("components/gsa/package.json", details["by_category"]["technical_doc_context"]["paths"])
         self.assertEqual(details["by_category"]["unknown"]["count"], 0)
@@ -662,6 +676,8 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(turbovasctl.branding_category("components/gsa/public/locales/gsa-en.json"), "active_product_surface")
         self.assertEqual(turbovasctl.branding_category("components/gsa/public/img/os_ipfire.svg"), "technical_doc_context")
         self.assertEqual(turbovasctl.branding_item_category("components/gsa/package.json", ["greenbone"]), "technical_doc_context")
+        self.assertEqual(turbovasctl.branding_locale_line_category('"OpenVAS Scanner": "OpenVAS Scanner",'), "technical_doc_context")
+        self.assertEqual(turbovasctl.branding_locale_line_category('"Your Greenbone Enterprise License is invalid!": "Your Greenbone Enterprise License is invalid!",'), "active_product_surface")
 
     def test_retained_json_artifacts_write_latest_history_and_prune(self):
         with tempfile.TemporaryDirectory() as tmp:
