@@ -18,6 +18,9 @@ inventory *args:
 native-tooling-state *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl native-tooling-state "$@"
 
+rust-migration-state *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl rust-migration-state "$@"
+
 doctor *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl doctor "$@"
 

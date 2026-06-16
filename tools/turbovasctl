@@ -86,6 +86,20 @@ BASELINE_TOOLS = (
     "cargo",
     "bear",
 )
+RUST_MIGRATION_TOOL_COMMANDS = (
+    ("bindgen", ("bindgen", "--version")),
+    ("cbindgen", ("cbindgen", "--version")),
+    ("c2rust", ("c2rust", "--version")),
+    ("c2rust-transpile", ("c2rust-transpile", "--version")),
+    ("cargo-llvm-cov", ("cargo", "llvm-cov", "--version")),
+    ("cargo-mutants", ("cargo", "mutants", "--version")),
+)
+RUST_MIGRATION_FIRST_CANDIDATE = {
+    "c_file": "components/gvm-libs/base/version.c",
+    "header": "components/gvm-libs/base/version.h",
+    "test_file": "components/gvm-libs/base/version_tests.c",
+    "reason": "Tiny production-adjacent C module with existing test coverage; suitable for non-production dry-run translation only.",
+}
 CORE_C_CHAIN = ("gvm-libs", "openvas-smb", "openvas-scanner")
 C_SERVICES_CHAIN = ("gvm-libs", "openvas-smb", "openvas-scanner", "pg-gvm", "gvmd", "gsad")
 PYTHON_CHAIN = ("python-gvm", "gvm-tools", "greenbone-feed-sync", "ospd-openvas", "notus-scanner")
@@ -1148,6 +1162,10 @@ def quality_gate_artifact_dir(repo_root: Path) -> Path:
 
 def performance_artifact_dir(repo_root: Path) -> Path:
     return runtime_path(repo_root, "artifacts", "performance")
+
+
+def rust_migration_artifact_dir(repo_root: Path) -> Path:
+    return runtime_path(repo_root, "artifacts", "rust-migration")
 
 
 def write_json_artifact(artifact_dir: Path, name: str, payload: dict[str, Any]) -> str:
@@ -2328,6 +2346,91 @@ def command_native_tooling_state(repo_root: Path) -> dict[str, Any]:
     ]
     result = make_result("native-tooling-state", repo_root, "Inherited GMP/python-gvm/gvm-tools dependency state collected.", findings)
     result["details"] = {"items": items, **summary}
+    return result
+
+
+def rust_migration_tool_state(repo_root: Path) -> list[dict[str, Any]]:
+    states: list[dict[str, Any]] = []
+    env = build_env(repo_root)
+    for name, command in RUST_MIGRATION_TOOL_COMMANDS:
+        executable = shutil.which(command[0])
+        state: dict[str, Any] = {"name": name, "command": list(command), "path": executable}
+        if executable:
+            probe = run_command(list(command), repo_root, env=env, timeout=30)
+            state["status"] = "pass" if probe.returncode == 0 else "warn"
+            state["version"] = probe.stdout.strip().splitlines()[0] if probe.stdout.strip() else None
+            state["exit_code"] = probe.returncode
+        else:
+            state["status"] = "fail"
+            state["version"] = None
+            state["exit_code"] = None
+        states.append(state)
+    return states
+
+
+def rust_toolchain_state(repo_root: Path) -> dict[str, Any]:
+    env = build_env(repo_root)
+    probes = {
+        "rustc": ["rustc", "--version"],
+        "cargo": ["cargo", "--version"],
+        "clang": ["clang", "--version"],
+        "llvm-config": ["llvm-config", "--version"],
+    }
+    state: dict[str, Any] = {}
+    for name, command in probes.items():
+        path = shutil.which(command[0])
+        item: dict[str, Any] = {"path": path}
+        if path:
+            probe = run_command(command, repo_root, env=env, timeout=30)
+            item["status"] = "pass" if probe.returncode == 0 else "warn"
+            item["version"] = probe.stdout.strip().splitlines()[0] if probe.stdout.strip() else None
+            item["exit_code"] = probe.returncode
+        else:
+            item["status"] = "fail"
+            item["version"] = None
+            item["exit_code"] = None
+        state[name] = item
+    return state
+
+
+def rust_migration_candidate_state(repo_root: Path) -> dict[str, Any]:
+    candidate = dict(RUST_MIGRATION_FIRST_CANDIDATE)
+    for key in ("c_file", "header", "test_file"):
+        path = repo_root / candidate[key]
+        candidate[f"{key}_exists"] = path.is_file()
+    candidate["production_replacement_allowed_in_current_slice"] = False
+    candidate["production_replacement_requirements"] = [
+        "CMake/Rust integration for the owning C library",
+        "exported C ABI if retained C callers continue to call the symbol",
+        "version-string injection equivalent to current GVM_LIBS_VERSION handling",
+        "preserved upstream license notices plus TurboVAS modification notice where required",
+        "existing C test parity and Rust-side tests before deleting the C implementation",
+    ]
+    return candidate
+
+
+def command_rust_migration_state(repo_root: Path) -> dict[str, Any]:
+    tools = rust_migration_tool_state(repo_root)
+    toolchain = rust_toolchain_state(repo_root)
+    candidate = rust_migration_candidate_state(repo_root)
+    scanner_workspace = repo_root / "components" / "openvas-scanner" / "rust" / "Cargo.toml"
+    artifact_dir = rust_migration_artifact_dir(repo_root)
+    findings: list[dict[str, Any]] = []
+    missing_tools = [item["name"] for item in tools if item["status"] == "fail"]
+    warning_tools = [item["name"] for item in tools if item["status"] == "warn"]
+    findings.append(finding("fail" if missing_tools else "pass", "rust-migration.tools", "All Rust migration tools are available." if not missing_tools else "Some Rust migration tools are missing.", details={"missing": missing_tools, "warnings": warning_tools, "tools": tools}))
+    failed_toolchain = [name for name, item in toolchain.items() if item["status"] == "fail"]
+    findings.append(finding("fail" if failed_toolchain else "pass", "rust-migration.toolchain", "Rust, Cargo, Clang, and LLVM config are available." if not failed_toolchain else "Rust/LLVM toolchain prerequisite is missing.", details={"missing": failed_toolchain, "toolchain": toolchain}))
+    findings.append(finding("pass" if scanner_workspace.is_file() else "warn", "rust-migration.scanner-workspace", "Inherited scanner Rust workspace exists." if scanner_workspace.is_file() else "Inherited scanner Rust workspace was not found.", str(scanner_workspace)))
+    candidate_ready = bool(candidate.get("c_file_exists") and candidate.get("header_exists") and candidate.get("test_file_exists"))
+    findings.append(finding("pass" if candidate_ready else "fail", "rust-migration.first-candidate", "First dry-run C-to-Rust candidate exists and has tests." if candidate_ready else "First dry-run C-to-Rust candidate is incomplete.", details=candidate))
+    try:
+        artifact_dir.mkdir(parents=True, exist_ok=True)
+        findings.append(finding("pass", "rust-migration.artifact-dir", "Rust migration artifact directory is ready.", str(artifact_dir)))
+    except OSError as error:
+        findings.append(finding("fail", "rust-migration.artifact-dir", f"Rust migration artifact directory is not usable: {error}", str(artifact_dir)))
+    result = make_result("rust-migration-state", repo_root, "Rust migration tooling and first dry-run candidate state collected.", findings, [str(artifact_dir)])
+    result["details"] = {"tools": tools, "toolchain": toolchain, "scanner_workspace": str(scanner_workspace), "first_candidate": candidate, "artifact_dir": str(artifact_dir)}
     return result
 
 
@@ -4967,6 +5070,7 @@ def build_parser() -> argparse.ArgumentParser:
     inventory = subparsers.add_parser("inventory", parents=[common], help="show expected component inventory")
     inventory.add_argument("--scope", help="limit inventory to a path under the repository")
     subparsers.add_parser("native-tooling-state", parents=[common], help="inventory inherited GMP/python-gvm/gvm-tools dependency surfaces")
+    subparsers.add_parser("rust-migration-state", parents=[common], help="inspect Rust migration tooling and first C-to-Rust dry-run candidate")
     subparsers.add_parser("doctor", parents=[common], help="run structural and environment health checks")
     subparsers.add_parser("branding-state", parents=[common], help="inventory visible branding and upstream-identity surfaces")
     license_report = subparsers.add_parser("license-report", parents=[common], help="check preserved license/provenance files")
@@ -5058,6 +5162,8 @@ def main(argv: list[str] | None = None) -> int:
         result = command_inventory(repo_root, args.scope)
     elif args.command == "native-tooling-state":
         result = command_native_tooling_state(repo_root)
+    elif args.command == "rust-migration-state":
+        result = command_rust_migration_state(repo_root)
     elif args.command == "doctor":
         result = command_doctor(repo_root)
     elif args.command == "branding-state":

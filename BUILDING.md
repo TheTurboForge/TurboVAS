@@ -52,6 +52,7 @@ tools/turbovasctl deps --json
 tools/turbovasctl build-baseline --json
 tools/turbovasctl quality-gate-state --json
 tools/turbovasctl production-posture-check --json
+tools/turbovasctl rust-migration-state --json
 ```
 
 `tools/forkctl` remains as a temporary compatibility wrapper during the command

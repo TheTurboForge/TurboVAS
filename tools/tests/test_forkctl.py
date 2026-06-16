@@ -580,12 +580,13 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_technical_foundation_commands_are_registered(self):
         source = (Path(__file__).resolve().parents[1] / "turbovasctl").read_text(encoding="utf-8")
         justfile = (Path(__file__).resolve().parents[2] / "justfile").read_text(encoding="utf-8")
-        for command in ("native-tooling-state", "branding-state", "production-posture-check", "runtime-log-review", "runtime-data-state", "runtime-performance-snapshot", "runtime-redis-state", "security-policy-check", "path-coupling-state", "quality-gate", "quality-gate-state", "quality-gate-schedule"):
+        for command in ("native-tooling-state", "rust-migration-state", "branding-state", "production-posture-check", "runtime-log-review", "runtime-data-state", "runtime-performance-snapshot", "runtime-redis-state", "security-policy-check", "path-coupling-state", "quality-gate", "quality-gate-state", "quality-gate-schedule"):
             with self.subTest(command=command):
                 self.assertIn(command, source)
                 self.assertIn(f"{command} *args:", justfile)
                 self.assertIn(f'tools/turbovasctl {command} "$@"', justfile)
         self.assertIn("def command_native_tooling_state", source)
+        self.assertIn("def command_rust_migration_state", source)
         self.assertIn("def command_branding_state", source)
         self.assertIn("def command_runtime_log_review", source)
         self.assertIn("def command_runtime_data_state", source)
@@ -629,6 +630,20 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("components/gvm-tools/scripts/list-scope-reports.gmp.py", details["by_category"]["product_workflow"]["paths"])
         self.assertIn("components/python-gvm/gvm/protocols/gmp/requests/v226/_reports.py", details["by_category"]["compatibility_bridge"]["paths"])
         self.assertIn("gvm-tools scope/report scripts", {item["workflow"] for item in details["next_replacement_candidates"]})
+
+    def test_rust_migration_state_tracks_tools_and_first_candidate(self):
+        root = Path(__file__).resolve().parents[2]
+        result = turbovasctl.command_rust_migration_state(root)
+        details = result["details"]
+        tool_names = {item["name"] for item in details["tools"]}
+        self.assertIn("bindgen", tool_names)
+        self.assertIn("c2rust", tool_names)
+        self.assertIn("cargo-llvm-cov", tool_names)
+        self.assertIn("cargo-mutants", tool_names)
+        self.assertEqual(details["first_candidate"]["c_file"], "components/gvm-libs/base/version.c")
+        self.assertFalse(details["first_candidate"]["production_replacement_allowed_in_current_slice"])
+        self.assertIn("CMake/Rust integration", "\n".join(details["first_candidate"]["production_replacement_requirements"]))
+        self.assertIn(result["status"], {"pass", "warn", "fail"})
 
     def test_native_tooling_category_keeps_scripts_and_docs_distinct(self):
         self.assertEqual(turbovasctl.native_tooling_category("tools/runtime_scope.py")[0], "required_runtime")
