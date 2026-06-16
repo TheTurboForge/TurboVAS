@@ -209,9 +209,11 @@ Runtime helpers are available for development validation:
 - `just runtime-scope-report-summary --json` summarizes the latest
   `Organization` scope report;
 - `just runtime-report-metrics --json` reads CVSS Load and authenticated
-  coverage for the latest completed full-test raw report;
+  coverage for the latest completed full-test raw report through the internal
+  native API;
 - `just runtime-scope-report-metrics --json` reads CVSS Load and authenticated
-  coverage for the latest `Organization` scope report.
+  coverage for the latest `Organization` scope report through the internal
+  native API.
 
 ## Product Rule
 

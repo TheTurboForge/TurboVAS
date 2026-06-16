@@ -632,6 +632,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("tools/runtime_report.py", details["by_category"]["required_runtime"]["paths"])
         self.assertIn("components/gvm-tools/scripts/list-scope-reports.gmp.py", details["by_category"]["product_workflow"]["paths"])
         self.assertIn("components/python-gvm/gvm/protocols/gmp/requests/v226/_reports.py", details["by_category"]["compatibility_bridge"]["paths"])
+        self.assertIn("tools/runtime_metrics.py", details["by_category"]["candidate_for_removal"]["paths"])
         self.assertIn("gvm-tools scope/report scripts", {item["workflow"] for item in details["next_replacement_candidates"]})
         endpoints = {item["endpoint"] for item in details["implemented_native_endpoints"]}
         self.assertIn("/api/v1/scope-reports", endpoints)
@@ -640,6 +641,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("/api/v1/scopes/{scope_id}/reports/{scope_report_id}/cves", endpoints)
         self.assertIn("/api/v1/scopes/{scope_id}/reports/{scope_report_id}/errors", endpoints)
         self.assertIn("/api/v1/scopes/{scope_id}/reports/{scope_report_id}/metrics", endpoints)
+        self.assertIn("/api/v1/reports/{report_id}/metrics", endpoints)
 
     def test_rust_migration_state_tracks_tools_and_first_candidate(self):
         root = Path(__file__).resolve().parents[2]

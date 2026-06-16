@@ -49,10 +49,11 @@ strangler map in the same slice.
 
 The first runtime implementation proof is scoped in
 `docs/NATIVE_API_PROOF_PLAN.md`. It starts with an internal-only Rust sidecar
-for scope-report list, Results, Hosts, CVEs, Error Messages, and Metrics because those read paths validate
-DB-backed scope membership, evidence provenance, and report reading without
-changing scanner control behavior. Browser/GSA integration is a later step once
-the internal DB-backed contract is stable.
+for scope-report list, Results, Hosts, CVEs, Error Messages, scope-report
+Metrics, and raw report Metrics because those read paths validate DB-backed
+scope membership, evidence provenance, and report reading without changing
+scanner control behavior. Browser/GSA integration is a later step once the
+internal DB-backed contract is stable.
 
 ## Non-Goals For V1
 

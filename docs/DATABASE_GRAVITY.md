@@ -95,7 +95,7 @@ evidence and must not create a second hidden truth store for report data.
 
 The first native API proof implements that direction as an internal Rust
 sidecar: scope-report list, result evidence, host evidence, CVE evidence,
-Error Message collections, and persisted scope-report metrics are queried from
-gvmd/PostgreSQL and returned as typed JSON, while GMP/XML remains available for
-the inherited browser/control path until that workflow is deliberately
-migrated.
+Error Message collections, persisted scope-report metrics, and raw report
+metrics are queried from gvmd/PostgreSQL and returned as typed JSON, while
+GMP/XML remains available for the inherited browser/control path until that
+workflow is deliberately migrated.

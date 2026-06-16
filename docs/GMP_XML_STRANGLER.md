@@ -14,10 +14,10 @@ tooling paths. They may remain temporarily as compatibility bridges while
 replacement APIs land.
 
 The first live proof is the Docker-internal Rust `turbovas-api` sidecar for
-scope-report collections, currently scope-report list, Results, Hosts, CVEs,
-Error Messages, and Metrics. It queries PostgreSQL directly and is intentionally not
-exposed on a host port; same-origin browser access is a later authenticated
-boundary step.
+scope-report collections and raw report metrics, currently scope-report list,
+Results, Hosts, CVEs, Error Messages, scope-report Metrics, and raw report
+Metrics. It queries PostgreSQL directly and is intentionally not exposed on a
+host port; same-origin browser access is a later authenticated boundary step.
 
 ## Workflow Retirement Classes
 
@@ -33,12 +33,12 @@ boundary step.
 | Workflow | Current path | Native target | Retirement criterion |
 | --- | --- | --- | --- |
 | Raw report list/detail | GSA GMP commands -> gsad -> gvmd XML -> PostgreSQL | `/api/v1/reports` and `/api/v1/reports/{report_id}` | GSA can read raw report list/detail via typed JSON with equal browser/test coverage. |
-| Raw report metrics | `get_report_metrics` over GMP and `runtime-report-metrics` through `python-gvm` | `/api/v1/reports/{report_id}/metrics` | Runtime helper and GSA Metrics tab no longer require `python-gvm` or GMP for this read. |
+| Raw report metrics | `get_report_metrics` over GMP and GSA Metrics tab; `runtime-report-metrics` was migrated to native API | `/api/v1/reports/{report_id}/metrics` | GSA Metrics tab no longer requires GMP for this read, and the runtime helper stays native. |
 | Scope list/detail | GMP scope commands and GSA scope pages | `/api/v1/scopes` and `/api/v1/scopes/{scope_id}` | Scope metadata and membership reads move to typed JSON; writes remain inherited until designed. |
 | Scope-report list/detail | GMP scope-report commands and GSA scope-report pages | `/api/v1/scopes/reports` and canonical scoped detail path | GSA list/detail reads use server-backed JSON collections and browser smoke remains green. |
 | Scope-report Results | gvmd source-report-constrained GMP collection | `/api/v1/scopes/{scope_id}/reports/{scope_report_id}/results` | Same filters/sorts/pages and raw evidence links work without UI-side XML parsing. |
 | Scope-report Results/Hosts/CVEs | Lazy GSA tabs and report-reading paths currently stitch source raw reports or use GMP collection commands | `/api/v1/scopes/{scope_id}/reports/{scope_report_id}/results`, `/hosts`, and `/cves` | DB-backed collection contracts replace source-by-source raw report loading and prove report-reading data can leave XML/GMP. |
-| Runtime report/scope helpers | `turbovasctl` helpers using `python-gvm` | Native API-backed helper calls | `runtime-scope-report-metrics` now uses the internal native API; raw report metrics and other GMP probes remain temporary inherited paths until their native replacements land. |
+| Runtime report/scope helpers | Some `turbovasctl` helpers still use `python-gvm`; report metrics helpers now use native API | Native API-backed helper calls | `runtime-report-metrics` and `runtime-scope-report-metrics` now use the internal native API; other GMP probes remain temporary inherited paths until their native replacements land. |
 | gvm-tools product scripts | Imported GMP scripts, plus TurboVAS scope/report scripts | `turbovasctl` or native API client commands | No operator or validation workflow requires `gvm-tools`; remaining scripts are optional compatibility or removed. |
 
 ## Expansion Rule

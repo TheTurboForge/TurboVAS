@@ -108,6 +108,9 @@ PYTHON_CHAIN = ("python-gvm", "gvm-tools", "greenbone-feed-sync", "ospd-openvas"
 BASELINE_CHAIN = (*C_SERVICES_CHAIN, "gsa", *PYTHON_CHAIN)
 RUNTIME_SERVICES = ("postgres", "redis-openvas", "mosquitto")
 APP_SERVICES = ("gvmd", "ospd-openvas", "notus-scanner", "gsad", "turbovas-api")
+FULL_TEST_TARGET_CIDR = "192.168.178.0/24"
+FULL_TEST_TASK_NAME = f"TurboVAS full test scan {FULL_TEST_TARGET_CIDR}"
+COMPLETED_SCAN_RUN_STATUS = 1
 RUNTIME_DIRS = (
     "postgres",
     "mosquitto",
@@ -2287,6 +2290,8 @@ def native_tooling_markers(path: Path) -> list[str]:
 
 def native_tooling_category(relative_path: str) -> tuple[str, str] | None:
     path = Path(relative_path)
+    if relative_path == "tools/runtime_metrics.py":
+        return "candidate_for_removal", "Legacy GMP/python-gvm metrics helper is no longer used by turbovasctl after native metric helper migration; remove once tests move to native fixtures."
     if relative_path == "tools/turbovasctl" or (relative_path.startswith("tools/runtime_") and relative_path.endswith(".py")):
         return "required_runtime", "TurboVAS runtime/helper command path still depends on inherited GMP/python-gvm plumbing."
     if relative_path.startswith("tools/tests/"):
@@ -2368,10 +2373,15 @@ def summarize_native_tooling(items: list[dict[str, Any]]) -> dict[str, Any]:
                 "status": "implemented_internal",
                 "replacement_candidates": ["runtime-scope-report-metrics helper (migrated)", "scope-report Metrics tab"],
             },
+            {
+                "endpoint": "/api/v1/reports/{report_id}/metrics",
+                "status": "implemented_internal",
+                "replacement_candidates": ["runtime-report-metrics helper (migrated)", "raw report Metrics tab"],
+            },
         ],
         "next_replacement_candidates": [
-            {"workflow": "raw report metrics runtime helper", "current_dependency": "python-gvm over GMP/XML", "native_target": "/api/v1/reports/{report_id}/metrics"},
             {"workflow": "scope-report browser tabs", "current_dependency": "GSA GMP command clients and source-report stitching", "native_target": "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/results, /hosts, /cves, /errors, and /metrics"},
+            {"workflow": "raw report Metrics tab", "current_dependency": "GSA GMP command clients", "native_target": "/api/v1/reports/{report_id}/metrics"},
             {"workflow": "gvm-tools scope/report scripts", "current_dependency": "gvm-tools GMP scripts", "native_target": "turbovasctl or native HTTP/JSON client commands"},
         ],
     }
@@ -4110,64 +4120,80 @@ def command_runtime_scope(repo_root: Path, action: str) -> dict[str, Any]:
 
 
 def command_runtime_metrics(repo_root: Path, action: str, report_id: str | None = None, scope_report_id: str | None = None) -> dict[str, Any]:
+    if action == "report":
+        return command_runtime_report_metrics_native(repo_root, report_id=report_id)
     if action == "scope-report":
         return command_runtime_scope_report_metrics_native(repo_root, scope_report_id=scope_report_id)
+    return make_result("runtime-metrics", repo_root, f"Unsupported metrics action: {action}", [finding("fail", "runtime-metrics.action", f"Unsupported metrics action: {action}")])
 
+
+def latest_completed_full_test_report_id(repo_root: Path) -> tuple[str | None, str | None, subprocess.CompletedProcess[str] | None]:
+    if not container_running(repo_root, "postgres"):
+        return None, "Postgres is not running; start the app profile before selecting the latest full-test report.", None
+    query = (
+        "SELECT r.uuid FROM reports r "
+        "JOIN tasks t ON t.id = r.task "
+        f"WHERE t.name = {sql_literal(FULL_TEST_TASK_NAME)} "
+        f"AND coalesce(r.scan_run_status, 0) = {COMPLETED_SCAN_RUN_STATUS} "
+        "AND coalesce(r.start_time, 0) > 0 "
+        "ORDER BY coalesce(r.end_time, 0) DESC, coalesce(r.start_time, 0) DESC, r.id DESC "
+        "LIMIT 1;"
+    )
+    result = psql(repo_root, query)
+    if result.returncode != 0:
+        return None, "Latest full-test report selection query failed.", result
+    report_id = psql_value(result).strip()
+    if not report_id:
+        return None, "No completed full-test raw report exists; pass --report-id to inspect a specific report.", result
+    return report_id, None, result
+
+
+def command_runtime_report_metrics_native(repo_root: Path, report_id: str | None = None) -> dict[str, Any]:
     findings: list[dict[str, Any]] = []
-    secret_path = runtime_secret_path(repo_root, DEV_ADMIN_SECRET)
-    python = venv_python(repo_root, "python-gvm")
-    probe = runtime_metrics_probe_path(repo_root)
     artifact_dir = metrics_artifact_dir(repo_root)
-    findings.append(finding("pass" if gvmd_socket_path(repo_root).is_socket() else "fail", "gvmd.socket", "gvmd socket is ready." if gvmd_socket_path(repo_root).is_socket() else "gvmd socket is not ready.", str(gvmd_socket_path(repo_root))))
-    findings.append(finding("pass" if secret_path.is_file() else "fail", "runtime.admin-secret", "Development admin secret exists." if secret_path.is_file() else "Development admin secret is missing.", str(secret_path)))
-    findings.append(finding("pass" if python.is_file() else "fail", "python-gvm.venv", "python-gvm runtime venv exists." if python.is_file() else "python-gvm venv is missing.", str(python.relative_to(repo_root)) if python.exists() else str(python)))
-    findings.append(finding("pass" if probe.is_file() else "fail", "runtime-metrics.probe", "Runtime metrics helper exists." if probe.is_file() else "Runtime metrics helper is missing.", str(probe.relative_to(repo_root)) if probe.exists() else str(probe)))
     try:
         artifact_dir.mkdir(parents=True, exist_ok=True)
         findings.append(finding("pass", "runtime-metrics.artifact-dir", "Runtime metrics artifact directory is ready.", str(artifact_dir)))
     except OSError as error:
         findings.append(finding("fail", "runtime-metrics.artifact-dir", f"Runtime metrics artifact directory is not usable: {error}", str(artifact_dir)))
+    findings.append(finding("pass" if container_running(repo_root, "turbovas-api") else "fail", "native-api.container", "turbovas-api container is running." if container_running(repo_root, "turbovas-api") else "turbovas-api container is not running; start the app profile before reading native raw-report metrics."))
+    selected_report_id = report_id
+    select_result = None
+    if selected_report_id is None:
+        selected_report_id, select_error, select_result = latest_completed_full_test_report_id(repo_root)
+        if select_error:
+            findings.append(finding("fail", "runtime-metrics.report-select", select_error, details={"output_tail": output_tail(select_result.stdout, 80) if select_result else []}))
+        else:
+            findings.append(finding("pass", "runtime-metrics.report-select", "Selected latest completed full-test raw report from PostgreSQL.", details={"report_id": selected_report_id}))
+    else:
+        findings.append(finding("pass", "runtime-metrics.report-select", "Using explicit raw report id.", details={"report_id": selected_report_id}))
+    if aggregate_status(findings) == "fail" or not selected_report_id:
+        payload = {
+            "status": "fail",
+            "summary": "Runtime report metrics stopped at native API prerequisites.",
+            "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+            "details": {"source": "turbovas-api", "report_id": selected_report_id},
+        }
+        payload["artifacts"] = [write_json_artifact(artifact_dir, "report-metrics-failed.json", payload)]
+        return make_result("runtime-report-metrics", repo_root, payload["summary"], findings, payload["artifacts"])
 
-    command_name = "runtime-report-metrics" if action == "report" else "runtime-scope-report-metrics"
-    if aggregate_status(findings) == "fail":
-        return make_result(command_name, repo_root, "Runtime metrics command stopped at prerequisites.", findings, [str(artifact_dir)])
-
-    args = [
-        str(python),
-        str(probe),
-        action,
-        "--socket",
-        str(gvmd_socket_path(repo_root)),
-        "--username",
-        DEV_ADMIN_USER,
-        "--password-file",
-        str(secret_path),
-        "--artifact-dir",
-        str(artifact_dir),
-    ]
-    if report_id:
-        args.extend(["--report-id", report_id])
-    if scope_report_id:
-        args.extend(["--scope-report-id", scope_report_id])
-    result = run_command(args, repo_root, env=build_env(repo_root), timeout=180)
-    try:
-        parsed = json.loads(result.stdout)
-    except json.JSONDecodeError:
-        parsed = None
-    helper_status = parsed.get("status") if parsed else None
-    finding_status = helper_status if result.returncode == 0 and helper_status in {"pass", "warn"} else "fail"
-    password = secret_path.read_text(encoding="utf-8").strip() if secret_path.is_file() else ""
-    findings.append(
-        finding(
-            finding_status,
-            f"runtime-metrics.{action}",
-            parsed.get("summary", f"Runtime metrics helper exit code {result.returncode}.") if parsed else f"Runtime metrics helper exit code {result.returncode}.",
-            details={"helper": parsed, "output_tail": output_tail(result.stdout, 120, [password])},
-        )
-    )
-    artifacts = list(parsed.get("artifacts", [])) if parsed and isinstance(parsed.get("artifacts"), list) else [str(artifact_dir)]
-    summary = parsed.get("summary") if parsed else f"Runtime metrics {action} command completed with exit code {result.returncode}."
-    return make_result(command_name, repo_root, summary, findings, artifacts)
+    metrics_path = f"/api/v1/reports/{urllib.parse.quote(selected_report_id)}/metrics"
+    metrics = native_api_curl(repo_root, metrics_path)
+    metrics_json = parse_json_output(metrics)
+    metrics_ok = metrics.returncode == 0 and isinstance(metrics_json, dict) and isinstance(metrics_json.get("summary"), dict)
+    payload = {
+        "status": "pass" if metrics_ok else "fail",
+        "summary": "Runtime report metrics read through the native API." if metrics_ok else "Runtime report metrics response did not include report metrics.",
+        "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "details": {
+            "source": "turbovas-api",
+            "report_id": selected_report_id,
+            "metrics": metrics_json,
+        },
+    }
+    payload["artifacts"] = [write_json_artifact(artifact_dir, "report-metrics.json" if metrics_ok else "report-metrics-failed.json", payload)]
+    findings.append(process_step_finding("pass" if metrics_ok else "fail", "runtime-metrics.report-native", payload["summary"], metrics, compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/reports/.../metrics")))
+    return make_result("runtime-report-metrics", repo_root, payload["summary"], findings, payload["artifacts"])
 
 
 def command_runtime_scope_report_metrics_native(repo_root: Path, scope_report_id: str | None = None) -> dict[str, Any]:
@@ -4544,6 +4570,31 @@ def command_runtime_native_api_smoke(repo_root: Path) -> dict[str, Any]:
             compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/scope-reports?page_size=1"),
         )
     )
+
+    raw_report_id, raw_report_error, raw_report_select = latest_completed_full_test_report_id(repo_root)
+    if raw_report_id:
+        raw_metrics_path = f"/api/v1/reports/{raw_report_id}/metrics"
+        raw_metrics = native_api_curl(repo_root, raw_metrics_path)
+        raw_metrics_json = parse_json_output(raw_metrics)
+        details["raw_report_metrics"] = raw_metrics_json
+        raw_metrics_ok = (
+            raw_metrics.returncode == 0
+            and isinstance(raw_metrics_json, dict)
+            and isinstance(raw_metrics_json.get("summary"), dict)
+            and isinstance(raw_metrics_json.get("systems"), list)
+            and isinstance(raw_metrics_json.get("vulnerabilities"), list)
+        )
+        findings.append(
+            process_step_finding(
+                "pass" if raw_metrics_ok else "fail",
+                "native-api.raw-report-metrics",
+                f"Native API raw-report Metrics probe exit code {raw_metrics.returncode}.",
+                raw_metrics,
+                compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/reports/.../metrics"),
+            )
+        )
+    else:
+        findings.append(finding("warn", "native-api.raw-report-metrics", raw_report_error or "No completed full-test report exists, so the raw-report Metrics probe was skipped.", details={"output_tail": output_tail(raw_report_select.stdout, 80) if raw_report_select else []}))
 
     if report_items:
         first_report = report_items[0]
