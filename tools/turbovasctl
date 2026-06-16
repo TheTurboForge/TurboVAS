@@ -4478,6 +4478,24 @@ def command_runtime_performance_snapshot(repo_root: Path) -> dict[str, Any]:
     else:
         findings.append(finding("warn", "performance.database", "Postgres is not running; database size and row counts are unavailable."))
 
+    if container_running(repo_root, "redis-openvas"):
+        scanner_redis = scanner_redis_metrics(repo_root)
+        details["scanner_redis"] = scanner_redis
+        metrics_ready = scanner_redis.get("dbsize_status") == "pass" and scanner_redis.get("info_status") == "pass"
+        findings.append(
+            finding(
+                "pass" if metrics_ready else "warn",
+                "performance.scanner-redis",
+                "Scanner Redis performance counters captured without key names or values."
+                if metrics_ready
+                else "Scanner Redis performance counters could not be fully captured.",
+                str(scanner_redis_socket_path(repo_root)),
+                {"scanner_redis": scanner_redis},
+            )
+        )
+    else:
+        findings.append(finding("warn", "performance.scanner-redis", "Scanner Redis is not running; performance counters are unavailable.", str(scanner_redis_socket_path(repo_root))))
+
     for name, path, recursive in (
         ("runtime-artifacts", runtime_path(repo_root, "artifacts"), True),
         ("runtime-logs", runtime_path(repo_root, "logs"), True),

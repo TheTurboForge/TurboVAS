@@ -811,6 +811,8 @@ db2:keys=5,expires=0,avg_ttl=0
     def test_performance_snapshot_captures_report_workflow_baseline(self):
         source = (Path(__file__).resolve().parents[1] / "turbovasctl").read_text(encoding="utf-8")
         self.assertIn("performance.report-workflow", source)
+        self.assertIn("performance.scanner-redis", source)
+        self.assertIn("scanner_redis_metrics", source)
         self.assertIn("max_sources_per_scope_report", source)
         self.assertIn("max_results_per_report", source)
         self.assertIn("max_scope_report_result_count", source)
