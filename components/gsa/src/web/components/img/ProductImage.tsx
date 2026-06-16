@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -19,7 +20,7 @@ const ProductImage = () => {
   const {settings} = useGmp();
   return (
     <StyledImage
-      alt={_('OPENVAS SCAN')}
+      alt={_('TurboVAS')}
       src={
         isDefined(settings) && isDefined(settings.vendorLabel)
           ? settings.vendorLabel

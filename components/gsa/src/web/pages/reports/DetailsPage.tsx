@@ -225,9 +225,10 @@ const ReportDetailsPage = () => {
       if (!isDefined(reportFormatId)) {
         const noReportFormatError = _(
           'The report cannot be displayed because' +
-            ' no Greenbone Vulnerability Manager report format is available.' +
+            ' no report format is available.' +
             ' This could be due to a missing gvmd data feed. Please update' +
-            ' the gvmd data feed, check the "feed import owner" setting, or' +
+            ' the gvmd data feed, check the "feed import owner" setting,' +
+            ' the feed status page, or' +
             ' contact your system administrator.',
         );
         throw new Error(noReportFormatError);

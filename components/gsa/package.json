@@ -1,19 +1,18 @@
 {
-  "name": "gsa",
+  "name": "turbovas-web-ui",
   "version": "27.2.1-dev1",
-  "description": "Greenbone Security Assistant",
+  "description": "TurboVAS web UI",
   "keywords": [
-    "openvas",
     "gmp",
-    "gsa",
-    "greenbone",
-    "greenbone security assistant"
+    "scanner",
+    "turbovas",
+    "vulnerability-management"
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/greenbone/gsa/"
+    "url": "https://github.com/TheTurboForge/TurboVAS/"
   },
-  "author": "Björn Ricks <bjoern.ricks@greenbone.net>",
+  "author": "TurboVAS contributors",
   "license": "AGPL-3.0+",
   "type": "module",
   "scripts": {

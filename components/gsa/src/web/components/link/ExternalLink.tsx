@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -34,11 +35,11 @@ const ExternalLink = ({children, to, ...props}: ExternalLinkProps) => {
     handleCloseDialog();
   };
 
-  const dialogTitle = _('You are leaving OPENVAS');
+  const dialogTitle = _('You are leaving TurboVAS');
   const dialogText = _(
     'This dialog will open a new window for {{- to}} ' +
       'if you click on "follow link". Following this link is on your own ' +
-      'responsibility. Greenbone does not endorse the content you will ' +
+      'responsibility. TurboVAS does not endorse the content you will ' +
       'see there.',
     {to},
   );

@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -47,7 +48,7 @@ class LoginCommand extends HttpCommand {
           case 503:
             rej.setMessage(
               _(
-                'The Greenbone Vulnerability Manager service is not ' +
+                'The TurboVAS manager service is not ' +
                   'responding. This could be due to system maintenance. ' +
                   'Please try again later, check the system status, or ' +
                   'contact your system administrator.',

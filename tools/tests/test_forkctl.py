@@ -652,12 +652,16 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertGreater(details["by_category"]["provenance_or_non_affiliation"]["count"], 0)
         self.assertIn("README.md", details["by_category"]["provenance_or_non_affiliation"]["paths"])
         self.assertIn("components/gsa/public/locales/gsa-en.json", details["by_category"]["active_product_surface"]["paths"])
+        self.assertNotIn("components/gsa/package.json", details["by_category"]["active_product_surface"]["paths"])
+        self.assertIn("components/gsa/package.json", details["by_category"]["technical_doc_context"]["paths"])
         self.assertEqual(details["by_category"]["unknown"]["count"], 0)
 
     def test_branding_category_classifies_known_contexts(self):
         self.assertEqual(turbovasctl.branding_category("README.md"), "provenance_or_non_affiliation")
         self.assertEqual(turbovasctl.branding_category("docs/ARCHITECTURE_FLOWS.md"), "technical_doc_context")
         self.assertEqual(turbovasctl.branding_category("components/gsa/public/locales/gsa-en.json"), "active_product_surface")
+        self.assertEqual(turbovasctl.branding_category("components/gsa/public/img/os_ipfire.svg"), "technical_doc_context")
+        self.assertEqual(turbovasctl.branding_item_category("components/gsa/package.json", ["greenbone"]), "technical_doc_context")
 
     def test_retained_json_artifacts_write_latest_history_and_prune(self):
         with tempfile.TemporaryDirectory() as tmp:

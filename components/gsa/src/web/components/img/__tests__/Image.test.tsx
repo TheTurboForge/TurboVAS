@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -9,9 +10,9 @@ import Image from 'web/components/img/Image';
 
 describe('Image tests', () => {
   test('should render image with attributes', () => {
-    const {element} = render(<Image alt="OPENVAS SCAN" src="greenbone.svg" />);
+    const {element} = render(<Image alt="TurboVAS" src="login-label.svg" />);
 
-    expect(element).toHaveAttribute('alt', 'OPENVAS SCAN');
-    expect(element).toHaveAttribute('src', '/img/greenbone.svg');
+    expect(element).toHaveAttribute('alt', 'TurboVAS');
+    expect(element).toHaveAttribute('src', '/img/login-label.svg');
   });
 });

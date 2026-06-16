@@ -2499,9 +2499,17 @@ def branding_category(relative_path: str) -> str:
         return "provenance_or_non_affiliation"
     if relative_path.startswith("docs/"):
         return "technical_doc_context"
+    if relative_path.startswith("components/gsa/public/img/os_"):
+        return "technical_doc_context"
     if relative_path.startswith("components/gsa/public/") or relative_path in {"components/gsa/index.html", "components/gsa/package.json"}:
         return "active_product_surface"
     return "unknown"
+
+
+def branding_item_category(relative_path: str, markers: list[str]) -> str:
+    if relative_path == "components/gsa/package.json" and markers == ["greenbone"]:
+        return "technical_doc_context"
+    return branding_category(relative_path)
 
 
 def branding_inventory(repo_root: Path) -> list[dict[str, Any]]:
@@ -2516,7 +2524,7 @@ def branding_inventory(repo_root: Path) -> list[dict[str, Any]]:
         markers = branding_markers(path)
         if not markers:
             continue
-        items.append({"path": relative_path, "category": branding_category(relative_path), "markers": markers})
+        items.append({"path": relative_path, "category": branding_item_category(relative_path, markers), "markers": markers})
     return sorted(items, key=lambda item: (item["category"], item["path"]))
 
 

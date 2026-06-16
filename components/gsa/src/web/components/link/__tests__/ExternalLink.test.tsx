@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -33,6 +34,8 @@ describe('ExternalLink tests', () => {
     fireEvent.click(element);
     const dialog = screen.getDialog();
     expect(dialog).toBeInTheDocument();
+    expect(dialog).toHaveTextContent('You are leaving TurboVAS');
+    expect(dialog).toHaveTextContent('TurboVAS does not endorse');
   });
 
   test('should close confirmation dialog on resume click', () => {
