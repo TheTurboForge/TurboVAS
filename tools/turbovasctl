@@ -1125,10 +1125,6 @@ def runtime_credential_smoke_probe_path(repo_root: Path) -> Path:
     return repo_root / "tools" / "runtime_credential_smoke.py"
 
 
-def runtime_metrics_probe_path(repo_root: Path) -> Path:
-    return repo_root / "tools" / "runtime_metrics.py"
-
-
 def runtime_rbac_smoke_probe_path(repo_root: Path) -> Path:
     return repo_root / "tools" / "runtime_rbac_smoke.py"
 
@@ -2290,8 +2286,6 @@ def native_tooling_markers(path: Path) -> list[str]:
 
 def native_tooling_category(relative_path: str) -> tuple[str, str] | None:
     path = Path(relative_path)
-    if relative_path == "tools/runtime_metrics.py":
-        return "candidate_for_removal", "Legacy GMP/python-gvm metrics helper is no longer used by turbovasctl after native metric helper migration; remove once tests move to native fixtures."
     if relative_path == "tools/turbovasctl" or (relative_path.startswith("tools/runtime_") and relative_path.endswith(".py")):
         return "required_runtime", "TurboVAS runtime/helper command path still depends on inherited GMP/python-gvm plumbing."
     if relative_path.startswith("tools/tests/"):

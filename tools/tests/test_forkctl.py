@@ -178,13 +178,6 @@ assert RUNTIME_SCOPE_SPEC.loader is not None
 sys.modules["runtime_scope"] = runtime_scope
 RUNTIME_SCOPE_SPEC.loader.exec_module(runtime_scope)
 
-RUNTIME_METRICS_PATH = Path(__file__).resolve().parents[1] / "runtime_metrics.py"
-RUNTIME_METRICS_SPEC = importlib.util.spec_from_loader("runtime_metrics", SourceFileLoader("runtime_metrics", str(RUNTIME_METRICS_PATH)))
-runtime_metrics = importlib.util.module_from_spec(RUNTIME_METRICS_SPEC)
-assert RUNTIME_METRICS_SPEC.loader is not None
-sys.modules["runtime_metrics"] = runtime_metrics
-RUNTIME_METRICS_SPEC.loader.exec_module(runtime_metrics)
-
 BROWSER_SMOKE_PATH = Path(__file__).resolve().parents[1] / "runtime_browser_smoke.py"
 BROWSER_SMOKE_SPEC = importlib.util.spec_from_loader("runtime_browser_smoke", SourceFileLoader("runtime_browser_smoke", str(BROWSER_SMOKE_PATH)))
 runtime_browser_smoke = importlib.util.module_from_spec(BROWSER_SMOKE_SPEC)
@@ -517,36 +510,15 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("192.0.2.99", {system["host"] for system in organization["systems"]})
         self.assertIn("nvt-d", {vulnerability["nvt"] for vulnerability in organization["vulnerabilities"]})
 
-    def test_runtime_metrics_parser_preserves_summary_systems_and_vulnerabilities(self):
-        xml = """
-        <get_report_metrics_response status="200" status_text="OK">
-          <report_metrics id="report-1">
-            <summary>
-              <alive_system_count>2</alive_system_count>
-              <total_system_cvss_load>12.3</total_system_cvss_load>
-              <average_system_cvss_load>6.15</average_system_cvss_load>
-              <vulnerability_count>2</vulnerability_count>
-              <authenticated_system_count>1</authenticated_system_count>
-              <authentication_failed_system_count>0</authentication_failed_system_count>
-              <no_credential_path_system_count>1</no_credential_path_system_count>
-              <unknown_authentication_system_count>0</unknown_authentication_system_count>
-              <authenticated_scan_coverage_percent>50.0</authenticated_scan_coverage_percent>
-            </summary>
-            <systems>
-              <system><host>192.0.2.10</host><cvss_load>7.0</cvss_load><max_cvss>7.0</max_cvss><vulnerability_count>1</vulnerability_count><authentication_state>authenticated</authentication_state><source_report_count>1</source_report_count></system>
-            </systems>
-            <vulnerabilities>
-              <vulnerability><nvt_oid>1.2.3</nvt_oid><name>Example</name><cvss_score>7.0</cvss_score><affected_system_count>1</affected_system_count><cvss_load>7.0</cvss_load><average_contribution>3.5</average_contribution><source_report_count>1</source_report_count></vulnerability>
-            </vulnerabilities>
-          </report_metrics>
-        </get_report_metrics_response>
-        """
-        parsed = runtime_metrics.parse_metrics(xml, "report_metrics")
-        self.assertEqual(parsed["id"], "report-1")
-        self.assertEqual(parsed["summary"]["alive_system_count"], 2)
-        self.assertEqual(parsed["summary"]["authenticated_scan_coverage_percent"], 50.0)
-        self.assertEqual(parsed["systems"][0]["authentication_state"], "authenticated")
-        self.assertEqual(parsed["vulnerabilities"][0]["average_contribution"], 3.5)
+    def test_runtime_metrics_commands_use_native_api_not_legacy_xml_helper(self):
+        root = Path(__file__).resolve().parents[2]
+        source = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
+        self.assertFalse((root / "tools" / "runtime_metrics.py").exists())
+        self.assertNotIn("runtime_metrics_probe_path", source)
+        self.assertIn("def command_runtime_report_metrics_native", source)
+        self.assertIn("def command_runtime_scope_report_metrics_native", source)
+        self.assertIn("/api/v1/reports/{urllib.parse.quote(selected_report_id)}/metrics", source)
+        self.assertIn("/api/v1/scopes/{selected_scope_id}/reports/{selected_scope_report_id}/metrics", source)
 
     def test_report_metrics_ui_is_exposed_on_raw_and_scope_report_details(self):
         root = Path(__file__).resolve().parents[2]
@@ -632,7 +604,8 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("tools/runtime_report.py", details["by_category"]["required_runtime"]["paths"])
         self.assertIn("components/gvm-tools/scripts/list-scope-reports.gmp.py", details["by_category"]["product_workflow"]["paths"])
         self.assertIn("components/python-gvm/gvm/protocols/gmp/requests/v226/_reports.py", details["by_category"]["compatibility_bridge"]["paths"])
-        self.assertIn("tools/runtime_metrics.py", details["by_category"]["candidate_for_removal"]["paths"])
+        all_paths = {path for category in details["by_category"].values() for path in category["paths"]}
+        self.assertNotIn("tools/runtime_metrics.py", all_paths)
         self.assertIn("gvm-tools scope/report scripts", {item["workflow"] for item in details["next_replacement_candidates"]})
         endpoints = {item["endpoint"] for item in details["implemented_native_endpoints"]}
         self.assertIn("/api/v1/scope-reports", endpoints)
