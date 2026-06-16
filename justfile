@@ -159,6 +159,9 @@ runtime-redis-state *args:
 security-policy-check *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl security-policy-check "$@"
 
+path-coupling-state *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl path-coupling-state "$@"
+
 runtime-app-up *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-app-up "$@"
 

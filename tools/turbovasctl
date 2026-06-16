@@ -217,6 +217,13 @@ NATIVE_TOOLING_SCAN_PREFIXES = (
 )
 NATIVE_TOOLING_SCAN_FILES = {"README.md", "UPSTREAMS.md", "LICENSE_AUDIT.md", "BUILDING.md"}
 REDIS_REFERENCE_PATTERN = re.compile(r"\bredis\b|redis-openvas|hiredis|scanner_redis|scanner redis", re.IGNORECASE)
+PATH_COUPLING_MARKERS = {
+    "dev_checkout_path": "/home/turboforge/Projects/TurboVAS",
+    "runtime_root_path": "/home/turboforge/Projects/TurboVAS-runtime",
+    "workspace_mount_path": "/workspace",
+    "build_prefix_path": "build/prefix",
+    "container_runtime_path": "/runtime/",
+}
 REDIS_REFERENCE_ROOTS = (
     "compose/",
     "docker/",
@@ -2370,6 +2377,59 @@ def summarize_redis_references(references: list[dict[str, Any]]) -> dict[str, An
     return {"total_items": len(references), "by_category": by_category}
 
 
+def path_coupling_category(relative_path: str) -> str:
+    if relative_path.startswith("docs/") or relative_path in {"README.md", "BUILDING.md"}:
+        return "documentation"
+    if relative_path.startswith(("compose/", "docker/", "ops/")) or relative_path in {"justfile", "tools/turbovasctl"}:
+        return "runtime_tooling"
+    if relative_path.startswith("tools/"):
+        return "diagnostic_tooling"
+    if relative_path.startswith("components/"):
+        return "component_source"
+    return "other_tracked_source"
+
+
+def path_coupling_markers(text: str) -> list[str]:
+    return sorted(marker for marker, needle in PATH_COUPLING_MARKERS.items() if needle in text)
+
+
+def path_coupling_references(repo_root: Path) -> list[dict[str, Any]]:
+    references: list[dict[str, Any]] = []
+    for relative_path in git_tracked_files(repo_root) or []:
+        path = repo_root / relative_path
+        if not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        markers = path_coupling_markers(text)
+        if not markers:
+            continue
+        references.append({"path": relative_path, "category": path_coupling_category(relative_path), "markers": markers})
+    return sorted(references, key=lambda item: (item["category"], item["path"]))
+
+
+def summarize_path_coupling(references: list[dict[str, Any]]) -> dict[str, Any]:
+    by_category: dict[str, list[str]] = {}
+    by_marker: dict[str, list[str]] = {}
+    warning_paths: list[str] = []
+    for reference in references:
+        path = reference["path"]
+        category = reference["category"]
+        by_category.setdefault(category, []).append(path)
+        for marker in reference["markers"]:
+            by_marker.setdefault(marker, []).append(path)
+        if category != "documentation" and "dev_checkout_path" in reference["markers"]:
+            warning_paths.append(path)
+    return {
+        "total_references": len(references),
+        "by_category": {category: {"count": len(paths), "paths": paths[:50]} for category, paths in sorted(by_category.items())},
+        "by_marker": {marker: {"count": len(paths), "paths": paths[:50]} for marker, paths in sorted(by_marker.items())},
+        "non_documentation_dev_checkout_paths": sorted(set(warning_paths))[:100],
+    }
+
+
 def redis_compose_boundaries(repo_root: Path) -> dict[str, Any]:
     path = compose_file(repo_root)
     try:
@@ -2493,6 +2553,26 @@ def command_runtime_redis_state(repo_root: Path) -> dict[str, Any]:
         findings.append(finding("warn", "redis-openvas.runtime-ping", "Scanner Redis container is not running; runtime ping skipped.", str(scanner_redis_socket_path(repo_root)), runtime["redis-openvas"]))
     result = make_result("runtime-redis-state", repo_root, "Redis dependency and runtime boundary state collected.", findings)
     result["details"] = {"references": references, "reference_summary": reference_summary, "boundaries": boundaries, "runtime": runtime}
+    return result
+
+
+def command_path_coupling_state(repo_root: Path) -> dict[str, Any]:
+    references = path_coupling_references(repo_root)
+    summary = summarize_path_coupling(references)
+    warning_paths = summary["non_documentation_dev_checkout_paths"]
+    findings = [
+        finding("pass", "path-coupling.source-map", f"Classified {len(references)} tracked path-coupling reference(s).", details=summary),
+        finding(
+            "warn" if warning_paths else "pass",
+            "path-coupling.dev-checkout",
+            "Hard-coded development checkout paths exist outside documentation."
+            if warning_paths
+            else "No hard-coded development checkout paths found outside documentation.",
+            details={"paths": warning_paths},
+        ),
+    ]
+    result = make_result("path-coupling-state", repo_root, "Absolute path and runtime path coupling state collected.", findings)
+    result["details"] = {"references": references[:200], "summary": summary, "reference_count": len(references)}
     return result
 
 
@@ -4708,7 +4788,7 @@ def command_doctor(repo_root: Path) -> dict[str, Any]:
     findings.append(finding(license_result["status"], "license.compliance", license_result["summary"], details={"status": license_result["status"], "findings": license_result["findings"]}))
     findings.append(finding("pass", "surface.available", "Build readiness surface is available.", details={"commands": ["just deps", "just configure", "just build", "just build-core-c", "just build-c-services", "just build-ui", "just build-python", "just build-baseline"]}))
     findings.append(finding("pass" if compose_file(repo_root).is_file() else "warn", "surface.available", "Runtime infrastructure command surface is available." if compose_file(repo_root).is_file() else "Runtime infrastructure command surface is not available.", details={"commands": ["just runtime-plan", "just up", "just down", "just logs", "just runtime-init", "just runtime-certs-init", "just runtime-manager-init", "just runtime-scanner-redis-init", "just runtime-gmp-smoke", "just runtime-scanner-register", "just runtime-scanner-capability-check", "just runtime-scanner-process-check", "just runtime-nmap-capability-check", "just runtime-feed-keyring-init", "just runtime-feed-import-init", "just runtime-full-test-scan-preflight", "just runtime-full-test-scan-start", "just runtime-full-test-scan-status", "just runtime-report-summary", "just runtime-report-export", "just runtime-report-metrics", "just runtime-scope-smoke", "just runtime-scope-report-summary", "just runtime-scope-report-metrics", "just runtime-rbac-smoke", "just feed-state", "just feed-cache-sync", "just feed-copy-to-runtime", "just runtime-status", "just runtime-smoke", "just runtime-log-review", "just runtime-data-state", "just runtime-performance-snapshot", "just runtime-app-up", "just runtime-app-smoke", "just runtime-webui-smoke", "just runtime-browser-smoke", "just runtime-credential-smoke", "just runtime-app-down", "just gvmd-smoke", "just quality-gate", "just quality-gate-state", "just quality-gate-schedule"]}))
-    findings.append(finding("pass", "surface.diagnostics", "Native API, Redis, and security-policy diagnostics are available.", details={"commands": ["just native-tooling-state", "just runtime-redis-state", "just security-policy-check"]}))
+    findings.append(finding("pass", "surface.diagnostics", "Native API, Redis, path-coupling, and security-policy diagnostics are available.", details={"commands": ["just native-tooling-state", "just runtime-redis-state", "just path-coupling-state", "just security-policy-check"]}))
     findings.append(finding("warn", "surface.deferred", "Test command surface is deferred until component checks are mapped.", details={"command": "just test"}))
     findings.append(finding("warn", "surface.deferred", "Full inherited service orchestration remains experimental until feed, scanner registration, and first UI/API connectivity are stabilized.", details={"commands": ["gvmd", "gsad", "ospd-openvas", "notus-scanner"]}))
     return make_result("doctor", repo_root, "Monorepo health checks completed.", findings)
@@ -4948,6 +5028,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("runtime-performance-snapshot", parents=[common], help="capture a lightweight runtime performance snapshot")
     subparsers.add_parser("runtime-redis-state", parents=[common], help="inspect Redis dependency and runtime boundary state")
     subparsers.add_parser("security-policy-check", parents=[common], help="validate security-sensitive path policy scaffolding")
+    subparsers.add_parser("path-coupling-state", parents=[common], help="inspect absolute checkout/runtime path coupling")
     subparsers.add_parser("runtime-app-up", parents=[common], help="start experimental application services")
     subparsers.add_parser("runtime-app-down", parents=[common], help="stop experimental application services")
     subparsers.add_parser("runtime-app-smoke", parents=[common], help="run experimental application service smoke checks")
@@ -5069,6 +5150,8 @@ def main(argv: list[str] | None = None) -> int:
         result = command_runtime_redis_state(repo_root)
     elif args.command == "security-policy-check":
         result = command_security_policy_check(repo_root)
+    elif args.command == "path-coupling-state":
+        result = command_path_coupling_state(repo_root)
     elif args.command == "runtime-app-up":
         result = command_runtime_app_up(repo_root)
     elif args.command == "runtime-app-down":
