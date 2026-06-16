@@ -178,6 +178,43 @@ RETAINED_QUALITY_GATE_ARTIFACTS = 30
 RETAINED_PERFORMANCE_ARTIFACTS = 30
 QUALITY_GATE_SYSTEMD_UNITS = ("turbovas-quality-gate.service", "turbovas-quality-gate.timer")
 QUALITY_GATE_TIMER_NAME = "turbovas-quality-gate.timer"
+NATIVE_TOOLING_CATEGORIES = (
+    "required_runtime",
+    "required_test",
+    "product_workflow",
+    "compatibility_bridge",
+    "candidate_for_removal",
+    "unknown",
+)
+NATIVE_TOOLING_MARKERS = (
+    "python-gvm",
+    "gvm-tools",
+    "from gvm",
+    "import gvm",
+    "UnixSocketConnection",
+    "GMP(",
+    "gmp.",
+    "gvm-cli",
+)
+NATIVE_TOOLING_PRODUCT_GVM_TOOLS_SCRIPTS = frozenset(
+    {
+        "generate-scope-report.gmp.py",
+        "list-scope-report-results.gmp.py",
+        "list-scope-reports.gmp.py",
+        "list-scopes.gmp.py",
+        "list-reports.gmp.py",
+        "report-metrics.gmp.py",
+        "scope-report-metrics.gmp.py",
+    }
+)
+NATIVE_TOOLING_SCAN_PREFIXES = (
+    "tools/",
+    "docs/",
+    "components/gsa/src/gmp/",
+    "components/python-gvm/",
+    "components/gvm-tools/",
+)
+NATIVE_TOOLING_SCAN_FILES = {"README.md", "UPSTREAMS.md", "LICENSE_AUDIT.md", "BUILDING.md"}
 QUALITY_GATE_SERVICE_NAME = "turbovas-quality-gate.service"
 LOG_REVIEW_PATTERNS: tuple[tuple[str, str, str, str], ...] = (
     ("fail", "nmap-root-privilege", r"requires root privileges|requires root|raw scans require root privileges", "Nmap/root-privilege warning found."),
@@ -2161,6 +2198,89 @@ def command_inventory(repo_root: Path, scope: str | None = None) -> dict[str, An
     for row in rows:
         findings.append(finding("pass" if row["exists"] else "fail", "component.exists", f"{row['name']}: {row['role']}", row["path"]))
     return make_result("inventory", repo_root, f"Inventory contains {len(rows)} expected component(s).", findings)
+
+
+def native_tooling_markers(path: Path) -> list[str]:
+    try:
+        text = path.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return []
+    lower = text.lower()
+    return [marker for marker in NATIVE_TOOLING_MARKERS if marker.lower() in lower]
+
+
+def native_tooling_category(relative_path: str) -> tuple[str, str] | None:
+    path = Path(relative_path)
+    if relative_path == "tools/turbovasctl" or (relative_path.startswith("tools/runtime_") and relative_path.endswith(".py")):
+        return "required_runtime", "TurboVAS runtime/helper command path still depends on inherited GMP/python-gvm plumbing."
+    if relative_path.startswith("tools/tests/"):
+        return "required_test", "Regression tests still characterize inherited GMP/python-gvm/gvm-tools behavior."
+    if relative_path.startswith("components/gsa/src/gmp/"):
+        return "product_workflow", "GSA product workflow still reads or writes through inherited GMP command clients."
+    if relative_path.startswith("components/gvm-tools/scripts/"):
+        if path.name in NATIVE_TOOLING_PRODUCT_GVM_TOOLS_SCRIPTS:
+            return "product_workflow", "gvm-tools script supports a retained TurboVAS report/scope workflow until native APIs replace it."
+        if path.suffix == ".py":
+            return "candidate_for_removal", "Inherited gvm-tools operator script is a removal candidate once native tooling covers retained needs."
+    if relative_path.startswith("components/python-gvm/") or relative_path.startswith("components/gvm-tools/gvmtools/"):
+        return "compatibility_bridge", "Inherited client library remains as temporary compatibility plumbing, not the desired product API."
+    if relative_path.startswith("components/gvm-tools/"):
+        return "compatibility_bridge", "Inherited gvm-tools component remains only as temporary compatibility plumbing."
+    if relative_path.startswith("docs/") or relative_path in {"README.md", "UPSTREAMS.md", "LICENSE_AUDIT.md", "BUILDING.md"}:
+        return "compatibility_bridge", "Documentation references inherited tooling while the native API retirement map is active."
+    return None
+
+
+def native_tooling_scan_candidate(relative_path: str) -> bool:
+    return relative_path in NATIVE_TOOLING_SCAN_FILES or any(relative_path.startswith(prefix) for prefix in NATIVE_TOOLING_SCAN_PREFIXES)
+
+
+def native_tooling_inventory(repo_root: Path) -> list[dict[str, Any]]:
+    tracked = git_tracked_files(repo_root) or []
+    items: list[dict[str, Any]] = []
+    for relative_path in tracked:
+        if not native_tooling_scan_candidate(relative_path):
+            continue
+        path = repo_root / relative_path
+        if not path.is_file():
+            continue
+        markers = native_tooling_markers(path)
+        if not markers:
+            continue
+        classified = native_tooling_category(relative_path)
+        category, reason = classified if classified else ("unknown", "Inherited tooling marker appears outside the current retirement map classification.")
+        items.append({"category": category, "path": relative_path, "markers": markers, "reason": reason})
+    return sorted(items, key=lambda item: (NATIVE_TOOLING_CATEGORIES.index(item["category"]), item["path"]))
+
+
+def summarize_native_tooling(items: list[dict[str, Any]]) -> dict[str, Any]:
+    by_category: dict[str, dict[str, Any]] = {}
+    for category in NATIVE_TOOLING_CATEGORIES:
+        category_items = [item for item in items if item["category"] == category]
+        by_category[category] = {"count": len(category_items), "paths": [item["path"] for item in category_items]}
+    return {
+        "total_items": len(items),
+        "by_category": by_category,
+        "next_replacement_candidates": [
+            {"workflow": "raw and scope-report metrics runtime helpers", "current_dependency": "python-gvm over GMP/XML", "native_target": "/api/v1/reports/{report_id}/metrics and /api/v1/scopes/{scope_id}/reports/{scope_report_id}/metrics"},
+            {"workflow": "scope-report Hosts/CVEs tabs", "current_dependency": "GSA GMP command clients and source-report stitching", "native_target": "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/hosts and /cves"},
+            {"workflow": "gvm-tools scope/report scripts", "current_dependency": "gvm-tools GMP scripts", "native_target": "turbovasctl or native HTTP/JSON client commands"},
+        ],
+    }
+
+
+def command_native_tooling_state(repo_root: Path) -> dict[str, Any]:
+    items = native_tooling_inventory(repo_root)
+    summary = summarize_native_tooling(items)
+    unknown_count = summary["by_category"]["unknown"]["count"]
+    findings = [
+        finding("pass", "native-tooling.inventory", f"Classified {len(items)} inherited tooling dependency surface(s).", details=summary),
+        finding("warn" if unknown_count else "pass", "native-tooling.unknown", f"{unknown_count} inherited tooling surface(s) are outside the current classification map." if unknown_count else "No inherited tooling surfaces were left unclassified.", details={"paths": summary["by_category"]["unknown"]["paths"]}),
+        finding("pass", "native-tooling.end-state", "End-state remains full removal of required python-gvm and gvm-tools dependence after native API replacements land."),
+    ]
+    result = make_result("native-tooling-state", repo_root, "Inherited GMP/python-gvm/gvm-tools dependency state collected.", findings)
+    result["details"] = {"items": items, **summary}
+    return result
 
 
 def comment_notice_supported(relative_path: str) -> bool:
@@ -4354,6 +4474,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("status", parents=[common], help="show repository status")
     inventory = subparsers.add_parser("inventory", parents=[common], help="show expected component inventory")
     inventory.add_argument("--scope", help="limit inventory to a path under the repository")
+    subparsers.add_parser("native-tooling-state", parents=[common], help="inventory inherited GMP/python-gvm/gvm-tools dependency surfaces")
     subparsers.add_parser("doctor", parents=[common], help="run structural and environment health checks")
     license_report = subparsers.add_parser("license-report", parents=[common], help="check preserved license/provenance files")
     license_report.add_argument("--public-release", action="store_true", help="fail while public-release license review items remain open")
@@ -4439,6 +4560,8 @@ def main(argv: list[str] | None = None) -> int:
         result = command_status(repo_root)
     elif args.command == "inventory":
         result = command_inventory(repo_root, args.scope)
+    elif args.command == "native-tooling-state":
+        result = command_native_tooling_state(repo_root)
     elif args.command == "doctor":
         result = command_doctor(repo_root)
     elif args.command == "license-report":

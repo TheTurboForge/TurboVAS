@@ -52,6 +52,7 @@ TurboVAS provides a small root command surface for repository health checks:
 
 - `just status`: show repository branch, HEAD, upstream, and worktree state.
 - `just inventory`: list the expected monorepo components.
+- `just native-tooling-state`: inventory inherited GMP, `python-gvm`, and `gvm-tools` dependency surfaces for native API retirement.
 - `just doctor`: run structural and environment readiness checks.
 - `just quality-gate`: run the local source quality gate.
 - `just quality-gate-state`: show the latest quality-gate result and retained history.

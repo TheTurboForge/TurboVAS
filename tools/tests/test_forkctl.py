@@ -580,11 +580,12 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_technical_foundation_commands_are_registered(self):
         source = (Path(__file__).resolve().parents[1] / "turbovasctl").read_text(encoding="utf-8")
         justfile = (Path(__file__).resolve().parents[2] / "justfile").read_text(encoding="utf-8")
-        for command in ("production-posture-check", "runtime-log-review", "runtime-data-state", "runtime-performance-snapshot", "quality-gate", "quality-gate-state", "quality-gate-schedule"):
+        for command in ("native-tooling-state", "production-posture-check", "runtime-log-review", "runtime-data-state", "runtime-performance-snapshot", "quality-gate", "quality-gate-state", "quality-gate-schedule"):
             with self.subTest(command=command):
                 self.assertIn(command, source)
                 self.assertIn(f"{command} *args:", justfile)
                 self.assertIn(f'tools/turbovasctl {command} "$@"', justfile)
+        self.assertIn("def command_native_tooling_state", source)
         self.assertIn("def command_runtime_log_review", source)
         self.assertIn("def command_runtime_data_state", source)
         self.assertIn("def command_runtime_performance_snapshot", source)
@@ -592,6 +593,27 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("def command_quality_gate", source)
         self.assertIn("def command_quality_gate_state", source)
         self.assertIn("def command_quality_gate_schedule", source)
+
+    def test_native_tooling_state_classifies_dependency_surfaces(self):
+        root = Path(__file__).resolve().parents[2]
+        result = turbovasctl.command_native_tooling_state(root)
+        details = result["details"]
+        self.assertEqual(result["status"], "pass")
+        self.assertGreater(details["by_category"]["required_runtime"]["count"], 0)
+        self.assertGreater(details["by_category"]["product_workflow"]["count"], 0)
+        self.assertGreater(details["by_category"]["compatibility_bridge"]["count"], 0)
+        self.assertIn("tools/runtime_report.py", details["by_category"]["required_runtime"]["paths"])
+        self.assertIn("components/gvm-tools/scripts/list-scope-reports.gmp.py", details["by_category"]["product_workflow"]["paths"])
+        self.assertIn("components/python-gvm/gvm/protocols/gmp/requests/v226/_reports.py", details["by_category"]["compatibility_bridge"]["paths"])
+        self.assertIn("gvm-tools scope/report scripts", {item["workflow"] for item in details["next_replacement_candidates"]})
+
+    def test_native_tooling_category_keeps_scripts_and_docs_distinct(self):
+        self.assertEqual(turbovasctl.native_tooling_category("tools/runtime_scope.py")[0], "required_runtime")
+        self.assertEqual(turbovasctl.native_tooling_category("tools/tests/test_forkctl.py")[0], "required_test")
+        self.assertEqual(turbovasctl.native_tooling_category("components/gsa/src/gmp/commands/scopes.ts")[0], "product_workflow")
+        self.assertEqual(turbovasctl.native_tooling_category("components/gvm-tools/scripts/list-scopes.gmp.py")[0], "product_workflow")
+        self.assertEqual(turbovasctl.native_tooling_category("components/gvm-tools/scripts/empty-trash.gmp.py")[0], "candidate_for_removal")
+        self.assertEqual(turbovasctl.native_tooling_category("docs/GMP_XML_STRANGLER.md")[0], "compatibility_bridge")
 
     def test_retained_json_artifacts_write_latest_history_and_prune(self):
         with tempfile.TemporaryDirectory() as tmp:
