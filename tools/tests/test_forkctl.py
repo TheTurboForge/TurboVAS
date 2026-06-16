@@ -580,12 +580,13 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_technical_foundation_commands_are_registered(self):
         source = (Path(__file__).resolve().parents[1] / "turbovasctl").read_text(encoding="utf-8")
         justfile = (Path(__file__).resolve().parents[2] / "justfile").read_text(encoding="utf-8")
-        for command in ("native-tooling-state", "production-posture-check", "runtime-log-review", "runtime-data-state", "runtime-performance-snapshot", "runtime-redis-state", "quality-gate", "quality-gate-state", "quality-gate-schedule"):
+        for command in ("native-tooling-state", "branding-state", "production-posture-check", "runtime-log-review", "runtime-data-state", "runtime-performance-snapshot", "runtime-redis-state", "quality-gate", "quality-gate-state", "quality-gate-schedule"):
             with self.subTest(command=command):
                 self.assertIn(command, source)
                 self.assertIn(f"{command} *args:", justfile)
                 self.assertIn(f'tools/turbovasctl {command} "$@"', justfile)
         self.assertIn("def command_native_tooling_state", source)
+        self.assertIn("def command_branding_state", source)
         self.assertIn("def command_runtime_log_review", source)
         self.assertIn("def command_runtime_data_state", source)
         self.assertIn("def command_runtime_performance_snapshot", source)
@@ -632,6 +633,21 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(turbovasctl.redis_reference_category("compose/dev.yaml", "/run/redis-openvas/redis.sock"), "scanner_kb")
         self.assertEqual(turbovasctl.redis_reference_category("docker/dev/Dockerfile", "redis-tools libhiredis-dev"), "dependency_build")
         self.assertEqual(turbovasctl.redis_reference_category("docs/ARCHITECTURE_FLOWS.md", "Redis"), "documentation")
+
+    def test_branding_state_separates_provenance_from_active_surfaces(self):
+        root = Path(__file__).resolve().parents[2]
+        result = turbovasctl.command_branding_state(root)
+        details = result["details"]
+        self.assertIn(result["status"], {"pass", "warn"})
+        self.assertGreater(details["by_category"]["provenance_or_non_affiliation"]["count"], 0)
+        self.assertIn("README.md", details["by_category"]["provenance_or_non_affiliation"]["paths"])
+        self.assertIn("components/gsa/public/locales/gsa-en.json", details["by_category"]["active_product_surface"]["paths"])
+        self.assertEqual(details["by_category"]["unknown"]["count"], 0)
+
+    def test_branding_category_classifies_known_contexts(self):
+        self.assertEqual(turbovasctl.branding_category("README.md"), "provenance_or_non_affiliation")
+        self.assertEqual(turbovasctl.branding_category("docs/ARCHITECTURE_FLOWS.md"), "technical_doc_context")
+        self.assertEqual(turbovasctl.branding_category("components/gsa/public/locales/gsa-en.json"), "active_product_surface")
 
     def test_retained_json_artifacts_write_latest_history_and_prune(self):
         with tempfile.TemporaryDirectory() as tmp:
