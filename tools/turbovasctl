@@ -2336,6 +2336,23 @@ def summarize_native_tooling(items: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "total_items": len(items),
         "by_category": by_category,
+        "implemented_native_endpoints": [
+            {
+                "endpoint": "/api/v1/scope-reports",
+                "status": "implemented_internal",
+                "replacement_candidates": ["scope-report list reads", "gvm-tools list-scope-reports script"],
+            },
+            {
+                "endpoint": "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/hosts",
+                "status": "implemented_internal",
+                "replacement_candidates": ["scope-report Hosts tab", "host evidence reads for scope reports"],
+            },
+            {
+                "endpoint": "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/cves",
+                "status": "implemented_internal",
+                "replacement_candidates": ["scope-report CVEs tab", "CVE evidence reads for scope reports"],
+            },
+        ],
         "next_replacement_candidates": [
             {"workflow": "raw and scope-report metrics runtime helpers", "current_dependency": "python-gvm over GMP/XML", "native_target": "/api/v1/reports/{report_id}/metrics and /api/v1/scopes/{scope_id}/reports/{scope_report_id}/metrics"},
             {"workflow": "scope-report Hosts/CVEs tabs", "current_dependency": "GSA GMP command clients and source-report stitching", "native_target": "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/hosts and /cves"},
