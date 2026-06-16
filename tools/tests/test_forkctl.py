@@ -593,6 +593,8 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("def command_runtime_performance_snapshot", source)
         self.assertIn("def command_runtime_redis_state", source)
         self.assertIn("def command_runtime_native_api_smoke", source)
+        self.assertIn("native-api.scope-report-hosts", source)
+        self.assertIn("native-api.scope-report-cves", source)
         self.assertIn("def command_security_policy_check", source)
         self.assertIn("def command_path_coupling_state", source)
         self.assertIn("def command_production_posture_check", source)

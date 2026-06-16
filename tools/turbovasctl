@@ -4477,10 +4477,26 @@ def command_runtime_native_api_smoke(repo_root: Path) -> dict[str, Any]:
                     compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/scopes/.../reports/.../hosts?page_size=5"),
                 )
             )
+            cves_path = f"/api/v1/scopes/{scope_id}/reports/{scope_report_id}/cves?page_size=5&sort=-max_severity"
+            cves = native_api_curl(repo_root, cves_path)
+            cves_json = parse_json_output(cves)
+            details["cves"] = cves_json
+            cve_items = cves_json.get("items", []) if isinstance(cves_json, dict) else []
+            findings.append(
+                process_step_finding(
+                    "pass" if cves.returncode == 0 and isinstance(cve_items, list) else "fail",
+                    "native-api.scope-report-cves",
+                    f"Native API scope-report CVEs probe exit code {cves.returncode}.",
+                    cves,
+                    compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/scopes/.../reports/.../cves?page_size=5"),
+                )
+            )
         else:
             findings.append(finding("fail", "native-api.scope-report-hosts", "Scope-report list did not include a scope/report id pair for the host probe."))
+            findings.append(finding("fail", "native-api.scope-report-cves", "Scope-report list did not include a scope/report id pair for the CVE probe."))
     else:
         findings.append(finding("warn", "native-api.scope-report-hosts", "No scope reports exist yet, so the host collection probe was skipped."))
+        findings.append(finding("warn", "native-api.scope-report-cves", "No scope reports exist yet, so the CVE collection probe was skipped."))
 
     result = make_result("runtime-native-api-smoke", repo_root, "Native API smoke checks completed.", findings, [str(artifact_dir / "native-api-smoke.json")])
     result["details"] = details

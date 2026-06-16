@@ -428,12 +428,17 @@ components:
       properties:
         id:
           type: string
-        severity:
-          type: number
         affected_system_count:
           type: integer
-        source_report_count:
+        result_count:
           type: integer
+        max_severity:
+          type: number
+        source_report_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
     ReportMetrics:
       type: object
       required: [summary, systems, vulnerabilities]
