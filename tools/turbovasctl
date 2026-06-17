@@ -4340,7 +4340,7 @@ def runtime_report_summary_row(row: dict[str, Any]) -> dict[str, Any]:
         "id": row.get("id"),
         "name": row.get("name"),
         "host": row.get("host"),
-        "hostname": None,
+        "hostname": row.get("hostname"),
         "port": row.get("port"),
         "severity": str(row.get("severity", "")),
         "severity_score": severity_score,
@@ -4348,8 +4348,8 @@ def runtime_report_summary_row(row: dict[str, Any]) -> dict[str, Any]:
         "qod": json_int(row.get("qod")),
         "nvt_oid": row.get("nvt_oid"),
         "nvt_name": row.get("name"),
-        "nvt_family": None,
-        "description_excerpt": None,
+        "nvt_family": row.get("nvt_family"),
+        "description_excerpt": row.get("description_excerpt"),
     }
 
 
@@ -4380,6 +4380,9 @@ def runtime_report_summary_affected_hosts(rows: list[dict[str, Any]]) -> list[di
         current["max_severity"] = max(current["max_severity"], severity_score)
         if severity_score > 0:
             current["vulnerability_count"] += 1
+        hostname = row.get("hostname")
+        if hostname:
+            current["hostnames"].add(str(hostname))
         current["threats"].add(native_result_threat(severity_score))
     return sorted(
         [

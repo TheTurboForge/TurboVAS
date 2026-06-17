@@ -702,11 +702,17 @@ components:
           type: string
         host:
           type: string
+        hostname:
+          type: string
         port:
           type: string
         nvt_oid:
           type: string
         name:
+          type: string
+        nvt_family:
+          type: string
+        description_excerpt:
           type: string
         severity:
           type: number

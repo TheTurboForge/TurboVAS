@@ -65,6 +65,15 @@ the native raw report detail/result-row endpoints instead of `python-gvm`.
 `runtime-native-api-smoke --json` and browser smoke cover the live runtime
 endpoints.
 
+Native raw and scope-report result rows include host, optional hostname,
+port, NVT OID/name/family, severity, QoD, creation time, source report ID,
+raw evidence link, and a bounded description excerpt. These fields are enough
+for summary views and future export-helper migration without asking GSA or
+runtime helpers to stitch raw XML report payloads together client-side.
+`runtime-report-export --json` remains on the inherited path until raw report
+count semantics are made explicitly equivalent or deliberately renamed in the
+native contract.
+
 ## Non-Goals For V1
 
 - Do not expose arbitrary GMP command forwarding through `/api/v1`.

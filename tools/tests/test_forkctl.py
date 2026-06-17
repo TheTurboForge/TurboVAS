@@ -762,6 +762,8 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("/reports:", openapi)
         self.assertIn("/reports/{report_id}:", openapi)
         self.assertIn("/reports/{report_id}/results:", openapi)
+        self.assertIn("description_excerpt", openapi)
+        self.assertIn("nvt_family", openapi)
         self.assertIn("ReportReference", openapi)
         self.assertIn("ReportSeverityCounts", openapi)
         self.assertIn("route(\"/api/v1/reports\", get(reports))", source)

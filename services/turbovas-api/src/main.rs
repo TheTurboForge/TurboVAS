@@ -258,9 +258,12 @@ struct TlsCertificateItem {
 struct ResultItem {
     id: String,
     host: String,
+    hostname: Option<String>,
     port: String,
     nvt_oid: String,
     name: String,
+    nvt_family: Option<String>,
+    description_excerpt: Option<String>,
     severity: f64,
     qod: i64,
     created_at: Option<String>,
@@ -577,9 +580,12 @@ async fn report_results(
          result_rows AS (\n\
              SELECT r.uuid AS id,\n\
                     lower(coalesce(nullif(r.host, ''), r.hostname, '')) AS host,\n\
+                    nullif(r.hostname, '') AS hostname,\n\
                     coalesce(r.port, '') AS port,\n\
                     coalesce(r.nvt, '') AS nvt_oid,\n\
                     coalesce(n.name, r.nvt, '') AS name,\n\
+                    nullif(n.family, '') AS nvt_family,\n\
+                    nullif(left(coalesce(r.description, ''), 240), '') AS description_excerpt,\n\
                     coalesce(r.severity, 0)::double precision AS severity,\n\
                     coalesce(r.qod, 0)::bigint AS qod,\n\
                     coalesce(r.date, 0)::bigint AS created_at_unix,\n\
@@ -587,7 +593,8 @@ async fn report_results(
                FROM selected_report sr\n\
                JOIN results r ON r.report = sr.id\n\
                LEFT JOIN nvts n ON n.oid = r.nvt\n\
-              WHERE coalesce(nullif(r.host, ''), r.hostname, '') <> ''\n\
+              WHERE coalesce(r.severity, 0) != -3.0\n\
+                AND coalesce(nullif(r.host, ''), r.hostname, '') <> ''\n\
          ),\n\
          filtered AS (\n\
              SELECT * FROM result_rows\n\
@@ -978,9 +985,12 @@ async fn scope_report_results(
          ranked AS (\n\
              SELECT r.uuid AS id,\n\
                     lower(coalesce(nullif(r.host, ''), r.hostname, '')) AS host,\n\
+                    nullif(r.hostname, '') AS hostname,\n\
                     coalesce(r.port, '') AS port,\n\
                     coalesce(r.nvt, '') AS nvt_oid,\n\
                     coalesce(n.name, r.nvt, '') AS name,\n\
+                    nullif(n.family, '') AS nvt_family,\n\
+                    nullif(left(coalesce(r.description, ''), 240), '') AS description_excerpt,\n\
                     coalesce(r.severity, 0)::double precision AS severity,\n\
                     coalesce(r.qod, 0)::bigint AS qod,\n\
                     coalesce(r.date, 0)::bigint AS created_at_unix,\n\
@@ -999,7 +1009,7 @@ async fn scope_report_results(
                 AND coalesce(nullif(r.host, ''), r.hostname, '') <> ''\n\
          ),\n\
          result_rows AS (\n\
-             SELECT id, host, port, nvt_oid, name, severity, qod, created_at_unix, source_report_id\n\
+             SELECT id, host, hostname, port, nvt_oid, name, nvt_family, description_excerpt, severity, qod, created_at_unix, source_report_id\n\
                FROM ranked WHERE rn = 1\n\
          ),\n\
          filtered AS (\n\
@@ -2498,18 +2508,21 @@ fn tls_certificate_from_row(row: &Row) -> TlsCertificateItem {
 }
 
 fn result_from_row(row: &Row) -> ResultItem {
-    let id: String = row.get(1);
-    let source_report_id: String = row.get(9);
+    let id: String = row.get("id");
+    let source_report_id: String = row.get("source_report_id");
     ResultItem {
         raw_evidence_href: format!("/report/{source_report_id}/result/{id}"),
         id,
-        host: row.get(2),
-        port: row.get(3),
-        nvt_oid: row.get(4),
-        name: row.get(5),
-        severity: row.get(6),
-        qod: row.get(7),
-        created_at: unix_ts_to_rfc3339(row.get(8)),
+        host: row.get("host"),
+        hostname: row.get("hostname"),
+        port: row.get("port"),
+        nvt_oid: row.get("nvt_oid"),
+        name: row.get("name"),
+        nvt_family: row.get("nvt_family"),
+        description_excerpt: row.get("description_excerpt"),
+        severity: row.get("severity"),
+        qod: row.get("qod"),
+        created_at: unix_ts_to_rfc3339(row.get("created_at_unix")),
         source_report_id,
     }
 }
