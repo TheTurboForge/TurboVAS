@@ -63,9 +63,10 @@ The first endpoint is not complete until it proves:
 Implementation commit `c59140a` proved the internal sidecar for scope-report
 list and Hosts. Later B-117/B-125 slices added scope-report Results, CVEs,
 Error Messages, persisted scope-report Metrics, and raw report Metrics with the
-same internal-only, PostgreSQL-backed pattern. The first browser proof now
-routes raw-report and scope-report Metrics through the authenticated
-same-origin `gsad` proxy defined in `docs/NATIVE_API_AUTH_BOUNDARY.md`.
+same internal-only, PostgreSQL-backed pattern. Browser proof work now routes
+raw-report and scope-report Metrics plus scope-report Hosts, CVEs, and Error
+Messages through the authenticated same-origin `gsad` proxy defined in
+`docs/NATIVE_API_AUTH_BOUNDARY.md`.
 
 ## Not In The First Proof
 
@@ -77,7 +78,7 @@ high-consequence inherited control paths until separately designed and reviewed.
 
 After scope-report Results/Hosts/CVEs/Error Messages/Metrics and raw report Metrics work, the next candidates are:
 
-1. authenticated same-origin browser access for another low-risk scope-report
-   read workflow through `gsad`, preferably Hosts or CVEs.
+1. authenticated same-origin browser access for scope-report Results through
+   `gsad`, replacing the remaining report-result GMP collection path.
 2. raw report list/detail or scope metadata reads, only if they directly unlock
    helper or browser migration away from GMP/XML.

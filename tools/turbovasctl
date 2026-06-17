@@ -2344,8 +2344,8 @@ def summarize_native_tooling(items: list[dict[str, Any]]) -> dict[str, Any]:
             },
             {
                 "endpoint": "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/hosts",
-                "status": "implemented_internal",
-                "replacement_candidates": ["scope-report Hosts tab", "host evidence reads for scope reports"],
+                "status": "implemented_internal_and_browser_proxied",
+                "replacement_candidates": ["GSA scope-report Hosts tab (migrated through gsad same-origin proxy)", "host evidence reads for scope reports"],
             },
             {
                 "endpoint": "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/results",
@@ -2354,13 +2354,13 @@ def summarize_native_tooling(items: list[dict[str, Any]]) -> dict[str, Any]:
             },
             {
                 "endpoint": "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/cves",
-                "status": "implemented_internal",
-                "replacement_candidates": ["scope-report CVEs tab", "CVE evidence reads for scope reports"],
+                "status": "implemented_internal_and_browser_proxied",
+                "replacement_candidates": ["GSA scope-report CVEs tab (migrated through gsad same-origin proxy)", "CVE evidence reads for scope reports"],
             },
             {
                 "endpoint": "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/errors",
-                "status": "implemented_internal",
-                "replacement_candidates": ["scope-report Error Messages tab", "scan-fidelity evidence reads for scope reports"],
+                "status": "implemented_internal_and_browser_proxied",
+                "replacement_candidates": ["GSA scope-report Error Messages tab (migrated through gsad same-origin proxy)", "scan-fidelity evidence reads for scope reports"],
             },
             {
                 "endpoint": "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/metrics",
@@ -2374,7 +2374,8 @@ def summarize_native_tooling(items: list[dict[str, Any]]) -> dict[str, Any]:
             },
         ],
         "next_replacement_candidates": [
-            {"workflow": "remaining scope-report browser tabs", "current_dependency": "GSA GMP command clients and source-report stitching", "native_target": "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/results, /hosts, /cves, and /errors"},
+            {"workflow": "scope-report Results browser tab", "current_dependency": "GSA GMP command clients and scope-report result command path", "native_target": "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/results"},
+            {"workflow": "remaining source-backed scope-report tabs", "current_dependency": "GSA source-report stitching for ports, applications, operating systems, and TLS certificates", "native_target": "typed native collection endpoints after data-contract definition"},
             {"workflow": "gvm-tools scope/report scripts", "current_dependency": "gvm-tools GMP scripts", "native_target": "turbovasctl or native HTTP/JSON client commands"},
         ],
     }

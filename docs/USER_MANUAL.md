@@ -189,11 +189,14 @@ in evidence can be promoted into official custom-scope membership before saving.
 Raw `/reports` and `/report/:id` pages remain available for technical evidence.
 
 Scope report details include lazy evidence tabs for Hosts, Ports, Applications,
-Operating Systems, CVEs, TLS Certificates, and Error Messages. These tabs load
-the selected raw source reports as evidence. The core list and result-reading
-paths are already backed by gvmd/PostgreSQL queries; future backend work should
-move the remaining heavyweight evidence tabs in the same direction where it
-improves performance or correctness.
+Operating Systems, CVEs, TLS Certificates, and Error Messages. Hosts, CVEs, and
+Error Messages are shown as aggregated scope-report collections backed by the
+native DB-backed API. Ports, Applications, Operating Systems, and TLS
+Certificates still load selected raw source reports as evidence. The Evidence
+Sources tab remains the provenance view for raw report, task, and target links.
+Future backend work should move the remaining heavyweight evidence tabs toward
+the same DB-backed collection model where it improves performance or
+correctness.
 
 See `SCOPE_BASED_REPORTING.md` for the detailed scope model and
 `REPORTING_MODEL.md` for the first reporting loop. See

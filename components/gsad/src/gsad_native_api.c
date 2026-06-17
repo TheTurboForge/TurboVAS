@@ -13,6 +13,7 @@
 #include "gsad_connection_info.h"
 #include "gsad_credentials.h"
 #include "gsad_http.h"
+#include "gsad_params.h"
 
 #include <errno.h>
 #include <netdb.h>
@@ -56,6 +57,8 @@ native_api_path_is_allowed (const gchar *path)
   const gchar *raw_report_prefix = "/api/v1/reports/";
   const gchar *scope_prefix = "/api/v1/scopes/";
   const gchar *metrics_suffix = "/metrics";
+  const gchar *scope_collection_suffixes[] = { "/metrics", "/hosts", "/cves",
+                                               "/errors", NULL };
 
   if (path == NULL || strchr (path, '?') != NULL)
     return FALSE;
@@ -69,23 +72,70 @@ native_api_path_is_allowed (const gchar *path)
       return is_uuid_segment (id, id_len);
     }
 
-  if (g_str_has_prefix (path, scope_prefix)
-      && g_str_has_suffix (path, metrics_suffix))
+  if (g_str_has_prefix (path, scope_prefix))
     {
       const gchar *scope_id = path + strlen (scope_prefix);
       const gchar *reports_sep = strstr (scope_id, "/reports/");
+      const gchar *suffix = NULL;
       if (reports_sep == NULL)
         return FALSE;
 
       const gchar *report_id = reports_sep + strlen ("/reports/");
       gsize scope_id_len = reports_sep - scope_id;
-      gsize report_id_len = strlen (report_id) - strlen (metrics_suffix);
+      gsize report_id_len;
+
+      for (gsize i = 0; scope_collection_suffixes[i] != NULL; i++)
+        if (g_str_has_suffix (path, scope_collection_suffixes[i]))
+          {
+            suffix = scope_collection_suffixes[i];
+            break;
+          }
+
+      if (suffix == NULL)
+        return FALSE;
+
+      report_id_len = strlen (report_id) - strlen (suffix);
 
       return is_uuid_segment (scope_id, scope_id_len)
              && is_uuid_segment (report_id, report_id_len);
     }
 
   return FALSE;
+}
+
+static void
+append_query_param (GString *target, params_t *params, const gchar *name)
+{
+  const gchar *value;
+  gchar *escaped_name;
+  gchar *escaped_value;
+
+  if (params == NULL)
+    return;
+
+  value = params_value (params, name);
+  if (value == NULL)
+    return;
+
+  escaped_name = g_uri_escape_string (name, NULL, TRUE);
+  escaped_value = g_uri_escape_string (value, NULL, TRUE);
+  g_string_append_c (target, strchr (target->str, '?') == NULL ? '?' : '&');
+  g_string_append_printf (target, "%s=%s", escaped_name, escaped_value);
+  g_free (escaped_name);
+  g_free (escaped_value);
+}
+
+static gchar *
+native_api_request_target (const gchar *path, params_t *params)
+{
+  GString *target = g_string_new (path);
+
+  append_query_param (target, params, "page");
+  append_query_param (target, params, "page_size");
+  append_query_param (target, params, "sort");
+  append_query_param (target, params, "filter");
+
+  return g_string_free (target, FALSE);
 }
 
 static gsad_http_result_t
@@ -263,6 +313,8 @@ gsad_http_handle_native_api_get (gsad_http_handler_t *handler_next,
 {
   gsad_credentials_t *credentials = (gsad_credentials_t *) data;
   const gchar *path = gsad_connection_info_get_url (con_info);
+  params_t *params = gsad_connection_info_get_params (con_info);
+  gchar *request_target = NULL;
   gchar *body = NULL;
   gchar *error_message = NULL;
   guint status_code = MHD_HTTP_BAD_GATEWAY;
@@ -278,7 +330,9 @@ gsad_http_handle_native_api_get (gsad_http_handler_t *handler_next,
                               "Native API path is not available.");
     }
 
-  body = fetch_native_api_json (path, &status_code, &error_message);
+  request_target = native_api_request_target (path, params);
+  body = fetch_native_api_json (request_target, &status_code, &error_message);
+  g_free (request_target);
   gsad_credentials_free (credentials);
 
   if (body == NULL)

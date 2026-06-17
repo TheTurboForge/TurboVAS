@@ -53,10 +53,10 @@ The first runtime implementation proof is scoped in
 for scope-report list, Results, Hosts, CVEs, Error Messages, scope-report
 Metrics, and raw report Metrics because those read paths validate DB-backed
 scope membership, evidence provenance, and report reading without changing
-scanner control behavior. The first browser-facing proof is now the report
-Metrics tab: GSA calls same-origin `/api/v1/.../metrics` paths, and `gsad`
-authenticates and allowlists those reads before proxying to the internal
-sidecar.
+scanner control behavior. Browser-facing proof now covers report Metrics and
+scope-report Hosts, CVEs, and Error Messages: GSA calls same-origin
+`/api/v1/...` paths, and `gsad` authenticates and allowlists those reads before
+proxying to the internal sidecar.
 
 ## Non-Goals For V1
 

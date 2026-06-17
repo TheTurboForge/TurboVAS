@@ -233,6 +233,22 @@ async function waitForMetricLabels(page) {
   ).catch(() => null);
 }
 
+async function waitForNativeApiResponse(page, responses, matcher) {
+  const deadline = Date.now() + config.timeoutMs;
+  while (Date.now() < deadline) {
+    const match = responses.find(item => matcher.test(item.path) && item.status >= 200 && item.status < 300);
+    if (match) return match;
+    await page.waitForTimeout(250);
+  }
+  return null;
+}
+
+async function assertNoPerSourceEvidenceSections(page, check) {
+  const text = await bodyText(page);
+  const found = /Evidence Source:/i.test(text);
+  add(found ? 'fail' : 'pass', check, found ? 'Tab still renders per-source raw-report evidence sections.' : 'Tab renders as one aggregated scope-report collection.', { url: page.url() });
+}
+
 async function runForBaseUrl(baseUrl) {
   config.baseUrl = baseUrl;
   const browser = await chromium.launch({ headless: true });
@@ -299,8 +315,33 @@ async function runForBaseUrl(baseUrl) {
     if (await clickTab(page, 'Hosts', isScopeReportDetailUrl)) {
       await screenshot(page, 'scope-report-hosts-tab');
       await assertNoAppError(page, 'scope-report-hosts-tab.app-error');
+      await assertNoPerSourceEvidenceSections(page, 'scope-report.hosts-aggregated-native-tab');
+      const nativeScopeHosts = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/scopes\/[^/]+\/reports\/[^/]+\/hosts$/);
+      add(nativeScopeHosts ? 'pass' : 'fail', 'scope-report.hosts-native-api', nativeScopeHosts ? 'Scope-report Hosts tab loaded through same-origin native API.' : 'Scope-report Hosts tab did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => item.path.includes('/hosts')) });
     } else {
-      add('fail', 'scope-report.hosts-tab', 'Could not activate the source-backed Hosts tab.');
+      add('fail', 'scope-report.hosts-tab', 'Could not activate the native Hosts tab.');
+    }
+
+    await page.goto(detailUrl, { waitUntil: 'networkidle', timeout: config.timeoutMs });
+    if (await clickTab(page, 'CVEs', isScopeReportDetailUrl)) {
+      await screenshot(page, 'scope-report-cves-tab');
+      await assertNoAppError(page, 'scope-report-cves-tab.app-error');
+      await assertNoPerSourceEvidenceSections(page, 'scope-report.cves-aggregated-native-tab');
+      const nativeScopeCves = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/scopes\/[^/]+\/reports\/[^/]+\/cves$/);
+      add(nativeScopeCves ? 'pass' : 'fail', 'scope-report.cves-native-api', nativeScopeCves ? 'Scope-report CVEs tab loaded through same-origin native API.' : 'Scope-report CVEs tab did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => item.path.includes('/cves')) });
+    } else {
+      add('fail', 'scope-report.cves-tab', 'Could not activate the native CVEs tab.');
+    }
+
+    await page.goto(detailUrl, { waitUntil: 'networkidle', timeout: config.timeoutMs });
+    if (await clickTab(page, 'Error Messages', isScopeReportDetailUrl)) {
+      await screenshot(page, 'scope-report-errors-tab');
+      await assertNoAppError(page, 'scope-report-errors-tab.app-error');
+      await assertNoPerSourceEvidenceSections(page, 'scope-report.errors-aggregated-native-tab');
+      const nativeScopeErrors = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/scopes\/[^/]+\/reports\/[^/]+\/errors$/);
+      add(nativeScopeErrors ? 'pass' : 'fail', 'scope-report.errors-native-api', nativeScopeErrors ? 'Scope-report Error Messages tab loaded through same-origin native API.' : 'Scope-report Error Messages tab did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => item.path.includes('/errors')) });
+    } else {
+      add('fail', 'scope-report.errors-tab', 'Could not activate the native Error Messages tab.');
     }
 
     await page.goto(detailUrl, { waitUntil: 'networkidle', timeout: config.timeoutMs });

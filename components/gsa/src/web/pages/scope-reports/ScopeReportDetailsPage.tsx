@@ -31,6 +31,7 @@ import TableRow from 'web/components/table/TableRow';
 import useGmp from 'web/hooks/useGmp';
 import useTranslation from 'web/hooks/useTranslation';
 import MetricsTab from 'web/pages/reports/details/MetricsTab';
+import NativeScopeReportEvidenceTab from 'web/pages/scope-reports/NativeScopeReportEvidenceTab';
 import ScopeReportEvidenceTab from 'web/pages/scope-reports/ScopeReportEvidenceTab';
 import ScopeReportResultsTab from 'web/pages/scope-reports/ScopeReportResultsTab';
 import {
@@ -179,7 +180,13 @@ const ScopeReportDetailsPage = () => {
   const metricsTab = (
     <MetricsTab id={report.id} scopeId={report.scopeId} source="scopeReport" />
   );
-  const hostsTab = <ScopeReportEvidenceTab kind="hosts" report={report} />;
+  const hostsTab = (
+    <NativeScopeReportEvidenceTab
+      kind="hosts"
+      scopeId={report.scopeId}
+      scopeReportId={report.id}
+    />
+  );
   const portsTab = <ScopeReportEvidenceTab kind="ports" report={report} />;
   const applicationsTab = (
     <ScopeReportEvidenceTab kind="applications" report={report} />
@@ -187,11 +194,23 @@ const ScopeReportDetailsPage = () => {
   const operatingSystemsTab = (
     <ScopeReportEvidenceTab kind="operatingSystems" report={report} />
   );
-  const cvesTab = <ScopeReportEvidenceTab kind="cves" report={report} />;
+  const cvesTab = (
+    <NativeScopeReportEvidenceTab
+      kind="cves"
+      scopeId={report.scopeId}
+      scopeReportId={report.id}
+    />
+  );
   const tlsCertificatesTab = (
     <ScopeReportEvidenceTab kind="tlsCertificates" report={report} />
   );
-  const errorsTab = <ScopeReportEvidenceTab kind="errors" report={report} />;
+  const errorsTab = (
+    <NativeScopeReportEvidenceTab
+      kind="errors"
+      scopeId={report.scopeId}
+      scopeReportId={report.id}
+    />
+  );
 
   const sourcesTab = (
     <Table>

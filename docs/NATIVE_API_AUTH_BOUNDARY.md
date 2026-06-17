@@ -49,14 +49,14 @@ trusted scanner operator. That simplifies product authorization, but it does
 not remove the need for one clear authentication boundary. For now, that
 boundary remains `gsad`.
 
-## First Browser Proof
+## Browser Proof Scope
 
-The first browser proof is read-only and low consequence: raw-report Metrics
-and scope-report Metrics load through authenticated same-origin `gsad` paths
-and then proxy to the Docker-internal `turbovas-api` service. This proves the
-browser can consume typed native JSON for one report-reading workflow without
-exposing the sidecar, adding CORS, or removing the inherited GMP/XML report
-paths.
+The browser proof is read-only and low consequence: raw-report Metrics,
+scope-report Metrics, and scope-report Hosts, CVEs, and Error Messages load
+through authenticated same-origin `gsad` paths and then proxy to the
+Docker-internal `turbovas-api` service. This proves the browser can consume
+typed native JSON for report-reading workflows without exposing the sidecar,
+adding CORS, or removing inherited GMP/XML control paths.
 
 Acceptance for the first proof:
 
@@ -66,7 +66,7 @@ Acceptance for the first proof:
   from `gsad` before reaching the sidecar.
 - Authenticated requests are proxied to `turbovas-api` and return typed JSON
   matching `api/openapi/turbovas-v1.yaml`; the current allowlist covers only
-  raw-report metrics and scope-report metrics.
+  raw-report metrics and selected scope-report read collections.
 - Existing GMP/GSA behavior remains available during the migration.
 - Browser smoke validates the routed page or tab as a user-visible workflow.
 

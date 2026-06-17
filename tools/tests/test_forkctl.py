@@ -538,6 +538,27 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("Authenticated Scan Coverage", metrics_tab)
         self.assertIn("No Credential Path", metrics_tab)
 
+    def test_scope_report_evidence_tabs_use_native_collections(self):
+        root = Path(__file__).resolve().parents[2]
+        scope_details = (root / "components" / "gsa" / "src" / "web" / "pages" / "scope-reports" / "ScopeReportDetailsPage.tsx").read_text(encoding="utf-8")
+        native_tab = (root / "components" / "gsa" / "src" / "web" / "pages" / "scope-reports" / "NativeScopeReportEvidenceTab.tsx").read_text(encoding="utf-8")
+        native_client = (root / "components" / "gsa" / "src" / "gmp" / "native-api" / "scope-report-collections.ts").read_text(encoding="utf-8")
+        self.assertIn("NativeScopeReportEvidenceTab", scope_details)
+        self.assertIn('kind="hosts"', scope_details)
+        self.assertIn('kind="cves"', scope_details)
+        self.assertIn('kind="errors"', scope_details)
+        self.assertIn('ScopeReportEvidenceTab kind="ports"', scope_details)
+        self.assertIn('ScopeReportEvidenceTab kind="applications"', scope_details)
+        self.assertIn('ScopeReportEvidenceTab kind="operatingSystems"', scope_details)
+        self.assertIn('ScopeReportEvidenceTab kind="tlsCertificates"', scope_details)
+        self.assertIn("fetchNativeScopeReportHosts", native_tab)
+        self.assertIn("fetchNativeScopeReportCves", native_tab)
+        self.assertIn("fetchNativeScopeReportErrors", native_tab)
+        self.assertIn("api/v1/scopes/", native_client)
+        self.assertIn("scopeReportPath(scopeId, scopeReportId, 'hosts')", native_client)
+        self.assertIn("scopeReportPath(scopeId, scopeReportId, 'cves')", native_client)
+        self.assertIn("scopeReportPath(scopeId, scopeReportId, 'errors')", native_client)
+
     def test_gsad_native_api_proxy_is_authenticated_and_allowlisted(self):
         root = Path(__file__).resolve().parents[2]
         request_router = (root / "components" / "gsad" / "src" / "gsad_http_handle_request.c").read_text(encoding="utf-8")
@@ -557,6 +578,15 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("/api/v1/reports/", native_api)
         self.assertIn("/api/v1/scopes/", native_api)
         self.assertIn("/metrics", native_api)
+        self.assertIn("/hosts", native_api)
+        self.assertIn("/cves", native_api)
+        self.assertIn("/errors", native_api)
+        self.assertIn("native_api_request_target", native_api)
+        self.assertIn('append_query_param (target, params, "page")', native_api)
+        self.assertIn('append_query_param (target, params, "page_size")', native_api)
+        self.assertIn('append_query_param (target, params, "sort")', native_api)
+        self.assertIn('append_query_param (target, params, "filter")', native_api)
+        self.assertNotIn('append_query_param (target, params, "token")', native_api)
         self.assertNotIn("MHD_POSTDATA_KIND", native_api)
 
     def test_runtime_browser_smoke_is_registered(self):
@@ -1079,6 +1109,12 @@ db2:keys=5,expires=0,avg_ttl=0
         source = (Path(__file__).resolve().parents[1] / "runtime_browser_smoke.py").read_text(encoding="utf-8")
         self.assertIn("scope-report.metrics-tab", source)
         self.assertIn("scope-report.metrics-native-api", source)
+        self.assertIn("scope-report.hosts-native-api", source)
+        self.assertIn("scope-report.cves-native-api", source)
+        self.assertIn("scope-report.errors-native-api", source)
+        self.assertIn("scope-report.hosts-aggregated-native-tab", source)
+        self.assertIn("scope-report.cves-aggregated-native-tab", source)
+        self.assertIn("scope-report.errors-aggregated-native-tab", source)
         self.assertIn("raw-report.metrics-tab", source)
         self.assertIn("raw-report.metrics-native-api", source)
         self.assertIn("/api/v1/", source)
