@@ -84,6 +84,29 @@ interface NativeReportResultsPayload {
   items?: NativeReportResultPayload[];
 }
 
+interface NativeReportHostPayload {
+  host: string;
+  hostname?: string;
+  best_os_cpe?: string;
+  best_os_txt?: string;
+  ports_count: number;
+  applications_count: number;
+  distance?: number;
+  authentication_state: string;
+  start_time?: string;
+  end_time?: string;
+  result_count: number;
+  vulnerability_count: number;
+  severity: NativeReportSeverityCounts;
+  max_severity: number;
+  source_report_id: string;
+}
+
+interface NativeReportHostsPayload {
+  page?: Partial<NativeReportPage>;
+  items?: NativeReportHostPayload[];
+}
+
 type NativeReportDetailPayload = NativeReportItem;
 
 export interface NativeReportQuery {
@@ -124,6 +147,29 @@ export interface NativeReportResultsResponse {
   page: NativeReportPage;
 }
 
+export interface NativeReportHostItem {
+  host: string;
+  hostname?: string;
+  bestOsCpe?: string;
+  bestOsTxt?: string;
+  portsCount: number;
+  applicationsCount: number;
+  distance?: number;
+  authenticationState: string;
+  startTime?: string;
+  endTime?: string;
+  resultCount: number;
+  vulnerabilityCount: number;
+  severity: NativeReportSeverityCounts;
+  maxSeverity: number;
+  sourceReportId: string;
+}
+
+export interface NativeReportHostsResponse {
+  items: NativeReportHostItem[];
+  page: NativeReportPage;
+}
+
 const REPORT_SORT_FIELDS: Record<string, string> = {
   date: 'creation_time',
   creation_time: 'creation_time',
@@ -155,6 +201,30 @@ const RESULT_SORT_FIELDS: Record<string, string> = {
   severity: 'severity',
 };
 
+const HOST_SORT_FIELDS: Record<string, string> = {
+  appsCount: 'applications_count',
+  applications_count: 'applications_count',
+  critical: 'critical',
+  distance: 'distance',
+  end: 'end_time',
+  end_time: 'end_time',
+  false_positive: 'false_positive',
+  high: 'high',
+  hostname: 'hostname',
+  ip: 'host',
+  log: 'log',
+  low: 'low',
+  medium: 'medium',
+  portsCount: 'ports_count',
+  ports_count: 'ports_count',
+  result_count: 'result_count',
+  severity: 'severity',
+  start: 'start_time',
+  start_time: 'start_time',
+  total: 'result_count',
+  vulnerability_count: 'vulnerability_count',
+};
+
 const integerValue = (value: unknown, fallback = 0): number => {
   const parsed = Number.parseInt(String(value ?? fallback), 10);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -173,6 +243,14 @@ const nativeSortFromFilter = (filter?: Filter): string => {
   const ascending = filter?.get('sort');
   const rawField = stringValue(reverse ?? ascending) || 'creation_time';
   const nativeField = REPORT_SORT_FIELDS[rawField] ?? rawField;
+  return reverse !== undefined ? `-${nativeField}` : nativeField;
+};
+
+const nativeHostSortFromFilter = (filter?: Filter): string => {
+  const reverse = filter?.get('sort-reverse');
+  const ascending = filter?.get('sort');
+  const rawField = stringValue(reverse ?? ascending) || 'host';
+  const nativeField = HOST_SORT_FIELDS[rawField] ?? rawField;
   return reverse !== undefined ? `-${nativeField}` : nativeField;
 };
 
@@ -206,6 +284,19 @@ export const nativeReportResultsQueryFromFilter = (
   };
 };
 
+export const nativeReportHostsQueryFromFilter = (
+  filter?: Filter,
+): NativeReportQuery => {
+  const pageSize = Math.max(1, integerValue(filter?.get('rows'), 25));
+  const first = Math.max(1, integerValue(filter?.get('first'), 1));
+  return {
+    page: Math.floor((first - 1) / pageSize) + 1,
+    pageSize,
+    sort: nativeHostSortFromFilter(filter),
+    filter: nativeSearchFromFilter(filter),
+  };
+};
+
 export const nativeReportQueryFromFilter = (filter?: Filter): NativeReportQuery => {
   const pageSize = Math.max(1, integerValue(filter?.get('rows'), 25));
   const first = Math.max(1, integerValue(filter?.get('first'), 1));
@@ -233,6 +324,36 @@ const nativeReportResultFromPayload = (
   createdAt: stringValue(item.created_at) || undefined,
   sourceReportId: stringValue(item.source_report_id),
   rawEvidenceHref: stringValue(item.raw_evidence_href),
+});
+
+const nativeReportHostFromPayload = (
+  item: NativeReportHostPayload,
+): NativeReportHostItem => ({
+  host: stringValue(item.host),
+  hostname: stringValue(item.hostname) || undefined,
+  bestOsCpe: stringValue(item.best_os_cpe) || undefined,
+  bestOsTxt: stringValue(item.best_os_txt) || undefined,
+  portsCount: integerValue(item.ports_count),
+  applicationsCount: integerValue(item.applications_count),
+  distance:
+    item.distance === undefined || item.distance === null
+      ? undefined
+      : integerValue(item.distance),
+  authenticationState: stringValue(item.authentication_state),
+  startTime: stringValue(item.start_time) || undefined,
+  endTime: stringValue(item.end_time) || undefined,
+  resultCount: integerValue(item.result_count),
+  vulnerabilityCount: integerValue(item.vulnerability_count),
+  severity: {
+    critical: integerValue(item.severity?.critical),
+    high: integerValue(item.severity?.high),
+    medium: integerValue(item.severity?.medium),
+    low: integerValue(item.severity?.low),
+    log: integerValue(item.severity?.log),
+    false_positive: integerValue(item.severity?.false_positive),
+  },
+  maxSeverity: numberValue(item.max_severity),
+  sourceReportId: stringValue(item.source_report_id),
 });
 
 const nativeCounts = (page: NativeReportPage, length: number) =>
@@ -391,6 +512,35 @@ export const fetchNativeReportResults = async (
   };
   return {
     items: (payload.items ?? []).map(nativeReportResultFromPayload),
+    page,
+  };
+};
+
+export const fetchNativeReportHosts = async (
+  gmp: NativeApiGmp,
+  reportId: string,
+  query: NativeReportQuery,
+): Promise<NativeReportHostsResponse> => {
+  const payload = await fetchNativeJson<NativeReportHostsPayload>(
+    gmp,
+    `api/v1/reports/${encodeURIComponent(reportId)}/hosts`,
+    {
+      token: gmp.session.token,
+      page: query.page,
+      page_size: query.pageSize,
+      sort: query.sort,
+      filter: query.filter,
+    },
+  );
+  const page = {
+    page: integerValue(payload.page?.page, 1),
+    page_size: integerValue(payload.page?.page_size, query.pageSize),
+    total: integerValue(payload.page?.total),
+    sort: stringValue(payload.page?.sort),
+    filter: stringValue(payload.page?.filter),
+  };
+  return {
+    items: (payload.items ?? []).map(nativeReportHostFromPayload),
     page,
   };
 };

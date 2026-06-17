@@ -54,6 +54,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ResultCollection'
+  /reports/{report_id}/hosts:
+    get:
+      summary: List raw scan report hosts
+      parameters:
+        - $ref: '#/components/parameters/ReportId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Filter'
+      responses:
+        '200':
+          description: Raw report host collection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportHostCollection'
   /reports/{report_id}/metrics:
     get:
       summary: Read raw report metrics
@@ -394,6 +410,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Result'
+    ReportHostCollection:
+      type: object
+      required: [page, items]
+      properties:
+        page:
+          $ref: '#/components/schemas/PageInfo'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportHost'
     HostCollection:
       type: object
       required: [page, items]
@@ -726,6 +752,43 @@ components:
           format: uuid
         raw_evidence_href:
           type: string
+    ReportHost:
+      type: object
+      required: [host, ports_count, applications_count, authentication_state, result_count, vulnerability_count, severity, max_severity, source_report_id]
+      properties:
+        host:
+          type: string
+        hostname:
+          type: string
+        best_os_cpe:
+          type: string
+        best_os_txt:
+          type: string
+        ports_count:
+          type: integer
+        applications_count:
+          type: integer
+        distance:
+          type: integer
+        authentication_state:
+          enum: [Authenticated, Authentication Failed, No Credential Path, Unknown]
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        result_count:
+          type: integer
+        vulnerability_count:
+          type: integer
+        severity:
+          $ref: '#/components/schemas/ReportSeverityCounts'
+        max_severity:
+          type: number
+        source_report_id:
+          type: string
+          format: uuid
     Host:
       type: object
       required: [host, scope_membership]

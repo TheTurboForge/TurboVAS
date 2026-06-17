@@ -22,11 +22,11 @@ write-safety controls.
 
 The first live proof is the Docker-internal Rust `turbovas-api` sidecar for
 raw report reads, scope-report collections, and report metrics, currently raw
-report list/detail/result rows, scope-report list, Results, Hosts, Ports,
+report list/detail/result rows/hosts, scope-report list, Results, Hosts, Ports,
 Applications, Operating Systems, CVEs, TLS Certificates, Error Messages,
 scope-report Metrics, and raw report Metrics. It queries PostgreSQL directly and is
 intentionally not exposed on a host port. Browser migration now covers the raw
-`/reports` list, raw-report and scope-report Metrics, plus all current
+`/reports` list, raw-report Results/Hosts, raw-report and scope-report Metrics, plus all current
 scope-report evidence tabs through the authenticated same-origin `gsad` proxy
 defined in `docs/NATIVE_API_AUTH_BOUNDARY.md`.
 
@@ -43,7 +43,7 @@ defined in `docs/NATIVE_API_AUTH_BOUNDARY.md`.
 
 | Workflow | Current path | Native target | Retirement criterion |
 | --- | --- | --- | --- |
-| Raw report list/detail/results | GSA GMP commands -> gsad -> gvmd XML -> PostgreSQL | `/api/v1/reports`, `/api/v1/reports/{report_id}`, and `/api/v1/reports/{report_id}/results` | `/reports` now reads its list through typed JSON. Raw detail summary and raw report Results tab reads use native JSON through the authenticated `gsad` proxy; remaining heavy detail tabs stay inherited until migrated in follow-ups. |
+| Raw report list/detail/results/hosts | GSA GMP commands -> gsad -> gvmd XML -> PostgreSQL | `/api/v1/reports`, `/api/v1/reports/{report_id}`, `/api/v1/reports/{report_id}/results`, and `/api/v1/reports/{report_id}/hosts` | `/reports` now reads its list through typed JSON. Raw detail summary plus raw report Results and Hosts tab reads use native JSON through the authenticated `gsad` proxy; remaining heavy detail tabs stay inherited until migrated in follow-ups. |
 | Raw report metrics | `runtime-report-metrics` and the GSA Metrics tab now use the native API; the inherited `get_report_metrics` GMP command remains available during transition | `/api/v1/reports/{report_id}/metrics` | Runtime and browser smoke continue to prove the native path while GMP compatibility remains intact. |
 | Scope list/detail | GMP scope commands and GSA scope pages | `/api/v1/scopes` and `/api/v1/scopes/{scope_id}` | Scope metadata and membership reads move to typed JSON; writes remain inherited until designed. |
 | Scope-report list/detail | GMP scope-report commands and GSA scope-report pages | `/api/v1/scopes/reports` and canonical scoped detail path | GSA list/detail reads use server-backed JSON collections and browser smoke remains green. |

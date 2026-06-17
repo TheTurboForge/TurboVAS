@@ -272,6 +272,25 @@ struct ResultItem {
 }
 
 #[derive(Debug, Serialize)]
+struct ReportHostItem {
+    host: String,
+    hostname: Option<String>,
+    best_os_cpe: Option<String>,
+    best_os_txt: Option<String>,
+    ports_count: i64,
+    applications_count: i64,
+    distance: Option<i64>,
+    authentication_state: String,
+    start_time: Option<String>,
+    end_time: Option<String>,
+    result_count: i64,
+    vulnerability_count: i64,
+    severity: ReportSeverityCounts,
+    max_severity: f64,
+    source_report_id: String,
+}
+
+#[derive(Debug, Serialize)]
 struct ErrorMessageItem {
     id: String,
     host: String,
@@ -392,6 +411,7 @@ async fn main() -> Result<(), ApiError> {
         .route("/api/v1/reports", get(reports))
         .route("/api/v1/reports/:report_id", get(report_detail))
         .route("/api/v1/reports/:report_id/results", get(report_results))
+        .route("/api/v1/reports/:report_id/hosts", get(report_hosts))
         .route("/api/v1/scopes", get(scopes))
         .route("/api/v1/scopes/:scope_id", get(scope_detail))
         .route("/api/v1/scope-reports", get(scope_reports))
@@ -629,6 +649,160 @@ async fn report_results(
     }
     let total = rows.first().map(|row| row.get::<_, i64>(0)).unwrap_or(0);
     let items = rows.iter().map(result_from_row).collect();
+    Ok(Json(Collection {
+        page: params.page_info(total),
+        items,
+    }))
+}
+
+async fn report_hosts(
+    State(state): State<AppState>,
+    Path(report_id): Path<String>,
+    Query(query): Query<CollectionQuery>,
+) -> Result<Json<Collection<ReportHostItem>>, ApiError> {
+    parse_uuid(&report_id)?;
+    let params = normalize_collection_query(query, "host")?;
+    let sort_sql = sort_clause(
+        &params.sort,
+        &[
+            ("host", "host"),
+            ("hostname", "hostname"),
+            ("ports_count", "ports_count"),
+            ("applications_count", "applications_count"),
+            ("distance", "distance"),
+            ("authentication_state", "authentication_state"),
+            ("start_time", "start_time_unix"),
+            ("end_time", "end_time_unix"),
+            ("result_count", "result_count"),
+            ("vulnerability_count", "vulnerability_count"),
+            ("critical", "severity_critical"),
+            ("high", "severity_high"),
+            ("medium", "severity_medium"),
+            ("low", "severity_low"),
+            ("log", "severity_log"),
+            ("false_positive", "severity_false_positive"),
+            ("severity", "max_severity"),
+            ("max_severity", "max_severity"),
+        ],
+    )?;
+    let sql = format!(
+        r#"WITH selected_report AS (
+             SELECT id, uuid FROM reports WHERE lower(uuid) = lower($1)
+         ),
+         host_base AS (
+             SELECT rh.id AS report_host_id,
+                    lower(coalesce(nullif(rh.host, ''), rh.hostname, '')) AS host_key,
+                    coalesce(nullif(rh.host, ''), rh.hostname, '') AS host,
+                    nullif(rh.hostname, '') AS hostname,
+                    coalesce(rh.start_time, 0)::bigint AS start_time_unix,
+                    coalesce(rh.end_time, 0)::bigint AS end_time_unix,
+                    sr.uuid AS source_report_id
+               FROM selected_report sr
+               JOIN report_hosts rh ON rh.report = sr.id
+              WHERE coalesce(nullif(rh.host, ''), rh.hostname, '') <> ''
+         ),
+         detail_rows AS (
+             SELECT hb.report_host_id,
+                    nullif(max(rhd.value) FILTER (WHERE rhd.name = 'best_os_cpe'), '') AS best_os_cpe,
+                    nullif(max(rhd.value) FILTER (WHERE rhd.name = 'best_os_txt'), '') AS best_os_txt,
+                    count(*) FILTER (WHERE rhd.name = 'App')::bigint AS applications_count,
+                    max(CASE WHEN rhd.name = 'distance' AND rhd.value ~ '^[0-9]+$' THEN rhd.value::bigint ELSE NULL END) AS distance,
+                    bool_or((lower(coalesce(rhd.name, '') || ' ' || coalesce(rhd.value, '') || ' ' || coalesce(rhd.source_name, '')) LIKE '%auth%'
+                             OR lower(coalesce(rhd.name, '') || ' ' || coalesce(rhd.value, '') || ' ' || coalesce(rhd.source_name, '')) LIKE '%credential%'
+                             OR lower(coalesce(rhd.name, '') || ' ' || coalesce(rhd.value, '') || ' ' || coalesce(rhd.source_name, '')) LIKE '%login%')
+                            AND (lower(coalesce(rhd.name, '') || ' ' || coalesce(rhd.value, '') || ' ' || coalesce(rhd.source_name, '')) LIKE '%success%'
+                                 OR lower(coalesce(rhd.name, '') || ' ' || coalesce(rhd.value, '') || ' ' || coalesce(rhd.source_name, '')) LIKE '%succeeded%'
+                                 OR lower(coalesce(rhd.name, '') || ' ' || coalesce(rhd.value, '') || ' ' || coalesce(rhd.source_name, '')) LIKE '%logged in%'
+                                 OR lower(coalesce(rhd.name, '') || ' ' || coalesce(rhd.value, '') || ' ' || coalesce(rhd.source_name, '')) LIKE '%valid credential%')) AS auth_success,
+                    bool_or((lower(coalesce(rhd.name, '') || ' ' || coalesce(rhd.value, '') || ' ' || coalesce(rhd.source_name, '')) LIKE '%auth%'
+                             OR lower(coalesce(rhd.name, '') || ' ' || coalesce(rhd.value, '') || ' ' || coalesce(rhd.source_name, '')) LIKE '%credential%'
+                             OR lower(coalesce(rhd.name, '') || ' ' || coalesce(rhd.value, '') || ' ' || coalesce(rhd.source_name, '')) LIKE '%login%')
+                            AND (lower(coalesce(rhd.name, '') || ' ' || coalesce(rhd.value, '') || ' ' || coalesce(rhd.source_name, '')) LIKE '%fail%'
+                                 OR lower(coalesce(rhd.name, '') || ' ' || coalesce(rhd.value, '') || ' ' || coalesce(rhd.source_name, '')) LIKE '%denied%'
+                                 OR lower(coalesce(rhd.name, '') || ' ' || coalesce(rhd.value, '') || ' ' || coalesce(rhd.source_name, '')) LIKE '%invalid%'
+                                 OR lower(coalesce(rhd.name, '') || ' ' || coalesce(rhd.value, '') || ' ' || coalesce(rhd.source_name, '')) LIKE '%refused%')) AS auth_failure,
+                    bool_or(lower(coalesce(rhd.name, '') || ' ' || coalesce(rhd.value, '') || ' ' || coalesce(rhd.source_name, '')) LIKE '%credential%'
+                            OR lower(coalesce(rhd.name, '') || ' ' || coalesce(rhd.value, '') || ' ' || coalesce(rhd.source_name, '')) LIKE '%auth%'
+                            OR lower(coalesce(rhd.name, '') || ' ' || coalesce(rhd.value, '') || ' ' || coalesce(rhd.source_name, '')) LIKE '%login%') AS has_credential_path
+               FROM host_base hb
+               LEFT JOIN report_host_details rhd ON rhd.report_host = hb.report_host_id
+              GROUP BY hb.report_host_id
+         ),
+         result_counts AS (
+             SELECT lower(coalesce(nullif(r.host, ''), r.hostname, '')) AS host_key,
+                    count(*)::bigint AS result_count,
+                    count(DISTINCT nullif(r.nvt, '')) FILTER (WHERE coalesce(r.severity, 0) > 0)::bigint AS vulnerability_count,
+                    count(DISTINCT nullif(r.port, ''))::bigint AS ports_count,
+                    count(*) FILTER (WHERE coalesce(r.severity, 0) >= 9.0)::bigint AS severity_critical,
+                    count(*) FILTER (WHERE coalesce(r.severity, 0) >= 7.0 AND coalesce(r.severity, 0) < 9.0)::bigint AS severity_high,
+                    count(*) FILTER (WHERE coalesce(r.severity, 0) >= 4.0 AND coalesce(r.severity, 0) < 7.0)::bigint AS severity_medium,
+                    count(*) FILTER (WHERE coalesce(r.severity, 0) > 0.0 AND coalesce(r.severity, 0) < 4.0)::bigint AS severity_low,
+                    count(*) FILTER (WHERE coalesce(r.severity, 0) = 0.0)::bigint AS severity_log,
+                    count(*) FILTER (WHERE coalesce(r.severity, 0) = -1.0)::bigint AS severity_false_positive,
+                    coalesce(max(r.severity) FILTER (WHERE coalesce(r.severity, 0) > 0), 0)::double precision AS max_severity
+               FROM selected_report sr
+               JOIN results r ON r.report = sr.id
+              WHERE coalesce(r.severity, 0) != -3.0
+                AND coalesce(nullif(r.host, ''), r.hostname, '') <> ''
+              GROUP BY lower(coalesce(nullif(r.host, ''), r.hostname, ''))
+         ),
+         rows AS (
+             SELECT hb.host, hb.hostname, dr.best_os_cpe, dr.best_os_txt,
+                    coalesce(rc.ports_count, 0)::bigint AS ports_count,
+                    coalesce(dr.applications_count, 0)::bigint AS applications_count,
+                    dr.distance,
+                    CASE WHEN coalesce(dr.auth_success, false) THEN 'authenticated'
+                         WHEN coalesce(dr.auth_failure, false) THEN 'authentication_failed'
+                         WHEN coalesce(dr.has_credential_path, false) THEN 'unknown'
+                         ELSE 'no_credential_path' END AS authentication_state,
+                    hb.start_time_unix, hb.end_time_unix,
+                    coalesce(rc.result_count, 0)::bigint AS result_count,
+                    coalesce(rc.vulnerability_count, 0)::bigint AS vulnerability_count,
+                    coalesce(rc.severity_critical, 0)::bigint AS severity_critical,
+                    coalesce(rc.severity_high, 0)::bigint AS severity_high,
+                    coalesce(rc.severity_medium, 0)::bigint AS severity_medium,
+                    coalesce(rc.severity_low, 0)::bigint AS severity_low,
+                    coalesce(rc.severity_log, 0)::bigint AS severity_log,
+                    coalesce(rc.severity_false_positive, 0)::bigint AS severity_false_positive,
+                    coalesce(rc.max_severity, 0)::double precision AS max_severity,
+                    hb.source_report_id
+               FROM host_base hb
+               LEFT JOIN detail_rows dr ON dr.report_host_id = hb.report_host_id
+               LEFT JOIN result_counts rc ON rc.host_key = hb.host_key
+         ),
+         filtered AS (
+             SELECT * FROM rows
+              WHERE ($2 = ''
+                     OR lower(host) LIKE '%' || lower($2) || '%'
+                     OR lower(coalesce(hostname, '')) LIKE '%' || lower($2) || '%'
+                     OR lower(coalesce(best_os_cpe, '')) LIKE '%' || lower($2) || '%'
+                     OR lower(coalesce(best_os_txt, '')) LIKE '%' || lower($2) || '%'
+                     OR lower(authentication_state) LIKE '%' || lower($2) || '%')
+         )
+         SELECT count(*) OVER()::bigint AS total, * FROM filtered
+          ORDER BY {sort_sql}, host ASC LIMIT $3 OFFSET $4;"#
+    );
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let rows = client
+        .query(
+            &sql,
+            &[
+                &report_id,
+                &params.filter,
+                &params.page_size,
+                &params.offset,
+            ],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "raw report host query failed");
+            ApiError::Database
+        })?;
+    if rows.is_empty() && !raw_report_exists(&client, &report_id).await? {
+        return Err(ApiError::NotFound);
+    }
+    let total = rows.first().map(|row| row.get::<_, i64>(0)).unwrap_or(0);
+    let items = rows.iter().map(report_host_from_row).collect();
     Ok(Json(Collection {
         page: params.page_info(total),
         items,
@@ -2528,6 +2702,35 @@ fn result_from_row(row: &Row) -> ResultItem {
         qod: row.get("qod"),
         created_at: unix_ts_to_rfc3339(row.get("created_at_unix")),
         source_report_id,
+    }
+}
+
+fn report_host_from_row(row: &Row) -> ReportHostItem {
+    ReportHostItem {
+        host: row.get("host"),
+        hostname: row.get("hostname"),
+        best_os_cpe: row.get("best_os_cpe"),
+        best_os_txt: row.get("best_os_txt"),
+        ports_count: row.get("ports_count"),
+        applications_count: row.get("applications_count"),
+        distance: row.get("distance"),
+        authentication_state: normalize_authentication_state(
+            &row.get::<_, String>("authentication_state"),
+        ),
+        start_time: unix_ts_to_rfc3339(row.get("start_time_unix")),
+        end_time: unix_ts_to_rfc3339(row.get("end_time_unix")),
+        result_count: row.get("result_count"),
+        vulnerability_count: row.get("vulnerability_count"),
+        severity: ReportSeverityCounts {
+            critical: row.get("severity_critical"),
+            high: row.get("severity_high"),
+            medium: row.get("severity_medium"),
+            low: row.get("severity_low"),
+            log: row.get("severity_log"),
+            false_positive: row.get("severity_false_positive"),
+        },
+        max_severity: row.get("max_severity"),
+        source_report_id: row.get("source_report_id"),
     }
 }
 
