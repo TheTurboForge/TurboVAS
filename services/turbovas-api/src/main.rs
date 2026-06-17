@@ -112,6 +112,17 @@ struct HostItem {
 }
 
 #[derive(Debug, Serialize)]
+struct PortItem {
+    port: String,
+    protocol: String,
+    host_count: i64,
+    result_count: i64,
+    vulnerability_count: i64,
+    max_severity: f64,
+    source_report_ids: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
 struct CveItem {
     id: String,
     affected_system_count: i64,
@@ -261,6 +272,10 @@ async fn main() -> Result<(), ApiError> {
         .route(
             "/api/v1/scopes/:scope_id/reports/:scope_report_id/hosts",
             get(scope_report_hosts),
+        )
+        .route(
+            "/api/v1/scopes/:scope_id/reports/:scope_report_id/ports",
+            get(scope_report_ports),
         )
         .route(
             "/api/v1/scopes/:scope_id/reports/:scope_report_id/cves",
@@ -991,6 +1006,107 @@ async fn scope_report_hosts(
     }))
 }
 
+async fn scope_report_ports(
+    State(state): State<AppState>,
+    Path((scope_id, scope_report_id)): Path<(String, String)>,
+    Query(query): Query<CollectionQuery>,
+) -> Result<Json<Collection<PortItem>>, ApiError> {
+    parse_uuid(&scope_id)?;
+    parse_uuid(&scope_report_id)?;
+    let params = normalize_collection_query(query, "port")?;
+    let sort_sql = sort_clause(
+        &params.sort,
+        &[
+            ("port", "port"),
+            ("protocol", "protocol"),
+            ("host_count", "host_count"),
+            ("result_count", "result_count"),
+            ("vulnerability_count", "vulnerability_count"),
+            ("max_severity", "max_severity"),
+        ],
+    )?;
+    let sql = format!(
+        "WITH selected_scope_report AS (\n\
+             SELECT sr.id, sr.scope, coalesce(s.is_global, 0)::int AS is_global\n\
+               FROM scope_reports sr\n\
+               JOIN scopes s ON s.id = sr.scope\n\
+              WHERE sr.uuid = $1 AND sr.scope_uuid = $2\n\
+         ),\n\
+         selected_hosts AS (\n\
+             SELECT lower(rh.host) AS host_key\n\
+               FROM selected_scope_report sr\n\
+               JOIN scope_report_sources srs ON srs.scope_report = sr.id\n\
+               JOIN report_hosts rh ON rh.report = srs.source_report\n\
+              WHERE sr.is_global = 1 AND coalesce(rh.host, '') <> ''\n\
+              GROUP BY lower(rh.host)\n\
+             UNION\n\
+             SELECT lower(h.name) AS host_key\n\
+               FROM selected_scope_report sr\n\
+               JOIN scope_hosts sh ON sh.scope = sr.scope AND sr.is_global = 0\n\
+               JOIN hosts h ON h.id = sh.host\n\
+              WHERE coalesce(h.name, '') <> ''\n\
+              GROUP BY lower(h.name)\n\
+         ),\n\
+         port_rows AS (\n\
+             SELECT coalesce(r.port, '') AS port,\n\
+                    CASE WHEN position('/' in coalesce(r.port, '')) > 0\n\
+                         THEN split_part(coalesce(r.port, ''), '/', 2)\n\
+                         ELSE '' END AS protocol,\n\
+                    count(DISTINCT lower(coalesce(nullif(r.host, ''), r.hostname, '')))::bigint AS host_count,\n\
+                    count(DISTINCT r.uuid)::bigint AS result_count,\n\
+                    count(DISTINCT coalesce(nullif(r.nvt, ''), r.uuid::text))\n\
+                      FILTER (WHERE coalesce(r.severity, 0) > 0)::bigint AS vulnerability_count,\n\
+                    max(coalesce(r.severity, 0))::double precision AS max_severity,\n\
+                    array_remove(array_agg(DISTINCT srs.source_report_uuid), NULL) AS source_report_ids\n\
+               FROM selected_scope_report sr\n\
+               JOIN scope_report_sources srs ON srs.scope_report = sr.id\n\
+               JOIN results r ON r.report = srs.source_report\n\
+               JOIN selected_hosts sh ON sh.host_key = lower(coalesce(nullif(r.host, ''), r.hostname, ''))\n\
+              WHERE coalesce(r.severity, 0) != -3.0\n\
+                AND coalesce(nullif(r.host, ''), r.hostname, '') <> ''\n\
+                AND coalesce(r.port, '') <> ''\n\
+              GROUP BY coalesce(r.port, ''),\n\
+                       CASE WHEN position('/' in coalesce(r.port, '')) > 0\n\
+                            THEN split_part(coalesce(r.port, ''), '/', 2)\n\
+                            ELSE '' END\n\
+         ),\n\
+         filtered AS (\n\
+             SELECT * FROM port_rows\n\
+              WHERE ($3 = ''\n\
+                     OR lower(port) LIKE '%' || lower($3) || '%'\n\
+                     OR lower(protocol) LIKE '%' || lower($3) || '%')\n\
+         )\n\
+         SELECT count(*) OVER()::bigint AS total, * FROM filtered\n\
+          ORDER BY {sort_sql}, port ASC LIMIT $4 OFFSET $5;"
+    );
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let rows = client
+        .query(
+            &sql,
+            &[
+                &scope_report_id,
+                &scope_id,
+                &params.filter,
+                &params.page_size,
+                &params.offset,
+            ],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "scope report port query failed");
+            ApiError::Database
+        })?;
+    if rows.is_empty() && !scope_report_exists(&client, &scope_report_id, &scope_id).await? {
+        return Err(ApiError::NotFound);
+    }
+    let total = rows.first().map(|row| row.get::<_, i64>(0)).unwrap_or(0);
+    let items = rows.iter().map(port_from_row).collect();
+    Ok(Json(Collection {
+        page: params.page_info(total),
+        items,
+    }))
+}
+
 async fn scope_report_cves(
     State(state): State<AppState>,
     Path((scope_id, scope_report_id)): Path<(String, String)>,
@@ -1213,6 +1329,18 @@ fn host_from_row(row: &Row) -> HostItem {
         result_count: row.get(4),
         vulnerability_count: row.get(5),
         authenticated_scan_state: normalize_authentication_state(&row.get::<_, String>(6)),
+        source_report_ids: row.get(7),
+    }
+}
+
+fn port_from_row(row: &Row) -> PortItem {
+    PortItem {
+        port: row.get(1),
+        protocol: row.get(2),
+        host_count: row.get(3),
+        result_count: row.get(4),
+        vulnerability_count: row.get(5),
+        max_severity: row.get(6),
         source_report_ids: row.get(7),
     }
 }

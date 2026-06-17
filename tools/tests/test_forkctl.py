@@ -544,19 +544,21 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("NativeScopeReportEvidenceTab", scope_details)
         self.assertIn('kind="results"', scope_details)
         self.assertIn('kind="hosts"', scope_details)
+        self.assertIn('kind="ports"', scope_details)
         self.assertIn('kind="cves"', scope_details)
         self.assertIn('kind="errors"', scope_details)
-        self.assertIn('ScopeReportEvidenceTab kind="ports"', scope_details)
         self.assertIn('ScopeReportEvidenceTab kind="applications"', scope_details)
         self.assertIn('ScopeReportEvidenceTab kind="operatingSystems"', scope_details)
         self.assertIn('ScopeReportEvidenceTab kind="tlsCertificates"', scope_details)
         self.assertIn("fetchNativeScopeReportResults", native_tab)
         self.assertIn("fetchNativeScopeReportHosts", native_tab)
+        self.assertIn("fetchNativeScopeReportPorts", native_tab)
         self.assertIn("fetchNativeScopeReportCves", native_tab)
         self.assertIn("fetchNativeScopeReportErrors", native_tab)
         self.assertIn("api/v1/scopes/", native_client)
         self.assertIn("scopeReportPath(scopeId, scopeReportId, 'results')", native_client)
         self.assertIn("scopeReportPath(scopeId, scopeReportId, 'hosts')", native_client)
+        self.assertIn("scopeReportPath(scopeId, scopeReportId, 'ports')", native_client)
         self.assertIn("scopeReportPath(scopeId, scopeReportId, 'cves')", native_client)
         self.assertIn("scopeReportPath(scopeId, scopeReportId, 'errors')", native_client)
 
@@ -581,6 +583,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("/metrics", native_api)
         self.assertIn("/results", native_api)
         self.assertIn("/hosts", native_api)
+        self.assertIn("/ports", native_api)
         self.assertIn("/cves", native_api)
         self.assertIn("/errors", native_api)
         self.assertIn("native_api_request_target", native_api)
@@ -626,6 +629,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("def command_runtime_redis_state", source)
         self.assertIn("def command_runtime_native_api_smoke", source)
         self.assertIn("native-api.scope-report-hosts", source)
+        self.assertIn("native-api.scope-report-ports", source)
         self.assertIn("native-api.scope-report-cves", source)
         self.assertIn("def command_security_policy_check", source)
         self.assertIn("def command_path_coupling_state", source)
@@ -717,6 +721,7 @@ class TurboVASCtlTests(unittest.TestCase):
         endpoints = {item["endpoint"] for item in details["implemented_native_endpoints"]}
         self.assertIn("/api/v1/scope-reports", endpoints)
         self.assertIn("/api/v1/scopes/{scope_id}/reports/{scope_report_id}/hosts", endpoints)
+        self.assertIn("/api/v1/scopes/{scope_id}/reports/{scope_report_id}/ports", endpoints)
         self.assertIn("/api/v1/scopes/{scope_id}/reports/{scope_report_id}/results", endpoints)
         self.assertIn("/api/v1/scopes/{scope_id}/reports/{scope_report_id}/cves", endpoints)
         self.assertIn("/api/v1/scopes/{scope_id}/reports/{scope_report_id}/errors", endpoints)
@@ -747,7 +752,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(turbovasctl.native_tooling_category("components/gvm-tools/scripts/empty-trash.gmp.py")[0], "candidate_for_removal")
         self.assertEqual(turbovasctl.native_tooling_category("docs/GMP_XML_STRANGLER.md")[0], "compatibility_bridge")
 
-    def test_openapi_tracks_remaining_scope_report_evidence_contracts(self):
+    def test_openapi_tracks_scope_report_evidence_contracts(self):
         root = Path(__file__).resolve().parents[2]
         openapi = (root / "api" / "openapi" / "turbovas-v1.yaml").read_text(encoding="utf-8")
         plan = (root / "docs" / "NATIVE_API_PROOF_PLAN.md").read_text(encoding="utf-8")
@@ -759,9 +764,13 @@ class TurboVASCtlTests(unittest.TestCase):
         ]:
             path = f"/scopes/{{scope_id}}/reports/{{scope_report_id}}/{suffix}"
             self.assertIn(path, openapi)
-            self.assertIn(path, plan)
             self.assertIn(schema, openapi)
-        self.assertIn("not live endpoint promises yet", plan)
+        for suffix in ("applications", "operating-systems", "tls-certificates"):
+            self.assertIn(f"/scopes/{{scope_id}}/reports/{{scope_report_id}}/{suffix}", plan)
+        self.assertNotIn("/scopes/{scope_id}/reports/{scope_report_id}/ports`", plan)
+        self.assertIn("Ports is now a live internal and browser-proxied endpoint", plan)
+        self.assertIn("Applications,", plan)
+        self.assertIn("operating systems, and TLS certificates are not live endpoint promises yet", plan)
 
     def test_redis_reference_summary_separates_scanner_and_generic_paths(self):
         references = [
@@ -1131,10 +1140,12 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertIn("scope-report.metrics-native-api", source)
         self.assertIn("scope-report.results-native-api", source)
         self.assertIn("scope-report.hosts-native-api", source)
+        self.assertIn("scope-report.ports-native-api", source)
         self.assertIn("scope-report.cves-native-api", source)
         self.assertIn("scope-report.errors-native-api", source)
         self.assertIn("scope-report.results-aggregated-native-tab", source)
         self.assertIn("scope-report.hosts-aggregated-native-tab", source)
+        self.assertIn("scope-report.ports-aggregated-native-tab", source)
         self.assertIn("scope-report.cves-aggregated-native-tab", source)
         self.assertIn("scope-report.errors-aggregated-native-tab", source)
         self.assertIn("raw-report.metrics-tab", source)

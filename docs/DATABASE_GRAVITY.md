@@ -81,12 +81,13 @@ largest relations, known row counts, report-workflow counts and largest-report
 indicators, and static asset size summaries. Those facts are instrumentation,
 not policy; optimization decisions need a later hot-path analysis.
 
-The first scope-report data-gravity move is in place: `/scopes/reports` obtains
-its list through filtered, sorted, paged gvmd/PostgreSQL queries, and scope
-report result reading uses the standard result-query path constrained by the
-scope-report snapshot. Browser-side code may still present lazy evidence tabs,
-but product report-reading collections should continue moving toward manager
-queries rather than client-side source-report stitching.
+The first scope-report data-gravity moves are in place: `/scopes/reports`
+obtains its list through filtered, sorted, paged gvmd/PostgreSQL queries, and
+scope-report Results, Hosts, Ports, CVEs, and Error Messages are served as
+typed native collections constrained by the scope-report snapshot. Browser-side
+code may still present lazy evidence tabs, but product report-reading
+collections should continue moving toward database-owned queries rather than
+client-side source-report stitching.
 
 The native `/api/v1` contract in `docs/API_CONTRACT.md` builds on the same
 rule: product reads should expose typed DB-owned state instead of forwarding
@@ -95,9 +96,9 @@ evidence and must not create a second hidden truth store for report data.
 
 The first native API proof implements that direction as an internal Rust
 sidecar: scope-report list, result evidence, host evidence, CVE evidence,
-Error Message collections, persisted scope-report metrics, and raw report
+port evidence, Error Message collections, persisted scope-report metrics, and raw report
 metrics are queried from gvmd/PostgreSQL and returned as typed JSON, while
 GMP/XML remains available for inherited control paths until each workflow is
 deliberately migrated. Raw-report and scope-report Metrics plus scope-report
-Results, Hosts, CVEs, and Error Messages are now browser-facing product reads
+Results, Hosts, Ports, CVEs, and Error Messages are now browser-facing product reads
 through the authenticated `gsad` same-origin native API proxy.

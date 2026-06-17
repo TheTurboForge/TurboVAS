@@ -52,8 +52,8 @@ boundary remains `gsad`.
 ## Browser Proof Scope
 
 The browser proof is read-only and low consequence: raw-report Metrics,
-scope-report Metrics, and scope-report Results, Hosts, CVEs, and Error Messages
-load through authenticated same-origin `gsad` paths and then proxy to the
+scope-report Metrics, and scope-report Results, Hosts, Ports, CVEs, and Error
+Messages load through authenticated same-origin `gsad` paths and then proxy to the
 Docker-internal `turbovas-api` service. This proves the browser can consume
 typed native JSON for report-reading workflows without exposing the sidecar,
 adding CORS, or removing inherited GMP/XML control paths.

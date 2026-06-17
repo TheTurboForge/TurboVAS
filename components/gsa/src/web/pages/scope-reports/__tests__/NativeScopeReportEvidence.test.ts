@@ -8,6 +8,7 @@ import {
   fetchNativeScopeReportCves,
   fetchNativeScopeReportErrors,
   fetchNativeScopeReportHosts,
+  fetchNativeScopeReportPorts,
   fetchNativeScopeReportResults,
 } from 'gmp/native-api/scope-report-collections';
 
@@ -123,6 +124,54 @@ describe('native API scope report evidence collections', () => {
         page: 1,
         page_size: 25,
         sort: '-severity',
+        filter: undefined,
+      },
+    );
+  });
+
+  test('fetches port rows and maps aggregate fields', async () => {
+    testing.stubGlobal(
+      'fetch',
+      testing.fn().mockResolvedValue({
+        json: testing.fn().mockResolvedValue({
+          page: {page: 1, page_size: 25, total: 1, sort: 'port', filter: ''},
+          items: [
+            {
+              port: '443/tcp',
+              protocol: 'tcp',
+              host_count: 3,
+              result_count: 8,
+              vulnerability_count: 2,
+              max_severity: 7.5,
+              source_report_ids: ['report-1', 'report-2'],
+            },
+          ],
+        }),
+        ok: true,
+        status: 200,
+      }),
+    );
+    const gmp = createGmp();
+
+    const collection = await fetchNativeScopeReportPorts(
+      gmp,
+      'scope-1',
+      'scope-report-1',
+      {page: 1, pageSize: 25, sort: 'port'},
+    );
+
+    expect(collection.items[0].port).toEqual('443/tcp');
+    expect(collection.items[0].protocol).toEqual('tcp');
+    expect(collection.items[0].hostCount).toEqual(3);
+    expect(collection.items[0].maxSeverity).toEqual(7.5);
+    expect(collection.items[0].sourceReportIds).toEqual(['report-1', 'report-2']);
+    expect(gmp.buildUrl).toHaveBeenCalledWith(
+      'api/v1/scopes/scope-1/reports/scope-report-1/ports',
+      {
+        token: 'test-token',
+        page: 1,
+        page_size: 25,
+        sort: 'port',
         filter: undefined,
       },
     );

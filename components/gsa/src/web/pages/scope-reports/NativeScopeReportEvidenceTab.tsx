@@ -8,12 +8,14 @@ import {
   fetchNativeScopeReportCves,
   fetchNativeScopeReportErrors,
   fetchNativeScopeReportHosts,
+  fetchNativeScopeReportPorts,
   fetchNativeScopeReportResults,
   type NativeCollection,
   type NativeCollectionQuery,
   type ScopeReportCveItem,
   type ScopeReportErrorMessageItem,
   type ScopeReportHostItem,
+  type ScopeReportPortItem,
   type ScopeReportResultItem,
 } from 'gmp/native-api/scope-report-collections';
 import SeverityBar from 'web/components/bar/SeverityBar';
@@ -41,6 +43,7 @@ const PAGE_SIZE = 25;
 export type NativeScopeReportEvidenceKind =
   | 'results'
   | 'hosts'
+  | 'ports'
   | 'cves'
   | 'errors';
 
@@ -53,6 +56,7 @@ interface NativeScopeReportEvidenceTabProps {
 interface EvidenceState {
   results?: NativeCollection<ScopeReportResultItem>;
   hosts?: NativeCollection<ScopeReportHostItem>;
+  ports?: NativeCollection<ScopeReportPortItem>;
   cves?: NativeCollection<ScopeReportCveItem>;
   errors?: NativeCollection<ScopeReportErrorMessageItem>;
 }
@@ -63,6 +67,8 @@ const defaultSortBy = (kind: NativeScopeReportEvidenceKind) => {
       return 'severity';
     case 'hosts':
       return 'host';
+    case 'ports':
+      return 'port';
     case 'cves':
       return 'max_severity';
     case 'errors':
@@ -73,7 +79,7 @@ const defaultSortBy = (kind: NativeScopeReportEvidenceKind) => {
 };
 
 const defaultSortDir = (kind: NativeScopeReportEvidenceKind): SortDirectionType =>
-  kind === 'hosts' ? SortDirection.ASC : SortDirection.DESC;
+  kind === 'hosts' || kind === 'ports' ? SortDirection.ASC : SortDirection.DESC;
 
 const sortQuery = (field: string, direction: SortDirectionType) =>
   direction === SortDirection.DESC ? `-${field}` : field;
@@ -145,6 +151,15 @@ const NativeScopeReportEvidenceTab = ({
       if (kind === 'hosts') {
         setData({
           hosts: await fetchNativeScopeReportHosts(
+            gmp,
+            scopeId,
+            scopeReportId,
+            query,
+          ),
+        });
+      } else if (kind === 'ports') {
+        setData({
+          ports: await fetchNativeScopeReportPorts(
             gmp,
             scopeId,
             scopeReportId,
@@ -311,6 +326,75 @@ const NativeScopeReportEvidenceTab = ({
                   {result.sourceReportId}
                 </Link>
               </TableData>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    );
+  };
+
+  const renderPorts = () => {
+    const ports = data.ports?.items ?? [];
+    return (
+      <Table>
+        <TableBody>
+          <TableRow>
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="port"
+              title={_('Port')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="protocol"
+              title={_('Protocol')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="max_severity"
+              title={_('Max Severity')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="host_count"
+              title={_('Hosts')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="result_count"
+              title={_('Results')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="vulnerability_count"
+              title={_('Vulnerabilities')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead>{_('Source Reports')}</TableHead>
+          </TableRow>
+          {ports.length === 0 && <EmptyRow colSpan={7} />}
+          {ports.map(port => (
+            <TableRow key={port.port}>
+              <TableData>{port.port}</TableData>
+              <TableData>{port.protocol}</TableData>
+              <TableData>
+                <SeverityBar severity={port.maxSeverity} />
+              </TableData>
+              <TableData align="end">{port.hostCount}</TableData>
+              <TableData align="end">{port.resultCount}</TableData>
+              <TableData align="end">{port.vulnerabilityCount}</TableData>
+              <TableData align="end">{port.sourceReportIds.length}</TableData>
             </TableRow>
           ))}
         </TableBody>
@@ -517,6 +601,8 @@ const NativeScopeReportEvidenceTab = ({
         renderResults()
       ) : kind === 'hosts' ? (
         renderHosts()
+      ) : kind === 'ports' ? (
+        renderPorts()
       ) : kind === 'cves' ? (
         renderCves()
       ) : (

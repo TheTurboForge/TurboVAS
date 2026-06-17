@@ -189,8 +189,8 @@ provenance remains intact.
 The current implementation deliberately focuses on core report reading parity:
 scope report list/detail views, information, results, metrics, evidence sources,
 raw evidence links, and result navigation. Scope report details also expose lazy
-evidence tabs. Results, Hosts, CVEs, and Error Messages are aggregated native
-scope-report collections; ports, applications, operating systems, and TLS
+evidence tabs. Results, Hosts, Ports, CVEs, and Error Messages are aggregated
+native scope-report collections; applications, operating systems, and TLS
 certificates still load selected raw source reports as evidence. The remaining
 backend direction is to add dedicated scope-report collection contracts for
 those source-backed tabs where that is more efficient than per-source raw

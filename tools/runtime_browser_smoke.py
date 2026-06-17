@@ -326,6 +326,17 @@ async function runForBaseUrl(baseUrl) {
     }
 
     await page.goto(detailUrl, { waitUntil: 'networkidle', timeout: config.timeoutMs });
+    if (await clickTab(page, 'Ports', isScopeReportDetailUrl)) {
+      await screenshot(page, 'scope-report-ports-tab');
+      await assertNoAppError(page, 'scope-report-ports-tab.app-error');
+      await assertNoPerSourceEvidenceSections(page, 'scope-report.ports-aggregated-native-tab');
+      const nativeScopePorts = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/scopes\/[^/]+\/reports\/[^/]+\/ports$/);
+      add(nativeScopePorts ? 'pass' : 'fail', 'scope-report.ports-native-api', nativeScopePorts ? 'Scope-report Ports tab loaded through same-origin native API.' : 'Scope-report Ports tab did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => item.path.includes('/ports')) });
+    } else {
+      add('fail', 'scope-report.ports-tab', 'Could not activate the native Ports tab.');
+    }
+
+    await page.goto(detailUrl, { waitUntil: 'networkidle', timeout: config.timeoutMs });
     if (await clickTab(page, 'CVEs', isScopeReportDetailUrl)) {
       await screenshot(page, 'scope-report-cves-tab');
       await assertNoAppError(page, 'scope-report-cves-tab.app-error');

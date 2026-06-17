@@ -45,8 +45,7 @@ Use these as the first practical benchmark targets:
    after adding more DB-backed evidence collections.
 2. Scope-report lazy evidence tabs.
    Compare source-by-source raw-report loading against future dedicated backend
-   collections for Hosts, CVEs, TLS certificates, applications, ports,
-   operating systems, and error messages.
+   collections for applications, operating systems, and TLS certificates.
 3. Raw report detail and metrics reads.
    Watch payload size and query cost when raw reports grow, because raw reports
    remain authoritative evidence.

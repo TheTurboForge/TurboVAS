@@ -61,11 +61,11 @@ The first endpoint is not complete until it proves:
 - the internal `runtime-native-api-smoke` can load the endpoint without GMP/XML.
 
 Implementation commit `c59140a` proved the internal sidecar for scope-report
-list and Hosts. Later B-117/B-125 slices added scope-report Results, CVEs,
-Error Messages, persisted scope-report Metrics, and raw report Metrics with the
+list and Hosts. Later B-117/B-125 slices added scope-report Results, Ports,
+CVEs, Error Messages, persisted scope-report Metrics, and raw report Metrics with the
 same internal-only, PostgreSQL-backed pattern. Browser proof work now routes
-raw-report and scope-report Metrics plus scope-report Results, Hosts, CVEs, and
-Error Messages through the authenticated same-origin `gsad` proxy defined in
+raw-report and scope-report Metrics plus scope-report Results, Hosts, Ports,
+CVEs, and Error Messages through the authenticated same-origin `gsad` proxy defined in
 `docs/NATIVE_API_AUTH_BOUNDARY.md`.
 
 ## Not In The First Proof
@@ -76,26 +76,27 @@ high-consequence inherited control paths until separately designed and reviewed.
 
 ## Next Proofs
 
-After scope-report Results/Hosts/CVEs/Error Messages/Metrics and raw report Metrics work, the next candidates are:
+After scope-report Results/Hosts/Ports/CVEs/Error Messages/Metrics and raw report Metrics work, the next candidates are:
 
 1. dedicated native contracts for the remaining source-backed scope-report tabs:
-   Ports, Applications, Operating Systems, and TLS Certificates.
+   Applications, Operating Systems, and TLS Certificates.
 2. raw report list/detail or scope metadata reads, only if they directly unlock
    helper or browser migration away from GMP/XML.
 
 ## Remaining Evidence Contract Candidates
 
-The OpenAPI baseline now names the four remaining scope-report detail
-collections before implementation:
+The OpenAPI baseline names the remaining scope-report detail collection
+contracts before implementation:
 
-- `GET /api/v1/scopes/{scope_id}/reports/{scope_report_id}/ports`
 - `GET /api/v1/scopes/{scope_id}/reports/{scope_report_id}/applications`
 - `GET /api/v1/scopes/{scope_id}/reports/{scope_report_id}/operating-systems`
 - `GET /api/v1/scopes/{scope_id}/reports/{scope_report_id}/tls-certificates`
 
-These are not live endpoint promises yet. Each implementation slice should
-first prove the DB query against `scope_report_sources` and the relevant raw
-report tables, then add sidecar routing, `gsad` same-origin allowlisting, typed
-GSA client code, browser-smoke coverage, and docs updates. If a row shape is
-too weak or too dependent on inherited report XML assumptions, stop at the
-contract and record the gap instead of papering it over in the UI.
+Ports is now a live internal and browser-proxied endpoint. Applications,
+operating systems, and TLS certificates are not live endpoint promises yet.
+Each implementation slice should first prove the DB query against
+`scope_report_sources` and the relevant raw report tables, then add sidecar
+routing, `gsad` same-origin allowlisting, typed GSA client code, browser-smoke
+coverage, and docs updates. If a row shape is too weak or too dependent on
+inherited report XML assumptions, stop at the contract and record the gap
+instead of papering it over in the UI.

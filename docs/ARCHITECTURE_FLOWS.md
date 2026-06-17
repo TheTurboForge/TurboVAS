@@ -38,7 +38,7 @@ browser/runtime coverage. See `docs/API_CONTRACT.md`,
 `docs/GMP_XML_STRANGLER.md`, and `api/openapi/turbovas-v1.yaml`.
 
 The first browser-facing native reads are raw-report/scope-report Metrics and
-scope-report Results, Hosts, CVEs, and Error Messages. `gsad` authenticates the
+scope-report Results, Hosts, Ports, CVEs, and Error Messages. `gsad` authenticates the
 existing operator session, allowlists only those read paths, forwards safe
 collection query parameters, and proxies to the internal-only Rust sidecar.
 
@@ -82,8 +82,8 @@ for scope targets while preserving source-report provenance. Raw `/reports`
 remain available as technical evidence; scope reports are reached through
 `/scopes` and `/scopes/reports`. The scope-report list is filtered, sorted, and
 paged through gvmd/PostgreSQL; result reading uses the standard result query
-path with a hidden scope-report constraint, and the Hosts, CVEs, and Error
-Messages tabs now use native DB-backed collections instead of browser-side
+path with a hidden scope-report constraint, and the Hosts, Ports, CVEs, and
+Error Messages tabs now use native DB-backed collections instead of browser-side
 source-report stitching.
 
 ## Auth And Operator Model

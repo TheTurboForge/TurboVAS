@@ -192,7 +192,13 @@ const ScopeReportDetailsPage = () => {
       scopeReportId={report.id}
     />
   );
-  const portsTab = <ScopeReportEvidenceTab kind="ports" report={report} />;
+  const portsTab = (
+    <NativeScopeReportEvidenceTab
+      kind="ports"
+      scopeId={report.scopeId}
+      scopeReportId={report.id}
+    />
+  );
   const applicationsTab = (
     <ScopeReportEvidenceTab kind="applications" report={report} />
   );
