@@ -774,10 +774,10 @@ class TurboVASCtlTests(unittest.TestCase):
             self.assertIn(schema, openapi)
         for suffix in ("applications", "operating-systems", "tls-certificates"):
             self.assertIn(f"/scopes/{{scope_id}}/reports/{{scope_report_id}}/{suffix}", plan)
-        self.assertNotIn("/scopes/{scope_id}/reports/{scope_report_id}/ports`", plan)
-        self.assertIn("Ports is now a live internal and browser-proxied endpoint", plan)
-        self.assertIn("Applications,", plan)
-        self.assertIn("operating systems, and TLS certificates are not live endpoint promises yet", plan)
+        self.assertIn("Completed Evidence Contracts", plan)
+        self.assertIn("live internal and browser-proxied endpoints", plan)
+        self.assertIn("complete native browser coverage for current scope-report evidence", plan)
+        self.assertNotIn("not live endpoint promises yet", plan)
 
     def test_redis_reference_summary_separates_scanner_and_generic_paths(self):
         references = [
