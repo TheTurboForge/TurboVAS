@@ -4,32 +4,15 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import {describe, expect, test, testing} from '@gsa/testing';
+import {afterEach, describe, expect, test, testing} from '@gsa/testing';
 import {rendererWith, screen} from 'web/testing';
 import CollectionCounts from 'gmp/collection/collection-counts';
 import Filter from 'gmp/models/filter';
-import Result from 'gmp/models/result';
 import {TASK_STATUS} from 'gmp/models/task';
 import {createSession} from 'gmp/testing';
 import ResultsTabContent from 'web/pages/reports/details/ResultsTabContent';
 
 const filter = Filter.fromString('first=1 rows=10');
-
-const createMockResult = (id = '101') => {
-  return Result.fromElement({
-    _id: id,
-    name: 'CVE-2019-1234',
-    host: {
-      __text: '192.0.2.10',
-      hostname: 'host.example.test',
-    },
-    port: '443/tcp',
-    severity: 7.5,
-    qod: {value: 80},
-    creation_time: '2024-01-15T10:00:00Z',
-    modification_time: '2024-01-15T10:00:00Z',
-  });
-};
 
 const reportResultsCounts = new CollectionCounts({
   filtered: 1,
@@ -38,22 +21,26 @@ const reportResultsCounts = new CollectionCounts({
   rows: 10,
 });
 
-const results = [createMockResult()];
-const resultsData = {
-  entities: results,
-  counts: reportResultsCounts,
-};
-
-const createGmp = ({
-  get = testing.fn().mockResolvedValue(resultsData),
-} = {}) => ({
-  results: {
-    get,
-  },
+const createGmp = () => ({
+  buildUrl: testing.fn((path: string, params?: Record<string, unknown>) => {
+    const query = new URLSearchParams();
+    Object.entries(params ?? {}).forEach(([key, value]) => {
+      if (value !== undefined) {
+        query.set(key, String(value));
+      }
+    });
+    return `https://turbovas.example/${path}${
+      query.size > 0 ? `?${query.toString()}` : ''
+    }`;
+  }),
   settings: {
     enableEPSS: false,
   },
   session: createSession({token: 'test-token'}),
+});
+
+afterEach(() => {
+  testing.unstubAllGlobals();
 });
 
 describe('ResultsTabContent', () => {
@@ -122,7 +109,31 @@ describe('ResultsTabContent', () => {
     ).toBeInTheDocument();
   });
 
-  test('should render ResultsTab for regular scans', () => {
+  test('should render native Results tab for regular scans', async () => {
+    const fetchMock = testing.fn().mockResolvedValue({
+      json: testing.fn().mockResolvedValue({
+        page: {page: 1, page_size: 10, total: 1, sort: '-severity', filter: ''},
+        items: [
+          {
+            id: 'result-1',
+            host: '192.0.2.10',
+            hostname: 'host.example.test',
+            port: '443/tcp',
+            nvt_oid: '1.3.6.1.4.1.25623.1.0.1',
+            name: 'OpenSSH Vulnerability',
+            nvt_family: 'General',
+            severity: 7.5,
+            qod: 80,
+            created_at: '2024-01-15T10:00:00Z',
+            source_report_id: 'report-123',
+            raw_evidence_href: '/report/report-123/result/result-1',
+          },
+        ],
+      }),
+      ok: true,
+      status: 200,
+    });
+    testing.stubGlobal('fetch', fetchMock);
     const gmp = createGmp();
     const {render} = rendererWith({gmp});
 
@@ -141,6 +152,10 @@ describe('ResultsTabContent', () => {
       />,
     );
 
-    expect(screen.getByTestId('loading')).toBeInTheDocument();
+    expect(await screen.findByText('OpenSSH Vulnerability')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/api/v1/reports/report-123/results'),
+      expect.objectContaining({credentials: 'include'}),
+    );
   });
 });

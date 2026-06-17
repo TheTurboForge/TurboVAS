@@ -63,6 +63,27 @@ interface NativeReportCollectionPayload {
   items?: NativeReportItem[];
 }
 
+interface NativeReportResultPayload {
+  id: string;
+  host: string;
+  hostname?: string;
+  port: string;
+  nvt_oid: string;
+  name: string;
+  nvt_family?: string;
+  description_excerpt?: string;
+  severity: number;
+  qod: number;
+  created_at?: string;
+  source_report_id: string;
+  raw_evidence_href: string;
+}
+
+interface NativeReportResultsPayload {
+  page?: Partial<NativeReportPage>;
+  items?: NativeReportResultPayload[];
+}
+
 type NativeReportDetailPayload = NativeReportItem;
 
 export interface NativeReportQuery {
@@ -80,6 +101,27 @@ export interface NativeReportsResponse {
 
 export interface NativeReportResponse {
   report: Report;
+}
+
+export interface NativeReportResultItem {
+  id: string;
+  host: string;
+  hostname?: string;
+  port: string;
+  nvtOid: string;
+  name: string;
+  nvtFamily?: string;
+  descriptionExcerpt?: string;
+  severity: number;
+  qod: number;
+  createdAt?: string;
+  sourceReportId: string;
+  rawEvidenceHref: string;
+}
+
+export interface NativeReportResultsResponse {
+  items: NativeReportResultItem[];
+  page: NativeReportPage;
 }
 
 const REPORT_SORT_FIELDS: Record<string, string> = {
@@ -101,8 +143,25 @@ const REPORT_SORT_FIELDS: Record<string, string> = {
   false_positive: 'false_positive',
 };
 
+const RESULT_SORT_FIELDS: Record<string, string> = {
+  created: 'created_at',
+  created_at: 'created_at',
+  host: 'host',
+  name: 'name',
+  nvt: 'nvt_oid',
+  nvt_oid: 'nvt_oid',
+  port: 'port',
+  qod: 'qod',
+  severity: 'severity',
+};
+
 const integerValue = (value: unknown, fallback = 0): number => {
   const parsed = Number.parseInt(String(value ?? fallback), 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const numberValue = (value: unknown, fallback = 0): number => {
+  const parsed = Number.parseFloat(String(value ?? fallback));
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
@@ -117,6 +176,14 @@ const nativeSortFromFilter = (filter?: Filter): string => {
   return reverse !== undefined ? `-${nativeField}` : nativeField;
 };
 
+const nativeResultSortFromFilter = (filter?: Filter): string => {
+  const reverse = filter?.get('sort-reverse');
+  const ascending = filter?.get('sort');
+  const rawField = stringValue(reverse ?? ascending) || 'severity';
+  const nativeField = RESULT_SORT_FIELDS[rawField] ?? rawField;
+  return reverse !== undefined ? `-${nativeField}` : nativeField;
+};
+
 const nativeSearchFromFilter = (filter?: Filter): string => {
   const search = filter?.get('search');
   if (search !== undefined) {
@@ -124,6 +191,19 @@ const nativeSearchFromFilter = (filter?: Filter): string => {
   }
   const criteria = filter?.toFilterCriteriaString().trim() ?? '';
   return /[=<>:~]/.test(criteria) ? '' : criteria;
+};
+
+export const nativeReportResultsQueryFromFilter = (
+  filter?: Filter,
+): NativeReportQuery => {
+  const pageSize = Math.max(1, integerValue(filter?.get('rows'), 25));
+  const first = Math.max(1, integerValue(filter?.get('first'), 1));
+  return {
+    page: Math.floor((first - 1) / pageSize) + 1,
+    pageSize,
+    sort: nativeResultSortFromFilter(filter),
+    filter: nativeSearchFromFilter(filter),
+  };
 };
 
 export const nativeReportQueryFromFilter = (filter?: Filter): NativeReportQuery => {
@@ -136,6 +216,24 @@ export const nativeReportQueryFromFilter = (filter?: Filter): NativeReportQuery 
     filter: nativeSearchFromFilter(filter),
   };
 };
+
+const nativeReportResultFromPayload = (
+  item: NativeReportResultPayload,
+): NativeReportResultItem => ({
+  id: stringValue(item.id),
+  host: stringValue(item.host),
+  hostname: stringValue(item.hostname) || undefined,
+  port: stringValue(item.port),
+  nvtOid: stringValue(item.nvt_oid),
+  name: stringValue(item.name),
+  nvtFamily: stringValue(item.nvt_family) || undefined,
+  descriptionExcerpt: stringValue(item.description_excerpt) || undefined,
+  severity: numberValue(item.severity),
+  qod: integerValue(item.qod),
+  createdAt: stringValue(item.created_at) || undefined,
+  sourceReportId: stringValue(item.source_report_id),
+  rawEvidenceHref: stringValue(item.raw_evidence_href),
+});
 
 const nativeCounts = (page: NativeReportPage, length: number) =>
   new CollectionCounts({
@@ -264,6 +362,35 @@ export const fetchNativeReports = async (
   return {
     reports,
     counts: nativeCounts(page, reports.length),
+    page,
+  };
+};
+
+export const fetchNativeReportResults = async (
+  gmp: NativeApiGmp,
+  reportId: string,
+  query: NativeReportQuery,
+): Promise<NativeReportResultsResponse> => {
+  const payload = await fetchNativeJson<NativeReportResultsPayload>(
+    gmp,
+    `api/v1/reports/${encodeURIComponent(reportId)}/results`,
+    {
+      token: gmp.session.token,
+      page: query.page,
+      page_size: query.pageSize,
+      sort: query.sort,
+      filter: query.filter,
+    },
+  );
+  const page = {
+    page: integerValue(payload.page?.page, 1),
+    page_size: integerValue(payload.page?.page_size, query.pageSize),
+    total: integerValue(payload.page?.total),
+    sort: stringValue(payload.page?.sort),
+    filter: stringValue(payload.page?.filter),
+  };
+  return {
+    items: (payload.items ?? []).map(nativeReportResultFromPayload),
     page,
   };
 };

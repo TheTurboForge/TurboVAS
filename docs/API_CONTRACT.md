@@ -70,8 +70,8 @@ Results, Hosts, Ports, Applications, Operating Systems, CVEs, TLS Certificates,
 Error Messages, scope-report Metrics, and raw report Metrics because those read
 paths validate DB-backed evidence, scope membership, provenance, and report
 reading without changing scanner control behavior. Browser-facing proof now
-covers the raw `/reports` list, `/scopes` list/detail reads, report Metrics,
-and all current scope-report evidence tabs: GSA calls same-origin
+covers the raw `/reports` list, `/scopes` list/detail reads, raw report Results,
+report Metrics, and all current scope-report evidence tabs: GSA calls same-origin
 `/api/v1/...` paths, and `gsad` authenticates and allowlists those reads before
 proxying to the internal sidecar. `runtime-report-summary --json` now also uses
 the native raw report detail/result-row endpoints instead of `python-gvm`.
@@ -83,8 +83,9 @@ port, NVT OID/name/family, severity, QoD, creation time, source report ID,
 raw evidence link, and a bounded description excerpt. These fields are enough
 for summary views and report-export artifacts without asking GSA or runtime
 helpers to stitch raw XML report payloads together client-side.
-`runtime-report-export --json` now reads native raw-report detail and result
-row endpoints, then writes the familiar runtime JSON export artifact. The
+`runtime-report-export --json` and the raw report Results tab now read native
+raw-report detail/result-row endpoints, then write or render their familiar
+JSON/table views. The
 artifact is an export of PostgreSQL-owned report data, not a separate source of
 truth.
 

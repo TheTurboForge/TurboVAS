@@ -43,7 +43,7 @@ defined in `docs/NATIVE_API_AUTH_BOUNDARY.md`.
 
 | Workflow | Current path | Native target | Retirement criterion |
 | --- | --- | --- | --- |
-| Raw report list/detail/results | GSA GMP commands -> gsad -> gvmd XML -> PostgreSQL | `/api/v1/reports`, `/api/v1/reports/{report_id}`, and `/api/v1/reports/{report_id}/results` | `/reports` now reads its list through typed JSON. Raw detail summary and result-row endpoints are live internally; the detail page header/tabs remain partially inherited until migrated in a follow-up. |
+| Raw report list/detail/results | GSA GMP commands -> gsad -> gvmd XML -> PostgreSQL | `/api/v1/reports`, `/api/v1/reports/{report_id}`, and `/api/v1/reports/{report_id}/results` | `/reports` now reads its list through typed JSON. Raw detail summary and raw report Results tab reads use native JSON through the authenticated `gsad` proxy; remaining heavy detail tabs stay inherited until migrated in follow-ups. |
 | Raw report metrics | `runtime-report-metrics` and the GSA Metrics tab now use the native API; the inherited `get_report_metrics` GMP command remains available during transition | `/api/v1/reports/{report_id}/metrics` | Runtime and browser smoke continue to prove the native path while GMP compatibility remains intact. |
 | Scope list/detail | GMP scope commands and GSA scope pages | `/api/v1/scopes` and `/api/v1/scopes/{scope_id}` | Scope metadata and membership reads move to typed JSON; writes remain inherited until designed. |
 | Scope-report list/detail | GMP scope-report commands and GSA scope-report pages | `/api/v1/scopes/reports` and canonical scoped detail path | GSA list/detail reads use server-backed JSON collections and browser smoke remains green. |

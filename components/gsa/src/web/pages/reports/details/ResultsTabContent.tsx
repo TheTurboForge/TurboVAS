@@ -9,7 +9,7 @@ import type Filter from 'gmp/models/filter';
 import type {TaskStatus} from 'gmp/models/task';
 import EmptyReport from 'web/pages/reports/details/EmptyReport';
 import EmptyResultsReport from 'web/pages/reports/details/EmptyResultsReport';
-import ResultsTab from 'web/pages/reports/details/ResultsTab';
+import NativeResultsTab from 'web/pages/reports/details/NativeResultsTab';
 
 interface ResultsTabContentProps {
   hasTarget: boolean;
@@ -75,19 +75,9 @@ const ResultsTabContent = ({
 
 
   return (
-    <ResultsTab
-      hasTarget={hasTarget}
-      progress={progress}
+    <NativeResultsTab
       reportFilter={reportFilter}
       reportId={reportId}
-      reportResultsCounts={reportResultsCounts}
-      status={status}
-      onFilterAddLogLevelClick={onFilterAddLogLevelClick}
-      onFilterDecreaseMinQoDClick={onFilterDecreaseMinQoDClick}
-      onFilterEditClick={onFilterEditClick}
-      onFilterRemoveClick={onFilterRemoveClick}
-      onFilterRemoveSeverityClick={onFilterRemoveSeverityClick}
-      onTargetEditClick={onTargetEditClick}
     />
   );
 };

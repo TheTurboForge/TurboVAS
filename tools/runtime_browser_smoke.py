@@ -406,6 +406,14 @@ async function runForBaseUrl(baseUrl) {
         await page.goto(new URL(rawReportHref, config.baseUrl).toString(), { waitUntil: 'networkidle', timeout: config.timeoutMs });
         await screenshot(page, 'raw-report-from-evidence-link');
         await assertNoAppError(page, 'raw-report-from-evidence-link.app-error');
+        if (await clickTab(page, 'Results', isRawReportDetailUrl)) {
+          await screenshot(page, 'raw-report-results-tab');
+          await assertNoAppError(page, 'raw-report-results-tab.app-error');
+          const nativeRawResults = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/reports\/[^/]+\/results$/);
+          add(nativeRawResults ? 'pass' : 'fail', 'raw-report.results-native-api', nativeRawResults ? 'Raw-report Results tab loaded through same-origin native API.' : 'Raw-report Results tab did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => item.path.includes('/results')) });
+        } else {
+          add('fail', 'raw-report.results-tab', 'Could not activate the raw-report Results tab.');
+        }
         if (await clickTab(page, 'Metrics', isRawReportDetailUrl)) {
           await waitForMetricLabels(page);
           await screenshot(page, 'raw-report-metrics-tab');

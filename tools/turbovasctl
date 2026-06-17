@@ -2517,8 +2517,8 @@ def summarize_native_tooling(items: list[dict[str, Any]]) -> dict[str, Any]:
             },
             {
                 "endpoint": "/api/v1/reports/{report_id}/results",
-                "status": "implemented_internal",
-                "replacement_candidates": ["runtime-report-summary helper (migrated)", "GSA raw report Results tab after browser contract review"],
+                "status": "implemented_internal_and_browser_proxied",
+                "replacement_candidates": ["runtime-report-summary helper (migrated)", "runtime-report-export helper (migrated)", "GSA raw report Results tab (migrated through gsad same-origin proxy)"],
             },
             {
                 "endpoint": "/api/v1/scopes",
@@ -2588,7 +2588,7 @@ def summarize_native_tooling(items: list[dict[str, Any]]) -> dict[str, Any]:
         ],
         "next_replacement_candidates": [
             {"workflow": "gvm-tools scope/report scripts", "current_dependency": "gvm-tools GMP scripts", "native_target": "turbovasctl or native HTTP/JSON client commands"},
-            {"workflow": "raw-report evidence tabs", "current_dependency": "GSA/GMP report detail collections", "native_target": "typed native collection endpoints after scope-report parity proves stable"},
+            {"workflow": "remaining raw-report detail tabs", "current_dependency": "GSA/GMP report detail collections", "native_target": "typed native collection endpoints after the native raw-report Results tab proves stable"},
         ],
     }
 
