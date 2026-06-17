@@ -53,6 +53,19 @@ export interface ScopeReportCveItem {
   sourceReportIds: string[];
 }
 
+export interface ScopeReportResultItem {
+  id: string;
+  host: string;
+  port: string;
+  nvtOid: string;
+  name: string;
+  severity: number;
+  qod: number;
+  createdAt?: string;
+  sourceReportId: string;
+  rawEvidenceHref: string;
+}
+
 export interface ScopeReportErrorMessageItem {
   id: string;
   host: string;
@@ -175,6 +188,30 @@ export const fetchNativeScopeReportHosts = (
       vulnerabilityCount: integerValue(item.vulnerability_count),
       authenticatedScanState: stringValue(item.authenticated_scan_state),
       sourceReportIds: stringArrayValue(item.source_report_ids),
+    }),
+  );
+
+export const fetchNativeScopeReportResults = (
+  gmp: NativeApiGmp,
+  scopeId: string,
+  scopeReportId: string,
+  query: NativeCollectionQuery,
+) =>
+  fetchNativeCollection<ScopeReportResultItem>(
+    gmp,
+    scopeReportPath(scopeId, scopeReportId, 'results'),
+    query,
+    item => ({
+      id: stringValue(item.id),
+      host: stringValue(item.host),
+      port: stringValue(item.port),
+      nvtOid: stringValue(item.nvt_oid),
+      name: stringValue(item.name),
+      severity: numberValue(item.severity),
+      qod: integerValue(item.qod),
+      createdAt: optionalStringValue(item.created_at),
+      sourceReportId: stringValue(item.source_report_id),
+      rawEvidenceHref: stringValue(item.raw_evidence_href),
     }),
   );
 

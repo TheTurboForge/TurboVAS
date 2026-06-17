@@ -307,6 +307,9 @@ async function runForBaseUrl(baseUrl) {
     if (await clickTab(page, 'Results', isScopeReportDetailUrl)) {
       await screenshot(page, 'scope-report-results-tab');
       await clickFirstResultRow(page);
+      await assertNoPerSourceEvidenceSections(page, 'scope-report.results-aggregated-native-tab');
+      const nativeScopeResults = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/scopes\/[^/]+\/reports\/[^/]+\/results$/);
+      add(nativeScopeResults ? 'pass' : 'fail', 'scope-report.results-native-api', nativeScopeResults ? 'Scope-report Results tab loaded through same-origin native API.' : 'Scope-report Results tab did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => item.path.includes('/results')) });
     } else {
       add('fail', 'scope-report.results-tab', 'Could not activate the Results tab.');
     }

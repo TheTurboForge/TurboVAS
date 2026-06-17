@@ -179,18 +179,17 @@ mistaking intended authenticated scanning for proven authenticated scanning.
 
 Findings are deduplicated by host identity, NVT/OID, port, and result identity.
 The scope-report list is served through manager-side filtering, sorting, and
-pagination. The result collection is served through the standard result-query
-path with a TurboVAS scope-report constraint, so operators get the familiar
-result table, filtering, sorting, pagination, severity presentation, and result
-drill-down without browser-side raw-report stitching. The scope report keeps
-representative result provenance and links back to the raw scan reports used as
-evidence. Raw source reports referenced by a scope report are protected from
-deletion so the snapshot provenance remains intact.
+pagination. The Results collection is now served through TurboVAS-native JSON
+from PostgreSQL-backed source-report references, so operators get an aggregated
+result table with filtering, sorting, pagination, severity presentation, and raw
+evidence links without browser-side raw-report stitching. Raw source reports
+referenced by a scope report are protected from deletion so the snapshot
+provenance remains intact.
 
 The current implementation deliberately focuses on core report reading parity:
 scope report list/detail views, information, results, metrics, evidence sources,
 raw evidence links, and result navigation. Scope report details also expose lazy
-evidence tabs. Hosts, CVEs, and Error Messages are aggregated native
+evidence tabs. Results, Hosts, CVEs, and Error Messages are aggregated native
 scope-report collections; ports, applications, operating systems, and TLS
 certificates still load selected raw source reports as evidence. The remaining
 backend direction is to add dedicated scope-report collection contracts for

@@ -8,6 +8,7 @@ import {
   fetchNativeScopeReportCves,
   fetchNativeScopeReportErrors,
   fetchNativeScopeReportHosts,
+  fetchNativeScopeReportResults,
 } from 'gmp/native-api/scope-report-collections';
 
 const createGmp = ({jwt, token = 'test-token'}: {jwt?: string; token?: string} = {}) => ({
@@ -72,6 +73,57 @@ describe('native API scope report evidence collections', () => {
           Accept: 'application/json',
           Authorization: 'Bearer jwt-token',
         },
+      },
+    );
+  });
+
+  test('fetches result rows with raw evidence links', async () => {
+    testing.stubGlobal(
+      'fetch',
+      testing.fn().mockResolvedValue({
+        json: testing.fn().mockResolvedValue({
+          page: {page: 1, page_size: 25, total: 1, sort: '-severity', filter: ''},
+          items: [
+            {
+              id: 'result-1',
+              host: '192.0.2.10',
+              port: '22/tcp',
+              nvt_oid: '1.3.6.1.4.1.25623.1.0.1',
+              name: 'Example finding',
+              severity: 7.5,
+              qod: 80,
+              created_at: '2026-06-17T10:00:00Z',
+              source_report_id: 'raw-report-1',
+              raw_evidence_href: '/report/raw-report-1/result/result-1',
+            },
+          ],
+        }),
+        ok: true,
+        status: 200,
+      }),
+    );
+    const gmp = createGmp();
+
+    const collection = await fetchNativeScopeReportResults(
+      gmp,
+      'scope-1',
+      'scope-report-1',
+      {page: 1, pageSize: 25, sort: '-severity'},
+    );
+
+    expect(collection.items[0].name).toEqual('Example finding');
+    expect(collection.items[0].severity).toEqual(7.5);
+    expect(collection.items[0].rawEvidenceHref).toEqual(
+      '/report/raw-report-1/result/result-1',
+    );
+    expect(gmp.buildUrl).toHaveBeenCalledWith(
+      'api/v1/scopes/scope-1/reports/scope-report-1/results',
+      {
+        token: 'test-token',
+        page: 1,
+        page_size: 25,
+        sort: '-severity',
+        filter: undefined,
       },
     );
   });

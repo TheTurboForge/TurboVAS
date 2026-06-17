@@ -33,7 +33,6 @@ import useTranslation from 'web/hooks/useTranslation';
 import MetricsTab from 'web/pages/reports/details/MetricsTab';
 import NativeScopeReportEvidenceTab from 'web/pages/scope-reports/NativeScopeReportEvidenceTab';
 import ScopeReportEvidenceTab from 'web/pages/scope-reports/ScopeReportEvidenceTab';
-import ScopeReportResultsTab from 'web/pages/scope-reports/ScopeReportResultsTab';
 import {
   EmptyRow,
   ErrorMessage,
@@ -176,7 +175,13 @@ const ScopeReportDetailsPage = () => {
     </InfoTable>
   );
 
-  const resultsTab = <ScopeReportResultsTab scopeReportId={report.id} />;
+  const resultsTab = (
+    <NativeScopeReportEvidenceTab
+      kind="results"
+      scopeId={report.scopeId}
+      scopeReportId={report.id}
+    />
+  );
   const metricsTab = (
     <MetricsTab id={report.id} scopeId={report.scopeId} source="scopeReport" />
   );

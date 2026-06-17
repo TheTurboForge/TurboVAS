@@ -120,12 +120,13 @@ evidence, and drill-down remain recognizable, while the evidence source changes
 from one technical scan report to the newest completed raw reports for the
 scope's targets.
 
-Scope report lists and result rows use manager-backed filtering, sorting, and
-pagination for the core reading workflow. Result rows use the standard result
-table behavior: severity display, result detail expansion, and links to the raw
-scan report evidence they were derived from. Raw report management actions that
-do not fit aggregated snapshots, such as report-composer downloads, alerts, and
-asset/tag mutation, remain raw-report workflows rather than scope report actions.
+Scope report lists and result rows use server-backed filtering, sorting, and
+pagination for the core reading workflow. Scope-report Results, Hosts, CVEs,
+Error Messages, and Metrics are aggregated views backed by TurboVAS-native JSON;
+result rows preserve severity display and link back to the raw scan report
+evidence they were derived from. Raw report management actions that do not fit
+aggregated snapshots, such as report-composer downloads, alerts, and asset/tag
+mutation, remain raw-report workflows rather than scope report actions.
 Inherited operator-facing report upload/import and raw delta-report comparison
 workflows have been removed.
 

@@ -38,9 +38,9 @@ browser/runtime coverage. See `docs/API_CONTRACT.md`,
 `docs/GMP_XML_STRANGLER.md`, and `api/openapi/turbovas-v1.yaml`.
 
 The first browser-facing native reads are raw-report/scope-report Metrics and
-scope-report Hosts, CVEs, and Error Messages. `gsad` authenticates the existing
-operator session, allowlists only those read paths, forwards safe collection
-query parameters, and proxies to the internal-only Rust sidecar.
+scope-report Results, Hosts, CVEs, and Error Messages. `gsad` authenticates the
+existing operator session, allowlists only those read paths, forwards safe
+collection query parameters, and proxies to the internal-only Rust sidecar.
 
 ## Scan Flow
 

@@ -8,11 +8,13 @@ import {
   fetchNativeScopeReportCves,
   fetchNativeScopeReportErrors,
   fetchNativeScopeReportHosts,
+  fetchNativeScopeReportResults,
   type NativeCollection,
   type NativeCollectionQuery,
   type ScopeReportCveItem,
   type ScopeReportErrorMessageItem,
   type ScopeReportHostItem,
+  type ScopeReportResultItem,
 } from 'gmp/native-api/scope-report-collections';
 import SeverityBar from 'web/components/bar/SeverityBar';
 import Button from 'web/components/form/Button';
@@ -36,7 +38,11 @@ import SortDirection, {type SortDirectionType} from 'web/utils/sort-direction';
 
 const PAGE_SIZE = 25;
 
-export type NativeScopeReportEvidenceKind = 'hosts' | 'cves' | 'errors';
+export type NativeScopeReportEvidenceKind =
+  | 'results'
+  | 'hosts'
+  | 'cves'
+  | 'errors';
 
 interface NativeScopeReportEvidenceTabProps {
   kind: NativeScopeReportEvidenceKind;
@@ -45,6 +51,7 @@ interface NativeScopeReportEvidenceTabProps {
 }
 
 interface EvidenceState {
+  results?: NativeCollection<ScopeReportResultItem>;
   hosts?: NativeCollection<ScopeReportHostItem>;
   cves?: NativeCollection<ScopeReportCveItem>;
   errors?: NativeCollection<ScopeReportErrorMessageItem>;
@@ -52,6 +59,8 @@ interface EvidenceState {
 
 const defaultSortBy = (kind: NativeScopeReportEvidenceKind) => {
   switch (kind) {
+    case 'results':
+      return 'severity';
     case 'hosts':
       return 'host';
     case 'cves':
@@ -142,6 +151,15 @@ const NativeScopeReportEvidenceTab = ({
             query,
           ),
         });
+      } else if (kind === 'results') {
+        setData({
+          results: await fetchNativeScopeReportResults(
+            gmp,
+            scopeId,
+            scopeReportId,
+            query,
+          ),
+        });
       } else if (kind === 'cves') {
         setData({
           cves: await fetchNativeScopeReportCves(
@@ -224,6 +242,81 @@ const NativeScopeReportEvidenceTab = ({
       />
     </PageActions>
   );
+
+  const renderResults = () => {
+    const results = data.results?.items ?? [];
+    return (
+      <Table>
+        <TableBody>
+          <TableRow>
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="severity"
+              title={_('Severity')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="name"
+              title={_('Name')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="host"
+              title={_('Host')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="port"
+              title={_('Port')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="qod"
+              title={_('QoD')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="created_at"
+              title={_('Created')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead>{_('Raw Evidence')}</TableHead>
+          </TableRow>
+          {results.length === 0 && <EmptyRow colSpan={7} />}
+          {results.map(result => (
+            <TableRow key={result.id}>
+              <TableData>
+                <SeverityBar severity={result.severity} />
+              </TableData>
+              <TableData>
+                <Link to={result.rawEvidenceHref}>{result.name || result.id}</Link>
+              </TableData>
+              <TableData>{result.host}</TableData>
+              <TableData>{result.port}</TableData>
+              <TableData align="end">{result.qod}</TableData>
+              <TableData>{formatDate(result.createdAt)}</TableData>
+              <TableData>
+                <Link to={`/report/${result.sourceReportId}`}>
+                  {result.sourceReportId}
+                </Link>
+              </TableData>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    );
+  };
 
   const renderHosts = () => {
     const hosts = data.hosts?.items ?? [];
@@ -420,6 +513,8 @@ const NativeScopeReportEvidenceTab = ({
       {error && <ErrorMessage>{error}</ErrorMessage>}
       {loading && !collection ? (
         <Loading />
+      ) : kind === 'results' ? (
+        renderResults()
       ) : kind === 'hosts' ? (
         renderHosts()
       ) : kind === 'cves' ? (
