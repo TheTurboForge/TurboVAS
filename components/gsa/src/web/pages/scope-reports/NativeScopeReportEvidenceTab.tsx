@@ -5,18 +5,24 @@
 
 import {useCallback, useEffect, useMemo, useState} from 'react';
 import {
+  fetchNativeScopeReportApplications,
   fetchNativeScopeReportCves,
   fetchNativeScopeReportErrors,
   fetchNativeScopeReportHosts,
+  fetchNativeScopeReportOperatingSystems,
   fetchNativeScopeReportPorts,
   fetchNativeScopeReportResults,
+  fetchNativeScopeReportTlsCertificates,
   type NativeCollection,
   type NativeCollectionQuery,
+  type ScopeReportApplicationItem,
   type ScopeReportCveItem,
   type ScopeReportErrorMessageItem,
   type ScopeReportHostItem,
+  type ScopeReportOperatingSystemItem,
   type ScopeReportPortItem,
   type ScopeReportResultItem,
+  type ScopeReportTlsCertificateItem,
 } from 'gmp/native-api/scope-report-collections';
 import SeverityBar from 'web/components/bar/SeverityBar';
 import Button from 'web/components/form/Button';
@@ -44,7 +50,10 @@ export type NativeScopeReportEvidenceKind =
   | 'results'
   | 'hosts'
   | 'ports'
+  | 'applications'
+  | 'operatingSystems'
   | 'cves'
+  | 'tlsCertificates'
   | 'errors';
 
 interface NativeScopeReportEvidenceTabProps {
@@ -57,7 +66,10 @@ interface EvidenceState {
   results?: NativeCollection<ScopeReportResultItem>;
   hosts?: NativeCollection<ScopeReportHostItem>;
   ports?: NativeCollection<ScopeReportPortItem>;
+  applications?: NativeCollection<ScopeReportApplicationItem>;
+  operatingSystems?: NativeCollection<ScopeReportOperatingSystemItem>;
   cves?: NativeCollection<ScopeReportCveItem>;
+  tlsCertificates?: NativeCollection<ScopeReportTlsCertificateItem>;
   errors?: NativeCollection<ScopeReportErrorMessageItem>;
 }
 
@@ -69,8 +81,14 @@ const defaultSortBy = (kind: NativeScopeReportEvidenceKind) => {
       return 'host';
     case 'ports':
       return 'port';
+    case 'applications':
+      return 'name';
+    case 'operatingSystems':
+      return 'name';
     case 'cves':
       return 'max_severity';
+    case 'tlsCertificates':
+      return 'not_after';
     case 'errors':
       return 'created_at';
     default:
@@ -79,7 +97,12 @@ const defaultSortBy = (kind: NativeScopeReportEvidenceKind) => {
 };
 
 const defaultSortDir = (kind: NativeScopeReportEvidenceKind): SortDirectionType =>
-  kind === 'hosts' || kind === 'ports' ? SortDirection.ASC : SortDirection.DESC;
+  kind === 'hosts' ||
+  kind === 'ports' ||
+  kind === 'applications' ||
+  kind === 'operatingSystems'
+    ? SortDirection.ASC
+    : SortDirection.DESC;
 
 const sortQuery = (field: string, direction: SortDirectionType) =>
   direction === SortDirection.DESC ? `-${field}` : field;
@@ -166,6 +189,24 @@ const NativeScopeReportEvidenceTab = ({
             query,
           ),
         });
+      } else if (kind === 'applications') {
+        setData({
+          applications: await fetchNativeScopeReportApplications(
+            gmp,
+            scopeId,
+            scopeReportId,
+            query,
+          ),
+        });
+      } else if (kind === 'operatingSystems') {
+        setData({
+          operatingSystems: await fetchNativeScopeReportOperatingSystems(
+            gmp,
+            scopeId,
+            scopeReportId,
+            query,
+          ),
+        });
       } else if (kind === 'results') {
         setData({
           results: await fetchNativeScopeReportResults(
@@ -178,6 +219,15 @@ const NativeScopeReportEvidenceTab = ({
       } else if (kind === 'cves') {
         setData({
           cves: await fetchNativeScopeReportCves(
+            gmp,
+            scopeId,
+            scopeReportId,
+            query,
+          ),
+        });
+      } else if (kind === 'tlsCertificates') {
+        setData({
+          tlsCertificates: await fetchNativeScopeReportTlsCertificates(
             gmp,
             scopeId,
             scopeReportId,
@@ -520,6 +570,225 @@ const NativeScopeReportEvidenceTab = ({
     );
   };
 
+  const renderApplications = () => {
+    const applications = data.applications?.items ?? [];
+    return (
+      <Table>
+        <TableBody>
+          <TableRow>
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="name"
+              title={_('Application')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="cpe"
+              title={_('CPE')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="max_severity"
+              title={_('Max Severity')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="host_count"
+              title={_('Hosts')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="result_count"
+              title={_('Results')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="vulnerability_count"
+              title={_('Vulnerabilities')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead>{_('Source Reports')}</TableHead>
+          </TableRow>
+          {applications.length === 0 && <EmptyRow colSpan={7} />}
+          {applications.map(application => (
+            <TableRow key={`${application.name}-${application.cpe}`}>
+              <TableData>{application.name}</TableData>
+              <TableData>{application.cpe || '-'}</TableData>
+              <TableData>
+                <SeverityBar severity={application.maxSeverity} />
+              </TableData>
+              <TableData align="end">{application.hostCount}</TableData>
+              <TableData align="end">{application.resultCount}</TableData>
+              <TableData align="end">{application.vulnerabilityCount}</TableData>
+              <TableData align="end">
+                {application.sourceReportIds.length}
+              </TableData>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    );
+  };
+
+  const renderOperatingSystems = () => {
+    const operatingSystems = data.operatingSystems?.items ?? [];
+    return (
+      <Table>
+        <TableBody>
+          <TableRow>
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="name"
+              title={_('Operating System')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="cpe"
+              title={_('CPE')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="max_severity"
+              title={_('Max Severity')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="host_count"
+              title={_('Hosts')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="result_count"
+              title={_('Results')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="vulnerability_count"
+              title={_('Vulnerabilities')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead>{_('Source Reports')}</TableHead>
+          </TableRow>
+          {operatingSystems.length === 0 && <EmptyRow colSpan={7} />}
+          {operatingSystems.map(os => (
+            <TableRow key={`${os.name}-${os.cpe}`}>
+              <TableData>{os.name}</TableData>
+              <TableData>{os.cpe || '-'}</TableData>
+              <TableData>
+                <SeverityBar severity={os.maxSeverity} />
+              </TableData>
+              <TableData align="end">{os.hostCount}</TableData>
+              <TableData align="end">{os.resultCount}</TableData>
+              <TableData align="end">{os.vulnerabilityCount}</TableData>
+              <TableData align="end">{os.sourceReportIds.length}</TableData>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    );
+  };
+
+  const renderTlsCertificates = () => {
+    const certificates = data.tlsCertificates?.items ?? [];
+    return (
+      <Table>
+        <TableBody>
+          <TableRow>
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="fingerprint_sha256"
+              title={_('SHA-256 Fingerprint')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="subject"
+              title={_('Subject')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="issuer"
+              title={_('Issuer')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="serial"
+              title={_('Serial')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="not_after"
+              title={_('Not After')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="host_count"
+              title={_('Hosts')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead
+              currentSortBy={sortBy}
+              currentSortDir={sortDir}
+              sortBy="port_count"
+              title={_('Ports')}
+              onSortChange={handleSortChange}
+            />
+            <TableHead>{_('Source Reports')}</TableHead>
+          </TableRow>
+          {certificates.length === 0 && <EmptyRow colSpan={8} />}
+          {certificates.map(certificate => (
+            <TableRow key={certificate.id}>
+              <TableData>
+                {certificate.fingerprintSha256 || certificate.id}
+              </TableData>
+              <TableData>{certificate.subject || '-'}</TableData>
+              <TableData>{certificate.issuer || '-'}</TableData>
+              <TableData>{certificate.serial || '-'}</TableData>
+              <TableData>{formatDate(certificate.notAfter)}</TableData>
+              <TableData align="end">{certificate.hostCount}</TableData>
+              <TableData align="end">{certificate.portCount}</TableData>
+              <TableData align="end">
+                {certificate.sourceReportIds.length}
+              </TableData>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    );
+  };
+
   const renderErrors = () => {
     const errors = data.errors?.items ?? [];
     return (
@@ -603,8 +872,14 @@ const NativeScopeReportEvidenceTab = ({
         renderHosts()
       ) : kind === 'ports' ? (
         renderPorts()
+      ) : kind === 'applications' ? (
+        renderApplications()
+      ) : kind === 'operatingSystems' ? (
+        renderOperatingSystems()
       ) : kind === 'cves' ? (
         renderCves()
+      ) : kind === 'tlsCertificates' ? (
+        renderTlsCertificates()
       ) : (
         renderErrors()
       )}

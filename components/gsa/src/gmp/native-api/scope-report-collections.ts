@@ -53,6 +53,27 @@ export interface ScopeReportCveItem {
   sourceReportIds: string[];
 }
 
+export interface ScopeReportApplicationItem {
+  name: string;
+  version: string;
+  cpe: string;
+  hostCount: number;
+  resultCount: number;
+  vulnerabilityCount: number;
+  maxSeverity: number;
+  sourceReportIds: string[];
+}
+
+export interface ScopeReportOperatingSystemItem {
+  name: string;
+  cpe: string;
+  hostCount: number;
+  resultCount: number;
+  vulnerabilityCount: number;
+  maxSeverity: number;
+  sourceReportIds: string[];
+}
+
 export interface ScopeReportPortItem {
   port: string;
   protocol: string;
@@ -84,6 +105,20 @@ export interface ScopeReportErrorMessageItem {
   description: string;
   sourceReportId: string;
   createdAt?: string;
+}
+
+export interface ScopeReportTlsCertificateItem {
+  id: string;
+  fingerprintSha256: string;
+  subject: string;
+  issuer: string;
+  serial: string;
+  notBefore?: string;
+  notAfter?: string;
+  hostCount: number;
+  portCount: number;
+  resultCount: number;
+  sourceReportIds: string[];
 }
 
 type NativeRecord = Record<string, unknown>;
@@ -201,6 +236,49 @@ export const fetchNativeScopeReportHosts = (
     }),
   );
 
+export const fetchNativeScopeReportApplications = (
+  gmp: NativeApiGmp,
+  scopeId: string,
+  scopeReportId: string,
+  query: NativeCollectionQuery,
+) =>
+  fetchNativeCollection<ScopeReportApplicationItem>(
+    gmp,
+    scopeReportPath(scopeId, scopeReportId, 'applications'),
+    query,
+    item => ({
+      name: stringValue(item.name),
+      version: stringValue(item.version),
+      cpe: stringValue(item.cpe),
+      hostCount: integerValue(item.host_count),
+      resultCount: integerValue(item.result_count),
+      vulnerabilityCount: integerValue(item.vulnerability_count),
+      maxSeverity: numberValue(item.max_severity),
+      sourceReportIds: stringArrayValue(item.source_report_ids),
+    }),
+  );
+
+export const fetchNativeScopeReportOperatingSystems = (
+  gmp: NativeApiGmp,
+  scopeId: string,
+  scopeReportId: string,
+  query: NativeCollectionQuery,
+) =>
+  fetchNativeCollection<ScopeReportOperatingSystemItem>(
+    gmp,
+    scopeReportPath(scopeId, scopeReportId, 'operating-systems'),
+    query,
+    item => ({
+      name: stringValue(item.name),
+      cpe: stringValue(item.cpe),
+      hostCount: integerValue(item.host_count),
+      resultCount: integerValue(item.result_count),
+      vulnerabilityCount: integerValue(item.vulnerability_count),
+      maxSeverity: numberValue(item.max_severity),
+      sourceReportIds: stringArrayValue(item.source_report_ids),
+    }),
+  );
+
 export const fetchNativeScopeReportResults = (
   gmp: NativeApiGmp,
   scopeId: string,
@@ -283,5 +361,30 @@ export const fetchNativeScopeReportErrors = (
       description: stringValue(item.description),
       sourceReportId: stringValue(item.source_report_id),
       createdAt: optionalStringValue(item.created_at),
+    }),
+  );
+
+export const fetchNativeScopeReportTlsCertificates = (
+  gmp: NativeApiGmp,
+  scopeId: string,
+  scopeReportId: string,
+  query: NativeCollectionQuery,
+) =>
+  fetchNativeCollection<ScopeReportTlsCertificateItem>(
+    gmp,
+    scopeReportPath(scopeId, scopeReportId, 'tls-certificates'),
+    query,
+    item => ({
+      id: stringValue(item.id),
+      fingerprintSha256: stringValue(item.fingerprint_sha256),
+      subject: stringValue(item.subject),
+      issuer: stringValue(item.issuer),
+      serial: stringValue(item.serial),
+      notBefore: optionalStringValue(item.not_before),
+      notAfter: optionalStringValue(item.not_after),
+      hostCount: integerValue(item.host_count),
+      portCount: integerValue(item.port_count),
+      resultCount: integerValue(item.result_count),
+      sourceReportIds: stringArrayValue(item.source_report_ids),
     }),
   );

@@ -123,11 +123,49 @@ struct PortItem {
 }
 
 #[derive(Debug, Serialize)]
+struct ApplicationItem {
+    name: String,
+    version: String,
+    cpe: String,
+    host_count: i64,
+    result_count: i64,
+    vulnerability_count: i64,
+    max_severity: f64,
+    source_report_ids: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct OperatingSystemItem {
+    name: String,
+    cpe: String,
+    host_count: i64,
+    result_count: i64,
+    vulnerability_count: i64,
+    max_severity: f64,
+    source_report_ids: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
 struct CveItem {
     id: String,
     affected_system_count: i64,
     result_count: i64,
     max_severity: f64,
+    source_report_ids: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct TlsCertificateItem {
+    id: String,
+    fingerprint_sha256: String,
+    subject: String,
+    issuer: String,
+    serial: String,
+    not_before: Option<String>,
+    not_after: Option<String>,
+    host_count: i64,
+    port_count: i64,
+    result_count: i64,
     source_report_ids: Vec<String>,
 }
 
@@ -278,8 +316,20 @@ async fn main() -> Result<(), ApiError> {
             get(scope_report_ports),
         )
         .route(
+            "/api/v1/scopes/:scope_id/reports/:scope_report_id/applications",
+            get(scope_report_applications),
+        )
+        .route(
+            "/api/v1/scopes/:scope_id/reports/:scope_report_id/operating-systems",
+            get(scope_report_operating_systems),
+        )
+        .route(
             "/api/v1/scopes/:scope_id/reports/:scope_report_id/cves",
             get(scope_report_cves),
+        )
+        .route(
+            "/api/v1/scopes/:scope_id/reports/:scope_report_id/tls-certificates",
+            get(scope_report_tls_certificates),
         )
         .route(
             "/api/v1/scopes/:scope_id/reports/:scope_report_id/errors",
@@ -1107,6 +1157,398 @@ async fn scope_report_ports(
     }))
 }
 
+async fn scope_report_applications(
+    State(state): State<AppState>,
+    Path((scope_id, scope_report_id)): Path<(String, String)>,
+    Query(query): Query<CollectionQuery>,
+) -> Result<Json<Collection<ApplicationItem>>, ApiError> {
+    parse_uuid(&scope_id)?;
+    parse_uuid(&scope_report_id)?;
+    let params = normalize_collection_query(query, "name")?;
+    let sort_sql = sort_clause(
+        &params.sort,
+        &[
+            ("name", "name"),
+            ("cpe", "cpe"),
+            ("host_count", "host_count"),
+            ("result_count", "result_count"),
+            ("vulnerability_count", "vulnerability_count"),
+            ("max_severity", "max_severity"),
+        ],
+    )?;
+    let sql = format!(
+        "WITH selected_scope_report AS (\n\
+             SELECT sr.id, sr.scope, coalesce(s.is_global, 0)::int AS is_global\n\
+               FROM scope_reports sr\n\
+               JOIN scopes s ON s.id = sr.scope\n\
+              WHERE sr.uuid = $1 AND sr.scope_uuid = $2\n\
+         ),\n\
+         selected_hosts AS (\n\
+             SELECT lower(rh.host) AS host_key\n\
+               FROM selected_scope_report sr\n\
+               JOIN scope_report_sources srs ON srs.scope_report = sr.id\n\
+               JOIN report_hosts rh ON rh.report = srs.source_report\n\
+              WHERE sr.is_global = 1 AND coalesce(rh.host, '') <> ''\n\
+              GROUP BY lower(rh.host)\n\
+             UNION\n\
+             SELECT lower(h.name) AS host_key\n\
+               FROM selected_scope_report sr\n\
+               JOIN scope_hosts sh ON sh.scope = sr.scope AND sr.is_global = 0\n\
+               JOIN hosts h ON h.id = sh.host\n\
+              WHERE coalesce(h.name, '') <> ''\n\
+              GROUP BY lower(h.name)\n\
+         ),\n\
+         app_instances AS (\n\
+             SELECT lower(rh.host) AS host_key,\n\
+                    rh.report AS source_report,\n\
+                    srs.source_report_uuid AS source_report_id,\n\
+                    rh.id AS report_host,\n\
+                    rhd.source_name AS detection_oid,\n\
+                    rhd.value AS name\n\
+               FROM selected_scope_report sr\n\
+               JOIN scope_report_sources srs ON srs.scope_report = sr.id\n\
+               JOIN report_hosts rh ON rh.report = srs.source_report\n\
+               JOIN selected_hosts sh ON sh.host_key = lower(rh.host)\n\
+               JOIN report_host_details rhd ON rhd.report_host = rh.id\n\
+              WHERE rhd.name = 'App'\n\
+                AND coalesce(rhd.value, '') <> ''\n\
+                AND coalesce(rhd.source_name, '') <> ''\n\
+              GROUP BY lower(rh.host), rh.report, srs.source_report_uuid,\n\
+                       rh.id, rhd.source_name, rhd.value\n\
+         ),\n\
+         result_detection AS (\n\
+             SELECT r.uuid AS result_id,\n\
+                    r.report AS source_report,\n\
+                    lower(coalesce(nullif(r.host, ''), r.hostname, '')) AS host_key,\n\
+                    coalesce(r.nvt, '') AS nvt_oid,\n\
+                    coalesce(r.severity, 0)::double precision AS severity,\n\
+                    coalesce(nullif(by_location.value, ''), by_generic.value, '') AS detection_oid,\n\
+                    coalesce(nullif(r.path, ''),\n\
+                             CASE WHEN coalesce(r.port, '') <> ''\n\
+                                    AND coalesce(r.port, '') NOT LIKE 'general/%'\n\
+                                  THEN r.port ELSE NULL END,\n\
+                             detected_at.value, '') AS detection_location\n\
+               FROM selected_scope_report sr\n\
+               JOIN scope_report_sources srs ON srs.scope_report = sr.id\n\
+               JOIN results r ON r.report = srs.source_report\n\
+               JOIN report_hosts rh\n\
+                 ON rh.report = r.report\n\
+                AND lower(rh.host) = lower(coalesce(nullif(r.host, ''), r.hostname, ''))\n\
+               JOIN selected_hosts sh ON sh.host_key = lower(rh.host)\n\
+               LEFT JOIN report_host_details detected_at\n\
+                 ON detected_at.report_host = rh.id\n\
+                AND detected_at.source_name = r.nvt\n\
+                AND detected_at.name = 'detected_at'\n\
+               LEFT JOIN report_host_details by_location\n\
+                 ON by_location.report_host = rh.id\n\
+                AND by_location.source_name = r.nvt\n\
+                AND by_location.name = 'detected_by@' || coalesce(nullif(r.path, ''),\n\
+                     CASE WHEN coalesce(r.port, '') <> ''\n\
+                            AND coalesce(r.port, '') NOT LIKE 'general/%'\n\
+                          THEN r.port ELSE NULL END,\n\
+                     detected_at.value, '')\n\
+               LEFT JOIN report_host_details by_generic\n\
+                 ON by_generic.report_host = rh.id\n\
+                AND by_generic.source_name = r.nvt\n\
+                AND by_generic.name = 'detected_by'\n\
+              WHERE coalesce(r.severity, 0) != -3.0\n\
+                AND coalesce(nullif(r.host, ''), r.hostname, '') <> ''\n\
+         ),\n\
+         app_result_matches AS (\n\
+             SELECT ai.name,\n\
+                    ai.host_key,\n\
+                    ai.source_report_id,\n\
+                    rd.result_id,\n\
+                    rd.nvt_oid,\n\
+                    rd.severity\n\
+               FROM app_instances ai\n\
+               LEFT JOIN result_detection rd\n\
+                 ON rd.source_report = ai.source_report\n\
+                AND rd.host_key = ai.host_key\n\
+                AND rd.detection_oid = ai.detection_oid\n\
+               LEFT JOIN report_host_details app_location\n\
+                 ON app_location.report_host = ai.report_host\n\
+                AND app_location.source_name = ai.detection_oid\n\
+                AND app_location.name = ai.name\n\
+                AND app_location.value = rd.detection_location\n\
+              WHERE rd.result_id IS NULL OR app_location.id IS NOT NULL\n\
+         ),\n\
+         application_rows AS (\n\
+             SELECT ai.name,\n\
+                    ''::text AS version,\n\
+                    CASE WHEN lower(ai.name) LIKE 'cpe:%' THEN ai.name ELSE '' END AS cpe,\n\
+                    count(DISTINCT ai.host_key)::bigint AS host_count,\n\
+                    count(DISTINCT arm.result_id)::bigint AS result_count,\n\
+                    count(DISTINCT coalesce(nullif(arm.nvt_oid, ''), arm.result_id))\n\
+                      FILTER (WHERE coalesce(arm.severity, 0) > 0)::bigint AS vulnerability_count,\n\
+                    coalesce(max(coalesce(arm.severity, 0)), 0)::double precision AS max_severity,\n\
+                    array_remove(array_agg(DISTINCT ai.source_report_id), NULL) AS source_report_ids\n\
+               FROM app_instances ai\n\
+               LEFT JOIN app_result_matches arm\n\
+                 ON arm.name = ai.name\n\
+                AND arm.host_key = ai.host_key\n\
+                AND arm.source_report_id = ai.source_report_id\n\
+              GROUP BY ai.name\n\
+         ),\n\
+         filtered AS (\n\
+             SELECT * FROM application_rows\n\
+              WHERE ($3 = ''\n\
+                     OR lower(name) LIKE '%' || lower($3) || '%'\n\
+                     OR lower(cpe) LIKE '%' || lower($3) || '%')\n\
+         )\n\
+         SELECT count(*) OVER()::bigint AS total, * FROM filtered\n\
+          ORDER BY {sort_sql}, name ASC LIMIT $4 OFFSET $5;"
+    );
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let rows = client
+        .query(
+            &sql,
+            &[
+                &scope_report_id,
+                &scope_id,
+                &params.filter,
+                &params.page_size,
+                &params.offset,
+            ],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "scope report application query failed");
+            ApiError::Database
+        })?;
+    if rows.is_empty() && !scope_report_exists(&client, &scope_report_id, &scope_id).await? {
+        return Err(ApiError::NotFound);
+    }
+    let total = rows.first().map(|row| row.get::<_, i64>(0)).unwrap_or(0);
+    let items = rows.iter().map(application_from_row).collect();
+    Ok(Json(Collection {
+        page: params.page_info(total),
+        items,
+    }))
+}
+
+async fn scope_report_operating_systems(
+    State(state): State<AppState>,
+    Path((scope_id, scope_report_id)): Path<(String, String)>,
+    Query(query): Query<CollectionQuery>,
+) -> Result<Json<Collection<OperatingSystemItem>>, ApiError> {
+    parse_uuid(&scope_id)?;
+    parse_uuid(&scope_report_id)?;
+    let params = normalize_collection_query(query, "name")?;
+    let sort_sql = sort_clause(
+        &params.sort,
+        &[
+            ("name", "name"),
+            ("cpe", "cpe"),
+            ("host_count", "host_count"),
+            ("result_count", "result_count"),
+            ("vulnerability_count", "vulnerability_count"),
+            ("max_severity", "max_severity"),
+        ],
+    )?;
+    let sql = format!(
+        "WITH selected_scope_report AS (\n\
+             SELECT sr.id, sr.scope, coalesce(s.is_global, 0)::int AS is_global\n\
+               FROM scope_reports sr\n\
+               JOIN scopes s ON s.id = sr.scope\n\
+              WHERE sr.uuid = $1 AND sr.scope_uuid = $2\n\
+         ),\n\
+         selected_hosts AS (\n\
+             SELECT lower(rh.host) AS host_key\n\
+               FROM selected_scope_report sr\n\
+               JOIN scope_report_sources srs ON srs.scope_report = sr.id\n\
+               JOIN report_hosts rh ON rh.report = srs.source_report\n\
+              WHERE sr.is_global = 1 AND coalesce(rh.host, '') <> ''\n\
+              GROUP BY lower(rh.host)\n\
+             UNION\n\
+             SELECT lower(h.name) AS host_key\n\
+               FROM selected_scope_report sr\n\
+               JOIN scope_hosts sh ON sh.scope = sr.scope AND sr.is_global = 0\n\
+               JOIN hosts h ON h.id = sh.host\n\
+              WHERE coalesce(h.name, '') <> ''\n\
+              GROUP BY lower(h.name)\n\
+         ),\n\
+         os_instances AS (\n\
+             SELECT lower(rh.host) AS host_key,\n\
+                    rh.report AS source_report,\n\
+                    srs.source_report_uuid AS source_report_id,\n\
+                    coalesce(nullif(os_txt.value, ''), nullif(os_cpe.value, ''), 'Unknown') AS name,\n\
+                    coalesce(os_cpe.value, '') AS cpe\n\
+               FROM selected_scope_report sr\n\
+               JOIN scope_report_sources srs ON srs.scope_report = sr.id\n\
+               JOIN report_hosts rh ON rh.report = srs.source_report\n\
+               JOIN selected_hosts sh ON sh.host_key = lower(rh.host)\n\
+               LEFT JOIN report_host_details os_cpe\n\
+                 ON os_cpe.report_host = rh.id AND os_cpe.name = 'best_os_cpe'\n\
+               LEFT JOIN report_host_details os_txt\n\
+                 ON os_txt.report_host = rh.id AND os_txt.name = 'best_os_txt'\n\
+              WHERE coalesce(os_txt.value, os_cpe.value, '') <> ''\n\
+              GROUP BY lower(rh.host), rh.report, srs.source_report_uuid,\n\
+                       coalesce(nullif(os_txt.value, ''), nullif(os_cpe.value, ''), 'Unknown'),\n\
+                       coalesce(os_cpe.value, '')\n\
+         ),\n\
+         operating_system_rows AS (\n\
+             SELECT oi.name,\n\
+                    oi.cpe,\n\
+                    count(DISTINCT oi.host_key)::bigint AS host_count,\n\
+                    count(DISTINCT r.uuid)::bigint AS result_count,\n\
+                    count(DISTINCT coalesce(nullif(r.nvt, ''), r.uuid::text))\n\
+                      FILTER (WHERE coalesce(r.severity, 0) > 0)::bigint AS vulnerability_count,\n\
+                    coalesce(max(coalesce(r.severity, 0)), 0)::double precision AS max_severity,\n\
+                    array_remove(array_agg(DISTINCT oi.source_report_id), NULL) AS source_report_ids\n\
+               FROM os_instances oi\n\
+               LEFT JOIN results r\n\
+                 ON r.report = oi.source_report\n\
+                AND lower(coalesce(nullif(r.host, ''), r.hostname, '')) = oi.host_key\n\
+                AND coalesce(r.severity, 0) != -3.0\n\
+              GROUP BY oi.name, oi.cpe\n\
+         ),\n\
+         filtered AS (\n\
+             SELECT * FROM operating_system_rows\n\
+              WHERE ($3 = ''\n\
+                     OR lower(name) LIKE '%' || lower($3) || '%'\n\
+                     OR lower(cpe) LIKE '%' || lower($3) || '%')\n\
+         )\n\
+         SELECT count(*) OVER()::bigint AS total, * FROM filtered\n\
+          ORDER BY {sort_sql}, name ASC LIMIT $4 OFFSET $5;"
+    );
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let rows = client
+        .query(
+            &sql,
+            &[
+                &scope_report_id,
+                &scope_id,
+                &params.filter,
+                &params.page_size,
+                &params.offset,
+            ],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "scope report operating-system query failed");
+            ApiError::Database
+        })?;
+    if rows.is_empty() && !scope_report_exists(&client, &scope_report_id, &scope_id).await? {
+        return Err(ApiError::NotFound);
+    }
+    let total = rows.first().map(|row| row.get::<_, i64>(0)).unwrap_or(0);
+    let items = rows.iter().map(operating_system_from_row).collect();
+    Ok(Json(Collection {
+        page: params.page_info(total),
+        items,
+    }))
+}
+
+async fn scope_report_tls_certificates(
+    State(state): State<AppState>,
+    Path((scope_id, scope_report_id)): Path<(String, String)>,
+    Query(query): Query<CollectionQuery>,
+) -> Result<Json<Collection<TlsCertificateItem>>, ApiError> {
+    parse_uuid(&scope_id)?;
+    parse_uuid(&scope_report_id)?;
+    let params = normalize_collection_query(query, "-not_after")?;
+    let sort_sql = sort_clause(
+        &params.sort,
+        &[
+            ("id", "id"),
+            ("fingerprint_sha256", "fingerprint_sha256"),
+            ("subject", "subject"),
+            ("issuer", "issuer"),
+            ("serial", "serial"),
+            ("not_before", "not_before_unix"),
+            ("not_after", "not_after_unix"),
+            ("host_count", "host_count"),
+            ("port_count", "port_count"),
+            ("result_count", "result_count"),
+        ],
+    )?;
+    let sql = format!(
+        "WITH selected_scope_report AS (\n\
+             SELECT sr.id, sr.scope, coalesce(s.is_global, 0)::int AS is_global\n\
+               FROM scope_reports sr\n\
+               JOIN scopes s ON s.id = sr.scope\n\
+              WHERE sr.uuid = $1 AND sr.scope_uuid = $2\n\
+         ),\n\
+         selected_hosts AS (\n\
+             SELECT lower(rh.host) AS host_key\n\
+               FROM selected_scope_report sr\n\
+               JOIN scope_report_sources srs ON srs.scope_report = sr.id\n\
+               JOIN report_hosts rh ON rh.report = srs.source_report\n\
+              WHERE sr.is_global = 1 AND coalesce(rh.host, '') <> ''\n\
+              GROUP BY lower(rh.host)\n\
+             UNION\n\
+             SELECT lower(h.name) AS host_key\n\
+               FROM selected_scope_report sr\n\
+               JOIN scope_hosts sh ON sh.scope = sr.scope AND sr.is_global = 0\n\
+               JOIN hosts h ON h.id = sh.host\n\
+              WHERE coalesce(h.name, '') <> ''\n\
+              GROUP BY lower(h.name)\n\
+         ),\n\
+         tls_rows AS (\n\
+             SELECT c.uuid AS id,\n\
+                    coalesce(c.sha256_fingerprint, '') AS fingerprint_sha256,\n\
+                    coalesce(c.subject_dn, '') AS subject,\n\
+                    coalesce(c.issuer_dn, '') AS issuer,\n\
+                    coalesce(c.serial, '') AS serial,\n\
+                    coalesce(c.activation_time, 0)::bigint AS not_before_unix,\n\
+                    coalesce(c.expiration_time, 0)::bigint AS not_after_unix,\n\
+                    count(DISTINCT lower(loc.host_ip))::bigint AS host_count,\n\
+                    count(DISTINCT loc.port)::bigint AS port_count,\n\
+                    count(DISTINCT src.uuid)::bigint AS result_count,\n\
+                    array_remove(array_agg(DISTINCT origin.origin_id), NULL) AS source_report_ids\n\
+               FROM selected_scope_report sr\n\
+               JOIN scope_report_sources srs ON srs.scope_report = sr.id\n\
+               JOIN tls_certificate_origins origin\n\
+                 ON origin.origin_type = 'Report'\n\
+                AND origin.origin_id = srs.source_report_uuid\n\
+               JOIN tls_certificate_sources src ON src.origin = origin.id\n\
+               JOIN tls_certificates c ON c.id = src.tls_certificate\n\
+               JOIN tls_certificate_locations loc ON loc.id = src.location\n\
+               JOIN selected_hosts sh ON sh.host_key = lower(loc.host_ip)\n\
+              GROUP BY c.uuid, c.sha256_fingerprint, c.subject_dn, c.issuer_dn,\n\
+                       c.serial, c.activation_time, c.expiration_time\n\
+         ),\n\
+         filtered AS (\n\
+             SELECT * FROM tls_rows\n\
+              WHERE ($3 = ''\n\
+                     OR lower(id) LIKE '%' || lower($3) || '%'\n\
+                     OR lower(fingerprint_sha256) LIKE '%' || lower($3) || '%'\n\
+                     OR lower(subject) LIKE '%' || lower($3) || '%'\n\
+                     OR lower(issuer) LIKE '%' || lower($3) || '%'\n\
+                     OR lower(serial) LIKE '%' || lower($3) || '%')\n\
+         )\n\
+         SELECT count(*) OVER()::bigint AS total, * FROM filtered\n\
+          ORDER BY {sort_sql}, id ASC LIMIT $4 OFFSET $5;"
+    );
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let rows = client
+        .query(
+            &sql,
+            &[
+                &scope_report_id,
+                &scope_id,
+                &params.filter,
+                &params.page_size,
+                &params.offset,
+            ],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "scope report TLS certificate query failed");
+            ApiError::Database
+        })?;
+    if rows.is_empty() && !scope_report_exists(&client, &scope_report_id, &scope_id).await? {
+        return Err(ApiError::NotFound);
+    }
+    let total = rows.first().map(|row| row.get::<_, i64>(0)).unwrap_or(0);
+    let items = rows.iter().map(tls_certificate_from_row).collect();
+    Ok(Json(Collection {
+        page: params.page_info(total),
+        items,
+    }))
+}
+
 async fn scope_report_cves(
     State(state): State<AppState>,
     Path((scope_id, scope_report_id)): Path<(String, String)>,
@@ -1345,6 +1787,31 @@ fn port_from_row(row: &Row) -> PortItem {
     }
 }
 
+fn application_from_row(row: &Row) -> ApplicationItem {
+    ApplicationItem {
+        name: row.get(1),
+        version: row.get(2),
+        cpe: row.get(3),
+        host_count: row.get(4),
+        result_count: row.get(5),
+        vulnerability_count: row.get(6),
+        max_severity: row.get(7),
+        source_report_ids: row.get(8),
+    }
+}
+
+fn operating_system_from_row(row: &Row) -> OperatingSystemItem {
+    OperatingSystemItem {
+        name: row.get(1),
+        cpe: row.get(2),
+        host_count: row.get(3),
+        result_count: row.get(4),
+        vulnerability_count: row.get(5),
+        max_severity: row.get(6),
+        source_report_ids: row.get(7),
+    }
+}
+
 fn cve_from_row(row: &Row) -> CveItem {
     CveItem {
         id: row.get(1),
@@ -1352,6 +1819,22 @@ fn cve_from_row(row: &Row) -> CveItem {
         result_count: row.get(3),
         max_severity: row.get(4),
         source_report_ids: row.get(5),
+    }
+}
+
+fn tls_certificate_from_row(row: &Row) -> TlsCertificateItem {
+    TlsCertificateItem {
+        id: row.get(1),
+        fingerprint_sha256: row.get(2),
+        subject: row.get(3),
+        issuer: row.get(4),
+        serial: row.get(5),
+        not_before: unix_ts_to_rfc3339(row.get(6)),
+        not_after: unix_ts_to_rfc3339(row.get(7)),
+        host_count: row.get(8),
+        port_count: row.get(9),
+        result_count: row.get(10),
+        source_report_ids: row.get(11),
     }
 }
 

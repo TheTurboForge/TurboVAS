@@ -15,18 +15,18 @@ replacement APIs land.
 
 The first live proof is the Docker-internal Rust `turbovas-api` sidecar for
 scope-report collections and raw report metrics, currently scope-report list,
-Results, Hosts, Ports, CVEs, Error Messages, scope-report Metrics, and raw report
-Metrics. It queries PostgreSQL directly and is intentionally not exposed on a
-host port. Browser migration is complete for raw-report and scope-report
-Metrics plus scope-report Results, Hosts, Ports, CVEs, and Error Messages through the
-authenticated same-origin `gsad` proxy defined in
+Results, Hosts, Ports, Applications, Operating Systems, CVEs, TLS Certificates,
+Error Messages, scope-report Metrics, and raw report Metrics. It queries
+PostgreSQL directly and is intentionally not exposed on a host port. Browser
+migration is complete for raw-report and scope-report Metrics plus all current
+scope-report evidence tabs through the authenticated same-origin `gsad` proxy defined in
 `docs/NATIVE_API_AUTH_BOUNDARY.md`.
 
 ## Workflow Retirement Classes
 
 | Class | Meaning | Current candidates |
 | --- | --- | --- |
-| Ready for native API proof | Low-risk read workflows with DB-owned state and existing validation. | Scope-report Results, remaining evidence tabs after contract definition, raw report reads, and scope metadata reads. |
+| Ready for native API proof | Low-risk read workflows with DB-owned state and existing validation. | Raw report reads, scope metadata reads, and remaining helper/tooling replacement paths. |
 | Later after product semantics | Workflows needing stronger operator-model decisions first. | Exposure-duration views, owner/patchability/support status, non-operator delivery, BYO inventory. |
 | High-consequence control path | Keep inherited control path until a separate design proves safety. | Scan start/stop, credentials, account/auth, feed import, scanner registration, runtime feed state. |
 | Compatibility-only | Retain only until no required TurboVAS workflow depends on it. | `python-gvm` request helpers, `gvm-tools` GMP scripts, direct XML report helper paths. |
@@ -41,7 +41,7 @@ authenticated same-origin `gsad` proxy defined in
 | Scope-report list/detail | GMP scope-report commands and GSA scope-report pages | `/api/v1/scopes/reports` and canonical scoped detail path | GSA list/detail reads use server-backed JSON collections and browser smoke remains green. |
 | Scope-report Results | GSA Results tab now uses typed native JSON through the authenticated `gsad` proxy; the inherited gvmd source-report-constrained GMP collection remains available during transition | `/api/v1/scopes/{scope_id}/reports/{scope_report_id}/results` | Browser smoke proves the native Results tab and raw evidence links while GMP compatibility remains intact. |
 | Scope-report metrics | `runtime-scope-report-metrics` and the GSA Metrics tab now use the native API; the inherited scope-report metrics GMP command remains available during transition | `/api/v1/scopes/{scope_id}/reports/{scope_report_id}/metrics` | Runtime and browser smoke continue to prove the native path while GMP compatibility remains intact. |
-| Scope-report Hosts/Ports/CVEs/Error Messages | GSA tabs now use typed native JSON through the authenticated `gsad` proxy; applications, operating systems, and TLS certificates still use source-report evidence tabs | `/api/v1/scopes/{scope_id}/reports/{scope_report_id}/hosts`, `/ports`, `/cves`, and `/errors` | Browser smoke proves aggregated tabs load through native JSON and no longer render per-source raw-report sections. |
+| Scope-report evidence tabs | GSA Results, Hosts, Ports, Applications, Operating Systems, CVEs, TLS Certificates, and Error Messages tabs now use typed native JSON through the authenticated `gsad` proxy | `/api/v1/scopes/{scope_id}/reports/{scope_report_id}/results`, `/hosts`, `/ports`, `/applications`, `/operating-systems`, `/cves`, `/tls-certificates`, and `/errors` | Browser smoke proves aggregated tabs load through native JSON and no longer render per-source raw-report sections. |
 | Runtime report/scope helpers | Some `turbovasctl` helpers still use `python-gvm`; metric helpers and scope-report summary no longer use legacy XML helper paths | Native API-backed helper calls | `runtime-report-metrics`, `runtime-scope-report-metrics`, and `runtime-scope-report-summary` now use the internal native API; other GMP probes remain temporary inherited paths until their native replacements land. |
 | gvm-tools product scripts | Imported GMP scripts, plus TurboVAS scope/report scripts | `turbovasctl` or native API client commands | No operator or validation workflow requires `gvm-tools`; remaining scripts are optional compatibility or removed. |
 

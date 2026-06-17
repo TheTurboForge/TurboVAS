@@ -51,20 +51,15 @@ strangler map in the same slice.
 
 The first runtime implementation proof is scoped in
 `docs/NATIVE_API_PROOF_PLAN.md`. It starts with an internal-only Rust sidecar
-for scope-report list, Results, Hosts, Ports, CVEs, Error Messages, scope-report
-Metrics, and raw report Metrics because those read paths validate DB-backed
-scope membership, evidence provenance, and report reading without changing
-scanner control behavior. Browser-facing proof now covers report Metrics and
-scope-report Results, Hosts, Ports, CVEs, and Error Messages: GSA calls same-origin
-`/api/v1/...` paths, and `gsad` authenticates and allowlists those reads before
-proxying to the internal sidecar.
-
-The OpenAPI baseline also defines the next contract candidates for
-scope-report Applications, Operating Systems, and TLS Certificates.
-Those contracts are intentionally contract-first until a focused implementation
-slice proves the corresponding PostgreSQL queries, browser tables, and smoke
-coverage. Do not treat them as live runtime endpoints before
-`runtime-native-api-smoke --json` and browser smoke cover them.
+for scope-report list, Results, Hosts, Ports, Applications, Operating Systems,
+CVEs, TLS Certificates, Error Messages, scope-report Metrics, and raw report
+Metrics because those read paths validate DB-backed scope membership, evidence
+provenance, and report reading without changing scanner control behavior.
+Browser-facing proof now covers report Metrics and all current scope-report
+evidence tabs: GSA calls same-origin `/api/v1/...` paths, and `gsad`
+authenticates and allowlists those reads before proxying to the internal
+sidecar. `runtime-native-api-smoke --json` and browser smoke cover the live
+runtime endpoints.
 
 ## Non-Goals For V1
 

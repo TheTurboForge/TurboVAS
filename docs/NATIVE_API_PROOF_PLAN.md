@@ -5,8 +5,8 @@
 
 TurboVAS proves the native HTTP/JSON direction with narrow read-only workflows
 before implementing broader endpoint coverage. The first proof started with
-scope-report Hosts and now also covers scope-report Results, CVEs, Error
-Messages, persisted scope-report Metrics, and raw report Metrics. Scanner
+scope-report Hosts and now also covers all scope-report evidence tabs,
+persisted scope-report Metrics, and raw report Metrics. Scanner
 control, feed state, credentials, writes, and account management remain out of
 scope for this proof.
 
@@ -62,10 +62,11 @@ The first endpoint is not complete until it proves:
 
 Implementation commit `c59140a` proved the internal sidecar for scope-report
 list and Hosts. Later B-117/B-125 slices added scope-report Results, Ports,
-CVEs, Error Messages, persisted scope-report Metrics, and raw report Metrics with the
-same internal-only, PostgreSQL-backed pattern. Browser proof work now routes
-raw-report and scope-report Metrics plus scope-report Results, Hosts, Ports,
-CVEs, and Error Messages through the authenticated same-origin `gsad` proxy defined in
+CVEs, Error Messages, Applications, Operating Systems, TLS Certificates,
+persisted scope-report Metrics, and raw report Metrics with the same
+internal-only, PostgreSQL-backed pattern. Browser proof work now routes raw-report
+and scope-report Metrics plus every scope-report evidence tab through the
+authenticated same-origin `gsad` proxy defined in
 `docs/NATIVE_API_AUTH_BOUNDARY.md`.
 
 ## Not In The First Proof
@@ -76,27 +77,22 @@ high-consequence inherited control paths until separately designed and reviewed.
 
 ## Next Proofs
 
-After scope-report Results/Hosts/Ports/CVEs/Error Messages/Metrics and raw report Metrics work, the next candidates are:
+After scope-report Results/Hosts/Ports/Applications/Operating Systems/CVEs/TLS
+Certificates/Error Messages/Metrics and raw report Metrics work, the next
+candidates are raw report list/detail or scope metadata reads, only if they
+directly unlock helper or browser migration away from GMP/XML.
 
-1. dedicated native contracts for the remaining source-backed scope-report tabs:
-   Applications, Operating Systems, and TLS Certificates.
-2. raw report list/detail or scope metadata reads, only if they directly unlock
-   helper or browser migration away from GMP/XML.
+## Completed Evidence Contracts
 
-## Remaining Evidence Contract Candidates
-
-The OpenAPI baseline names the remaining scope-report detail collection
-contracts before implementation:
+The OpenAPI baseline names these scope-report detail collection contracts, and
+they are now live internal and browser-proxied endpoints:
 
 - `GET /api/v1/scopes/{scope_id}/reports/{scope_report_id}/applications`
 - `GET /api/v1/scopes/{scope_id}/reports/{scope_report_id}/operating-systems`
 - `GET /api/v1/scopes/{scope_id}/reports/{scope_report_id}/tls-certificates`
 
-Ports is now a live internal and browser-proxied endpoint. Applications,
-operating systems, and TLS certificates are not live endpoint promises yet.
-Each implementation slice should first prove the DB query against
-`scope_report_sources` and the relevant raw report tables, then add sidecar
-routing, `gsad` same-origin allowlisting, typed GSA client code, browser-smoke
-coverage, and docs updates. If a row shape is too weak or too dependent on
-inherited report XML assumptions, stop at the contract and record the gap
-instead of papering it over in the UI.
+Together with Results, Hosts, Ports, CVEs, Error Messages, and Metrics, these
+endpoints complete native browser coverage for current scope-report evidence
+tabs. Further native API expansion should now move outward to raw report
+list/detail reads, scope metadata reads, or helper/tooling replacements that
+remove required GMP/XML, `python-gvm`, or `gvm-tools` dependence.

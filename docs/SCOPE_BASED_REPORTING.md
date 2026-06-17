@@ -179,22 +179,18 @@ mistaking intended authenticated scanning for proven authenticated scanning.
 
 Findings are deduplicated by host identity, NVT/OID, port, and result identity.
 The scope-report list is served through manager-side filtering, sorting, and
-pagination. The Results collection is now served through TurboVAS-native JSON
-from PostgreSQL-backed source-report references, so operators get an aggregated
-result table with filtering, sorting, pagination, severity presentation, and raw
-evidence links without browser-side raw-report stitching. Raw source reports
-referenced by a scope report are protected from deletion so the snapshot
-provenance remains intact.
+pagination. Scope-report evidence collections are now served through
+TurboVAS-native JSON from PostgreSQL-backed source-report references, so
+operators get aggregated tables with filtering, sorting, pagination, severity
+presentation, and raw evidence links without browser-side raw-report stitching.
+Raw source reports referenced by a scope report are protected from deletion so
+the snapshot provenance remains intact.
 
 The current implementation deliberately focuses on core report reading parity:
 scope report list/detail views, information, results, metrics, evidence sources,
 raw evidence links, and result navigation. Scope report details also expose lazy
-evidence tabs. Results, Hosts, Ports, CVEs, and Error Messages are aggregated
-native scope-report collections; applications, operating systems, and TLS
-certificates still load selected raw source reports as evidence. The remaining
-backend direction is to add dedicated scope-report collection contracts for
-those source-backed tabs where that is more efficient than per-source raw
-evidence loading.
+evidence tabs. Results, Hosts, Ports, Applications, Operating Systems, CVEs, TLS
+Certificates, and Error Messages are aggregated native scope-report collections.
 
 Raw-only workflows such as import/upload, delta comparison, report-composer
 downloads, alerts, and asset/tag mutation are not scope-report actions;

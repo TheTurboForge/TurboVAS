@@ -337,6 +337,28 @@ async function runForBaseUrl(baseUrl) {
     }
 
     await page.goto(detailUrl, { waitUntil: 'networkidle', timeout: config.timeoutMs });
+    if (await clickTab(page, 'Applications', isScopeReportDetailUrl)) {
+      await screenshot(page, 'scope-report-applications-tab');
+      await assertNoAppError(page, 'scope-report-applications-tab.app-error');
+      await assertNoPerSourceEvidenceSections(page, 'scope-report.applications-aggregated-native-tab');
+      const nativeScopeApplications = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/scopes\/[^/]+\/reports\/[^/]+\/applications$/);
+      add(nativeScopeApplications ? 'pass' : 'fail', 'scope-report.applications-native-api', nativeScopeApplications ? 'Scope-report Applications tab loaded through same-origin native API.' : 'Scope-report Applications tab did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => item.path.includes('/applications')) });
+    } else {
+      add('fail', 'scope-report.applications-tab', 'Could not activate the native Applications tab.');
+    }
+
+    await page.goto(detailUrl, { waitUntil: 'networkidle', timeout: config.timeoutMs });
+    if (await clickTab(page, 'Operating Systems', isScopeReportDetailUrl)) {
+      await screenshot(page, 'scope-report-operating-systems-tab');
+      await assertNoAppError(page, 'scope-report-operating-systems-tab.app-error');
+      await assertNoPerSourceEvidenceSections(page, 'scope-report.operating-systems-aggregated-native-tab');
+      const nativeScopeOperatingSystems = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/scopes\/[^/]+\/reports\/[^/]+\/operating-systems$/);
+      add(nativeScopeOperatingSystems ? 'pass' : 'fail', 'scope-report.operating-systems-native-api', nativeScopeOperatingSystems ? 'Scope-report Operating Systems tab loaded through same-origin native API.' : 'Scope-report Operating Systems tab did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => item.path.includes('/operating-systems')) });
+    } else {
+      add('fail', 'scope-report.operating-systems-tab', 'Could not activate the native Operating Systems tab.');
+    }
+
+    await page.goto(detailUrl, { waitUntil: 'networkidle', timeout: config.timeoutMs });
     if (await clickTab(page, 'CVEs', isScopeReportDetailUrl)) {
       await screenshot(page, 'scope-report-cves-tab');
       await assertNoAppError(page, 'scope-report-cves-tab.app-error');
@@ -345,6 +367,17 @@ async function runForBaseUrl(baseUrl) {
       add(nativeScopeCves ? 'pass' : 'fail', 'scope-report.cves-native-api', nativeScopeCves ? 'Scope-report CVEs tab loaded through same-origin native API.' : 'Scope-report CVEs tab did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => item.path.includes('/cves')) });
     } else {
       add('fail', 'scope-report.cves-tab', 'Could not activate the native CVEs tab.');
+    }
+
+    await page.goto(detailUrl, { waitUntil: 'networkidle', timeout: config.timeoutMs });
+    if (await clickTab(page, 'TLS Certificates', isScopeReportDetailUrl)) {
+      await screenshot(page, 'scope-report-tls-certificates-tab');
+      await assertNoAppError(page, 'scope-report-tls-certificates-tab.app-error');
+      await assertNoPerSourceEvidenceSections(page, 'scope-report.tls-certificates-aggregated-native-tab');
+      const nativeScopeTlsCertificates = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/scopes\/[^/]+\/reports\/[^/]+\/tls-certificates$/);
+      add(nativeScopeTlsCertificates ? 'pass' : 'fail', 'scope-report.tls-certificates-native-api', nativeScopeTlsCertificates ? 'Scope-report TLS Certificates tab loaded through same-origin native API.' : 'Scope-report TLS Certificates tab did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => item.path.includes('/tls-certificates')) });
+    } else {
+      add('fail', 'scope-report.tls-certificates-tab', 'Could not activate the native TLS Certificates tab.');
     }
 
     await page.goto(detailUrl, { waitUntil: 'networkidle', timeout: config.timeoutMs });

@@ -57,8 +57,15 @@ native_api_path_is_allowed (const gchar *path)
   const gchar *raw_report_prefix = "/api/v1/reports/";
   const gchar *scope_prefix = "/api/v1/scopes/";
   const gchar *metrics_suffix = "/metrics";
-  const gchar *scope_collection_suffixes[] = { "/metrics", "/results", "/hosts",
-                                               "/ports",   "/cves",    "/errors",
+  const gchar *scope_collection_suffixes[] = { "/metrics",
+                                               "/results",
+                                               "/hosts",
+                                               "/ports",
+                                               "/applications",
+                                               "/operating-systems",
+                                               "/cves",
+                                               "/tls-certificates",
+                                               "/errors",
                                                NULL };
 
   if (path == NULL || strchr (path, '?') != NULL)

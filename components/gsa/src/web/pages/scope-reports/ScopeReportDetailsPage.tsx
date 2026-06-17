@@ -32,7 +32,6 @@ import useGmp from 'web/hooks/useGmp';
 import useTranslation from 'web/hooks/useTranslation';
 import MetricsTab from 'web/pages/reports/details/MetricsTab';
 import NativeScopeReportEvidenceTab from 'web/pages/scope-reports/NativeScopeReportEvidenceTab';
-import ScopeReportEvidenceTab from 'web/pages/scope-reports/ScopeReportEvidenceTab';
 import {
   EmptyRow,
   ErrorMessage,
@@ -200,10 +199,18 @@ const ScopeReportDetailsPage = () => {
     />
   );
   const applicationsTab = (
-    <ScopeReportEvidenceTab kind="applications" report={report} />
+    <NativeScopeReportEvidenceTab
+      kind="applications"
+      scopeId={report.scopeId}
+      scopeReportId={report.id}
+    />
   );
   const operatingSystemsTab = (
-    <ScopeReportEvidenceTab kind="operatingSystems" report={report} />
+    <NativeScopeReportEvidenceTab
+      kind="operatingSystems"
+      scopeId={report.scopeId}
+      scopeReportId={report.id}
+    />
   );
   const cvesTab = (
     <NativeScopeReportEvidenceTab
@@ -213,7 +220,11 @@ const ScopeReportDetailsPage = () => {
     />
   );
   const tlsCertificatesTab = (
-    <ScopeReportEvidenceTab kind="tlsCertificates" report={report} />
+    <NativeScopeReportEvidenceTab
+      kind="tlsCertificates"
+      scopeId={report.scopeId}
+      scopeReportId={report.id}
+    />
   );
   const errorsTab = (
     <NativeScopeReportEvidenceTab

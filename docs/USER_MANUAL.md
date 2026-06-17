@@ -120,10 +120,10 @@ evidence, and drill-down remain recognizable, while the evidence source changes
 from one technical scan report to the newest completed raw reports for the
 scope's targets.
 
-Scope report lists and result rows use server-backed filtering, sorting, and
+Scope report lists and evidence rows use server-backed filtering, sorting, and
 pagination for the core reading workflow. Scope-report Results, Hosts, Ports,
-CVEs, Error Messages, and Metrics are aggregated views backed by
-TurboVAS-native JSON;
+Applications, Operating Systems, CVEs, TLS Certificates, Error Messages, and
+Metrics are aggregated views backed by TurboVAS-native JSON;
 result rows preserve severity display and link back to the raw scan report
 evidence they were derived from. Raw report management actions that do not fit
 aggregated snapshots, such as report-composer downloads, alerts, and asset/tag
@@ -191,14 +191,10 @@ in evidence can be promoted into official custom-scope membership before saving.
 Raw `/reports` and `/report/:id` pages remain available for technical evidence.
 
 Scope report details include lazy evidence tabs for Hosts, Ports, Applications,
-Operating Systems, CVEs, TLS Certificates, and Error Messages. Hosts, Ports,
-CVEs, and Error Messages are shown as aggregated scope-report collections
-backed by the native DB-backed API. Applications, Operating Systems, and TLS
-Certificates still load selected raw source reports as evidence. The Evidence
-Sources tab remains the provenance view for raw report, task, and target links.
-Future backend work should move the remaining heavyweight evidence tabs toward
-the same DB-backed collection model where it improves performance or
-correctness.
+Operating Systems, CVEs, TLS Certificates, and Error Messages. These tabs are
+shown as aggregated scope-report collections backed by the native DB-backed API.
+The Evidence Sources tab remains the provenance view for raw report, task, and
+target links.
 
 See `SCOPE_BASED_REPORTING.md` for the detailed scope model and
 `REPORTING_MODEL.md` for the first reporting loop. See

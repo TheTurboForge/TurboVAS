@@ -83,11 +83,11 @@ not policy; optimization decisions need a later hot-path analysis.
 
 The first scope-report data-gravity moves are in place: `/scopes/reports`
 obtains its list through filtered, sorted, paged gvmd/PostgreSQL queries, and
-scope-report Results, Hosts, Ports, CVEs, and Error Messages are served as
-typed native collections constrained by the scope-report snapshot. Browser-side
-code may still present lazy evidence tabs, but product report-reading
-collections should continue moving toward database-owned queries rather than
-client-side source-report stitching.
+scope-report Results, Hosts, Ports, Applications, Operating Systems, CVEs, TLS
+Certificates, and Error Messages are served as typed native collections
+constrained by the scope-report snapshot. Browser-side code may still present
+lazy evidence tabs, but current scope-report evidence reading no longer depends
+on client-side source-report stitching.
 
 The native `/api/v1` contract in `docs/API_CONTRACT.md` builds on the same
 rule: product reads should expose typed DB-owned state instead of forwarding
@@ -95,10 +95,11 @@ GMP/XML payloads. Contract-first API work must keep raw reports inspectable as
 evidence and must not create a second hidden truth store for report data.
 
 The first native API proof implements that direction as an internal Rust
-sidecar: scope-report list, result evidence, host evidence, CVE evidence,
-port evidence, Error Message collections, persisted scope-report metrics, and raw report
-metrics are queried from gvmd/PostgreSQL and returned as typed JSON, while
-GMP/XML remains available for inherited control paths until each workflow is
-deliberately migrated. Raw-report and scope-report Metrics plus scope-report
-Results, Hosts, Ports, CVEs, and Error Messages are now browser-facing product reads
-through the authenticated `gsad` same-origin native API proxy.
+sidecar: scope-report list, result evidence, host evidence, port evidence,
+application evidence, operating-system evidence, CVE evidence, TLS certificate
+evidence, Error Message collections, persisted scope-report metrics, and raw
+report metrics are queried from gvmd/PostgreSQL and returned as typed JSON,
+while GMP/XML remains available for inherited control paths until each workflow
+is deliberately migrated. Raw-report and scope-report Metrics plus every current
+scope-report evidence tab are now browser-facing product reads through the
+authenticated `gsad` same-origin native API proxy.
