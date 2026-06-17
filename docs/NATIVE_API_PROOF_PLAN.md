@@ -7,7 +7,7 @@ TurboVAS proves the native HTTP/JSON direction with narrow read-only workflows
 before implementing broader endpoint coverage. The first proof started with
 scope-report Hosts and now also covers all scope-report evidence tabs,
 persisted scope-report Metrics, raw report Metrics, raw report list/detail,
-and scope list/detail
+raw report result rows, and scope list/detail
 reads. Scanner
 control, feed state, credentials, writes, and account management remain out of
 scope for this proof.
@@ -66,10 +66,13 @@ Implementation commit `c59140a` proved the internal sidecar for scope-report
 list and Hosts. Later B-117/B-125 slices added scope-report Results, Ports,
 CVEs, Error Messages, Applications, Operating Systems, TLS Certificates,
 persisted scope-report Metrics, raw report Metrics, and raw report list/detail
-reads with the same internal-only, PostgreSQL-backed pattern. Browser proof
-work now routes the raw `/reports` list, raw-report and scope-report Metrics,
-plus scope list/detail and every scope-report evidence tab through the authenticated same-origin
-`gsad` proxy defined in `docs/NATIVE_API_AUTH_BOUNDARY.md`.
+reads plus raw report result rows with the same internal-only,
+PostgreSQL-backed pattern. Browser proof work now routes the raw `/reports`
+list, raw-report and scope-report Metrics, plus scope list/detail and every
+scope-report evidence tab through the authenticated same-origin `gsad` proxy
+defined in `docs/NATIVE_API_AUTH_BOUNDARY.md`. `runtime-report-summary --json`
+uses the native raw report detail/result-row endpoints; raw report export and
+the heavier raw report detail tabs remain inherited follow-ups.
 
 ## Not In The First Proof
 
@@ -81,9 +84,10 @@ high-consequence inherited control paths until separately designed and reviewed.
 
 After scope-report Results/Hosts/Ports/Applications/Operating Systems/CVEs/TLS
 Certificates/Error Messages/Metrics, raw report Metrics, raw report
-list/detail, and scope metadata reads, the next candidates are raw report
-detail-page header integration or helper/tooling replacements, only if they
-directly unlock helper or browser migration away from GMP/XML.
+list/detail/result rows, and scope metadata reads, the next candidates are raw
+report detail-page header integration, native raw report tab collections, or
+helper/tooling replacements such as `runtime-report-export`, only if they
+directly unlock migration away from GMP/XML.
 
 ## Completed Evidence Contracts
 

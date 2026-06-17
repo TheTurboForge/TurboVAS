@@ -38,6 +38,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Report'
+  /reports/{report_id}/results:
+    get:
+      summary: List raw scan report results
+      parameters:
+        - $ref: '#/components/parameters/ReportId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Filter'
+      responses:
+        '200':
+          description: Raw report result collection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultCollection'
   /reports/{report_id}/metrics:
     get:
       summary: Read raw report metrics

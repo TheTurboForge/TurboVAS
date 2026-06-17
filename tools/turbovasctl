@@ -2520,6 +2520,11 @@ def summarize_native_tooling(items: list[dict[str, Any]]) -> dict[str, Any]:
                 "replacement_candidates": ["GSA raw report detail summary", "runtime-report-summary helper"],
             },
             {
+                "endpoint": "/api/v1/reports/{report_id}/results",
+                "status": "implemented_internal",
+                "replacement_candidates": ["runtime-report-summary helper (migrated)", "GSA raw report Results tab after browser contract review"],
+            },
+            {
                 "endpoint": "/api/v1/scopes",
                 "status": "implemented_internal_and_browser_proxied",
                 "replacement_candidates": ["GSA scope list reads (migrated through gsad same-origin proxy)", "gvm-tools scope list scripts"],
@@ -4237,6 +4242,9 @@ def command_runtime_report(
     max_results: int = 1000,
     top_results: int = 10,
 ) -> dict[str, Any]:
+    if action == "summary":
+        return command_runtime_report_summary_native(repo_root, report_id=report_id, max_results=max_results, top_results=top_results)
+
     findings: list[dict[str, Any]] = []
     secret_path = runtime_secret_path(repo_root, DEV_ADMIN_SECRET)
     python = venv_python(repo_root, "python-gvm")
@@ -4301,6 +4309,226 @@ def json_int(value: Any) -> int:
         return int(value)
     except (TypeError, ValueError):
         return 0
+
+
+def json_float(value: Any) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def native_result_threat(score: float) -> str:
+    if score >= 9.0:
+        return "Critical"
+    if score >= 7.0:
+        return "High"
+    if score >= 4.0:
+        return "Medium"
+    if score > 0.0:
+        return "Low"
+    if score == 0.0:
+        return "Log"
+    if score == -1.0:
+        return "False Positive"
+    return "Unknown"
+
+
+def runtime_report_summary_row(row: dict[str, Any]) -> dict[str, Any]:
+    severity_score = json_float(row.get("severity"))
+    return {
+        "id": row.get("id"),
+        "name": row.get("name"),
+        "host": row.get("host"),
+        "hostname": None,
+        "port": row.get("port"),
+        "severity": str(row.get("severity", "")),
+        "severity_score": severity_score,
+        "threat": native_result_threat(severity_score),
+        "qod": json_int(row.get("qod")),
+        "nvt_oid": row.get("nvt_oid"),
+        "nvt_name": row.get("name"),
+        "nvt_family": None,
+        "description_excerpt": None,
+    }
+
+
+def runtime_report_summary_severity_counts(rows: list[dict[str, Any]]) -> dict[str, int]:
+    counts = {bucket: 0 for bucket in ("Critical", "High", "Medium", "Low", "Log", "False Positive", "Unknown")}
+    for row in rows:
+        counts[native_result_threat(json_float(row.get("severity")))] += 1
+    return counts
+
+
+def runtime_report_summary_affected_hosts(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    hosts: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        host = str(row.get("host") or "unknown")
+        current = hosts.setdefault(
+            host,
+            {
+                "host": host,
+                "hostnames": set(),
+                "result_count": 0,
+                "vulnerability_count": 0,
+                "max_severity": 0.0,
+                "threats": set(),
+            },
+        )
+        current["result_count"] += 1
+        severity_score = json_float(row.get("severity"))
+        current["max_severity"] = max(current["max_severity"], severity_score)
+        if severity_score > 0:
+            current["vulnerability_count"] += 1
+        current["threats"].add(native_result_threat(severity_score))
+    return sorted(
+        [
+            {
+                "host": host["host"],
+                "hostnames": sorted(host["hostnames"]),
+                "result_count": host["result_count"],
+                "vulnerability_count": host["vulnerability_count"],
+                "max_severity": host["max_severity"],
+                "threats": sorted(host["threats"]),
+            }
+            for host in hosts.values()
+        ],
+        key=lambda item: (-item["max_severity"], item["host"]),
+    )
+
+
+def native_report_results_pages(repo_root: Path, report_id: str, max_results: int) -> tuple[list[dict[str, Any]], int | None, subprocess.CompletedProcess[str] | None, dict[str, Any] | None]:
+    rows: list[dict[str, Any]] = []
+    total: int | None = None
+    first_result: subprocess.CompletedProcess[str] | None = None
+    first_parsed: dict[str, Any] | None = None
+    page = 1
+    while len(rows) < max_results:
+        page_size = min(500, max_results - len(rows))
+        if page_size <= 0:
+            break
+        path = f"/api/v1/reports/{urllib.parse.quote(report_id)}/results?page={page}&page_size={page_size}&sort=-severity"
+        result = native_api_curl(repo_root, path)
+        parsed = parse_json_output(result)
+        if first_result is None:
+            first_result = result
+            first_parsed = parsed
+        if result.returncode != 0 or not isinstance(parsed, dict):
+            return rows, total, result, parsed
+        items = parsed.get("items", [])
+        page_info = parsed.get("page", {})
+        if not isinstance(items, list) or not isinstance(page_info, dict):
+            return rows, total, result, parsed
+        total = json_int(page_info.get("total"))
+        rows.extend(item for item in items if isinstance(item, dict))
+        if len(rows) >= total or not items:
+            break
+        page += 1
+    return rows, total, first_result, first_parsed
+
+
+def command_runtime_report_summary_native(repo_root: Path, report_id: str | None = None, max_results: int = 1000, top_results: int = 10) -> dict[str, Any]:
+    findings: list[dict[str, Any]] = []
+    artifact_dir = report_artifact_dir(repo_root)
+    try:
+        artifact_dir.mkdir(parents=True, exist_ok=True)
+        findings.append(finding("pass", "runtime-report.artifact-dir", "Runtime report artifact directory is ready.", str(artifact_dir)))
+    except OSError as error:
+        findings.append(finding("fail", "runtime-report.artifact-dir", f"Runtime report artifact directory is not usable: {error}", str(artifact_dir)))
+    findings.append(finding("pass" if container_running(repo_root, "turbovas-api") else "fail", "native-api.container", "turbovas-api container is running." if container_running(repo_root, "turbovas-api") else "turbovas-api container is not running; start the app profile before reading native raw-report summaries."))
+    selected_report_id = report_id
+    select_result = None
+    if selected_report_id is None:
+        selected_report_id, select_error, select_result = latest_completed_full_test_report_id(repo_root)
+        if select_error:
+            findings.append(finding("fail", "runtime-report.report-select", select_error, details={"output_tail": output_tail(select_result.stdout, 80) if select_result else []}))
+        else:
+            findings.append(finding("pass", "runtime-report.report-select", "Selected latest completed full-test raw report from PostgreSQL.", details={"report_id": selected_report_id}))
+    else:
+        findings.append(finding("pass", "runtime-report.report-select", "Using explicit raw report id.", details={"report_id": selected_report_id}))
+    if aggregate_status(findings) == "fail" or not selected_report_id:
+        payload = {
+            "status": "fail",
+            "summary": "Runtime report summary stopped at native API prerequisites.",
+            "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+            "details": {"source": "turbovas-api", "report_id": selected_report_id},
+        }
+        payload["artifacts"] = [write_json_artifact(artifact_dir, "summary-failed.json", payload)]
+        return make_result("runtime-report-summary", repo_root, payload["summary"], findings, payload["artifacts"])
+
+    detail_path = f"/api/v1/reports/{urllib.parse.quote(selected_report_id)}"
+    detail = native_api_curl(repo_root, detail_path)
+    detail_json = parse_json_output(detail)
+    detail_ok = detail.returncode == 0 and isinstance(detail_json, dict) and detail_json.get("id") == selected_report_id
+    findings.append(
+        native_api_probe_finding(
+            "pass" if detail_ok else "fail",
+            "runtime-report.summary-native-detail",
+            "Native raw-report detail read." if detail_ok else "Native raw-report detail response was not usable.",
+            detail,
+            compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/reports/..."),
+            detail_json if isinstance(detail_json, dict) else None,
+        )
+    )
+    rows, total, rows_result, rows_json = native_report_results_pages(repo_root, selected_report_id, max_results)
+    rows_ok = rows_result is not None and rows_result.returncode == 0 and total is not None
+    findings.append(
+        native_api_probe_finding(
+            "pass" if rows_ok else "fail",
+            "runtime-report.summary-native-results",
+            "Native raw-report result rows read." if rows_ok else "Native raw-report result response was not usable.",
+            rows_result or detail,
+            compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/reports/.../results?..."),
+            rows_json if isinstance(rows_json, dict) else None,
+        )
+    )
+    if not detail_ok or not rows_ok or not isinstance(detail_json, dict):
+        payload = {
+            "status": "fail",
+            "summary": "Runtime report summary failed while reading native report data.",
+            "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+            "details": {"source": "turbovas-api", "report_id": selected_report_id, "detail": detail_json, "results": rows_json},
+        }
+        payload["artifacts"] = [write_json_artifact(artifact_dir, "summary-failed.json", payload)]
+        return make_result("runtime-report-summary", repo_root, payload["summary"], findings, payload["artifacts"])
+
+    task = detail_json.get("task") if isinstance(detail_json.get("task"), dict) else {}
+    counts = {
+        "hosts": json_int(detail_json.get("host_count")),
+        "results": json_int(detail_json.get("result_count")),
+        "vulnerabilities": json_int(detail_json.get("vulnerability_count")),
+        "cves": json_int(detail_json.get("cve_count")),
+        "operating_systems": None,
+    }
+    normalized_rows = [runtime_report_summary_row(row) for row in rows]
+    export_complete = total is None or len(rows) >= total
+    payload = {
+        "status": "pass" if export_complete else "warn",
+        "summary": "Runtime report summary read through the native API.",
+        "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "details": {
+            "source": "turbovas-api",
+            "report_id": selected_report_id,
+        },
+        "report": {
+            "id": detail_json.get("id"),
+            "name": detail_json.get("name"),
+            "task_id": task.get("id"),
+            "task_name": task.get("name"),
+            "scan_run_status": detail_json.get("status"),
+            "scan_start": detail_json.get("scan_start"),
+            "scan_end": detail_json.get("scan_end"),
+            "counts": counts,
+        },
+        "result_filter": f"native:/api/v1/reports/{selected_report_id}/results?sort=-severity&max_results={max_results}",
+        "parsed_result_count": len(rows),
+        "export_complete": export_complete,
+        "severity_counts": runtime_report_summary_severity_counts(rows),
+        "affected_hosts": runtime_report_summary_affected_hosts(rows),
+        "top_results": normalized_rows[:top_results],
+    }
+    payload["artifacts"] = [write_json_artifact(artifact_dir, "summary.json", payload)]
+    return make_result("runtime-report-summary", repo_root, payload["summary"], findings, payload["artifacts"])
 
 
 def command_runtime_scope_report_summary_native(repo_root: Path) -> dict[str, Any]:
@@ -5030,6 +5258,20 @@ def command_runtime_native_api_smoke(repo_root: Path) -> dict[str, Any]:
                     raw_report_detail,
                     compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/reports/...") ,
                     raw_report_detail_json,
+                )
+            )
+            raw_report_results = native_api_curl(repo_root, f"/api/v1/reports/{urllib.parse.quote(raw_report_detail_id)}/results?page_size=5&sort=-severity")
+            raw_report_results_json = parse_json_output(raw_report_results)
+            details["raw_report_results"] = summarize_native_api_response(raw_report_results_json)
+            raw_report_result_items = raw_report_results_json.get("items", []) if isinstance(raw_report_results_json, dict) else []
+            findings.append(
+                native_api_probe_finding(
+                    "pass" if raw_report_results.returncode == 0 and isinstance(raw_report_result_items, list) else "fail",
+                    "native-api.raw-report-results",
+                    f"Native API raw-report Results probe exit code {raw_report_results.returncode}.",
+                    raw_report_results,
+                    compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/reports/.../results?page_size=5"),
+                    raw_report_results_json,
                 )
             )
         else:

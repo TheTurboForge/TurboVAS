@@ -18,7 +18,7 @@ needs over time.
 
 The first API phase is read-only and report-focused:
 
-- raw report list, detail, and metrics;
+- raw report list, detail, result rows, and metrics;
 - scope list and scope detail;
 - scope-report list, detail, results, hosts, ports, applications, operating
   systems, CVEs, TLS certificates, error messages, and metrics.
@@ -52,15 +52,16 @@ strangler map in the same slice.
 
 The first runtime implementation proof is scoped in
 `docs/NATIVE_API_PROOF_PLAN.md`. It starts with an internal-only Rust sidecar
-for raw report list/detail, scope list/detail, scope-report list, Results,
-Hosts, Ports, Applications, Operating Systems, CVEs, TLS Certificates, Error
-Messages, scope-report Metrics, and raw report Metrics because those read paths
-validate DB-backed evidence, scope membership, provenance, and report reading
-without changing scanner control behavior. Browser-facing proof now covers the
-raw `/reports` list, `/scopes` list/detail reads, report Metrics, and all
-current scope-report evidence tabs: GSA calls same-origin `/api/v1/...` paths,
-and `gsad` authenticates and allowlists those reads before proxying to the
-internal sidecar.
+for raw report list/detail/result rows, scope list/detail, scope-report list,
+Results, Hosts, Ports, Applications, Operating Systems, CVEs, TLS Certificates,
+Error Messages, scope-report Metrics, and raw report Metrics because those read
+paths validate DB-backed evidence, scope membership, provenance, and report
+reading without changing scanner control behavior. Browser-facing proof now
+covers the raw `/reports` list, `/scopes` list/detail reads, report Metrics,
+and all current scope-report evidence tabs: GSA calls same-origin
+`/api/v1/...` paths, and `gsad` authenticates and allowlists those reads before
+proxying to the internal sidecar. `runtime-report-summary --json` now also uses
+the native raw report detail/result-row endpoints instead of `python-gvm`.
 `runtime-native-api-smoke --json` and browser smoke cover the live runtime
 endpoints.
 

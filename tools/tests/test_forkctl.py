@@ -515,9 +515,11 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertFalse((root / "tools" / "runtime_metrics.py").exists())
         self.assertNotIn("runtime_metrics_probe_path", source)
         self.assertIn("def command_runtime_scope_report_summary_native", source)
+        self.assertIn("def command_runtime_report_summary_native", source)
         self.assertIn("def command_runtime_report_metrics_native", source)
         self.assertIn("def command_runtime_scope_report_metrics_native", source)
         self.assertIn("/api/v1/scope-reports?page_size=1&sort=-creation_time&filter=Organization", source)
+        self.assertIn("/api/v1/reports/{urllib.parse.quote(report_id)}/results", source)
         self.assertIn("/api/v1/reports/{urllib.parse.quote(selected_report_id)}/metrics", source)
         self.assertIn("/api/v1/scopes/{selected_scope_id}/reports/{selected_scope_report_id}/metrics", source)
 
@@ -732,6 +734,7 @@ class TurboVASCtlTests(unittest.TestCase):
         endpoints = {item["endpoint"] for item in details["implemented_native_endpoints"]}
         self.assertIn("/api/v1/reports", endpoints)
         self.assertIn("/api/v1/reports/{report_id}", endpoints)
+        self.assertIn("/api/v1/reports/{report_id}/results", endpoints)
         self.assertIn("/api/v1/scopes", endpoints)
         self.assertIn("/api/v1/scopes/{scope_id}", endpoints)
         self.assertIn("/api/v1/scope-reports", endpoints)
@@ -758,12 +761,15 @@ class TurboVASCtlTests(unittest.TestCase):
         smoke = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
         self.assertIn("/reports:", openapi)
         self.assertIn("/reports/{report_id}:", openapi)
+        self.assertIn("/reports/{report_id}/results:", openapi)
         self.assertIn("ReportReference", openapi)
         self.assertIn("ReportSeverityCounts", openapi)
         self.assertIn("route(\"/api/v1/reports\", get(reports))", source)
         self.assertIn("route(\"/api/v1/reports/:report_id\", get(report_detail))", source)
+        self.assertIn("route(\"/api/v1/reports/:report_id/results\", get(report_results))", source)
         self.assertIn("native-api.raw-reports", smoke)
         self.assertIn("native-api.raw-report-detail", smoke)
+        self.assertIn("native-api.raw-report-results", smoke)
 
     def test_openapi_tracks_scope_read_contracts(self):
         root = Path(__file__).resolve().parents[2]
