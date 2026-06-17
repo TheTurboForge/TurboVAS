@@ -28,6 +28,31 @@ const manualUrl = 'test/';
 const {entity} = getMockReport();
 const reportId = entity.report?.id ?? '';
 
+const nativeReportPayload = {
+  id: reportId,
+  name: entity.name,
+  status: 'Done',
+  task: {id: '314', name: 'foo'},
+  target: {id: 'target-1', name: 'target'},
+  scan_start: '2019-06-03T11:00:00Z',
+  scan_end: '2019-06-03T11:30:00Z',
+  creation_time: '2019-06-03T11:00:00Z',
+  modification_time: '2019-06-03T11:30:00Z',
+  result_count: 1,
+  vulnerability_count: 1,
+  host_count: 1,
+  cve_count: 1,
+  severity: {
+    critical: 0,
+    high: 1,
+    medium: 0,
+    low: 0,
+    log: 0,
+    false_positive: 0,
+  },
+  max_severity: 7.5,
+};
+
 const emptyCollectionResponse: CollectionResponse = {
   data: [],
   meta: {
@@ -49,6 +74,7 @@ const createGetSettingMock = () =>
   });
 
 const createGmp = () => ({
+  buildUrl: testing.fn((path: string) => `https://turbovas.example/${path}`),
   settings: {
     manualUrl,
     reportResultsThreshold: 100,
@@ -119,6 +145,14 @@ const createGmp = () => ({
 });
 
 const setupRenderer = (gmp = createGmp()) => {
+  testing.stubGlobal(
+    'fetch',
+    testing.fn().mockResolvedValue({
+      json: testing.fn().mockResolvedValue(nativeReportPayload),
+      ok: true,
+      status: 200,
+    }),
+  );
   const {render, store} = rendererWith({
     gmp,
     capabilities: true,

@@ -5,9 +5,12 @@
 
 import {useQuery} from '@tanstack/react-query';
 import Filter, {ALL_FILTER, RESULTS_FILTER_FILTER} from 'gmp/models/filter';
+import type Response from 'gmp/http/response';
+import type {XmlMeta} from 'gmp/http/transform/fast-xml';
 import type Report from 'gmp/models/report';
 import type ReportConfig from 'gmp/models/report-config';
 import type ReportFormat from 'gmp/models/report-format';
+import {fetchNativeReport} from 'gmp/native-api/reports';
 import {isDefined} from 'gmp/utils/identity';
 import useGmp from 'web/hooks/useGmp';
 import useSessionToken from 'web/hooks/useSessionToken';
@@ -34,11 +37,8 @@ export const useGetReport = ({
 
   return useGetEntity<Report>({
     gmpMethod: async ({id}) => {
-      const lightResponse = await gmp.report.get(
-        {id},
-        {filter: filterString, details: false},
-      );
-      const lightReport = lightResponse.data;
+      const nativeResponse = await fetchNativeReport(gmp, id);
+      const lightReport = nativeResponse.report;
 
       const needsFullReport =
         isDefined(lightReport?.report?.results) &&
@@ -48,7 +48,7 @@ export const useGetReport = ({
         return gmp.report.get({id}, {filter: filterString, details: true});
       }
 
-      return lightResponse;
+      return {data: lightReport} as Response<Report, XmlMeta>;
     },
     queryId: 'get_report',
     queryKeyParts: [filterString],

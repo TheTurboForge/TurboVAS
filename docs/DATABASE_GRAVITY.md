@@ -106,5 +106,6 @@ raw-report and scope-report Metrics, plus every current scope-report evidence
 tab are now browser-facing product reads through the authenticated `gsad`
 same-origin native API proxy. `runtime-report-summary --json` is now a DB-owned
 export produced through the native API rather than a `python-gvm` XML helper;
-`runtime-report-export --json` remains a legacy export until a native equivalent
-is deliberately designed.
+`runtime-report-export --json` is now a native API-backed export over raw report
+detail and result-row endpoints. The JSON file it writes remains a runtime
+artifact, while gvmd/PostgreSQL remains the source of truth.

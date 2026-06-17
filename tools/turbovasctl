@@ -1236,10 +1236,6 @@ def full_test_scan_artifact_dir(repo_root: Path) -> Path:
     return runtime_path(repo_root, "artifacts", "full-test-scan")
 
 
-def runtime_report_probe_path(repo_root: Path) -> Path:
-    return repo_root / "tools" / "runtime_report.py"
-
-
 def runtime_scope_probe_path(repo_root: Path) -> Path:
     return repo_root / "tools" / "runtime_scope.py"
 
@@ -2516,8 +2512,8 @@ def summarize_native_tooling(items: list[dict[str, Any]]) -> dict[str, Any]:
             },
             {
                 "endpoint": "/api/v1/reports/{report_id}",
-                "status": "implemented_internal",
-                "replacement_candidates": ["GSA raw report detail summary", "runtime-report-summary helper"],
+                "status": "implemented_internal_and_browser_proxied",
+                "replacement_candidates": ["GSA raw report detail summary (migrated through gsad same-origin proxy)", "runtime-report-summary helper"],
             },
             {
                 "endpoint": "/api/v1/reports/{report_id}/results",
@@ -2536,8 +2532,8 @@ def summarize_native_tooling(items: list[dict[str, Any]]) -> dict[str, Any]:
             },
             {
                 "endpoint": "/api/v1/scope-reports",
-                "status": "implemented_internal",
-                "replacement_candidates": ["runtime-scope-report-summary helper (migrated)", "scope-report list reads", "gvm-tools list-scope-reports script"],
+                "status": "implemented_internal_and_browser_proxied",
+                "replacement_candidates": ["runtime-scope-report-summary helper (migrated)", "GSA scope-report list reads (migrated through gsad same-origin proxy)", "gvm-tools list-scope-reports script"],
             },
             {
                 "endpoint": "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/hosts",
@@ -4244,64 +4240,116 @@ def command_runtime_report(
 ) -> dict[str, Any]:
     if action == "summary":
         return command_runtime_report_summary_native(repo_root, report_id=report_id, max_results=max_results, top_results=top_results)
+    if action == "export":
+        return command_runtime_report_export_native(repo_root, report_id=report_id, max_results=max_results, top_results=top_results)
+    return make_result(
+        f"runtime-report-{action}",
+        repo_root,
+        f"Unsupported runtime report action: {action}",
+        [finding("fail", "runtime-report.action", f"Unsupported runtime report action: {action}")],
+        [],
+    )
 
+
+def command_runtime_report_export_native(repo_root: Path, report_id: str | None = None, max_results: int = 1000, top_results: int = 10) -> dict[str, Any]:
     findings: list[dict[str, Any]] = []
-    secret_path = runtime_secret_path(repo_root, DEV_ADMIN_SECRET)
-    python = venv_python(repo_root, "python-gvm")
-    probe = runtime_report_probe_path(repo_root)
     artifact_dir = report_artifact_dir(repo_root)
-    findings.append(finding("pass" if gvmd_socket_path(repo_root).is_socket() else "fail", "gvmd.socket", "gvmd socket is ready." if gvmd_socket_path(repo_root).is_socket() else "gvmd socket is not ready.", str(gvmd_socket_path(repo_root))))
-    findings.append(finding("pass" if secret_path.is_file() else "fail", "runtime.admin-secret", "Development admin secret exists." if secret_path.is_file() else "Development admin secret is missing.", str(secret_path)))
-    findings.append(finding("pass" if python.is_file() else "fail", "python-gvm.venv", "python-gvm runtime venv exists." if python.is_file() else "python-gvm venv is missing.", str(python.relative_to(repo_root)) if python.exists() else str(python)))
-    findings.append(finding("pass" if probe.is_file() else "fail", "runtime-report.probe", "Runtime report helper exists." if probe.is_file() else "Runtime report helper is missing.", str(probe.relative_to(repo_root)) if probe.exists() else str(probe)))
     try:
         artifact_dir.mkdir(parents=True, exist_ok=True)
         findings.append(finding("pass", "runtime-report.artifact-dir", "Runtime report artifact directory is ready.", str(artifact_dir)))
     except OSError as error:
         findings.append(finding("fail", "runtime-report.artifact-dir", f"Runtime report artifact directory is not usable: {error}", str(artifact_dir)))
+    findings.append(finding("pass" if container_running(repo_root, "turbovas-api") else "fail", "native-api.container", "turbovas-api container is running." if container_running(repo_root, "turbovas-api") else "turbovas-api container is not running; start the app profile before exporting native raw-report data."))
+    selected_report_id = report_id
+    select_result = None
+    if selected_report_id is None:
+        selected_report_id, select_error, select_result = latest_completed_full_test_report_id(repo_root)
+        if select_error:
+            findings.append(finding("fail", "runtime-report.report-select", select_error, details={"output_tail": output_tail(select_result.stdout, 80) if select_result else []}))
+        else:
+            findings.append(finding("pass", "runtime-report.report-select", "Selected latest completed full-test raw report from PostgreSQL.", details={"report_id": selected_report_id}))
+    else:
+        findings.append(finding("pass", "runtime-report.report-select", "Using explicit raw report id.", details={"report_id": selected_report_id}))
+    if aggregate_status(findings) == "fail" or not selected_report_id:
+        payload = {
+            "status": "fail",
+            "summary": "Runtime report export stopped at native API prerequisites.",
+            "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+            "details": {"source": "turbovas-api", "report_id": selected_report_id},
+        }
+        payload["artifacts"] = [write_json_artifact(artifact_dir, "export-failed.json", payload)]
+        return make_result("runtime-report-export", repo_root, payload["summary"], findings, payload["artifacts"])
 
-    command_name = f"runtime-report-{action}"
-    if aggregate_status(findings) == "fail":
-        return make_result(command_name, repo_root, "Runtime report command stopped at prerequisites.", findings, [str(artifact_dir)])
-
-    args = [
-        str(python),
-        str(probe),
-        action,
-        "--socket",
-        str(gvmd_socket_path(repo_root)),
-        "--username",
-        DEV_ADMIN_USER,
-        "--password-file",
-        str(secret_path),
-        "--artifact-dir",
-        str(artifact_dir),
-        "--max-results",
-        str(max_results),
-        "--top-results",
-        str(top_results),
-    ]
-    if report_id:
-        args.extend(["--report-id", report_id])
-    result = run_command(args, repo_root, env=build_env(repo_root), timeout=180)
-    try:
-        parsed = json.loads(result.stdout)
-    except json.JSONDecodeError:
-        parsed = None
-    helper_status = parsed.get("status") if parsed else None
-    finding_status = helper_status if result.returncode == 0 and helper_status in {"pass", "warn"} else "fail"
-    password = secret_path.read_text(encoding="utf-8").strip() if secret_path.is_file() else ""
+    detail_path = f"/api/v1/reports/{urllib.parse.quote(selected_report_id)}"
+    detail = native_api_curl(repo_root, detail_path)
+    detail_json = parse_json_output(detail)
+    detail_ok = detail.returncode == 0 and isinstance(detail_json, dict) and detail_json.get("id") == selected_report_id
     findings.append(
-        finding(
-            finding_status,
-            f"runtime-report.{action}",
-            parsed.get("summary", f"Runtime report helper exit code {result.returncode}.") if parsed else f"Runtime report helper exit code {result.returncode}.",
-            details={"helper": parsed, "output_tail": output_tail(result.stdout, 120, [password])},
+        native_api_probe_finding(
+            "pass" if detail_ok else "fail",
+            "runtime-report.export-native-detail",
+            "Native raw-report detail read." if detail_ok else "Native raw-report detail response was not usable.",
+            detail,
+            compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/reports/..."),
+            detail_json if isinstance(detail_json, dict) else None,
         )
     )
-    artifacts = list(parsed.get("artifacts", [])) if parsed and isinstance(parsed.get("artifacts"), list) else [str(artifact_dir)]
-    summary = parsed.get("summary") if parsed else f"Runtime report {action} command completed with exit code {result.returncode}."
-    return make_result(command_name, repo_root, summary, findings, artifacts)
+    rows, total, rows_result, rows_json = native_report_results_pages(repo_root, selected_report_id, max_results)
+    rows_ok = rows_result is not None and rows_result.returncode == 0 and total is not None
+    findings.append(
+        native_api_probe_finding(
+            "pass" if rows_ok else "fail",
+            "runtime-report.export-native-results",
+            "Native raw-report result rows read." if rows_ok else "Native raw-report result response was not usable.",
+            rows_result or detail,
+            compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/reports/.../results?..."),
+            rows_json if isinstance(rows_json, dict) else None,
+        )
+    )
+    if not detail_ok or not rows_ok or not isinstance(detail_json, dict):
+        payload = {
+            "status": "fail",
+            "summary": "Runtime report export failed while reading native report data.",
+            "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+            "details": {"source": "turbovas-api", "report_id": selected_report_id, "detail": detail_json, "results": rows_json},
+        }
+        payload["artifacts"] = [write_json_artifact(artifact_dir, "export-failed.json", payload)]
+        return make_result("runtime-report-export", repo_root, payload["summary"], findings, payload["artifacts"])
+
+    task = detail_json.get("task") if isinstance(detail_json.get("task"), dict) else {}
+    normalized_rows = [runtime_report_summary_row(row) for row in rows]
+    export_complete = total is None or len(rows) >= total
+    payload = {
+        "status": "pass" if export_complete else "warn",
+        "summary": "Runtime report export read through the native API.",
+        "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "details": {"source": "turbovas-api", "report_id": selected_report_id},
+        "report": {
+            "id": detail_json.get("id"),
+            "name": detail_json.get("name"),
+            "task_id": task.get("id"),
+            "task_name": task.get("name"),
+            "scan_run_status": detail_json.get("status"),
+            "scan_start": detail_json.get("scan_start"),
+            "scan_end": detail_json.get("scan_end"),
+            "counts": {
+                "hosts": json_int(detail_json.get("host_count")),
+                "results": json_int(detail_json.get("result_count")),
+                "vulnerabilities": json_int(detail_json.get("vulnerability_count")),
+                "cves": json_int(detail_json.get("cve_count")),
+                "operating_systems": None,
+            },
+        },
+        "result_filter": f"native:/api/v1/reports/{selected_report_id}/results?sort=-severity&max_results={max_results}",
+        "parsed_result_count": len(rows),
+        "export_complete": export_complete,
+        "severity_counts": runtime_report_summary_severity_counts(rows),
+        "affected_hosts": runtime_report_summary_affected_hosts(rows),
+        "top_results": normalized_rows[:top_results],
+        "results": normalized_rows,
+    }
+    payload["artifacts"] = [write_json_artifact(artifact_dir, "export.json", payload)]
+    return make_result("runtime-report-export", repo_root, payload["summary"], findings, payload["artifacts"])
 
 
 def json_int(value: Any) -> int:

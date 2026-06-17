@@ -165,13 +165,6 @@ assert FULL_TEST_SCAN_SPEC.loader is not None
 sys.modules["runtime_full_test_scan"] = runtime_full_test_scan
 FULL_TEST_SCAN_SPEC.loader.exec_module(runtime_full_test_scan)
 
-RUNTIME_REPORT_PATH = Path(__file__).resolve().parents[1] / "runtime_report.py"
-RUNTIME_REPORT_SPEC = importlib.util.spec_from_loader("runtime_report", SourceFileLoader("runtime_report", str(RUNTIME_REPORT_PATH)))
-runtime_report = importlib.util.module_from_spec(RUNTIME_REPORT_SPEC)
-assert RUNTIME_REPORT_SPEC.loader is not None
-sys.modules["runtime_report"] = runtime_report
-RUNTIME_REPORT_SPEC.loader.exec_module(runtime_report)
-
 RUNTIME_SCOPE_PATH = Path(__file__).resolve().parents[1] / "runtime_scope.py"
 RUNTIME_SCOPE_SPEC = importlib.util.spec_from_loader("runtime_scope", SourceFileLoader("runtime_scope", str(RUNTIME_SCOPE_PATH)))
 runtime_scope = importlib.util.module_from_spec(RUNTIME_SCOPE_SPEC)
@@ -390,8 +383,10 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("<SeverityBar severity={report.maxSeverity} />", list_page)
         self.assertIn("report.resultsTotal", list_page)
         self.assertIn("scopeReportFilter", list_page)
-        self.assertIn("gmp.scopereports.get({details: 1, filter})", list_page)
-        self.assertIn("setCounts(reportResponse.meta.counts", list_page)
+        self.assertIn("fetchNativeScopeReports(gmp, filter)", list_page)
+        self.assertIn("fetchNativeScopes(gmp)", list_page)
+        self.assertIn("setCounts(reportResponse.counts", list_page)
+        self.assertNotIn("gmp.scopereports.get({details: 1, filter})", list_page)
         self.assertNotIn("filteredReports", list_page)
         self.assertIn("_('Information')", details_page)
         self.assertIn("_('Results')", details_page)
@@ -587,6 +582,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("DEFAULT_NATIVE_API_HOST \"turbovas-api\"", native_api)
         self.assertIn("DEFAULT_NATIVE_API_PORT \"9080\"", native_api)
         self.assertIn("native_api_path_is_allowed", native_api)
+        self.assertIn("/api/v1/scope-reports", native_api)
         self.assertIn("/api/v1/reports/", native_api)
         self.assertIn("/api/v1/scopes/", native_api)
         self.assertIn("/metrics", native_api)
@@ -723,7 +719,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertGreater(details["by_category"]["required_runtime"]["count"], 0)
         self.assertGreater(details["by_category"]["product_workflow"]["count"], 0)
         self.assertGreater(details["by_category"]["compatibility_bridge"]["count"], 0)
-        self.assertIn("tools/runtime_report.py", details["by_category"]["required_runtime"]["paths"])
+        self.assertNotIn("tools/runtime_report.py", details["by_category"]["required_runtime"]["paths"])
         self.assertIn("components/gvm-tools/scripts/list-scope-reports.gmp.py", details["by_category"]["product_workflow"]["paths"])
         self.assertIn("components/python-gvm/gvm/protocols/gmp/requests/v226/_reports.py", details["by_category"]["compatibility_bridge"]["paths"])
         all_paths = {path for category in details["by_category"].values() for path in category["paths"]}
@@ -748,11 +744,16 @@ class TurboVASCtlTests(unittest.TestCase):
         raw_reports = next(item for item in details["implemented_native_endpoints"] if item["endpoint"] == "/api/v1/reports")
         self.assertEqual(raw_reports["status"], "implemented_internal_and_browser_proxied")
         self.assertIn("GSA raw report list (migrated through gsad same-origin proxy)", raw_reports["replacement_candidates"])
+        raw_report_detail = next(item for item in details["implemented_native_endpoints"] if item["endpoint"] == "/api/v1/reports/{report_id}")
+        self.assertEqual(raw_report_detail["status"], "implemented_internal_and_browser_proxied")
+        self.assertIn("GSA raw report detail summary (migrated through gsad same-origin proxy)", raw_report_detail["replacement_candidates"])
         scopes = next(item for item in details["implemented_native_endpoints"] if item["endpoint"] == "/api/v1/scopes")
         self.assertEqual(scopes["status"], "implemented_internal_and_browser_proxied")
         self.assertIn("GSA scope list reads (migrated through gsad same-origin proxy)", scopes["replacement_candidates"])
         scope_report_candidates = next(item for item in details["implemented_native_endpoints"] if item["endpoint"] == "/api/v1/scope-reports")
+        self.assertEqual(scope_report_candidates["status"], "implemented_internal_and_browser_proxied")
         self.assertIn("runtime-scope-report-summary helper (migrated)", scope_report_candidates["replacement_candidates"])
+        self.assertIn("GSA scope-report list reads (migrated through gsad same-origin proxy)", scope_report_candidates["replacement_candidates"])
 
     def test_openapi_tracks_raw_report_contracts(self):
         root = Path(__file__).resolve().parents[2]
@@ -2256,151 +2257,49 @@ db2:keys=5,expires=0,avg_ttl=0
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "TurboVAS"
             root.mkdir()
-            self.assertEqual(turbovasctl.runtime_report_probe_path(root), root / "tools" / "runtime_report.py")
+            self.assertFalse((root / "tools" / "runtime_report.py").exists())
             self.assertEqual(turbovasctl.report_artifact_dir(root), Path(tmp) / "TurboVAS-runtime" / "artifacts" / "reports")
             self.assertIn("artifacts/reports", turbovasctl.RUNTIME_DIRS)
 
-    def test_runtime_report_parser_summarizes_results(self):
-        response = (
-            "<get_reports_response>"
-            "<report id=\"report-1\">"
-            "<name>2026-06-02T15:59:28Z</name>"
-            "<task id=\"task-1\"><name>scan task</name></task>"
-            "<report id=\"report-1\">"
-            "<scan_run_status>Done</scan_run_status>"
-            "<scan_start>2026-06-02T15:59:50Z</scan_start>"
-            "<scan_end>2026-06-02T16:02:15Z</scan_end>"
-            "<hosts><count>2</count></hosts>"
-            "<vulns><count>2</count></vulns>"
-            "<cves><count>1</count></cves>"
-            "<os><count>1</count></os>"
-            "<result_count><full>2</full></result_count>"
-            "<results start=\"1\" max=\"100\">"
-            "<result id=\"result-low\">"
-            "<name>ICMP Timestamp Reply Information Disclosure</name>"
-            "<host>192.168.178.1<hostname>router.local</hostname></host>"
-            "<port>general/icmp</port>"
-            "<nvt oid=\"1.2.3\"><name>ICMP Timestamp</name><family>General</family></nvt>"
-            "<threat>Low</threat><severity>2.1</severity>"
-            "<qod><value>80</value></qod>"
-            "<description>Timestamp reply was observed. This is a low severity finding.</description>"
-            "</result>"
-            "<result id=\"result-log\">"
-            "<name>OS Detection Consolidation and Reporting</name>"
-            "<host>192.168.178.42</host>"
-            "<port>general/tcp</port>"
-            "<nvt oid=\"1.2.4\"><name>OS Detection</name><family>Service detection</family></nvt>"
-            "<threat>Log</threat><severity>0.0</severity>"
-            "<qod><value>80</value></qod>"
-            "<description>Detected a host.</description>"
-            "</result>"
-            "</results>"
-            "</report>"
-            "</report>"
-            "</get_reports_response>"
-        )
-        listing = {
-            "id": "report-1",
-            "task_id": "task-1",
-            "result_count": "2",
-            "hosts_count": "2",
-            "vulns_count": "2",
-            "cves_count": "3",
-            "os_count": "1",
-        }
-        parsed, error = runtime_report.parse_report_payload(response, listing, top_limit=1, max_results=100)
-        self.assertIsNone(error)
-        self.assertEqual(parsed["report"]["id"], "report-1")
-        self.assertEqual(parsed["report"]["task_name"], "scan task")
-        self.assertEqual(parsed["report"]["counts"]["cves"], 3)
-        self.assertEqual(parsed["parsed_result_count"], 2)
-        self.assertTrue(parsed["export_complete"])
-        self.assertEqual(parsed["severity_counts"]["Low"], 1)
-        self.assertEqual(parsed["severity_counts"]["Log"], 1)
-        self.assertEqual(parsed["affected_hosts"][0]["host"], "192.168.178.1")
-        self.assertEqual(parsed["affected_hosts"][0]["hostnames"], ["router.local"])
-        self.assertEqual(parsed["top_results"][0]["id"], "result-low")
-        self.assertEqual(parsed["result_filter"], "apply_overrides=0 min_qod=0 first=1 rows=100 sort-reverse=severity")
-
-    def test_runtime_report_summary_defaults_to_latest_completed_full_test_report(self):
-        report_response = (
-            "<get_reports_response>"
-            "<report id=\"report-done\">"
-            "<name>2026-06-02T15:59:28Z</name>"
-            "<task id=\"task-1\"><name>scan task</name></task>"
-            "<report id=\"report-done\">"
-            "<scan_run_status>Done</scan_run_status>"
-            "<scan_start>2026-06-02T15:59:50Z</scan_start>"
-            "<scan_end>2026-06-02T16:02:15Z</scan_end>"
-            "<hosts><count>1</count></hosts>"
-            "<vulns><count>1</count></vulns>"
-            "<cves><count>0</count></cves>"
-            "<os><count>0</count></os>"
-            "<result_count><full>1</full></result_count>"
-            "<results><result id=\"result-1\"><name>Finding</name><host>192.168.178.1</host><port>general/tcp</port><threat>Low</threat><severity>1.0</severity></result></results>"
-            "</report>"
-            "</report>"
-            "</get_reports_response>"
-        )
-
-        class FakeGMP:
-            def get_scan_configs(self):
-                return "<get_configs_response/>"
-
-            def get_port_lists(self):
-                return "<get_port_lists_response/>"
-
-            def get_scanners(self, details=True):
-                return "<get_scanners_response/>"
-
-            def get_targets(self, tasks=True):
-                return "<get_targets_response/>"
-
-            def get_tasks(self, details=True, ignore_pagination=True):
-                return (
-                    "<get_tasks_response>"
-                    "<task id=\"task-1\">"
-                    f"<name>{runtime_full_test_scan.FULL_TEST_TASK_NAME}</name>"
-                    "<status>Done</status>"
-                    "</task>"
-                    "</get_tasks_response>"
-                )
-
-            def get_reports(self, filter_string=None, details=True, ignore_pagination=True):
-                self.latest_filter = filter_string
-                return (
-                    "<get_reports_response>"
-                    "<report id=\"report-interrupted\">"
-                    "<task id=\"task-1\"/>"
-                    "<report id=\"report-interrupted\"><scan_run_status>Interrupted</scan_run_status><result_count><full>0</full></result_count></report>"
-                    "</report>"
-                    "<report id=\"report-done-no-start\">"
-                    "<task id=\"task-1\"/>"
-                    "<report id=\"report-done-no-start\"><scan_run_status>Done</scan_run_status><result_count><full>0</full></result_count></report>"
-                    "</report>"
-                    "<report id=\"report-done\">"
-                    "<task id=\"task-1\"/>"
-                    "<report id=\"report-done\"><scan_run_status>Done</scan_run_status><scan_start>2026-06-02T15:59:50Z</scan_start><result_count><full>1</full></result_count></report>"
-                    "</report>"
-                    "</get_reports_response>"
-                )
-
-            def get_report(self, report_id, filter_string=None, details=True, ignore_pagination=False):
-                self.report_id = report_id
-                self.report_filter = filter_string
-                return report_response
-
-        fake = FakeGMP()
-        with tempfile.TemporaryDirectory() as tmp:
-            payload = runtime_report.command_summary(fake, Path(tmp), report_id=None, max_results=100, top_results_limit=1)
-            artifact_exists = (Path(tmp) / "summary.json").is_file()
-        self.assertEqual(payload["status"], "pass")
-        self.assertEqual(payload["details"]["report"]["id"], "report-done")
-        self.assertEqual(payload["details"]["top_results"][0]["id"], "result-1")
-        self.assertEqual(fake.report_id, "report-done")
-        self.assertIn("task_id=task-1", fake.latest_filter)
-        self.assertIn("rows=100", fake.report_filter)
-        self.assertTrue(artifact_exists)
+    def test_runtime_report_summary_helpers_format_native_rows(self):
+        rows = [
+            {
+                "id": "result-low",
+                "name": "ICMP Timestamp Reply Information Disclosure",
+                "host": "192.168.178.1",
+                "hostname": "router.local",
+                "port": "general/icmp",
+                "severity": 2.1,
+                "qod": 80,
+                "nvt_oid": "1.2.3",
+                "nvt_family": "General",
+                "description_excerpt": "Timestamp reply was observed.",
+            },
+            {
+                "id": "result-log",
+                "name": "OS Detection Consolidation and Reporting",
+                "host": "192.168.178.42",
+                "port": "general/tcp",
+                "severity": 0.0,
+                "qod": 80,
+                "nvt_oid": "1.2.4",
+                "nvt_family": "Service detection",
+                "description_excerpt": "Detected a host.",
+            },
+        ]
+        normalized = turbovasctl.runtime_report_summary_row(rows[0])
+        self.assertEqual(normalized["id"], "result-low")
+        self.assertEqual(normalized["host"], "192.168.178.1")
+        self.assertEqual(normalized["hostname"], "router.local")
+        self.assertEqual(normalized["severity_score"], 2.1)
+        self.assertEqual(normalized["threat"], "Low")
+        self.assertEqual(normalized["nvt_family"], "General")
+        self.assertEqual(turbovasctl.runtime_report_summary_severity_counts(rows)["Low"], 1)
+        self.assertEqual(turbovasctl.runtime_report_summary_severity_counts(rows)["Log"], 1)
+        affected_hosts = turbovasctl.runtime_report_summary_affected_hosts(rows)
+        self.assertEqual(affected_hosts[0]["host"], "192.168.178.1")
+        self.assertEqual(affected_hosts[0]["hostnames"], ["router.local"])
+        self.assertEqual(affected_hosts[0]["vulnerability_count"], 1)
 
 
 if __name__ == "__main__":

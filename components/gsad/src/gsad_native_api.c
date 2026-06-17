@@ -57,6 +57,7 @@ native_api_path_is_allowed (const gchar *path)
   const gchar *raw_reports_path = "/api/v1/reports";
   const gchar *raw_report_prefix = "/api/v1/reports/";
   const gchar *scopes_path = "/api/v1/scopes";
+  const gchar *scope_reports_path = "/api/v1/scope-reports";
   const gchar *scope_prefix = "/api/v1/scopes/";
   const gchar *metrics_suffix = "/metrics";
   const gchar *scope_collection_suffixes[] = { "/metrics",
@@ -77,6 +78,9 @@ native_api_path_is_allowed (const gchar *path)
     return TRUE;
 
   if (g_strcmp0 (path, scopes_path) == 0)
+    return TRUE;
+
+  if (g_strcmp0 (path, scope_reports_path) == 0)
     return TRUE;
 
   if (g_str_has_prefix (path, raw_report_prefix)

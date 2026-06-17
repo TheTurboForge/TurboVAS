@@ -6,7 +6,8 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
 import type {Scope, ScopeReport} from 'gmp/commands/scopes';
 import CollectionCounts from 'gmp/collection/collection-counts';
-import Filter from 'gmp/models/filter';
+import {fetchNativeScopeReports} from 'gmp/native-api/scope-reports';
+import {fetchNativeScopes} from 'gmp/native-api/scopes';
 import {TASK_STATUS} from 'gmp/models/task';
 import SeverityBar from 'web/components/bar/SeverityBar';
 import StatusBar from 'web/components/bar/StatusBar';
@@ -33,6 +34,17 @@ import SortDirection, {type SortDirectionType} from 'web/utils/sort-direction';
 
 const PAGE_SIZE = 25;
 
+const NATIVE_SCOPE_REPORT_SORT_FIELDS: Record<ScopeReportSortField, string> = {
+  created: 'creation_time',
+  scope: 'scope_name',
+  latest_evidence: 'latest_evidence_time',
+  severity: 'max_severity',
+  source_reports: 'source_report_count',
+  hosts: 'evidence_host_count',
+  results: 'result_count',
+  vulnerabilities: 'vulnerability_count',
+};
+
 type ScopeReportSortField =
   | 'created'
   | 'scope'
@@ -43,23 +55,20 @@ type ScopeReportSortField =
   | 'results'
   | 'vulnerabilities';
 
-const quoteFilterValue = (value: string) =>
-  `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
-
 const scopeReportFilter = (
   page: number,
   sortBy: ScopeReportSortField,
   sortDir: SortDirectionType,
   search: string,
 ) => {
-  const filter = Filter.fromString(
-    `first=${(page - 1) * PAGE_SIZE + 1} rows=${PAGE_SIZE}`,
-  ).set(sortDir === SortDirection.ASC ? 'sort' : 'sort-reverse', sortBy);
   const normalizedSearch = search.trim().replace(/\s+/g, ' ');
-  if (normalizedSearch.length > 0) {
-    filter.set('search', quoteFilterValue(normalizedSearch));
-  }
-  return filter;
+  const sort = NATIVE_SCOPE_REPORT_SORT_FIELDS[sortBy];
+  return {
+    page,
+    pageSize: PAGE_SIZE,
+    sort: sortDir === SortDirection.ASC ? sort : `-${sort}`,
+    filter: normalizedSearch,
+  };
 };
 
 const ScopeReportListPage = () => {
@@ -90,12 +99,12 @@ const ScopeReportListPage = () => {
     setError(undefined);
     try {
       const [scopeResponse, reportResponse] = await Promise.all([
-        gmp.scopes.get({details: 0}),
-        gmp.scopereports.get({details: 1, filter}),
+        fetchNativeScopes(gmp),
+        fetchNativeScopeReports(gmp, filter),
       ]);
-      setScopes(scopeResponse.data);
-      setReports(reportResponse.data);
-      setCounts(reportResponse.meta.counts ?? new CollectionCounts());
+      setScopes(scopeResponse);
+      setReports(reportResponse.reports);
+      setCounts(reportResponse.counts ?? new CollectionCounts());
     } catch (err) {
       setError(String(err));
     } finally {

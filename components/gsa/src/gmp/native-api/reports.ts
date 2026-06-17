@@ -63,6 +63,8 @@ interface NativeReportCollectionPayload {
   items?: NativeReportItem[];
 }
 
+type NativeReportDetailPayload = NativeReportItem;
+
 export interface NativeReportQuery {
   page: number;
   pageSize: number;
@@ -74,6 +76,10 @@ export interface NativeReportsResponse {
   reports: Report[];
   counts: CollectionCounts;
   page: NativeReportPage;
+}
+
+export interface NativeReportResponse {
+  report: Report;
 }
 
 const REPORT_SORT_FIELDS: Record<string, string> = {
@@ -191,37 +197,62 @@ export const nativeReportToModel = (item: NativeReportItem): Report => {
         log: resultCountElement(item.severity.log),
         false_positive: resultCountElement(item.severity.false_positive),
       },
+      timezone: 'UTC',
+      timezone_abbrev: 'UTC',
     },
   });
+};
+
+const nativeHeaders = (gmp: NativeApiGmp): HeadersInit => {
+  const headers: HeadersInit = {Accept: 'application/json'};
+  if (gmp.session.jwt) {
+    headers.Authorization = `Bearer ${gmp.session.jwt}`;
+  }
+  return headers;
+};
+
+const fetchNativeJson = async <T>(
+  gmp: NativeApiGmp,
+  path: string,
+  params: UrlParams,
+): Promise<T> => {
+  const response = await fetch(gmp.buildUrl(path, params), {
+    credentials: 'include',
+    headers: nativeHeaders(gmp),
+  });
+  if (!response.ok) {
+    throw new Error(`Native API request failed with status ${response.status}`);
+  }
+  return (await response.json()) as T;
+};
+
+export const fetchNativeReport = async (
+  gmp: NativeApiGmp,
+  id: string,
+): Promise<NativeReportResponse> => {
+  const payload = await fetchNativeJson<NativeReportDetailPayload>(
+    gmp,
+    `api/v1/reports/${encodeURIComponent(id)}`,
+    {token: gmp.session.token},
+  );
+  return {report: nativeReportToModel(payload)};
 };
 
 export const fetchNativeReports = async (
   gmp: NativeApiGmp,
   query: NativeReportQuery,
 ): Promise<NativeReportsResponse> => {
-  const headers: HeadersInit = {Accept: 'application/json'};
-  if (gmp.session.jwt) {
-    headers.Authorization = `Bearer ${gmp.session.jwt}`;
-  }
-
-  const response = await fetch(
-    gmp.buildUrl('api/v1/reports', {
+  const payload = await fetchNativeJson<NativeReportCollectionPayload>(
+    gmp,
+    'api/v1/reports',
+    {
       token: gmp.session.token,
       page: query.page,
       page_size: query.pageSize,
       sort: query.sort,
       filter: query.filter,
-    }),
-    {
-      credentials: 'include',
-      headers,
     },
   );
-  if (!response.ok) {
-    throw new Error(`Native API request failed with status ${response.status}`);
-  }
-
-  const payload = (await response.json()) as NativeReportCollectionPayload;
   const page = {
     page: integerValue(payload.page?.page, 1),
     page_size: integerValue(payload.page?.page_size, query.pageSize),

@@ -81,10 +81,12 @@ endpoints.
 Native raw and scope-report result rows include host, optional hostname,
 port, NVT OID/name/family, severity, QoD, creation time, source report ID,
 raw evidence link, and a bounded description excerpt. These fields are enough
-for summary views and future export-helper migration without asking GSA or
-runtime helpers to stitch raw XML report payloads together client-side.
-`runtime-report-export --json` remains on the inherited path until raw report
-export behavior is migrated and verified against the native contract.
+for summary views and report-export artifacts without asking GSA or runtime
+helpers to stitch raw XML report payloads together client-side.
+`runtime-report-export --json` now reads native raw-report detail and result
+row endpoints, then writes the familiar runtime JSON export artifact. The
+artifact is an export of PostgreSQL-owned report data, not a separate source of
+truth.
 
 Raw report `vulnerability_count` mirrors inherited raw-report summary semantics:
 it counts distinct NVTs on non-error result rows, including log-level rows. CVSS
