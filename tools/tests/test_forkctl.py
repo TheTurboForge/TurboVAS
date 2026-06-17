@@ -603,10 +603,13 @@ class TurboVASCtlTests(unittest.TestCase):
 
     def test_runtime_browser_smoke_is_registered(self):
         source = (Path(__file__).resolve().parents[1] / "turbovasctl").read_text(encoding="utf-8")
+        browser_smoke = (Path(__file__).resolve().parents[1] / "runtime_browser_smoke.py").read_text(encoding="utf-8")
         justfile = (Path(__file__).resolve().parents[2] / "justfile").read_text(encoding="utf-8")
         self.assertIn("def command_runtime_browser_smoke", source)
         self.assertIn("runtime_browser_smoke_probe_path", source)
         self.assertIn("runtime-browser-smoke", source)
+        self.assertIn("raw-report.list-native-api", browser_smoke)
+        self.assertIn("Raw-report list loaded through same-origin native API", browser_smoke)
         self.assertIn("runtime-browser-smoke *args:", justfile)
         self.assertIn('tools/turbovasctl runtime-browser-smoke "$@"', justfile)
 
@@ -726,6 +729,8 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertNotIn("components/gvm-tools/scripts/scope-report-metrics.gmp.py", all_paths)
         self.assertIn("gvm-tools scope/report scripts", {item["workflow"] for item in details["next_replacement_candidates"]})
         endpoints = {item["endpoint"] for item in details["implemented_native_endpoints"]}
+        self.assertIn("/api/v1/reports", endpoints)
+        self.assertIn("/api/v1/reports/{report_id}", endpoints)
         self.assertIn("/api/v1/scope-reports", endpoints)
         self.assertIn("/api/v1/scopes/{scope_id}/reports/{scope_report_id}/hosts", endpoints)
         self.assertIn("/api/v1/scopes/{scope_id}/reports/{scope_report_id}/ports", endpoints)
@@ -734,8 +739,25 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("/api/v1/scopes/{scope_id}/reports/{scope_report_id}/errors", endpoints)
         self.assertIn("/api/v1/scopes/{scope_id}/reports/{scope_report_id}/metrics", endpoints)
         self.assertIn("/api/v1/reports/{report_id}/metrics", endpoints)
+        raw_reports = next(item for item in details["implemented_native_endpoints"] if item["endpoint"] == "/api/v1/reports")
+        self.assertEqual(raw_reports["status"], "implemented_internal_and_browser_proxied")
+        self.assertIn("GSA raw report list (migrated through gsad same-origin proxy)", raw_reports["replacement_candidates"])
         scope_report_candidates = next(item for item in details["implemented_native_endpoints"] if item["endpoint"] == "/api/v1/scope-reports")
         self.assertIn("runtime-scope-report-summary helper (migrated)", scope_report_candidates["replacement_candidates"])
+
+    def test_openapi_tracks_raw_report_contracts(self):
+        root = Path(__file__).resolve().parents[2]
+        openapi = (root / "api" / "openapi" / "turbovas-v1.yaml").read_text(encoding="utf-8")
+        source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
+        smoke = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
+        self.assertIn("/reports:", openapi)
+        self.assertIn("/reports/{report_id}:", openapi)
+        self.assertIn("ReportReference", openapi)
+        self.assertIn("ReportSeverityCounts", openapi)
+        self.assertIn("route(\"/api/v1/reports\", get(reports))", source)
+        self.assertIn("route(\"/api/v1/reports/:report_id\", get(report_detail))", source)
+        self.assertIn("native-api.raw-reports", smoke)
+        self.assertIn("native-api.raw-report-detail", smoke)
 
     def test_rust_migration_state_tracks_tools_and_first_candidate(self):
         root = Path(__file__).resolve().parents[2]

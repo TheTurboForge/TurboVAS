@@ -9,11 +9,14 @@ import {reportsReducer} from 'web/store/entities/reports/reducers';
 import {
   createEntitiesLoadingActions,
   createLoadAllEntities,
-  createLoadEntities,
   types,
 } from 'web/store/entities/utils/actions';
 import {initialState} from 'web/store/entities/utils/reducers';
 import {createEntitiesSelector} from 'web/store/entities/utils/selectors';
+import {
+  fetchNativeReports,
+  nativeReportQueryFromFilter,
+} from 'gmp/native-api/reports';
 
 const reportsSelector = createEntitiesSelector('report');
 const entitiesActions = createEntitiesLoadingActions('report');
@@ -22,11 +25,29 @@ const loadAllEntities = createLoadAllEntities({
   actions: entitiesActions,
   entityType: 'report',
 });
-const loadEntities = createLoadEntities({
-  selector: reportsSelector,
-  actions: entitiesActions,
-  entityType: 'report',
-});
+const loadEntities = gmp => filter => (dispatch, getState) => {
+  const rootState = getState();
+  const state = reportsSelector(rootState);
+
+  if (state.isLoadingEntities(filter)) {
+    return Promise.resolve();
+  }
+
+  dispatch(entitiesActions.request(filter));
+
+  return fetchNativeReports(gmp, nativeReportQueryFromFilter(filter)).then(
+    response =>
+      dispatch(
+        entitiesActions.success(
+          response.reports,
+          filter,
+          filter,
+          response.counts,
+        ),
+      ),
+    error => dispatch(entitiesActions.error(error, filter)),
+  );
+};
 
 const reducer = (state = initialState, action) => {
   if (action.entityType !== 'report') {

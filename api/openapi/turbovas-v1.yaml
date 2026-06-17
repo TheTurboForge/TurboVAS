@@ -450,7 +450,7 @@ components:
             $ref: '#/components/schemas/ErrorMessage'
     Report:
       type: object
-      required: [id, name, status]
+      required: [id, name, status, result_count, vulnerability_count, host_count, cve_count, severity, max_severity]
       properties:
         id:
           type: string
@@ -459,9 +459,16 @@ components:
           type: string
         status:
           type: string
-        task_id:
+        task:
+          $ref: '#/components/schemas/ReportReference'
+        target:
+          $ref: '#/components/schemas/ReportReference'
+        creation_time:
           type: string
-          format: uuid
+          format: date-time
+        modification_time:
+          type: string
+          format: date-time
         scan_start:
           type: string
           format: date-time
@@ -469,12 +476,41 @@ components:
           type: string
           format: date-time
         severity:
+          $ref: '#/components/schemas/ReportSeverityCounts'
+        max_severity:
           type: number
         result_count:
           type: integer
         vulnerability_count:
           type: integer
         host_count:
+          type: integer
+        cve_count:
+          type: integer
+    ReportReference:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+    ReportSeverityCounts:
+      type: object
+      required: [critical, high, medium, low, log, false_positive]
+      properties:
+        critical:
+          type: integer
+        high:
+          type: integer
+        medium:
+          type: integer
+        low:
+          type: integer
+        log:
+          type: integer
+        false_positive:
           type: integer
     Scope:
       type: object

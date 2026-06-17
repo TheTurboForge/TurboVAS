@@ -14,13 +14,14 @@ tooling paths. They may remain temporarily as compatibility bridges while
 replacement APIs land.
 
 The first live proof is the Docker-internal Rust `turbovas-api` sidecar for
-scope-report collections and raw report metrics, currently scope-report list,
-Results, Hosts, Ports, Applications, Operating Systems, CVEs, TLS Certificates,
-Error Messages, scope-report Metrics, and raw report Metrics. It queries
-PostgreSQL directly and is intentionally not exposed on a host port. Browser
-migration is complete for raw-report and scope-report Metrics plus all current
-scope-report evidence tabs through the authenticated same-origin `gsad` proxy defined in
-`docs/NATIVE_API_AUTH_BOUNDARY.md`.
+raw report reads, scope-report collections, and report metrics, currently raw
+report list/detail, scope-report list, Results, Hosts, Ports, Applications,
+Operating Systems, CVEs, TLS Certificates, Error Messages, scope-report
+Metrics, and raw report Metrics. It queries PostgreSQL directly and is
+intentionally not exposed on a host port. Browser migration now covers the raw
+`/reports` list, raw-report and scope-report Metrics, plus all current
+scope-report evidence tabs through the authenticated same-origin `gsad` proxy
+defined in `docs/NATIVE_API_AUTH_BOUNDARY.md`.
 
 ## Workflow Retirement Classes
 
@@ -35,7 +36,7 @@ scope-report evidence tabs through the authenticated same-origin `gsad` proxy de
 
 | Workflow | Current path | Native target | Retirement criterion |
 | --- | --- | --- | --- |
-| Raw report list/detail | GSA GMP commands -> gsad -> gvmd XML -> PostgreSQL | `/api/v1/reports` and `/api/v1/reports/{report_id}` | GSA can read raw report list/detail via typed JSON with equal browser/test coverage. |
+| Raw report list/detail | GSA GMP commands -> gsad -> gvmd XML -> PostgreSQL | `/api/v1/reports` and `/api/v1/reports/{report_id}` | `/reports` now reads its list through typed JSON. Raw detail summary endpoint is live internally; the detail page header/tabs remain partially inherited until migrated in a follow-up. |
 | Raw report metrics | `runtime-report-metrics` and the GSA Metrics tab now use the native API; the inherited `get_report_metrics` GMP command remains available during transition | `/api/v1/reports/{report_id}/metrics` | Runtime and browser smoke continue to prove the native path while GMP compatibility remains intact. |
 | Scope list/detail | GMP scope commands and GSA scope pages | `/api/v1/scopes` and `/api/v1/scopes/{scope_id}` | Scope metadata and membership reads move to typed JSON; writes remain inherited until designed. |
 | Scope-report list/detail | GMP scope-report commands and GSA scope-report pages | `/api/v1/scopes/reports` and canonical scoped detail path | GSA list/detail reads use server-backed JSON collections and browser smoke remains green. |

@@ -6,7 +6,8 @@
 TurboVAS proves the native HTTP/JSON direction with narrow read-only workflows
 before implementing broader endpoint coverage. The first proof started with
 scope-report Hosts and now also covers all scope-report evidence tabs,
-persisted scope-report Metrics, and raw report Metrics. Scanner
+persisted scope-report Metrics, raw report Metrics, and raw report list/detail
+reads. Scanner
 control, feed state, credentials, writes, and account management remain out of
 scope for this proof.
 
@@ -63,11 +64,11 @@ The first endpoint is not complete until it proves:
 Implementation commit `c59140a` proved the internal sidecar for scope-report
 list and Hosts. Later B-117/B-125 slices added scope-report Results, Ports,
 CVEs, Error Messages, Applications, Operating Systems, TLS Certificates,
-persisted scope-report Metrics, and raw report Metrics with the same
-internal-only, PostgreSQL-backed pattern. Browser proof work now routes raw-report
-and scope-report Metrics plus every scope-report evidence tab through the
-authenticated same-origin `gsad` proxy defined in
-`docs/NATIVE_API_AUTH_BOUNDARY.md`.
+persisted scope-report Metrics, raw report Metrics, and raw report list/detail
+reads with the same internal-only, PostgreSQL-backed pattern. Browser proof
+work now routes the raw `/reports` list, raw-report and scope-report Metrics,
+plus every scope-report evidence tab through the authenticated same-origin
+`gsad` proxy defined in `docs/NATIVE_API_AUTH_BOUNDARY.md`.
 
 ## Not In The First Proof
 
@@ -78,9 +79,10 @@ high-consequence inherited control paths until separately designed and reviewed.
 ## Next Proofs
 
 After scope-report Results/Hosts/Ports/Applications/Operating Systems/CVEs/TLS
-Certificates/Error Messages/Metrics and raw report Metrics work, the next
-candidates are raw report list/detail or scope metadata reads, only if they
-directly unlock helper or browser migration away from GMP/XML.
+Certificates/Error Messages/Metrics, raw report Metrics, and raw report
+list/detail work, the next candidates are raw report detail-page header reads,
+scope metadata reads, or helper/tooling replacements, only if they directly
+unlock helper or browser migration away from GMP/XML.
 
 ## Completed Evidence Contracts
 

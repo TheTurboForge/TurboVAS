@@ -54,6 +54,7 @@ is_uuid_segment (const gchar *value, gsize length)
 static gboolean
 native_api_path_is_allowed (const gchar *path)
 {
+  const gchar *raw_reports_path = "/api/v1/reports";
   const gchar *raw_report_prefix = "/api/v1/reports/";
   const gchar *scope_prefix = "/api/v1/scopes/";
   const gchar *metrics_suffix = "/metrics";
@@ -71,6 +72,9 @@ native_api_path_is_allowed (const gchar *path)
   if (path == NULL || strchr (path, '?') != NULL)
     return FALSE;
 
+  if (g_strcmp0 (path, raw_reports_path) == 0)
+    return TRUE;
+
   if (g_str_has_prefix (path, raw_report_prefix)
       && g_str_has_suffix (path, metrics_suffix))
     {
@@ -78,6 +82,12 @@ native_api_path_is_allowed (const gchar *path)
       gsize id_len = strlen (path) - strlen (raw_report_prefix)
                      - strlen (metrics_suffix);
       return is_uuid_segment (id, id_len);
+    }
+
+  if (g_str_has_prefix (path, raw_report_prefix))
+    {
+      const gchar *id = path + strlen (raw_report_prefix);
+      return is_uuid_segment (id, strlen (id));
     }
 
   if (g_str_has_prefix (path, scope_prefix))
