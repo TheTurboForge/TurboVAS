@@ -3,10 +3,11 @@
 
 # TurboVAS HTTP/JSON API Contract
 
-TurboVAS will add typed HTTP/JSON product APIs under `/api/v1` for DB-backed
-operator workflows. This is a contract baseline, not a live endpoint promise:
-the current runtime still uses GSA, gsad, gvmd, GMP/XML, `python-gvm`, and
-`gvm-tools` for inherited control and compatibility paths.
+TurboVAS is adding typed HTTP/JSON product APIs under `/api/v1` for DB-backed
+operator workflows. Several read-only report and scope endpoints are already
+live through the internal Rust sidecar and authenticated `gsad` proxy; the
+inherited GSA, gsad, gvmd, GMP/XML, `python-gvm`, and `gvm-tools` paths remain
+temporary compatibility and control plumbing during the strangler migration.
 
 The goal is not to wrap GMP/XML in REST. New TurboVAS product reads should be
 sourced from gvmd/PostgreSQL-owned state and should keep GMP/XML contained as a
@@ -51,14 +52,15 @@ strangler map in the same slice.
 
 The first runtime implementation proof is scoped in
 `docs/NATIVE_API_PROOF_PLAN.md`. It starts with an internal-only Rust sidecar
-for raw report list/detail, scope-report list, Results, Hosts, Ports,
-Applications, Operating Systems, CVEs, TLS Certificates, Error Messages,
-scope-report Metrics, and raw report Metrics because those read paths validate
-DB-backed evidence, scope membership, provenance, and report reading without
-changing scanner control behavior. Browser-facing proof now covers the raw
-`/reports` list, report Metrics, and all current scope-report evidence tabs:
-GSA calls same-origin `/api/v1/...` paths, and `gsad` authenticates and
-allowlists those reads before proxying to the internal sidecar.
+for raw report list/detail, scope list/detail, scope-report list, Results,
+Hosts, Ports, Applications, Operating Systems, CVEs, TLS Certificates, Error
+Messages, scope-report Metrics, and raw report Metrics because those read paths
+validate DB-backed evidence, scope membership, provenance, and report reading
+without changing scanner control behavior. Browser-facing proof now covers the
+raw `/reports` list, `/scopes` list/detail reads, report Metrics, and all
+current scope-report evidence tabs: GSA calls same-origin `/api/v1/...` paths,
+and `gsad` authenticates and allowlists those reads before proxying to the
+internal sidecar.
 `runtime-native-api-smoke --json` and browser smoke cover the live runtime
 endpoints.
 

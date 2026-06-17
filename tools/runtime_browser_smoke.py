@@ -279,6 +279,10 @@ async function runForBaseUrl(baseUrl) {
     await gotoRoute(page, '/tasks', 'tasks');
     await assertNoForbiddenText(page, 'tasks', [/Resume/i, /Task Wizard/i, /Advanced Task Wizard/i, /Import Task/i, /Delta Report/i]);
 
+    await gotoRoute(page, '/scopes', 'scopes');
+    const nativeScopes = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/scopes$/);
+    add(nativeScopes ? 'pass' : 'fail', 'scope.list-native-api', nativeScopes ? 'Scope list loaded through same-origin native API.' : 'Scope list did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => item.path === '/api/v1/scopes') });
+
     await gotoRoute(page, '/scopes/reports', 'scope-reports');
     const detailHref = config.scopeReportPath || await firstHref(page, /\/scopes\/[^/]+\/reports\/[^/]+/);
     add(detailHref ? 'pass' : 'fail', 'scope-reports.detail-link', detailHref ? 'Found a canonical scope-report detail route.' : 'No canonical scope-report detail link found.', { href: detailHref, preferred: Boolean(config.scopeReportPath) });

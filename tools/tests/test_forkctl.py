@@ -609,6 +609,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("runtime_browser_smoke_probe_path", source)
         self.assertIn("runtime-browser-smoke", source)
         self.assertIn("raw-report.list-native-api", browser_smoke)
+        self.assertIn("scope.list-native-api", browser_smoke)
         self.assertIn("Raw-report list loaded through same-origin native API", browser_smoke)
         self.assertIn("runtime-browser-smoke *args:", justfile)
         self.assertIn('tools/turbovasctl runtime-browser-smoke "$@"', justfile)
@@ -731,6 +732,8 @@ class TurboVASCtlTests(unittest.TestCase):
         endpoints = {item["endpoint"] for item in details["implemented_native_endpoints"]}
         self.assertIn("/api/v1/reports", endpoints)
         self.assertIn("/api/v1/reports/{report_id}", endpoints)
+        self.assertIn("/api/v1/scopes", endpoints)
+        self.assertIn("/api/v1/scopes/{scope_id}", endpoints)
         self.assertIn("/api/v1/scope-reports", endpoints)
         self.assertIn("/api/v1/scopes/{scope_id}/reports/{scope_report_id}/hosts", endpoints)
         self.assertIn("/api/v1/scopes/{scope_id}/reports/{scope_report_id}/ports", endpoints)
@@ -742,6 +745,9 @@ class TurboVASCtlTests(unittest.TestCase):
         raw_reports = next(item for item in details["implemented_native_endpoints"] if item["endpoint"] == "/api/v1/reports")
         self.assertEqual(raw_reports["status"], "implemented_internal_and_browser_proxied")
         self.assertIn("GSA raw report list (migrated through gsad same-origin proxy)", raw_reports["replacement_candidates"])
+        scopes = next(item for item in details["implemented_native_endpoints"] if item["endpoint"] == "/api/v1/scopes")
+        self.assertEqual(scopes["status"], "implemented_internal_and_browser_proxied")
+        self.assertIn("GSA scope list reads (migrated through gsad same-origin proxy)", scopes["replacement_candidates"])
         scope_report_candidates = next(item for item in details["implemented_native_endpoints"] if item["endpoint"] == "/api/v1/scope-reports")
         self.assertIn("runtime-scope-report-summary helper (migrated)", scope_report_candidates["replacement_candidates"])
 
@@ -758,6 +764,28 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("route(\"/api/v1/reports/:report_id\", get(report_detail))", source)
         self.assertIn("native-api.raw-reports", smoke)
         self.assertIn("native-api.raw-report-detail", smoke)
+
+    def test_openapi_tracks_scope_read_contracts(self):
+        root = Path(__file__).resolve().parents[2]
+        openapi = (root / "api" / "openapi" / "turbovas-v1.yaml").read_text(encoding="utf-8")
+        source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
+        smoke = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
+        native_client = (root / "components" / "gsa" / "src" / "gmp" / "native-api" / "scopes.ts").read_text(encoding="utf-8")
+        scope_list = (root / "components" / "gsa" / "src" / "web" / "pages" / "scopes" / "ScopeListPage.tsx").read_text(encoding="utf-8")
+        scope_details = (root / "components" / "gsa" / "src" / "web" / "pages" / "scopes" / "ScopeDetailsPage.tsx").read_text(encoding="utf-8")
+        self.assertIn("/scopes:", openapi)
+        self.assertIn("/scopes/{scope_id}:", openapi)
+        self.assertIn("ScopeCandidateHost", openapi)
+        self.assertIn("ScopeReportReference", openapi)
+        self.assertIn("route(\"/api/v1/scopes\", get(scopes))", source)
+        self.assertIn("route(\"/api/v1/scopes/:scope_id\", get(scope_detail))", source)
+        self.assertIn("native-api.scopes", smoke)
+        self.assertIn("native-api.scope-detail", smoke)
+        self.assertIn("fetchNativeScopes", native_client)
+        self.assertIn("fetchNativeScope", native_client)
+        self.assertIn("api/v1/scopes", native_client)
+        self.assertIn("fetchNativeScopes(gmp)", scope_list)
+        self.assertIn("fetchNativeScope(gmp, id)", scope_details)
 
     def test_rust_migration_state_tracks_tools_and_first_candidate(self):
         root = Path(__file__).resolve().parents[2]

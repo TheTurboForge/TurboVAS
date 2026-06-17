@@ -6,6 +6,7 @@
 import {useCallback, useEffect, useState} from 'react';
 import {useNavigate, useParams} from 'react-router';
 import type {ProtectionRequirement, Scope} from 'gmp/commands/scopes';
+import {fetchNativeScope} from 'gmp/native-api/scopes';
 import Button from 'web/components/form/Button';
 import MultiSelect from 'web/components/form/MultiSelect';
 import Select from 'web/components/form/Select';
@@ -107,22 +108,13 @@ const ScopeDetailsPage = () => {
     try {
       const targetsCommand = gmp.targets as unknown as EntityListCommand;
       const hostsCommand = (gmp as unknown as {hosts: EntityListCommand}).hosts;
-      const [response, targetsResponse, hostsResponse] = await Promise.all([
-        gmp.scopes.getOne(id),
+      const [scopeData, targetsResponse, hostsResponse] = await Promise.all([
+        fetchNativeScope(gmp, id),
         targetsCommand.get({filter: 'rows=-1'}),
         hostsCommand.get({filter: 'rows=-1'}),
       ]);
-      const scopeData = response.data;
       if (scopeData) {
-        const reportsResponse = await gmp.scopereports.get({
-          scopeId: scopeData.id,
-          details: 0,
-        });
-        const enrichedScope = {
-          ...scopeData,
-          scopeReports: reportsResponse.data,
-        };
-        setScope(enrichedScope);
+        setScope(scopeData);
         setName(scopeData.name);
         setComment(scopeData.comment ?? '');
         setProtectionRequirement(scopeData.protectionRequirement);

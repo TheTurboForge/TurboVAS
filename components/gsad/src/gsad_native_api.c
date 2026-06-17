@@ -56,6 +56,7 @@ native_api_path_is_allowed (const gchar *path)
 {
   const gchar *raw_reports_path = "/api/v1/reports";
   const gchar *raw_report_prefix = "/api/v1/reports/";
+  const gchar *scopes_path = "/api/v1/scopes";
   const gchar *scope_prefix = "/api/v1/scopes/";
   const gchar *metrics_suffix = "/metrics";
   const gchar *scope_collection_suffixes[] = { "/metrics",
@@ -73,6 +74,9 @@ native_api_path_is_allowed (const gchar *path)
     return FALSE;
 
   if (g_strcmp0 (path, raw_reports_path) == 0)
+    return TRUE;
+
+  if (g_strcmp0 (path, scopes_path) == 0)
     return TRUE;
 
   if (g_str_has_prefix (path, raw_report_prefix)
@@ -96,7 +100,7 @@ native_api_path_is_allowed (const gchar *path)
       const gchar *reports_sep = strstr (scope_id, "/reports/");
       const gchar *suffix = NULL;
       if (reports_sep == NULL)
-        return FALSE;
+        return is_uuid_segment (scope_id, strlen (scope_id));
 
       const gchar *report_id = reports_sep + strlen ("/reports/");
       gsize scope_id_len = reports_sep - scope_id;

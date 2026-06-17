@@ -6,7 +6,8 @@
 TurboVAS proves the native HTTP/JSON direction with narrow read-only workflows
 before implementing broader endpoint coverage. The first proof started with
 scope-report Hosts and now also covers all scope-report evidence tabs,
-persisted scope-report Metrics, raw report Metrics, and raw report list/detail
+persisted scope-report Metrics, raw report Metrics, raw report list/detail,
+and scope list/detail
 reads. Scanner
 control, feed state, credentials, writes, and account management remain out of
 scope for this proof.
@@ -67,7 +68,7 @@ CVEs, Error Messages, Applications, Operating Systems, TLS Certificates,
 persisted scope-report Metrics, raw report Metrics, and raw report list/detail
 reads with the same internal-only, PostgreSQL-backed pattern. Browser proof
 work now routes the raw `/reports` list, raw-report and scope-report Metrics,
-plus every scope-report evidence tab through the authenticated same-origin
+plus scope list/detail and every scope-report evidence tab through the authenticated same-origin
 `gsad` proxy defined in `docs/NATIVE_API_AUTH_BOUNDARY.md`.
 
 ## Not In The First Proof
@@ -79,10 +80,10 @@ high-consequence inherited control paths until separately designed and reviewed.
 ## Next Proofs
 
 After scope-report Results/Hosts/Ports/Applications/Operating Systems/CVEs/TLS
-Certificates/Error Messages/Metrics, raw report Metrics, and raw report
-list/detail work, the next candidates are raw report detail-page header reads,
-scope metadata reads, or helper/tooling replacements, only if they directly
-unlock helper or browser migration away from GMP/XML.
+Certificates/Error Messages/Metrics, raw report Metrics, raw report
+list/detail, and scope metadata reads, the next candidates are raw report
+detail-page header integration or helper/tooling replacements, only if they
+directly unlock helper or browser migration away from GMP/XML.
 
 ## Completed Evidence Contracts
 
@@ -96,5 +97,5 @@ they are now live internal and browser-proxied endpoints:
 Together with Results, Hosts, Ports, CVEs, Error Messages, and Metrics, these
 endpoints complete native browser coverage for current scope-report evidence
 tabs. Further native API expansion should now move outward to raw report
-list/detail reads, scope metadata reads, or helper/tooling replacements that
-remove required GMP/XML, `python-gvm`, or `gvm-tools` dependence.
+detail-page integration or helper/tooling replacements that remove required
+GMP/XML, `python-gvm`, or `gvm-tools` dependence.

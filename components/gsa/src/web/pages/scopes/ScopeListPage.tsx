@@ -5,6 +5,7 @@
 
 import {useCallback, useEffect, useState} from 'react';
 import type {ProtectionRequirement, Scope} from 'gmp/commands/scopes';
+import {fetchNativeScopes} from 'gmp/native-api/scopes';
 import Button from 'web/components/form/Button';
 import Select from 'web/components/form/Select';
 import TextField from 'web/components/form/TextField';
@@ -40,8 +41,7 @@ const ScopeListPage = () => {
     setLoading(true);
     setError(undefined);
     try {
-      const response = await gmp.scopes.get({details: 1});
-      setScopes(response.data);
+      setScopes(await fetchNativeScopes(gmp));
     } catch (err) {
       setError(String(err));
     } finally {

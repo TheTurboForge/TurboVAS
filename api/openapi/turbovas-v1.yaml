@@ -514,7 +514,7 @@ components:
           type: integer
     Scope:
       type: object
-      required: [id, name, protection_requirement]
+      required: [id, name, protection_requirement, protection_requirement_label, predefined, global, target_count, host_count, scope_report_count]
       properties:
         id:
           type: string
@@ -524,13 +524,95 @@ components:
         comment:
           type: string
         protection_requirement:
+          enum: [normal, high, very_high]
+        protection_requirement_label:
           enum: [Normal, High, Very High]
         predefined:
           type: boolean
+        global:
+          type: boolean
+        creation_time:
+          type: string
+          format: date-time
+        modification_time:
+          type: string
+          format: date-time
         target_count:
           type: integer
         host_count:
           type: integer
+        scope_report_count:
+          type: integer
+        targets:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScopeEntity'
+        hosts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScopeEntity'
+        candidate_hosts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScopeCandidateHost'
+        scope_reports:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScopeReportReference'
+    ScopeEntity:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+    ScopeCandidateHost:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        target_id:
+          type: string
+          format: uuid
+        target_name:
+          type: string
+        source_report_id:
+          type: string
+          format: uuid
+    ScopeReportReference:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        creation_time:
+          type: string
+          format: date-time
+        latest_evidence_time:
+          type: string
+          format: date-time
+        source_report_count:
+          type: integer
+        member_host_count:
+          type: integer
+        evidence_host_count:
+          type: integer
+        missing_host_count:
+          type: integer
+        result_count:
+          type: integer
+        vulnerability_count:
+          type: integer
+        max_severity:
+          type: number
     ScopeReport:
       type: object
       required: [id, name, status, scope, source_report_count, result_count, vulnerability_count]
