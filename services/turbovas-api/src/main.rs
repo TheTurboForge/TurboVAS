@@ -879,7 +879,7 @@ fn raw_report_sql(filtered_predicate: &str, sort_sql: &str, limit_clause: &str) 
          result_agg AS (
              SELECT b.report_pk,
                     count(res.id) FILTER (WHERE coalesce(res.severity, 0) != -3.0)::bigint AS result_count,
-                    count(DISTINCT nullif(res.nvt, '')) FILTER (WHERE coalesce(res.severity, 0) > 0)::bigint AS vulnerability_count,
+                    count(DISTINCT nullif(res.nvt, '')) FILTER (WHERE coalesce(res.severity, 0) != -3.0)::bigint AS vulnerability_count,
                     coalesce(max(coalesce(res.severity, 0)) FILTER (WHERE coalesce(res.severity, 0) > 0), 0)::double precision AS max_severity,
                     count(res.id) FILTER (WHERE coalesce(res.severity, 0) >= 9.0)::bigint AS severity_critical,
                     count(res.id) FILTER (WHERE coalesce(res.severity, 0) >= 7.0 AND coalesce(res.severity, 0) < 9.0)::bigint AS severity_high,

@@ -71,8 +71,12 @@ raw evidence link, and a bounded description excerpt. These fields are enough
 for summary views and future export-helper migration without asking GSA or
 runtime helpers to stitch raw XML report payloads together client-side.
 `runtime-report-export --json` remains on the inherited path until raw report
-count semantics are made explicitly equivalent or deliberately renamed in the
-native contract.
+export behavior is migrated and verified against the native contract.
+
+Raw report `vulnerability_count` mirrors inherited raw-report summary semantics:
+it counts distinct NVTs on non-error result rows, including log-level rows. CVSS
+Load metric payloads have their own `vulnerability_count` semantics and count
+positive-severity vulnerability metric rows only.
 
 ## Non-Goals For V1
 

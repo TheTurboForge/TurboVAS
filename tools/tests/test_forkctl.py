@@ -764,6 +764,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("/reports/{report_id}/results:", openapi)
         self.assertIn("description_excerpt", openapi)
         self.assertIn("nvt_family", openapi)
+        self.assertIn("count(DISTINCT nullif(res.nvt, '')) FILTER (WHERE coalesce(res.severity, 0) != -3.0)", source)
         self.assertIn("ReportReference", openapi)
         self.assertIn("ReportSeverityCounts", openapi)
         self.assertIn("route(\"/api/v1/reports\", get(reports))", source)
