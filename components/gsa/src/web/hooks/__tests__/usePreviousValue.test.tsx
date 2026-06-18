@@ -1,19 +1,22 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
  *
+ * Modified by TurboVAS contributors, 2026.
+ *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import {useState} from 'react';
 import {describe, test, expect} from '@gsa/testing';
-import {fireEvent, render, screen} from 'web/testing';
+import {render, screen} from 'web/testing';
 import usePreviousValue from 'web/hooks/usePreviousValue';
 
-const TestComponent = () => {
-  const [value, setValue] = useState(0);
+interface TestComponentProps {
+  value: number;
+}
+
+const TestComponent = ({value}: TestComponentProps) => {
   const previousValue = usePreviousValue(value);
   return (
     <>
-      <button onClick={() => setValue(1)}></button>
       <span data-testid="value">{value}</span>
       <span data-testid="previousValue">{String(previousValue)}</span>
     </>
@@ -22,7 +25,7 @@ const TestComponent = () => {
 
 describe('usePreviousValue', () => {
   test('should return the previous value', () => {
-    render(<TestComponent />);
+    const {rerender} = render(<TestComponent value={0} />);
 
     const value = screen.getByTestId('value');
     const previousValue = screen.getByTestId('previousValue');
@@ -30,7 +33,7 @@ describe('usePreviousValue', () => {
     expect(value).toHaveTextContent('0');
     expect(previousValue).toHaveTextContent('undefined');
 
-    fireEvent.click(screen.getByRole('button'));
+    rerender(<TestComponent value={1} />);
 
     expect(value).toHaveTextContent('1');
     expect(previousValue).toHaveTextContent('0');
