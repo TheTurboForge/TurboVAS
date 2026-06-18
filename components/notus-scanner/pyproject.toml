@@ -49,7 +49,7 @@ packaging = "<25.1"
 [tool.poetry.group.dev.dependencies]
 rope = "^1.14.0"
 coverage = ">=7.4.0"
-autohooks-plugin-black = ">=22.7.0"
+black = {version = ">=26.3.1", python = ">=3.10"}
 autohooks-plugin-isort = ">=22.8.0"
 autohooks-plugin-ruff = ">=24.1.0"
 pontos = ">=22.7.2"
@@ -78,7 +78,7 @@ exclude = '''
 
 [tool.autohooks]
 mode = "poetry"
-pre-commit = ["autohooks.plugins.black", "autohooks.plugins.ruff"]
+pre-commit = ["autohooks.plugins.ruff"]
 
 [tool.pontos.version]
 version-module-file = "notus/scanner/__version__.py"

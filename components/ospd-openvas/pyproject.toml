@@ -57,9 +57,8 @@ python-gnupg = ">=0.4.8,<0.6.0"
 pylint = "^3.3.9"
 rope = "^1.14.0"
 autohooks-plugin-pylint = ">=21.6.0"
-autohooks-plugin-black = ">=22.7.0"
 pontos = ">=22.8.0"
-black = ">=22.6.0"
+black = {version = ">=26.3.1", python = ">=3.10"}
 
 [tool.poetry.scripts]
 ospd-openvas = "ospd_openvas.daemon:main"
@@ -85,7 +84,7 @@ exclude = '''
 
 [tool.autohooks]
 mode = "poetry"
-pre-commit = ['autohooks.plugins.black']
+pre-commit = []
 
 [tool.pontos.version]
 version-module-file = "ospd_openvas/__version__.py"
