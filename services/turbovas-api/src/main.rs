@@ -189,6 +189,24 @@ struct PortListReference {
 }
 
 #[derive(Debug, Serialize)]
+struct CredentialReference {
+    id: String,
+    name: String,
+    credential_type: String,
+    port: Option<i64>,
+}
+
+#[derive(Debug, Serialize)]
+struct TargetCredentials {
+    ssh: Option<CredentialReference>,
+    ssh_elevate: Option<CredentialReference>,
+    smb: Option<CredentialReference>,
+    esxi: Option<CredentialReference>,
+    snmp: Option<CredentialReference>,
+    krb5: Option<CredentialReference>,
+}
+
+#[derive(Debug, Serialize)]
 struct TargetItem {
     id: String,
     name: String,
@@ -201,6 +219,7 @@ struct TargetItem {
     reverse_lookup_only: bool,
     reverse_lookup_unify: bool,
     port_list: Option<PortListReference>,
+    credentials: TargetCredentials,
     task_count: i64,
     tasks: Vec<TargetReference>,
     creation_time: Option<String>,
@@ -1537,6 +1556,54 @@ fn target_sql(filtered_predicate: &str, sort_sql: &str, limit_clause: &str) -> S
                     coalesce(t.reverse_lookup_unify, 0)::int AS reverse_lookup_unify,
                     pl.uuid AS port_list_id,
                     pl.name AS port_list_name,
+                    (SELECT c.uuid FROM targets_login_data tld JOIN credentials c ON c.id = tld.credential
+                      WHERE tld.target = t.id AND tld.type = 'ssh' LIMIT 1) AS ssh_credential_id,
+                    (SELECT c.name FROM targets_login_data tld JOIN credentials c ON c.id = tld.credential
+                      WHERE tld.target = t.id AND tld.type = 'ssh' LIMIT 1) AS ssh_credential_name,
+                    (SELECT c.type FROM targets_login_data tld JOIN credentials c ON c.id = tld.credential
+                      WHERE tld.target = t.id AND tld.type = 'ssh' LIMIT 1) AS ssh_credential_type,
+                    (SELECT NULLIF(tld.port, 0)::bigint FROM targets_login_data tld
+                      WHERE tld.target = t.id AND tld.type = 'ssh' LIMIT 1) AS ssh_credential_port,
+                    (SELECT c.uuid FROM targets_login_data tld JOIN credentials c ON c.id = tld.credential
+                      WHERE tld.target = t.id AND tld.type = 'elevate' LIMIT 1) AS ssh_elevate_credential_id,
+                    (SELECT c.name FROM targets_login_data tld JOIN credentials c ON c.id = tld.credential
+                      WHERE tld.target = t.id AND tld.type = 'elevate' LIMIT 1) AS ssh_elevate_credential_name,
+                    (SELECT c.type FROM targets_login_data tld JOIN credentials c ON c.id = tld.credential
+                      WHERE tld.target = t.id AND tld.type = 'elevate' LIMIT 1) AS ssh_elevate_credential_type,
+                    (SELECT NULLIF(tld.port, 0)::bigint FROM targets_login_data tld
+                      WHERE tld.target = t.id AND tld.type = 'elevate' LIMIT 1) AS ssh_elevate_credential_port,
+                    (SELECT c.uuid FROM targets_login_data tld JOIN credentials c ON c.id = tld.credential
+                      WHERE tld.target = t.id AND tld.type = 'smb' LIMIT 1) AS smb_credential_id,
+                    (SELECT c.name FROM targets_login_data tld JOIN credentials c ON c.id = tld.credential
+                      WHERE tld.target = t.id AND tld.type = 'smb' LIMIT 1) AS smb_credential_name,
+                    (SELECT c.type FROM targets_login_data tld JOIN credentials c ON c.id = tld.credential
+                      WHERE tld.target = t.id AND tld.type = 'smb' LIMIT 1) AS smb_credential_type,
+                    (SELECT NULLIF(tld.port, 0)::bigint FROM targets_login_data tld
+                      WHERE tld.target = t.id AND tld.type = 'smb' LIMIT 1) AS smb_credential_port,
+                    (SELECT c.uuid FROM targets_login_data tld JOIN credentials c ON c.id = tld.credential
+                      WHERE tld.target = t.id AND tld.type = 'esxi' LIMIT 1) AS esxi_credential_id,
+                    (SELECT c.name FROM targets_login_data tld JOIN credentials c ON c.id = tld.credential
+                      WHERE tld.target = t.id AND tld.type = 'esxi' LIMIT 1) AS esxi_credential_name,
+                    (SELECT c.type FROM targets_login_data tld JOIN credentials c ON c.id = tld.credential
+                      WHERE tld.target = t.id AND tld.type = 'esxi' LIMIT 1) AS esxi_credential_type,
+                    (SELECT NULLIF(tld.port, 0)::bigint FROM targets_login_data tld
+                      WHERE tld.target = t.id AND tld.type = 'esxi' LIMIT 1) AS esxi_credential_port,
+                    (SELECT c.uuid FROM targets_login_data tld JOIN credentials c ON c.id = tld.credential
+                      WHERE tld.target = t.id AND tld.type = 'snmp' LIMIT 1) AS snmp_credential_id,
+                    (SELECT c.name FROM targets_login_data tld JOIN credentials c ON c.id = tld.credential
+                      WHERE tld.target = t.id AND tld.type = 'snmp' LIMIT 1) AS snmp_credential_name,
+                    (SELECT c.type FROM targets_login_data tld JOIN credentials c ON c.id = tld.credential
+                      WHERE tld.target = t.id AND tld.type = 'snmp' LIMIT 1) AS snmp_credential_type,
+                    (SELECT NULLIF(tld.port, 0)::bigint FROM targets_login_data tld
+                      WHERE tld.target = t.id AND tld.type = 'snmp' LIMIT 1) AS snmp_credential_port,
+                    (SELECT c.uuid FROM targets_login_data tld JOIN credentials c ON c.id = tld.credential
+                      WHERE tld.target = t.id AND tld.type = 'krb5' LIMIT 1) AS krb5_credential_id,
+                    (SELECT c.name FROM targets_login_data tld JOIN credentials c ON c.id = tld.credential
+                      WHERE tld.target = t.id AND tld.type = 'krb5' LIMIT 1) AS krb5_credential_name,
+                    (SELECT c.type FROM targets_login_data tld JOIN credentials c ON c.id = tld.credential
+                      WHERE tld.target = t.id AND tld.type = 'krb5' LIMIT 1) AS krb5_credential_type,
+                    (SELECT NULLIF(tld.port, 0)::bigint FROM targets_login_data tld
+                      WHERE tld.target = t.id AND tld.type = 'krb5' LIMIT 1) AS krb5_credential_port,
                     coalesce(t.creation_time, 0)::bigint AS creation_time,
                     coalesce(t.modification_time, 0)::bigint AS modification_time,
                     CASE WHEN coalesce(t.hosts, '') = '' THEN 0::bigint
@@ -3405,6 +3472,73 @@ fn port_list_reference(id: Option<String>, name: Option<String>) -> Option<PortL
     Some(PortListReference { id, name })
 }
 
+fn credential_reference(
+    row: &Row,
+    id_field: &str,
+    name_field: &str,
+    type_field: &str,
+    port_field: &str,
+) -> Option<CredentialReference> {
+    let id: Option<String> = row.get(id_field);
+    id.map(|id| CredentialReference {
+        name: row
+            .get::<_, Option<String>>(name_field)
+            .unwrap_or_else(|| id.clone()),
+        credential_type: row
+            .get::<_, Option<String>>(type_field)
+            .unwrap_or_else(|| "unknown".to_string()),
+        port: row.get(port_field),
+        id,
+    })
+}
+
+fn target_credentials(row: &Row) -> TargetCredentials {
+    TargetCredentials {
+        ssh: credential_reference(
+            row,
+            "ssh_credential_id",
+            "ssh_credential_name",
+            "ssh_credential_type",
+            "ssh_credential_port",
+        ),
+        ssh_elevate: credential_reference(
+            row,
+            "ssh_elevate_credential_id",
+            "ssh_elevate_credential_name",
+            "ssh_elevate_credential_type",
+            "ssh_elevate_credential_port",
+        ),
+        smb: credential_reference(
+            row,
+            "smb_credential_id",
+            "smb_credential_name",
+            "smb_credential_type",
+            "smb_credential_port",
+        ),
+        esxi: credential_reference(
+            row,
+            "esxi_credential_id",
+            "esxi_credential_name",
+            "esxi_credential_type",
+            "esxi_credential_port",
+        ),
+        snmp: credential_reference(
+            row,
+            "snmp_credential_id",
+            "snmp_credential_name",
+            "snmp_credential_type",
+            "snmp_credential_port",
+        ),
+        krb5: credential_reference(
+            row,
+            "krb5_credential_id",
+            "krb5_credential_name",
+            "krb5_credential_type",
+            "krb5_credential_port",
+        ),
+    }
+}
+
 fn csv_values(value: &str) -> Vec<String> {
     value
         .split(',')
@@ -3457,6 +3591,7 @@ fn target_from_row(row: &Row) -> TargetItem {
         reverse_lookup_only: boolean_int(row.get("reverse_lookup_only")),
         reverse_lookup_unify: boolean_int(row.get("reverse_lookup_unify")),
         port_list: port_list_reference(row.get("port_list_id"), row.get("port_list_name")),
+        credentials: target_credentials(row),
         task_count: row.get("task_count"),
         tasks: target_task_references(row),
         creation_time: unix_ts_to_rfc3339(row.get("creation_time")),

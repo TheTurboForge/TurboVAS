@@ -91,10 +91,10 @@ high-consequence inherited control paths until separately designed and reviewed.
 ## Next Proofs
 
 After scope-report and raw-report evidence reads, scope metadata reads, and
-target/task read-summary endpoints, the next candidates are native browser reads
-for Tasks, a safe target credential-label parity decision before target browser
-migration, the Closed CVEs decision, and helper/tooling replacements that
-directly unlock migration away from GMP/XML.
+target/task read-summary endpoints, `/targets` list reads now use typed JSON
+with safe credential-reference parity. The next candidates are task browser-read
+parity, target detail migration, the Closed CVEs decision, and helper/tooling
+replacements that directly unlock migration away from GMP/XML.
 
 ## Completed Evidence Contracts
 
@@ -114,7 +114,11 @@ they are now live internal and browser-proxied endpoints:
 
 Together with Results, Hosts, Ports, CVEs, Error Messages, and Metrics, these
 endpoints complete native browser coverage for current scope-report evidence
-tabs and the high-value raw report evidence tabs. Further native API expansion
-should now decide the Closed CVEs path, then move toward remaining helper/tooling
-replacements and, later, carefully designed write/control paths that remove
-required GMP/XML, `python-gvm`, or `gvm-tools` dependence.
+tabs and the high-value raw report evidence tabs. Target list reads are also
+browser-proxied through the authenticated `gsad` same-origin boundary, including
+credential metadata that the inherited UI already displayed. Target-detail reads
+and task reads remain internal native endpoints until their browser parity gaps
+are closed. Further native API expansion should now decide the Closed CVEs path,
+then move toward remaining helper/tooling replacements and, later, carefully
+designed write/control paths that remove required GMP/XML, `python-gvm`, or
+`gvm-tools` dependence.

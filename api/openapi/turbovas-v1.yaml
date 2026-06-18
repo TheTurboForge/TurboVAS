@@ -890,9 +890,41 @@ components:
         modification_time:
           type: string
           format: date-time
+    TargetCredentialReference:
+      type: object
+      required: [id, name, credential_type]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: Credential display name; secret material is never returned.
+        credential_type:
+          type: string
+          description: Internal credential kind, such as up, usk, snmp, or krb5.
+        port:
+          type: integer
+          nullable: true
+          description: Credential-use port where relevant, currently mainly SSH.
+    TargetCredentials:
+      type: object
+      properties:
+        ssh:
+          $ref: '#/components/schemas/TargetCredentialReference'
+        ssh_elevate:
+          $ref: '#/components/schemas/TargetCredentialReference'
+        smb:
+          $ref: '#/components/schemas/TargetCredentialReference'
+        esxi:
+          $ref: '#/components/schemas/TargetCredentialReference'
+        snmp:
+          $ref: '#/components/schemas/TargetCredentialReference'
+        krb5:
+          $ref: '#/components/schemas/TargetCredentialReference'
     Target:
       type: object
-      required: [id, name, hosts, exclude_hosts, alive_tests, allow_simultaneous_ips, task_count]
+      required: [id, name, hosts, exclude_hosts, alive_tests, allow_simultaneous_ips, credentials, task_count]
       properties:
         id:
           type: string
@@ -924,6 +956,8 @@ components:
           type: boolean
         port_list:
           $ref: '#/components/schemas/ResourceReference'
+        credentials:
+          $ref: '#/components/schemas/TargetCredentials'
         task_count:
           type: integer
         tasks:

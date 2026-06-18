@@ -96,8 +96,9 @@ endpoints.
 
 Native target rows include target identity, host and exclude-host membership,
 alive-test labels, reverse-DNS flags, port-list reference, task references, and
-timestamps. They deliberately omit credential secret values and defer richer
-credential-label parity to a later safe metadata design.
+timestamps. They include safe credential metadata already visible in the
+inherited UI, such as credential UUID/name/type and SSH port, but never expose
+credential secret values.
 
 Native task rows include task identity, status/progress, target/config/scanner
 and schedule references, report counts, current/latest report references,

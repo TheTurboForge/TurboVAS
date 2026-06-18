@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import {describe, test, expect, testing} from '@gsa/testing';
+import {afterEach, describe, test, expect, testing} from '@gsa/testing';
 import {
   getSelectItemElementsForSelect,
   screen,
@@ -62,6 +62,43 @@ const target = Target.fromElement({
 const reloadInterval = -1;
 const manualUrl = 'test/';
 
+const nativeTargetPayload = {
+  page: {page: 1, page_size: 10, total: 1, sort: 'name', filter: ''},
+  items: [
+    {
+      id: '46264',
+      name: 'target 1',
+      comment: 'hello world',
+      creation_time: '2020-12-23T14:14:11Z',
+      modification_time: '2021-01-04T11:54:12Z',
+      hosts: ['127.0.0.1', '123.456.574.64'],
+      exclude_hosts: ['192.168.0.1'],
+      max_hosts: 2,
+      alive_tests: [SCAN_CONFIG_DEFAULT],
+      allow_simultaneous_ips: true,
+      reverse_lookup_only: true,
+      reverse_lookup_unify: false,
+      port_list: {id: '32323', name: 'All IANA assigned TCP'},
+      credentials: {
+        ssh: {id: '1235', name: 'ssh', credential_type: 'up', port: 22},
+        ssh_elevate: {id: '3456', name: 'ssh_elevate', credential_type: 'up'},
+      },
+      task_count: 1,
+      tasks: [{id: '465', name: 'foo'}],
+    },
+  ],
+};
+
+const mockNativeTargetFetch = () => {
+  const fetchMock = testing.fn().mockResolvedValue({
+    json: testing.fn().mockResolvedValue(nativeTargetPayload),
+    ok: true,
+    status: 200,
+  });
+  testing.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+};
+
 const createGmp = ({
   currentSettings = testing
     .fn()
@@ -98,6 +135,7 @@ const createGmp = ({
     foo: 'bar',
   }),
 } = {}) => ({
+  buildUrl: testing.fn((path: string) => `https://turbovas.example/${path}`),
   targets: {
     get: getTargets,
     deleteByFilter,
@@ -116,8 +154,13 @@ const createGmp = ({
   user: {currentSettings, getSetting},
 });
 
+afterEach(() => {
+  testing.unstubAllGlobals();
+});
+
 describe('TargetsListPage tests', () => {
   test('should render full TargetListPage', async () => {
+    mockNativeTargetFetch();
     const gmp = createGmp();
 
     const {render, store} = rendererWith({
@@ -198,6 +241,7 @@ describe('TargetsListPage tests', () => {
   });
 
   test('should allow to bulk action on page contents', async () => {
+    mockNativeTargetFetch();
     const gmp = createGmp();
 
     const {render, store} = rendererWith({
@@ -244,6 +288,7 @@ describe('TargetsListPage tests', () => {
   });
 
   test('should allow to bulk action on selected targets', async () => {
+    mockNativeTargetFetch();
     const gmp = createGmp();
 
     const {render, store} = rendererWith({
@@ -300,6 +345,7 @@ describe('TargetsListPage tests', () => {
   });
 
   test('should allow to bulk action on filtered targets', async () => {
+    mockNativeTargetFetch();
     const gmp = createGmp();
 
     const {render, store} = rendererWith({

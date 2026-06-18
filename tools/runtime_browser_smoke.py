@@ -276,6 +276,10 @@ async function runForBaseUrl(baseUrl) {
     const nativeRawReports = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/reports$/);
     add(nativeRawReports ? 'pass' : 'fail', 'raw-report.list-native-api', nativeRawReports ? 'Raw-report list loaded through same-origin native API.' : 'Raw-report list did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => item.path === '/api/v1/reports') });
 
+    await gotoRoute(page, '/targets', 'targets');
+    const nativeTargets = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/targets$/);
+    add(nativeTargets ? 'pass' : 'fail', 'target.list-native-api', nativeTargets ? 'Target list loaded through same-origin native API.' : 'Target list did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => item.path === '/api/v1/targets') });
+
     await gotoRoute(page, '/tasks', 'tasks');
     await assertNoForbiddenText(page, 'tasks', [/Resume/i, /Task Wizard/i, /Advanced Task Wizard/i, /Import Task/i, /Delta Report/i]);
 
