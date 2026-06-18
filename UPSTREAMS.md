@@ -22,6 +22,12 @@ boundaries. This is intended to avoid tying reports directly to technical target
 definitions when one operational population needs several targets because of
 network boundaries, credentials, scan constraints, or scanner reachability.
 
+TurboVAS also intentionally limits feed synchronization to the Greenbone
+Community Feed. It does not support Greenbone Enterprise Feed subscription keys
+or Enterprise Feed synchronization. Feed content is runtime state, not source
+code, and must not be bundled, mirrored, packaged, or redistributed without a
+separate feed-terms review.
+
 See `docs/SCOPE_BASED_REPORTING.md` for the public model.
 
 ## Imported Components

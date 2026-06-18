@@ -12,6 +12,18 @@ TurboVAS is not affiliated with, sponsored by, or endorsed by Greenbone AG. For
 official Greenbone/OpenVAS vulnerability-management products, support, or
 services, contact Greenbone directly at https://www.greenbone.net/.
 
+## Feed Model
+
+TurboVAS supports the Greenbone Community Feed only. It does not support
+Greenbone Enterprise Feed subscription keys or Enterprise Feed synchronization.
+Organizations that need Greenbone Enterprise Feed access, official Greenbone
+products, support, or services should contact Greenbone directly.
+
+Feed data is treated as runtime state, not source code. Development feed caches
+and runtime feed copies stay local and untracked. TurboVAS must not bundle,
+package, mirror, or redistribute feed content without a separate feed-terms
+review.
+
 ## Reporting Model
 
 Inherited OpenVAS behavior makes raw task reports the primary reporting surface.
