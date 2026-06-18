@@ -4,7 +4,7 @@
  */
 
 import {afterEach, describe, expect, test, testing} from '@gsa/testing';
-import {fetchNativeTasks} from 'gmp/native-api/tasks';
+import {fetchNativeTask, fetchNativeTasks} from 'gmp/native-api/tasks';
 
 const createGmp = ({jwt, token = 'test-token'}: {jwt?: string; token?: string} = {}) => ({
   buildUrl: testing.fn((path: string) => `https://turbovas.example/${path}`),
@@ -83,6 +83,50 @@ describe('native API task list', () => {
     });
     expect(fetchMock).toHaveBeenCalledWith(
       'https://turbovas.example/api/v1/tasks',
+      {
+        credentials: 'include',
+        headers: {
+          Accept: 'application/json',
+          Authorization: 'Bearer jwt-token',
+        },
+      },
+    );
+  });
+
+  test('fetches one task from the native detail endpoint', async () => {
+    const fetchMock = testing.fn().mockResolvedValue({
+      json: testing.fn().mockResolvedValue({
+        id: 'task-1',
+        name: 'Full and fast',
+        comment: 'authorized LAN scan',
+        status: 'Done',
+        progress: 100,
+        trend: '',
+        usage_type: 'scan',
+        target: {id: 'target-1', name: 'LAN target'},
+        config: {id: 'config-1', name: 'Full and fast'},
+        scanner: {id: 'scanner-1', name: 'Default scanner'},
+        scanner_type: 2,
+        report_count: {total: 1, finished: 1},
+        last_report: {id: 'report-1', severity: 7.5},
+      }),
+      ok: true,
+      status: 200,
+    });
+    testing.stubGlobal('fetch', fetchMock);
+    const gmp = createGmp({jwt: 'jwt-token'});
+
+    const response = await fetchNativeTask(gmp, 'task-1');
+
+    expect(response.task.id).toEqual('task-1');
+    expect(response.task.name).toEqual('Full and fast');
+    expect(response.task.report_count?.total).toEqual(1);
+    expect(response.task.scanner?.scannerType).toEqual('2');
+    expect(gmp.buildUrl).toHaveBeenCalledWith('api/v1/tasks/task-1', {
+      token: 'test-token',
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://turbovas.example/api/v1/tasks/task-1',
       {
         credentials: 'include',
         headers: {

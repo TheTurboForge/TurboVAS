@@ -6,6 +6,7 @@
 
 import {createAll} from 'web/store/entities/utils/main';
 import {
+  fetchNativeTarget,
   fetchNativeTargets,
   nativeTargetQueryFromFilter,
 } from 'gmp/native-api/targets';
@@ -50,10 +51,30 @@ const nativeLoadEntities = gmp => filter => (dispatch, getState) => {
   );
 };
 
+const nativeLoadEntity = gmp => id => (dispatch, getState) => {
+  if (!canUseNativeApi(gmp)) {
+    return loadEntity(gmp)(id)(dispatch, getState);
+  }
+
+  const rootState = getState();
+  const state = selector(rootState);
+
+  if (state.isLoadingEntity(id)) {
+    return Promise.resolve();
+  }
+
+  dispatch(entityLoadingActions.request(id));
+
+  return fetchNativeTarget(gmp, id).then(
+    response => dispatch(entityLoadingActions.success(id, response.target)),
+    error => dispatch(entityLoadingActions.error(id, error)),
+  );
+};
+
 export {
   loadAllEntities,
   nativeLoadEntities as loadEntities,
-  loadEntity,
+  nativeLoadEntity as loadEntity,
   reducer,
   selector,
   entitiesLoadingActions,

@@ -82,6 +82,10 @@ export interface NativeTargetsResponse {
   page: NativeTargetPage;
 }
 
+export interface NativeTargetResponse {
+  target: Target;
+}
+
 const TARGET_SORT_FIELDS: Record<string, string> = {
   created: 'creation_time',
   creation_time: 'creation_time',
@@ -261,4 +265,16 @@ export const fetchNativeTargets = async (
     counts: nativeCounts(page, targets.length),
     page,
   };
+};
+
+export const fetchNativeTarget = async (
+  gmp: NativeApiGmp,
+  id: string,
+): Promise<NativeTargetResponse> => {
+  const payload = await fetchNativeJson<NativeTargetItem>(
+    gmp,
+    `api/v1/targets/${encodeURIComponent(id)}`,
+    {token: gmp.session.token},
+  );
+  return {target: nativeTargetToModel(payload)};
 };

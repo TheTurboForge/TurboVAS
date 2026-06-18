@@ -83,6 +83,10 @@ export interface NativeTasksResponse {
   page: NativeTaskPage;
 }
 
+export interface NativeTaskResponse {
+  task: Task;
+}
+
 const TASK_SORT_FIELDS: Record<string, string> = {
   config: 'config',
   created: 'creation_time',
@@ -277,4 +281,16 @@ export const fetchNativeTasks = async (
     counts: nativeCounts(page, tasks.length),
     page,
   };
+};
+
+export const fetchNativeTask = async (
+  gmp: NativeApiGmp,
+  id: string,
+): Promise<NativeTaskResponse> => {
+  const payload = await fetchNativeJson<NativeTaskItem>(
+    gmp,
+    `api/v1/tasks/${encodeURIComponent(id)}`,
+    {token: gmp.session.token},
+  );
+  return {task: nativeTaskToModel(payload)};
 };

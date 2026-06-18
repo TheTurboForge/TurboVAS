@@ -243,6 +243,16 @@ async function waitForNativeApiResponse(page, responses, matcher) {
   return null;
 }
 
+async function waitForNativeItemId(page, responses, path) {
+  const deadline = Date.now() + config.timeoutMs;
+  while (Date.now() < deadline) {
+    const match = responses.find(item => item.path === path && Array.isArray(item.itemIds) && item.itemIds.length > 0);
+    if (match) return match.itemIds[0];
+    await page.waitForTimeout(250);
+  }
+  return null;
+}
+
 async function assertNoPerSourceEvidenceSections(page, check) {
   const text = await bodyText(page);
   const found = /Evidence Source:/i.test(text);
@@ -260,7 +270,15 @@ async function runForBaseUrl(baseUrl) {
     try {
       const url = new URL(response.url());
       if (url.pathname.startsWith('/api/v1/')) {
-        nativeApiResponses.push({ path: url.pathname, status: response.status() });
+        const entry = { path: url.pathname, status: response.status() };
+        nativeApiResponses.push(entry);
+        if (url.pathname === '/api/v1/targets' || url.pathname === '/api/v1/tasks') {
+          response.json().then(body => {
+            entry.itemIds = Array.isArray(body?.items)
+              ? body.items.map(item => item?.id).filter(Boolean)
+              : [];
+          }).catch(() => null);
+        }
       }
     } catch (_) {
       // Ignore non-URL browser-internal responses.
@@ -279,11 +297,27 @@ async function runForBaseUrl(baseUrl) {
     await gotoRoute(page, '/targets', 'targets');
     const nativeTargets = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/targets$/);
     add(nativeTargets ? 'pass' : 'fail', 'target.list-native-api', nativeTargets ? 'Target list loaded through same-origin native API.' : 'Target list did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => item.path === '/api/v1/targets') });
+    const targetDetailId = await waitForNativeItemId(page, nativeApiResponses, '/api/v1/targets');
+    add(targetDetailId ? 'pass' : 'warn', 'target.detail-id', targetDetailId ? 'Found a target id from the native list response.' : 'No target id was available from the native list response.', { id: targetDetailId });
+    if (targetDetailId) {
+      await gotoRoute(page, `/target/${targetDetailId}`, 'target-detail');
+      await assertNoAppError(page, 'target-detail.app-error');
+      const nativeTargetDetail = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/targets\/[^/]+$/);
+      add(nativeTargetDetail ? 'pass' : 'fail', 'target.detail-native-api', nativeTargetDetail ? 'Target detail loaded through same-origin native API.' : 'Target detail did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => /\/api\/v1\/targets\/[^/]+$/.test(item.path)) });
+    }
 
     await gotoRoute(page, '/tasks', 'tasks');
     await assertNoForbiddenText(page, 'tasks', [/Resume/i, /Task Wizard/i, /Advanced Task Wizard/i, /Import Task/i, /Delta Report/i]);
     const nativeTasks = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/tasks$/);
     add(nativeTasks ? 'pass' : 'fail', 'task.list-native-api', nativeTasks ? 'Task list loaded through same-origin native API.' : 'Task list did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => item.path === '/api/v1/tasks') });
+    const taskDetailId = await waitForNativeItemId(page, nativeApiResponses, '/api/v1/tasks');
+    add(taskDetailId ? 'pass' : 'warn', 'task.detail-id', taskDetailId ? 'Found a task id from the native list response.' : 'No task id was available from the native list response.', { id: taskDetailId });
+    if (taskDetailId) {
+      await gotoRoute(page, `/task/${taskDetailId}`, 'task-detail');
+      await assertNoAppError(page, 'task-detail.app-error');
+      const nativeTaskDetail = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/tasks\/[^/]+$/);
+      add(nativeTaskDetail ? 'pass' : 'fail', 'task.detail-native-api', nativeTaskDetail ? 'Task detail loaded through same-origin native API.' : 'Task detail did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => /\/api\/v1\/tasks\/[^/]+$/.test(item.path)) });
+    }
 
     await gotoRoute(page, '/scopes', 'scopes');
     const nativeScopes = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/scopes$/);

@@ -4,7 +4,7 @@
  */
 
 import {afterEach, describe, expect, test, testing} from '@gsa/testing';
-import {fetchNativeTargets} from 'gmp/native-api/targets';
+import {fetchNativeTarget, fetchNativeTargets} from 'gmp/native-api/targets';
 
 const createGmp = ({jwt, token = 'test-token'}: {jwt?: string; token?: string} = {}) => ({
   buildUrl: testing.fn((path: string) => `https://turbovas.example/${path}`),
@@ -85,6 +85,49 @@ describe('native API target list', () => {
     });
     expect(fetchMock).toHaveBeenCalledWith(
       'https://turbovas.example/api/v1/targets',
+      {
+        credentials: 'include',
+        headers: {
+          Accept: 'application/json',
+          Authorization: 'Bearer jwt-token',
+        },
+      },
+    );
+  });
+
+  test('fetches one target from the native detail endpoint', async () => {
+    const fetchMock = testing.fn().mockResolvedValue({
+      json: testing.fn().mockResolvedValue({
+        id: 'target-1',
+        name: 'metasploitable',
+        comment: 'detail target',
+        hosts: ['192.168.178.50'],
+        exclude_hosts: [],
+        max_hosts: 1,
+        alive_tests: ['Scan Config Default'],
+        allow_simultaneous_ips: true,
+        reverse_lookup_only: false,
+        reverse_lookup_unify: false,
+        port_list: {id: 'port-list-1', name: 'All IANA assigned TCP'},
+        credentials: {},
+        tasks: [{id: 'task-1', name: 'Full and fast'}],
+      }),
+      ok: true,
+      status: 200,
+    });
+    testing.stubGlobal('fetch', fetchMock);
+    const gmp = createGmp({jwt: 'jwt-token'});
+
+    const response = await fetchNativeTarget(gmp, 'target-1');
+
+    expect(response.target.id).toEqual('target-1');
+    expect(response.target.name).toEqual('metasploitable');
+    expect(response.target.tasks?.[0].id).toEqual('task-1');
+    expect(gmp.buildUrl).toHaveBeenCalledWith('api/v1/targets/target-1', {
+      token: 'test-token',
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://turbovas.example/api/v1/targets/target-1',
       {
         credentials: 'include',
         headers: {
