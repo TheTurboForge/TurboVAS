@@ -60,7 +60,7 @@ TurboVAS provides a small root command surface for repository health checks:
 - `just native-tooling-state`: inventory inherited GMP, `python-gvm`, and `gvm-tools` dependency surfaces for native API retirement.
 - `just rust-migration-state`: inspect Rust/C migration tools and the first non-production C-to-Rust dry-run candidate.
 - `just doctor`: run structural and environment readiness checks.
-- `just branding-state`: inventory visible TurboVAS/upstream identity and branding residue.
+- `just branding-state`: inventory visible TurboVAS/upstream identity and branding residue, including public image assets and SVG icon files.
 - `just quality-gate`: run the local source quality gate.
 - `just quality-gate-state`: show the latest quality-gate result and retained history.
 - `just quality-gate-schedule`: install, inspect, or disable the server-side development quality-gate timer.

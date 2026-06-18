@@ -279,6 +279,16 @@ REDIS_REFERENCE_ROOTS = (
 )
 REDIS_REFERENCE_FILES = {"README.md", "justfile"}
 BRANDING_MARKERS = ("OpenVAS", "OPENVAS", "Greenbone", "greenbone", "GSA")
+BRANDING_PATH_MARKERS = (
+    "OpenVAS",
+    "openvas",
+    "OPENVAS",
+    "Greenbone",
+    "greenbone",
+    "GSA",
+    "gsa",
+    "Enterprise_",
+)
 BRANDING_LOCALE_TECHNICAL_PHRASES = frozenset(
     {
         "Default OpenVAS Scan Config",
@@ -298,7 +308,11 @@ BRANDING_SCAN_FILES = {
     "components/gsa/package.json",
     "components/gsa/public/locales/gsa-en.json",
 }
-BRANDING_SCAN_PREFIXES = ("docs/", "components/gsa/public/img/")
+BRANDING_SCAN_PREFIXES = (
+    "docs/",
+    "components/gsa/public/img/",
+    "components/gsa/src/web/components/icon/svg/",
+)
 BRANDING_PROVENANCE_FILES = {
     "README.md",
     "UPSTREAMS.md",
@@ -3073,12 +3087,15 @@ def branding_scan_candidate(relative_path: str) -> bool:
     return relative_path in BRANDING_SCAN_FILES or any(relative_path.startswith(prefix) for prefix in BRANDING_SCAN_PREFIXES)
 
 
-def branding_markers(path: Path) -> list[str]:
+def branding_markers(path: Path, relative_path: str = "") -> list[str]:
+    filename = relative_path.rsplit("/", 1)[-1]
+    markers = {marker for marker in BRANDING_PATH_MARKERS if marker in filename}
     try:
         text = path.read_text(encoding="utf-8", errors="ignore")
     except OSError:
-        return []
-    return [marker for marker in BRANDING_MARKERS if marker in text]
+        return sorted(markers)
+    markers.update(marker for marker in BRANDING_MARKERS if marker in text)
+    return sorted(markers)
 
 
 def branding_locale_line_category(line: str) -> str:
@@ -3117,6 +3134,8 @@ def branding_category(relative_path: str) -> str:
         return "technical_doc_context"
     if relative_path.startswith("components/gsa/public/img/os_"):
         return "technical_doc_context"
+    if relative_path.startswith("components/gsa/src/web/components/icon/svg/"):
+        return "active_product_surface"
     if relative_path.startswith("components/gsa/public/") or relative_path in {"components/gsa/index.html", "components/gsa/package.json"}:
         return "active_product_surface"
     return "unknown"
@@ -3140,7 +3159,7 @@ def branding_inventory(repo_root: Path) -> list[dict[str, Any]]:
         if relative_path == "components/gsa/public/locales/gsa-en.json":
             items.extend(branding_locale_items(path, relative_path))
             continue
-        markers = branding_markers(path)
+        markers = branding_markers(path, relative_path)
         if not markers:
             continue
         items.append({"path": relative_path, "category": branding_item_category(relative_path, markers), "markers": markers})

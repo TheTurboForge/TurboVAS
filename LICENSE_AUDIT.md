@@ -53,6 +53,10 @@ artifacts that include the service.
 - Mark ambiguous cases for human/legal review before public release or distribution.
 - Run `just license-report` during license-sensitive work. The report checks expected component license files, TurboVAS modification notices on modified imported source files, SPDX headers on new TurboVAS-created files, explicit handling for modified imported files that cannot carry comments, accidental tracking of runtime feed/cache content, and public-release review gate state.
 - Run `just license-public-release-gate` before any public repository, release artifact, publication, packaging, or distribution step. The gate fails until public-release license review items are closed.
+- Run `just branding-state` before public visibility changes. Branding review
+  includes text, locale strings, public image assets, SVG icon files, favicons,
+  banners, splash images, screenshots, and other visual files that can carry
+  inherited OpenVAS, Greenbone, GSA, Enterprise, or misleading product identity.
 
 ## Modification Notice Policy
 

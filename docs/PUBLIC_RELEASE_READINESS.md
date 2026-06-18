@@ -14,6 +14,9 @@ project until the release-readiness gate is explicitly satisfied.
 - Greenbone non-affiliation wording is present in public-facing entry points.
 - Greenbone trademark/non-affiliation wording and residual OpenVAS/Greenbone
   branding have been reviewed for public presentation.
+- Image assets, icons, favicons, banners, splash images, screenshots, and other
+  binary or SVG visual files have been reviewed for inherited OpenVAS,
+  Greenbone, GSA, Enterprise, or other misleading product identity.
 - TurboVAS is clearly documented as Greenbone Community Feed-only; Greenbone
   Enterprise Feed subscription-key support is absent from live feed-sync source
   and public docs.

@@ -918,8 +918,13 @@ db2:keys=5,expires=0,avg_ttl=0
         ]
         self.assertIn(result["status"], {"pass", "warn"})
         self.assertGreater(details["by_category"]["provenance_or_non_affiliation"]["count"], 0)
+        active_paths = details["by_category"]["active_product_surface"]["paths"]
         self.assertIn("README.md", details["by_category"]["provenance_or_non_affiliation"]["paths"])
-        self.assertIn("components/gsa/public/locales/gsa-en.json", details["by_category"]["active_product_surface"]["paths"])
+        self.assertIn("components/gsa/public/locales/gsa-en.json", active_paths)
+        self.assertIn("components/gsa/public/img/greenbone_banner.png", active_paths)
+        self.assertIn("components/gsa/public/img/openvasHorizontal.svg", active_paths)
+        self.assertIn("components/gsa/src/web/components/icon/svg/Greenbone_white_logo.svg", active_paths)
+        self.assertIn("components/gsa/src/web/components/icon/svg/Enterprise_150.svg", active_paths)
         self.assertTrue(any("Greenbone Enterprise License" in item["text"] for item in active_locale_items))
         self.assertTrue(any("OpenVAS Scanner" in item["text"] for item in technical_locale_items))
         self.assertNotIn("components/gsa/package.json", details["by_category"]["active_product_surface"]["paths"])
@@ -931,6 +936,7 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertEqual(turbovasctl.branding_category("docs/ARCHITECTURE_FLOWS.md"), "technical_doc_context")
         self.assertEqual(turbovasctl.branding_category("components/gsa/public/locales/gsa-en.json"), "active_product_surface")
         self.assertEqual(turbovasctl.branding_category("components/gsa/public/img/os_ipfire.svg"), "technical_doc_context")
+        self.assertEqual(turbovasctl.branding_category("components/gsa/src/web/components/icon/svg/Greenbone_white_logo.svg"), "active_product_surface")
         self.assertEqual(turbovasctl.branding_item_category("components/gsa/package.json", ["greenbone"]), "technical_doc_context")
         self.assertEqual(turbovasctl.branding_locale_line_category('"OpenVAS Scanner": "OpenVAS Scanner",'), "technical_doc_context")
         self.assertEqual(turbovasctl.branding_locale_line_category('"Your Greenbone Enterprise License is invalid!": "Your Greenbone Enterprise License is invalid!",'), "active_product_surface")
