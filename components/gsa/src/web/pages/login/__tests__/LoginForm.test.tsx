@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -29,6 +30,29 @@ describe('LoginForm tests', () => {
 
     expect(screen.getByName('username')).toBeInTheDocument();
     expect(screen.getByName('password')).toBeInTheDocument();
+  });
+
+  test('should display non-affiliation notice', () => {
+    const handleSubmit = testing.fn();
+    const handleClick = testing.fn();
+
+    const {render} = rendererWith({gmp});
+
+    render(
+      <LoginForm onGuestLoginClick={handleClick} onSubmit={handleSubmit} />,
+    );
+
+    const notice = screen.getByTestId('non-affiliation-notice');
+    expect(notice).toHaveTextContent(
+      'Independent project. Not affiliated with Greenbone AG.',
+    );
+    expect(notice).toHaveTextContent(
+      'For official Greenbone products and services, visit greenbone.net.',
+    );
+    expect(screen.getByText('greenbone.net')).toHaveAttribute(
+      'href',
+      'https://www.greenbone.net/',
+    );
   });
 
   test('should display error', () => {

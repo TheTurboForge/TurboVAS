@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -71,6 +72,18 @@ const ProductImageContainer = styled(Layout)`
   margin-top: 30px;
 `;
 
+const NonAffiliationNotice = styled.div`
+  color: ${Theme.darkGray};
+  font-size: 0.8rem;
+  line-height: 1.35;
+  margin: 0.25rem 0 1rem;
+  text-align: center;
+
+  p {
+    margin: 0.15rem 0;
+  }
+`;
+
 const LoginForm = ({
   error,
   showGuestLogin = false,
@@ -103,6 +116,21 @@ const LoginForm = ({
         <Layout align="center">
           <LoginLogo />
         </Layout>
+
+        <NonAffiliationNotice data-testid="non-affiliation-notice">
+          <p>{_('Independent project. Not affiliated with Greenbone AG.')}</p>
+          <p>
+            {_('For official Greenbone products and services, visit ')}
+            <a
+              href="https://www.greenbone.net/"
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              {_('greenbone.net')}
+            </a>
+            .
+          </p>
+        </NonAffiliationNotice>
 
         <Layout flex="column">
           {showProtocolInsecure && (

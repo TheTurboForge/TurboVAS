@@ -12,6 +12,13 @@ TurboVAS is not affiliated with, sponsored by, or endorsed by Greenbone AG. For
 official Greenbone/OpenVAS vulnerability-management products, support, or
 services, contact Greenbone directly at https://www.greenbone.net/.
 
+## Visual Identity
+
+TurboVAS uses an independent visual identity to avoid confusion with upstream
+Greenbone/OpenVAS projects while preserving factual upstream provenance.
+TurboVAS branding should be performance-oriented, operator-focused, readable,
+accessible, and clearly separate from upstream product branding.
+
 ## Feed Model
 
 TurboVAS supports the Greenbone Community Feed only. It does not support
