@@ -115,7 +115,7 @@ const TaskRow = ({
               scanner.scannerType === GREENBONE_SENSOR_SCANNER_TYPE && (
                 <SensorIcon
                   size="small"
-                  title={_('Task is configured to run on sensor {{name}}', {
+                  title={_('Task is configured to run on remote scanner {{name}}', {
                     name: scanner.name as string,
                   })}
                 />

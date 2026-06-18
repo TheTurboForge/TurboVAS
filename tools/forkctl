@@ -1,8 +1,0 @@
-#!/usr/bin/env sh
-# SPDX-FileCopyrightText: 2026 TurboVAS contributors
-# SPDX-License-Identifier: GPL-3.0-or-later
-
-set -eu
-
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-exec "$SCRIPT_DIR/turbovasctl" "$@"

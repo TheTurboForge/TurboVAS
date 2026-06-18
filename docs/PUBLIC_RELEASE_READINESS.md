@@ -3,12 +3,31 @@
 
 # Public Release Readiness Checklist
 
-TurboVAS must not be published, packaged, distributed, or promoted as a public
-project until the release-readiness gate is explicitly satisfied.
+TurboVAS uses mode-specific publication gates. Public source visibility is a
+narrower mode than publishing packages, containers, hosted services, feed
+mirrors, feed bundles, or feed-derived data.
+
+For source repository visibility, run:
+
+```sh
+just license-public-release-gate --json --mode source-public
+```
+
+For later release modes, use the stricter mode-specific gates:
+
+```sh
+just license-public-release-gate --json --mode binary
+just license-public-release-gate --json --mode container
+just license-public-release-gate --json --mode hosted
+just license-public-release-gate --json --mode feed-redistribution
+```
+
+The stricter modes remain blocked until their own source-offer, packaging,
+runtime, security, and feed-term procedures are complete.
 
 ## Required Before Public Release
 
-- `just license-public-release-gate` passes.
+- `just license-public-release-gate --mode source-public` passes.
 - Upstream provenance in `UPSTREAMS.md` is current.
 - `LICENSE_AUDIT.md` has no unresolved publication blockers.
 - Greenbone non-affiliation wording is present in public-facing entry points.
@@ -34,5 +53,6 @@ project until the release-readiness gate is explicitly satisfied.
 ## Not Sufficient
 
 The routine engineering gate `just license-report --json` is necessary during
-development, but it is not sufficient for public release. Publication requires
-the stricter public-release gate and human review of legal/provenance decisions.
+development, but it is not sufficient for any publication mode. Publication
+requires the relevant mode-specific gate and human review of unresolved
+legal/provenance decisions.

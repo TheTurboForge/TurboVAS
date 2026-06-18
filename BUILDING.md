@@ -56,9 +56,6 @@ tools/turbovasctl rust-migration-state --json
 tools/turbovasctl runtime-native-api-smoke --json
 ```
 
-`tools/forkctl` remains as a temporary compatibility wrapper during the command
-rename.
-
 ## Quality Gates
 
 `just quality-gate` and `tools/turbovasctl quality-gate --json` are the local

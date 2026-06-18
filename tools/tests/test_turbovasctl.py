@@ -817,7 +817,7 @@ class TurboVASCtlTests(unittest.TestCase):
 
     def test_native_tooling_category_keeps_scripts_and_docs_distinct(self):
         self.assertEqual(turbovasctl.native_tooling_category("tools/runtime_scope.py")[0], "required_runtime")
-        self.assertEqual(turbovasctl.native_tooling_category("tools/tests/test_forkctl.py")[0], "required_test")
+        self.assertEqual(turbovasctl.native_tooling_category("tools/tests/test_turbovasctl.py")[0], "required_test")
         self.assertEqual(turbovasctl.native_tooling_category("components/gsa/src/gmp/commands/scopes.ts")[0], "product_workflow")
         self.assertEqual(turbovasctl.native_tooling_category("components/gvm-tools/scripts/list-scopes.gmp.py")[0], "product_workflow")
         self.assertEqual(turbovasctl.native_tooling_category("components/gvm-tools/scripts/empty-trash.gmp.py")[0], "candidate_for_removal")
@@ -920,12 +920,8 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertGreater(details["by_category"]["provenance_or_non_affiliation"]["count"], 0)
         active_paths = details["by_category"]["active_product_surface"]["paths"]
         self.assertIn("README.md", details["by_category"]["provenance_or_non_affiliation"]["paths"])
-        self.assertIn("components/gsa/public/locales/gsa-en.json", active_paths)
-        self.assertIn("components/gsa/public/img/greenbone_banner.png", active_paths)
-        self.assertIn("components/gsa/public/img/openvasHorizontal.svg", active_paths)
-        self.assertIn("components/gsa/src/web/components/icon/svg/Greenbone_white_logo.svg", active_paths)
-        self.assertIn("components/gsa/src/web/components/icon/svg/Enterprise_150.svg", active_paths)
-        self.assertTrue(any("Greenbone Enterprise License" in item["text"] for item in active_locale_items))
+        self.assertEqual(active_paths, [])
+        self.assertEqual(active_locale_items, [])
         self.assertTrue(any("OpenVAS Scanner" in item["text"] for item in technical_locale_items))
         self.assertNotIn("components/gsa/package.json", details["by_category"]["active_product_surface"]["paths"])
         self.assertIn("components/gsa/package.json", details["by_category"]["technical_doc_context"]["paths"])
@@ -936,10 +932,11 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertEqual(turbovasctl.branding_category("docs/ARCHITECTURE_FLOWS.md"), "technical_doc_context")
         self.assertEqual(turbovasctl.branding_category("components/gsa/public/locales/gsa-en.json"), "active_product_surface")
         self.assertEqual(turbovasctl.branding_category("components/gsa/public/img/os_ipfire.svg"), "technical_doc_context")
-        self.assertEqual(turbovasctl.branding_category("components/gsa/src/web/components/icon/svg/Greenbone_white_logo.svg"), "active_product_surface")
+        self.assertEqual(turbovasctl.branding_category("components/gsa/src/web/components/icon/svg/deleted_legacy_logo.svg"), "active_product_surface")
         self.assertEqual(turbovasctl.branding_item_category("components/gsa/package.json", ["greenbone"]), "technical_doc_context")
         self.assertEqual(turbovasctl.branding_locale_line_category('"OpenVAS Scanner": "OpenVAS Scanner",'), "technical_doc_context")
-        self.assertEqual(turbovasctl.branding_locale_line_category('"Your Greenbone Enterprise License is invalid!": "Your Greenbone Enterprise License is invalid!",'), "active_product_surface")
+        self.assertEqual(turbovasctl.branding_locale_line_category('"Greenbone": "Greenbone",'), "technical_doc_context")
+        self.assertEqual(turbovasctl.branding_locale_line_category('"Greenbone Product": "Greenbone Product",'), "active_product_surface")
 
     def test_retained_json_artifacts_write_latest_history_and_prune(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1070,6 +1067,8 @@ db2:keys=5,expires=0,avg_ttl=0
             "push:",
             "pull_request:",
             "workflow_dispatch:",
+            "permissions:",
+            "contents: read",
             "actions/checkout@v5",
             "actions/setup-python@v6",
             "actions/setup-node@v5",
@@ -1092,6 +1091,7 @@ db2:keys=5,expires=0,avg_ttl=0
             "feed-copy-to-runtime",
             "docker compose up",
             "license-public-release-gate",
+            "pull_request_target",
         ]
         for needle in forbidden:
             self.assertNotIn(needle, text)
@@ -1307,7 +1307,8 @@ db2:keys=5,expires=0,avg_ttl=0
 
     def test_public_readiness_gate_is_explicit(self):
         self.assertEqual(turbovasctl.public_readiness_finding()["status"], "pass")
-        self.assertEqual(turbovasctl.public_readiness_finding(public_release=True)["status"], "fail")
+        self.assertEqual(turbovasctl.public_readiness_finding(public_release=True, mode="source-public")["status"], "pass")
+        self.assertEqual(turbovasctl.public_readiness_finding(public_release=True, mode="binary")["status"], "fail")
         self.assertIn("Greenbone non-affiliation", "\n".join(turbovasctl.PUBLIC_READINESS_LICENSE_ITEMS))
 
     def test_production_posture_tracks_password_rotation_gap(self):

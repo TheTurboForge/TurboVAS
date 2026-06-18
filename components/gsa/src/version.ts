@@ -4,16 +4,12 @@
  */
 
 const getMajorMinorVersion = () => {
-  let [major, minor] = VERSION.split('.');
+  const [major, minor] = VERSION.split('.');
   const minorVersion = parseInt(minor);
-  if (minorVersion < 10) {
-    // add a leading zero for the links
-    minor = `0${minorVersion}`;
-  }
-  return `${major}.${minor}`;
+  return `${major}.${minorVersion}`;
 };
 
-export const VERSION = '27.2.1-dev1';
+export const VERSION = '0.1.0-alpha.0';
 
 export const RELEASE_VERSION = getMajorMinorVersion();
 

@@ -9,10 +9,12 @@ The import preserves upstream component boundaries under `components/`. Upstream
 
 TurboVAS is an independent project and is not affiliated with, sponsored by, or endorsed by Greenbone AG. Greenbone/OpenVAS component references in this audit are provenance records and do not imply Greenbone approval or support for TurboVAS.
 
-Original TurboVAS-created root tooling and public documentation use `GPL-3.0-or-later` as the provisional project default unless a more specific compatible license is selected for a component-local file.
+Original TurboVAS-created root tooling and public documentation use
+`GPL-3.0-or-later` as the project default unless a more specific compatible
+license is selected for a component-local file.
 
 TurboVAS-created service code outside imported upstream component trees, including
-`services/turbovas-api`, currently follows this provisional `GPL-3.0-or-later`
+`services/turbovas-api`, follows this `GPL-3.0-or-later`
 default. Third-party Rust crate dependencies recorded in
 `services/turbovas-api/Cargo.lock` are external package dependencies, not
 vendored source. Keep the lockfile tracked for reproducibility and run the
@@ -31,7 +33,7 @@ artifacts that include the service.
 | gsa | `components/gsa` | AGPL-3.0-or-later. | `LICENSE`, `package.json` license declaration | Web UI served over a network. AGPL obligations matter for deployment and public access scenarios. |
 | ospd-openvas | `components/ospd-openvas` | AGPL-3.0-or-later. | `COPYING` | Includes its own `ospd` package. Preserve service/config documentation. |
 | notus-scanner | `components/notus-scanner` | AGPL-3.0-or-later. | `LICENSE`, `pyproject.toml` license declaration | Scanner service with feed and MQTT integration implications. |
-| openvas-smb | `components/openvas-smb` | GPL-2.0-or-later. | `COPYING` | README notes Samba-derived/forked GPLv2 basis. Requires deeper provenance review before public release or distribution. |
+| openvas-smb | `components/openvas-smb` | GPL-2.0-or-later. | `COPYING`, `README.md`, `samba/README` | README records the Zenoss `wmi-1.3.14` origin and Samba-derived GPLv2 basis; `samba/README` records the stripped-down and modified Samba 4 library origin. Preserve these provenance notes. |
 | greenbone-feed-sync | `components/greenbone-feed-sync` | GPL-3.0-or-later. | `LICENSE`, `pyproject.toml` license declaration | Source license does not determine Greenbone Community Feed data terms. Treat feed data/signature/use terms separately. |
 | python-gvm | `components/python-gvm` | GPL-3.0-or-later. | `LICENSE`, `pyproject.toml` license declaration | Protocol library for GMP and OSP. |
 | gvm-tools | `components/gvm-tools` | GPL-3.0-or-later. | `LICENSE`, `pyproject.toml` license declaration | Depends on `python-gvm`; useful for CLI/operator tooling and smoke tests. |
@@ -52,7 +54,13 @@ artifacts that include the service.
   product/legal decision.
 - Mark ambiguous cases for human/legal review before public release or distribution.
 - Run `just license-report` during license-sensitive work. The report checks expected component license files, TurboVAS modification notices on modified imported source files, SPDX headers on new TurboVAS-created files, explicit handling for modified imported files that cannot carry comments, accidental tracking of runtime feed/cache content, and public-release review gate state.
-- Run `just license-public-release-gate` before any public repository, release artifact, publication, packaging, or distribution step. The gate fails until public-release license review items are closed.
+- Run `just license-public-release-gate --mode source-public` before changing
+  repository visibility for public source read access. This mode is limited to
+  source visibility and does not authorize binaries, containers, hosted
+  service operation, feed mirroring, feed bundling, or feed redistribution.
+- Run `just license-public-release-gate --mode binary`, `--mode container`,
+  `--mode hosted`, or `--mode feed-redistribution` before those stricter modes;
+  they remain blocked until their own procedures and reviews are complete.
 - Run `just branding-state` before public visibility changes. Branding review
   includes text, locale strings, public image assets, SVG icon files, favicons,
   banners, splash images, screenshots, and other visual files that can carry
@@ -79,8 +87,44 @@ New TurboVAS-created files should include an SPDX license identifier and copyrig
 notice. Prefer the license already governing the component or subdirectory where
 the file lives. If the governing license is unclear, especially in mixed-license
 areas such as `components/openvas-scanner`, stop and review before adding the file.
-Root-level TurboVAS-only tooling and public documentation currently use
-`GPL-3.0-or-later` as the provisional default.
+Root-level TurboVAS-only tooling, public documentation, and TurboVAS-owned
+service code outside imported component trees use `GPL-3.0-or-later` as the
+default.
+
+## Source-Public Boundary
+
+Making this repository source-readable gives readers access to the current
+TurboVAS source tree and preserved upstream component provenance. It is not a
+binary release, container release, hosted service, feed mirror, feed bundle, or
+feed-derived data publication.
+
+The source tree includes AGPL-covered network-service components such as `gvmd`,
+`gsad`, `gsa`, `ospd-openvas`, and `notus-scanner`. Source-public visibility of
+this repository satisfies the project's source-read transparency goal for the
+current code. Any later hosted TurboVAS service must separately provide the
+corresponding source for the exact deployed version and any deployment-side
+modifications required by AGPL-covered components.
+
+The development feed cache and runtime feed copy are intentionally outside the
+repository. TurboVAS source-public visibility does not grant permission to
+mirror, bundle, package, redistribute, or publish Greenbone Community Feed
+content.
+
+## openvas-smb Provenance
+
+`components/openvas-smb` preserves upstream provenance files relevant for public
+source visibility:
+
+- `COPYING` contains GPLv2 text.
+- `README.md` states that the module is GPL-2.0-or-later, records derivation
+  from the Zenoss `wmi-1.3.14` package, and records that the Zenoss package was
+  copied from Samba code forked on a GPLv2 basis.
+- `samba/README` states that the subtree contains a stripped-down and modified
+  Samba 4 library from 2006 under GPLv2.
+
+TurboVAS preserves those notices and treats `openvas-smb` as GPL-2.0-or-later
+source with Samba-derived provenance. Do not rewrite this component's
+provenance history during routine cleanup.
 
 Some modified imported data or generated files do not safely support comments,
 for example JSON locale/package files or test snapshots. These paths are tracked
@@ -93,9 +137,14 @@ reason it cannot.
 
 - Confirm whether TurboVAS should preserve upstream git history in a later archival/import refinement, or whether explicit source snapshots plus `UPSTREAMS.md` are sufficient.
 - Review `components/openvas-scanner/license-details.md` before changing scanner/NASL/Rust license-sensitive files.
-- Revisit the provisional `GPL-3.0-or-later` root tooling/documentation default before public release and before adding substantial original application code.
-- Review `components/openvas-smb` Samba-derived provenance before public release or distribution.
+- Revisit the `GPL-3.0-or-later` root tooling/documentation/service default
+  only if a future legal/product decision needs a different project-level
+  policy.
+- Re-review `components/openvas-smb` Samba-derived provenance before binary,
+  container, or other artifact distribution; the current source-public boundary
+  preserves the relevant provenance files.
 - Review Greenbone Community Feed terms before bundling, redistributing, mirroring, or packaging feed content. TurboVAS currently supports Community Feed synchronization only and deliberately does not support Greenbone Enterprise Feed subscription keys.
 - Review third-party Rust crate license and security posture for
   `services/turbovas-api` before public release, packaging, or distribution.
-- Define release-time source publication and attribution procedures before making this repository public.
+- Define artifact-specific source publication and attribution procedures before
+  binary, container, hosted-service, or feed-redistribution modes.

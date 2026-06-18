@@ -20,22 +20,6 @@ const LicenseLinkComponent = () => {
   return <Link to="license">{_('License Management page')}</Link>;
 };
 
-const SupportPageLinkComponent = () => {
-  return (
-    <a
-      href="https://service.greenbone.net"
-      rel="noopener noreferrer"
-      target="_blank"
-    >
-      {'https://service.greenbone.net'}
-    </a>
-  );
-};
-
-const SupportMailLinkComponent = () => {
-  return <a href="mailto:support@greenbone.net">{'support@greenbone.net'}</a>;
-};
-
 const LicenseNotification = ({capabilities, onCloseClick}) => {
   const [_] = useTranslation();
   const {license} = useLicense();
@@ -45,35 +29,29 @@ const LicenseNotification = ({capabilities, onCloseClick}) => {
   const corruptMessageAdmin = (
     <span>
       {_(
-        'The Greenbone Enterprise License for this system is invalid. ' +
+        'The legacy appliance license for this system is invalid. ' +
           'You can still use the system without restrictions, but you will not ' +
-          'receive updates anymore. For further advice please contact the ' +
-          'Greenbone Enterprise Support at',
+          'receive updates anymore. Review the local deployment documentation ' +
+          'before relying on this system beyond development use.',
       )}
-      &nbsp;
-      <SupportPageLinkComponent />
-      &nbsp;
-      {_('or')}
-      &nbsp;
-      <SupportMailLinkComponent />
     </span>
   );
   const corruptMessageUser = (
     <span>
       {_(
-        'The Greenbone Enterprise License for this system is invalid. ' +
+        'The legacy appliance license for this system is invalid. ' +
           'You can still use the system without restrictions, but you will not ' +
           'receive updates anymore. Please contact your administrator.',
       )}
     </span>
   );
   const corruptTitleMessage = _(
-    'Your Greenbone Enterprise License is invalid!',
+    'Your legacy appliance license is invalid!',
   );
   const expiringMessageAdmin = (
     <span>
       {_(
-        'The Greenbone Enterprise License for this system will expire in ' +
+        'The legacy appliance license for this system will expire in ' +
           '{{days}} days. After that your appliance remains valid and you can ' +
           'still use the system without restrictions, but you will not receive ' +
           'updates anymore. You can find information about extending your ' +
@@ -87,7 +65,7 @@ const LicenseNotification = ({capabilities, onCloseClick}) => {
   const expiringMessageUser = (
     <span>
       {_(
-        'The Greenbone Enterprise License for this system will expire in ' +
+        'The legacy appliance license for this system will expire in ' +
           '{{days}} days. After that your appliance remains valid and you can ' +
           'still use the system without restrictions, but you will not receive ' +
           'updates anymore. Please contact your administrator for extending the ' +
@@ -97,7 +75,7 @@ const LicenseNotification = ({capabilities, onCloseClick}) => {
     </span>
   );
   const expiringTitleMessage = _(
-    'Your Greenbone Enterprise License will expire in {{days}} days!',
+    'Your legacy appliance license will expire in {{days}} days!',
     {
       days,
     },
@@ -126,7 +104,7 @@ const LicenseNotification = ({capabilities, onCloseClick}) => {
   const expiredMessageAdmin = (
     <Layout flex="column">
       {_(
-        'The Greenbone Enterprise License for this system expired {{days}} days ' +
+        'The legacy appliance license for this system expired {{days}} days ' +
           'ago. You can still use the system without restrictions, but you will ' +
           'not receive updates anymore. Especially, you will miss new ' +
           'vulnerability tests and thus your scans will not detect important new ' +
@@ -144,7 +122,7 @@ const LicenseNotification = ({capabilities, onCloseClick}) => {
   const expiredMessageUser = (
     <span>
       {_(
-        'The Greenbone Enterprise License for ' +
+        'The legacy appliance license for ' +
           'this system expired {{days}} days ago. You can still use the system without ' +
           'restrictions, but you will not receive updates anymore. Especially you ' +
           'will miss new vulnerability tests and thus your scans will not detect ' +
@@ -155,7 +133,7 @@ const LicenseNotification = ({capabilities, onCloseClick}) => {
     </span>
   );
   const expiredTitleMessage = _(
-    'Your Greenbone Enterprise License has expired {{days}} days ago!',
+    'Your legacy appliance license has expired {{days}} days ago!',
     {days: Math.abs(days)},
   );
 

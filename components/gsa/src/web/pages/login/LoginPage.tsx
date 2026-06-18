@@ -17,16 +17,16 @@ import Footer from 'web/components/structure/Footer';
 import useGmp from 'web/hooks/useGmp';
 import useTranslation from 'web/hooks/useTranslation';
 import LoginForm from 'web/pages/login/LoginForm';
-import Theme from 'web/utils/Theme';
-
 const log = logger.getLogger('web.login');
 
 const StyledLayout = styled(Layout)`
   background: radial-gradient(
-    51.84% 102.52% at 58.54% 44.97%,
-    #a1ddba 0%,
-    ${Theme.green} 67.26%
-  );
+      55% 90% at 58% 42%,
+      #2a2d36 0%,
+      #181a22 54%,
+      #101115 100%
+    ),
+    linear-gradient(135deg, #111217 0%, #1d2028 55%, #b11226 170%);
   flex-direction: column;
   justify-content: center;
   align-items: center;

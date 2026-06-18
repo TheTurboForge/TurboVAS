@@ -177,7 +177,7 @@ describe('TaskRow tests', () => {
     const sensorIcon = screen.getByTestId('sensor-icon');
     expect(sensorIcon).toHaveAttribute(
       'title',
-      'Task is configured to run on sensor scanner',
+      'Task is configured to run on remote scanner scanner',
     );
   });
 

@@ -41,7 +41,7 @@ See `docs/SCOPE_BASED_REPORTING.md` for the public model.
 | ospd-openvas | `components/ospd-openvas` | https://github.com/greenbone/ospd-openvas | `874c524` | OSP server implementation for controlling OpenVAS Scanner and Notus Scanner. |
 | gsad | `components/gsad` | https://github.com/greenbone/gsad | `88ef642` | HTTP daemon connecting the browser UI to `gvmd`. |
 | gsa | `components/gsa` | https://github.com/greenbone/gsa | `f1e8cbe` | React web UI for Greenbone vulnerability management. |
-| openvas-smb | `components/openvas-smb` | https://github.com/greenbone/openvas-smb | `488c810` | SMB/WMI support module for authenticated Windows scanning. |
+| openvas-smb | `components/openvas-smb` | https://github.com/greenbone/openvas-smb | `488c810` | SMB/WMI support module for authenticated Windows scanning. Its preserved README records Zenoss `wmi-1.3.14` and Samba-derived GPLv2 provenance. |
 | notus-scanner | `components/notus-scanner` | https://github.com/greenbone/notus-scanner | `80681c6` | Python scanner for local security checks based on collected system information and Notus feed data. |
 | greenbone-feed-sync | `components/greenbone-feed-sync` | https://github.com/greenbone/greenbone-feed-sync | `1be4adf` | Tool for downloading Greenbone Community Feed data. |
 | python-gvm | `components/python-gvm` | https://github.com/greenbone/python-gvm | `acf6ccf` | Python API library for GMP and OSP. |

@@ -188,7 +188,7 @@ const Summary = ({
           </TableRow>
           {isDefined(slave) && (
             <TableRow>
-              <TableData>{_('Scan sensor')}</TableData>
+              <TableData>{_('Scan remote scanner')}</TableData>
               <TableData>{slave.name}</TableData>
             </TableRow>
           )}

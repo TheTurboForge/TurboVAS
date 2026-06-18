@@ -14,7 +14,6 @@ import PasswordField from 'web/components/form/PasswordField';
 import TextField from 'web/components/form/TextField';
 import useFormValues from 'web/components/form/useFormValues';
 import LoginLogo from 'web/components/img/LoginLogo';
-import ProductImage from 'web/components/img/ProductImage';
 import Divider from 'web/components/layout/Divider';
 import Layout from 'web/components/layout/Layout';
 import useTranslation from 'web/hooks/useTranslation';
@@ -66,10 +65,6 @@ const StyledPanel = styled(Panel)`
 const H1 = styled.h1`
   display: flex;
   flex-grow: 1;
-`;
-
-const ProductImageContainer = styled(Layout)`
-  margin-top: 30px;
 `;
 
 const NonAffiliationNotice = styled.div`
@@ -200,9 +195,6 @@ const LoginForm = ({
           </FormGroup>
         )}
 
-        <ProductImageContainer align={'center'}>
-          <ProductImage />
-        </ProductImageContainer>
       </Divider>
     </Paper>
   );

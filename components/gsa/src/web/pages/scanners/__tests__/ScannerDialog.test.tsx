@@ -78,7 +78,7 @@ describe('ScannerDialog tests', () => {
 
     expect(screen.getDialog()).toBeInTheDocument();
     const scannerType = screen.getByRole('textbox', {name: 'Scanner Type'});
-    expect(scannerType).toHaveValue('Greenbone Sensor');
+    expect(scannerType).toHaveValue('Remote Scanner');
     expect(screen.getByName('host')).toHaveValue('localhost');
     expect(screen.queryByName('port')).not.toBeInTheDocument();
     expect(screen.queryByName('caCertificate')).not.toBeInTheDocument();
@@ -203,7 +203,7 @@ describe('ScannerDialog tests', () => {
     expect(inputs[2]).toHaveAttribute('value', 'mypc');
 
     const scannerType = screen.getByRole('textbox', {name: 'Scanner Type'});
-    expect(scannerType).toHaveValue('Greenbone Sensor');
+    expect(scannerType).toHaveValue('Remote Scanner');
   });
 
   test('should allow to save dialog', async () => {
@@ -344,9 +344,9 @@ describe('ScannerDialog tests', () => {
     });
     expect(scannerType).toHaveValue('');
     const scannerTypeItems = await getSelectItemElementsForSelect(scannerType);
-    expect(scannerTypeItems.length).toEqual(2); // OpenVAS Scanner and Greenbone Sensor
+    expect(scannerTypeItems.length).toEqual(2); // OpenVAS Scanner and Remote Scanner
     expect(scannerTypeItems[0]).toHaveTextContent('OpenVAS Scanner');
-    expect(scannerTypeItems[1]).toHaveTextContent('Greenbone Sensor');
+    expect(scannerTypeItems[1]).toHaveTextContent('Remote Scanner');
   });
 
 
@@ -369,6 +369,6 @@ describe('ScannerDialog tests', () => {
 
     expect(screen.getDialog()).toBeInTheDocument();
     const scannerType = screen.getByRole('textbox', {name: 'Scanner Type'});
-    expect(scannerType).toHaveValue('Greenbone Sensor');
+    expect(scannerType).toHaveValue('Remote Scanner');
   });
 });

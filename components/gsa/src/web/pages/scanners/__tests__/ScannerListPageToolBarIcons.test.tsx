@@ -41,7 +41,7 @@ describe('ScannerListPageToolBarIcons tests', () => {
   });
 
 
-  test('should not render New icon if Greenbone Sensor are disabled', () => {
+  test('should not render New icon if remote scanners are disabled', () => {
     const gmp = {
       settings: {
         enableGreenboneSensor: false,

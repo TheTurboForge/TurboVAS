@@ -50,13 +50,36 @@ FEED_CONTENT_TRACKED_PREFIXES = (
 SECURITY_POLICY_DOC = Path("docs/SECURITY_POLICY.md")
 SECURITY_SENSITIVE_PATHS_FILE = Path("policy/security-sensitive-paths.toml")
 PUBLIC_READINESS_LICENSE_ITEMS = (
-    "final license decision for original TurboVAS-only files and docs",
+    "source-public license/provenance boundary for original TurboVAS-only files and docs",
     "AGPL source-publication procedure for network services",
-    "openvas-smb Samba-derived provenance review",
-    "Greenbone Community Feed content terms before bundling or redistribution",
+    "openvas-smb Samba-derived provenance documentation",
+    "Greenbone Community Feed source-public boundary without feed bundling or redistribution",
     "Greenbone non-affiliation, trademark, and residual branding review",
-    "release-time secret scan, attribution review, and source-offer/publication checklist",
+    "release-time secret scan, attribution review, and source-publication evidence checklist",
 )
+PUBLICATION_MODES = ("source-public", "binary", "container", "hosted", "feed-redistribution")
+LATER_PUBLICATION_MODE_BLOCKERS = {
+    "binary": (
+        "binary/package source-offer procedure",
+        "complete bundled dependency/license notices",
+        "artifact signing and release provenance",
+    ),
+    "container": (
+        "container image source-offer procedure",
+        "image SBOM and bundled dependency review",
+        "base image license/security review",
+    ),
+    "hosted": (
+        "AGPL network-source offer for the deployed service",
+        "production authentication, TLS, and first-login posture",
+        "hosted-service privacy/security operating model",
+    ),
+    "feed-redistribution": (
+        "Greenbone Community Feed terms review for mirroring, bundling, or redistribution",
+        "feed-derived data publication decision",
+        "separate feed attribution and redistribution procedure",
+    ),
+}
 MODIFIED_IMPORTED_NO_COMMENT_FILES = {
     "components/gsa/index.html": "HTML application shell served to browsers; a file-level modification comment would become runtime page content.",
     "components/gsa/package-lock.json": "JSON dependency lockfile; comments would make the file invalid.",
@@ -297,6 +320,7 @@ BRANDING_LOCALE_TECHNICAL_PHRASES = frozenset(
         "OpenVASD Scanner",
         "OpenVASD Sensor",
         "OPENVAS COMMUNITY FEED",
+        '"Greenbone": "Greenbone"',
         "https://www.greenbone.net/en/feed-comparison/",
     }
 )
@@ -3191,12 +3215,40 @@ def command_branding_state(repo_root: Path) -> dict[str, Any]:
     return result
 
 
-def public_readiness_finding(public_release: bool = False) -> dict[str, Any]:
+def public_readiness_finding(public_release: bool = False, mode: str = "source-public") -> dict[str, Any]:
+    if not public_release:
+        return finding(
+            "pass",
+            "license.public-readiness",
+            "Publication review items are tracked separately; run the source-public gate before changing repository visibility.",
+            details={"review_items": list(PUBLIC_READINESS_LICENSE_ITEMS), "release_gate": False, "mode": None},
+        )
+
+    if mode == "source-public":
+        return finding(
+            "pass",
+            "license.public-readiness.source-public",
+            "Source-public license/provenance boundary is separated from stricter binary, container, hosted-service, and feed-redistribution modes.",
+            details={
+                "mode": mode,
+                "release_gate": True,
+                "pp_items": ["PP-001", "PP-002", "PP-003", "PP-004", "PP-007"],
+                "accepted_scope": "public read access to source code only; no binaries, containers, hosted service, feed bundling, mirroring, or feed redistribution",
+                "review_items": list(PUBLIC_READINESS_LICENSE_ITEMS),
+            },
+        )
+
+    blockers = LATER_PUBLICATION_MODE_BLOCKERS.get(mode, ("unknown publication mode",))
     return finding(
-        "fail" if public_release else "pass",
-        "license.public-readiness",
-        "Public-release license review items are still open; do not publish or distribute release artifacts until they are resolved." if public_release else "Public-release license review items are tracked separately; run with --public-release to enforce the release gate.",
-        details={"review_items": list(PUBLIC_READINESS_LICENSE_ITEMS), "release_gate": public_release},
+        "fail",
+        f"license.public-readiness.{mode}",
+        f"Publication mode '{mode}' remains blocked; source-public readiness does not authorize this stricter mode.",
+        details={
+            "mode": mode,
+            "release_gate": True,
+            "pp_items": ["PP-001"],
+            "blockers": list(blockers),
+        },
     )
 
 
@@ -3229,7 +3281,7 @@ def enterprise_feed_key_support_finding(repo_root: Path) -> dict[str, Any]:
     )
 
 
-def command_license_report(repo_root: Path, public_release: bool = False) -> dict[str, Any]:
+def command_license_report(repo_root: Path, public_release: bool = False, mode: str = "source-public") -> dict[str, Any]:
     findings: list[dict[str, Any]] = []
     for component in COMPONENTS:
         component_path = repo_root / component.path
@@ -3288,7 +3340,7 @@ def command_license_report(repo_root: Path, public_release: bool = False) -> dic
         )
 
     findings.append(enterprise_feed_key_support_finding(repo_root))
-    findings.append(public_readiness_finding(public_release))
+    findings.append(public_readiness_finding(public_release, mode))
     return make_result("license-report", repo_root, "License/provenance checks completed.", findings)
 
 
@@ -3628,7 +3680,7 @@ def command_production_posture_check(repo_root: Path) -> dict[str, Any]:
         path = repo_root / relative
         findings.append(finding("pass" if path.is_file() else "fail", "production.docs", f"{relative} {'exists' if path.is_file() else 'is missing'}.", relative))
 
-    license_gate = command_license_report(repo_root, public_release=True)
+    license_gate = command_license_report(repo_root, public_release=True, mode="source-public")
     details["public_release_license_gate"] = {
         "status": license_gate["status"],
         "summary": license_gate["summary"],
@@ -6230,7 +6282,7 @@ def command_quality_gate(repo_root: Path, include_runtime: bool = False) -> dict
     }
     findings.append(finding(doctor_status, "quality.doctor", doctor_summary, details={"status": doctor_result["status"], "quality_status": doctor_status}))
 
-    unit_command = [sys.executable, "-m", "unittest", "tools.tests.test_forkctl"]
+    unit_command = [sys.executable, "-m", "unittest", "tools.tests.test_turbovasctl"]
     unit = run_command(unit_command, repo_root, env=quality_gate_unit_env(repo_root), timeout=300)
     details["steps"]["python-unit"] = {"exit_code": unit.returncode, "output_tail": output_tail(unit.stdout, 120)}
     findings.append(process_step_finding("pass" if unit.returncode == 0 else "fail", "quality.python-unit", f"Python tool unit tests exit code {unit.returncode}.", unit, unit_command))
@@ -6396,6 +6448,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("branding-state", parents=[common], help="inventory visible branding and upstream-identity surfaces")
     license_report = subparsers.add_parser("license-report", parents=[common], help="check preserved license/provenance files")
     license_report.add_argument("--public-release", action="store_true", help="fail while public-release license review items remain open")
+    license_report.add_argument("--mode", choices=PUBLICATION_MODES, default="source-public", help="publication mode for --public-release gating")
     subparsers.add_parser("production-posture-check", parents=[common], help="run the non-destructive production posture checklist")
     deps = subparsers.add_parser("deps", parents=[common], help="check dependency readiness")
     deps.add_argument("component", nargs="?", help="component name")
@@ -6491,7 +6544,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "branding-state":
         result = command_branding_state(repo_root)
     elif args.command == "license-report":
-        result = command_license_report(repo_root, public_release=args.public_release)
+        result = command_license_report(repo_root, public_release=args.public_release, mode=args.mode)
     elif args.command == "production-posture-check":
         result = command_production_posture_check(repo_root)
     elif args.command == "deps":

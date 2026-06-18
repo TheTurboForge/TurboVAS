@@ -5,7 +5,7 @@
 
 TurboVAS is an OpenVAS-derived monorepo for vulnerability scanner operators. It is intentionally organized around the components required to run TurboVAS as one coherent scanner system.
 
-This repository is currently in an early private development phase. The initial source snapshot preserves upstream component boundaries and provenance so future changes can be made with clear licensing and attribution context.
+This repository is currently in an early development phase. The initial source snapshot preserves upstream component boundaries and provenance so future changes can be made with clear licensing and attribution context. Public source visibility, if enabled, is for source transparency only and is not a binary release, container release, hosted service, production deployment, feed mirror, or feed redistribution.
 
 ## Relationship To Greenbone
 
@@ -51,6 +51,14 @@ For the native HTTP/JSON API direction and GMP/XML retirement map, see
 `docs/API_CONTRACT.md`, `docs/NATIVE_API_PROOF_PLAN.md`,
 `docs/GMP_XML_STRANGLER.md`, and `api/openapi/turbovas-v1.yaml`.
 
+## Contributions And Security Reports
+
+Public source visibility is intended for transparency at this stage. TurboVAS
+is not currently seeking external contributions and does not provide a support
+promise. See `CONTRIBUTING.md` and `SECURITY.md` before opening issues or pull
+requests, and do not submit secrets, scan results, customer data, private
+configuration, or other sensitive material.
+
 ## Development Commands
 
 TurboVAS provides a small root command surface for repository health checks:
@@ -65,7 +73,7 @@ TurboVAS provides a small root command surface for repository health checks:
 - `just quality-gate-state`: show the latest quality-gate result and retained history.
 - `just quality-gate-schedule`: install, inspect, or disable the server-side development quality-gate timer.
 - `just license-report`: check preserved license and provenance files.
-- `just license-public-release-gate`: fail until public-release license review items are closed.
+- `just license-public-release-gate --mode source-public`: check source-public license/provenance readiness while keeping stricter binary, container, hosted-service, and feed-redistribution modes blocked until separately reviewed.
 - `just production-posture-check`: run the non-destructive production posture checklist.
 - `just deps [component]`: check build dependency readiness.
 - `just configure <component>`: configure a CMake component into `build/<component>/`.
@@ -125,9 +133,6 @@ either surface, for example:
 just doctor --json
 tools/turbovasctl doctor --json
 ```
-
-`tools/forkctl` remains as a temporary compatibility wrapper during the command
-rename.
 
 GitHub Actions also runs the source-only quality gate in
 `.github/workflows/quality-gate.yml` on pushes to `main`, pull requests, and

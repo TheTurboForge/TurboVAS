@@ -123,7 +123,7 @@ interface ScannerProperties extends ModelProperties {
 export const SCANNER_TYPE_DEFINITIONS = {
   OPENVAS_SCANNER_TYPE: {value: '2', name: _l('OpenVAS Scanner')},
   CVE_SCANNER_TYPE: {value: '3', name: _l('CVE Scanner')},
-  GREENBONE_SENSOR_SCANNER_TYPE: {value: '5', name: _l('Greenbone Sensor')},
+  GREENBONE_SENSOR_SCANNER_TYPE: {value: '5', name: _l('Remote Scanner')},
   OPENVASD_SCANNER_TYPE: {value: '6', name: _l('OpenVASD Scanner')},
   OPENVASD_SENSOR_SCANNER_TYPE: {value: '8', name: _l('OpenVASD Sensor')},
 } as const;

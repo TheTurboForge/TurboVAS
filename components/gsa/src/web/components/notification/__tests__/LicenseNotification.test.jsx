@@ -156,7 +156,7 @@ describe('LicenseNotification tests', () => {
     expect(links[0]).toHaveAttribute('href', '/license');
     expect(links[0]).toHaveTextContent('License Management page');
     expect(baseElement).toHaveTextContent(
-      'The Greenbone Enterprise License for this system will expire in 26 days',
+      'The legacy appliance license for this system will expire in 26 days',
     );
     expect(heading).toHaveBackgroundColor(Theme.lightBlue);
   });
@@ -189,7 +189,7 @@ describe('LicenseNotification tests', () => {
 
     expect(links.length).toEqual(0);
     expect(baseElement).toHaveTextContent(
-      'The Greenbone Enterprise License for this system will expire in 26 days',
+      'The legacy appliance license for this system will expire in 26 days',
     );
     expect(heading).toHaveBackgroundColor(Theme.lightBlue);
   });
@@ -349,7 +349,7 @@ describe('LicenseNotification tests', () => {
     expect(links[0]).toHaveAttribute('href', '/license');
     expect(links[0]).toHaveTextContent('License Management page');
     expect(baseElement).toHaveTextContent(
-      'Your Greenbone Enterprise License has expired 1 days ago!',
+      'Your legacy appliance license has expired 1 days ago!',
     );
     expect(heading).toHaveBackgroundColor(Theme.mediumLightRed);
   });
@@ -384,7 +384,7 @@ describe('LicenseNotification tests', () => {
 
     expect(links.length).toEqual(0);
     expect(baseElement).toHaveTextContent(
-      'Your Greenbone Enterprise License has expired 1 days ago!',
+      'Your legacy appliance license has expired 1 days ago!',
     );
     expect(heading).toHaveBackgroundColor(Theme.mediumLightRed);
   });
@@ -417,15 +417,10 @@ describe('LicenseNotification tests', () => {
     const heading = screen.getByTestId('infopanel-heading');
     const links = baseElement.querySelectorAll('a');
 
-    expect(links.length).toEqual(2);
-    expect(links[0]).toHaveAttribute('href', 'https://service.greenbone.net');
-    expect(links[0]).toHaveTextContent('https://service.greenbone.net');
-
-    expect(links[1]).toHaveAttribute('href', 'mailto:support@greenbone.net');
-    expect(links[1]).toHaveTextContent('support@greenbone.net');
+    expect(links.length).toEqual(0);
 
     expect(baseElement).toHaveTextContent(
-      'Your Greenbone Enterprise License is invalid!',
+      'Your legacy appliance license is invalid!',
     );
     expect(heading).toHaveBackgroundColor(Theme.mediumLightRed);
   });
@@ -460,7 +455,7 @@ describe('LicenseNotification tests', () => {
 
     expect(links.length).toEqual(0);
     expect(baseElement).toHaveTextContent(
-      'Your Greenbone Enterprise License is invalid!',
+      'Your legacy appliance license is invalid!',
     );
     expect(heading).toHaveBackgroundColor(Theme.mediumLightRed);
   });

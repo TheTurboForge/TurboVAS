@@ -287,7 +287,7 @@ const PerformancePage = () => {
             </FormGroup>
 
             {gmp.settings.enableGreenboneSensor && (
-              <FormGroup title={_('Report for Greenbone Sensor')}>
+              <FormGroup title={_('Report for Remote Scanner')}>
                 <Select
                   items={renderSelectItems(
                     sensors as Array<{id: string; name: string}>,

@@ -6,9 +6,6 @@ set shell := ["bash", "-eo", "pipefail", "-c"]
 turbovasctl *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl "$@"
 
-forkctl *args:
-    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/forkctl "$@"
-
 status *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl status "$@"
 
