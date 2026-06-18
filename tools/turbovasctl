@@ -2607,6 +2607,11 @@ def summarize_native_tooling(items: list[dict[str, Any]]) -> dict[str, Any]:
                 "replacement_candidates": ["GSA top-level Results list (migrated through gsad same-origin proxy)", "read-only result automation", "native-api-request helper"],
             },
             {
+                "endpoint": "/api/v1/vulnerabilities",
+                "status": "implemented_internal_and_browser_proxied",
+                "replacement_candidates": ["GSA top-level Vulnerabilities list (migrated through gsad same-origin proxy)", "read-only vulnerability automation", "native-api-request helper"],
+            },
+            {
                 "endpoint": "/api/v1/reports",
                 "status": "implemented_internal_and_browser_proxied",
                 "replacement_candidates": ["GSA raw report list (migrated through gsad same-origin proxy)", "runtime-report-summary helper", "native-api-request helper"],
@@ -5622,6 +5627,22 @@ def command_runtime_native_api_smoke(repo_root: Path) -> dict[str, Any]:
             raw_reports_json,
         )
     )
+
+    vulnerabilities = native_api_curl(repo_root, "/api/v1/vulnerabilities?page_size=1&sort=-severity")
+    vulnerabilities_json = parse_json_output(vulnerabilities)
+    details["vulnerabilities"] = summarize_native_api_response(vulnerabilities_json)
+    vulnerability_items = vulnerabilities_json.get("items", []) if isinstance(vulnerabilities_json, dict) else []
+    findings.append(
+        native_api_probe_finding(
+            "pass" if vulnerabilities.returncode == 0 and isinstance(vulnerability_items, list) else "fail",
+            "native-api.vulnerabilities",
+            f"Native API top-level Vulnerabilities probe exit code {vulnerabilities.returncode}.",
+            vulnerabilities,
+            compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/vulnerabilities?page_size=1"),
+            vulnerabilities_json,
+        )
+    )
+
     if raw_report_items:
         first_raw_report = raw_report_items[0]
         raw_report_detail_id = first_raw_report.get("id") if isinstance(first_raw_report, dict) else None

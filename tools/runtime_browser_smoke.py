@@ -298,6 +298,10 @@ async function runForBaseUrl(baseUrl) {
     const nativeResults = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/results$/);
     add(nativeResults ? 'pass' : 'fail', 'result.list-native-api', nativeResults ? 'Top-level Results list loaded through same-origin native API.' : 'Top-level Results list did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => item.path === '/api/v1/results') });
 
+    await gotoRoute(page, '/vulnerabilities', 'vulnerabilities');
+    const nativeVulnerabilities = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/vulnerabilities$/);
+    add(nativeVulnerabilities ? 'pass' : 'fail', 'vulnerability.list-native-api', nativeVulnerabilities ? 'Top-level Vulnerabilities list loaded through same-origin native API.' : 'Top-level Vulnerabilities list did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => item.path === '/api/v1/vulnerabilities') });
+
     await gotoRoute(page, '/targets', 'targets');
     const nativeTargets = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/targets$/);
     add(nativeTargets ? 'pass' : 'fail', 'target.list-native-api', nativeTargets ? 'Target list loaded through same-origin native API.' : 'Target list did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => item.path === '/api/v1/targets') });

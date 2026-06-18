@@ -26,6 +26,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ResultCollection'
+  /vulnerabilities:
+    get:
+      summary: List top-level vulnerabilities from scan results
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Filter'
+      responses:
+        '200':
+          description: Vulnerability collection aggregated from positive-severity raw scan results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VulnerabilityCollection'
   /reports:
     get:
       summary: List raw scan reports
@@ -609,6 +624,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Result'
+    VulnerabilityCollection:
+      type: object
+      required: [page, items]
+      properties:
+        page:
+          $ref: '#/components/schemas/PageInfo'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Vulnerability'
     ReportHostCollection:
       type: object
       required: [page, items]
@@ -1123,6 +1148,29 @@ components:
           format: uuid
         raw_evidence_href:
           type: string
+    Vulnerability:
+      type: object
+      required: [id, name, severity, qod, result_count, host_count]
+      properties:
+        id:
+          type: string
+          description: NVT OID for the vulnerability row.
+        name:
+          type: string
+        oldest_result:
+          type: string
+          format: date-time
+        newest_result:
+          type: string
+          format: date-time
+        severity:
+          type: number
+        qod:
+          type: integer
+        result_count:
+          type: integer
+        host_count:
+          type: integer
     ReportHost:
       type: object
       required: [host, ports_count, applications_count, authentication_state, result_count, vulnerability_count, severity, max_severity, source_report_id]

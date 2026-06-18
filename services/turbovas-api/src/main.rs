@@ -370,6 +370,18 @@ struct ResultItem {
     raw_evidence_href: String,
 }
 
+#[derive(Serialize)]
+struct VulnerabilityItem {
+    id: String,
+    name: String,
+    oldest_result: Option<String>,
+    newest_result: Option<String>,
+    severity: f64,
+    qod: i64,
+    result_count: i64,
+    host_count: i64,
+}
+
 #[derive(Debug, Serialize)]
 struct ReportHostItem {
     host: String,
@@ -508,6 +520,7 @@ async fn main() -> Result<(), ApiError> {
     let app = Router::new()
         .route("/healthz", get(healthz))
         .route("/api/v1/results", get(results))
+        .route("/api/v1/vulnerabilities", get(vulnerabilities))
         .route("/api/v1/reports", get(reports))
         .route("/api/v1/reports/:report_id", get(report_detail))
         .route("/api/v1/reports/:report_id/results", get(report_results))
@@ -668,6 +681,72 @@ async fn reports(
         })?;
     let total = rows.first().map(|row| row.get::<_, i64>(0)).unwrap_or(0);
     let items = rows.iter().map(report_from_row).collect();
+    Ok(Json(Collection {
+        page: params.page_info(total),
+        items,
+    }))
+}
+
+async fn vulnerabilities(
+    State(state): State<AppState>,
+    Query(query): Query<CollectionQuery>,
+) -> Result<Json<Collection<VulnerabilityItem>>, ApiError> {
+    let params = normalize_collection_query(query, "-severity")?;
+    let sort_sql = sort_clause(
+        &params.sort,
+        &[
+            ("id", "id"),
+            ("name", "name"),
+            ("oldest", "oldest_result_unix"),
+            ("newest", "newest_result_unix"),
+            ("severity", "severity"),
+            ("qod", "qod"),
+            ("results", "result_count"),
+            ("hosts", "host_count"),
+        ],
+    )?;
+    let sql = format!(
+        r#"WITH vulnerability_rows AS (
+             SELECT coalesce(nullif(r.nvt, ''), r.uuid::text) AS id,
+                    coalesce(max(nullif(n.name, '')), max(nullif(r.nvt, '')), 'Unknown vulnerability') AS name,
+                    min(coalesce(r.date, 0))::bigint AS oldest_result_unix,
+                    max(coalesce(r.date, 0))::bigint AS newest_result_unix,
+                    max(coalesce(r.severity, 0))::double precision AS severity,
+                    max(coalesce(r.qod, 0))::bigint AS qod,
+                    count(*)::bigint AS result_count,
+                    count(DISTINCT lower(coalesce(nullif(r.host, ''), r.hostname, '')))::bigint AS host_count
+               FROM results r
+               JOIN reports rep ON rep.id = r.report
+               LEFT JOIN tasks t ON t.id = coalesce(r.task, rep.task)
+               LEFT JOIN nvts n ON n.oid = r.nvt
+              WHERE coalesce(r.severity, 0) > 0
+                AND coalesce(nullif(r.nvt, ''), '') <> ''
+                AND coalesce(nullif(r.host, ''), r.hostname, '') <> ''
+                AND (t.id IS NULL OR coalesce(t.usage_type, 'scan') = 'scan')
+              GROUP BY coalesce(nullif(r.nvt, ''), r.uuid::text)
+         ),
+         filtered AS (
+             SELECT * FROM vulnerability_rows
+              WHERE ($1 = ''
+                     OR lower(id) LIKE '%' || lower($1) || '%'
+                     OR lower(name) LIKE '%' || lower($1) || '%')
+         )
+         SELECT count(*) OVER()::bigint AS total, * FROM filtered
+          ORDER BY {sort_sql}, name ASC, id ASC LIMIT $2 OFFSET $3;"#,
+    );
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let rows = client
+        .query(&sql, &[&params.filter, &params.page_size, &params.offset])
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "vulnerability list query failed");
+            ApiError::Database
+        })?;
+    let total = rows
+        .first()
+        .map(|row| row.get::<_, i64>("total"))
+        .unwrap_or(0);
+    let items = rows.iter().map(vulnerability_from_row).collect();
     Ok(Json(Collection {
         page: params.page_info(total),
         items,
@@ -3561,6 +3640,19 @@ impl NormalizedQuery {
             sort: self.sort.clone(),
             filter: self.filter.clone(),
         }
+    }
+}
+
+fn vulnerability_from_row(row: &Row) -> VulnerabilityItem {
+    VulnerabilityItem {
+        id: row.get("id"),
+        name: row.get("name"),
+        oldest_result: unix_ts_to_rfc3339(row.get("oldest_result_unix")),
+        newest_result: unix_ts_to_rfc3339(row.get("newest_result_unix")),
+        severity: row.get("severity"),
+        qod: row.get("qod"),
+        result_count: row.get("result_count"),
+        host_count: row.get("host_count"),
     }
 }
 
