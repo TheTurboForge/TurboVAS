@@ -1,4 +1,5 @@
 # SPDX-FileCopyrightText: 2023-2024 Greenbone AG
+# Modified by TurboVAS contributors, 2026.
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
@@ -17,7 +18,6 @@ from greenbone.feed.sync.config import (
     DEFAULT_USER_CONFIG_FILE,
     Config,
     ConfigDict,
-    EnterpriseSettings,
     maybe_int,
 )
 from greenbone.feed.sync.errors import ConfigFileError
@@ -284,27 +284,7 @@ class CliParser:
             "script. (Default: %(default)s)",
         )
 
-        parser.add_argument(
-            "--greenbone-enterprise-feed-key",
-            type=Path,
-            help="File to read the Greenbone Enterprise Feed key from. "
-            "The key gives access to additional vulnerability tests for "
-            "enterprise software among other advantages. See "
-            "https://www.greenbone.net/en/feed-comparison/ for more details."
-            "The default URLs are adjusted according to the data in the key."
-            "If the key file does not exist it is ignored. "
-            "(Default: %(default)s)",
-        )
-
         self.parser = parser
-
-    def _determine_enterprise_settings(
-        self, enterprise_key: Path
-    ) -> EnterpriseSettings | None:
-        if not enterprise_key or not enterprise_key.exists():
-            return None
-
-        return EnterpriseSettings.from_key(enterprise_key)
 
     def _load_config(self, config_file: str) -> Config:
         config_path = None
@@ -343,13 +323,6 @@ class CliParser:
         # Load the defaults from the config file if it exists.
         config = self._load_config(known_args.config)
 
-        # set greenbone enterprise feed key in config if user passed one to load
-        # desired key for determining the feed url
-        if known_args.greenbone_enterprise_feed_key:
-            config["greenbone-enterprise-feed-key"] = (
-                known_args.greenbone_enterprise_feed_key
-            )
-
         if known_args.feed_version:
             config["feed-release"] = known_args.feed_version
 
@@ -368,15 +341,6 @@ class CliParser:
 
         # apply defaults in config
         config.apply_settings()
-
-        # check if a enterprise feed key is available
-        enterprise_settings = self._determine_enterprise_settings(
-            config["greenbone-enterprise-feed-key"]
-        )
-
-        # override feed url from key
-        if enterprise_settings:
-            config["feed-url"] = enterprise_settings.feed_url()
 
         # apply other config defaults
         config.apply_dependent_settings()

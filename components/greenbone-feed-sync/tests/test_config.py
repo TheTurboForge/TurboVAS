@@ -1,4 +1,5 @@
 # SPDX-FileCopyrightText: 2023-2024 Greenbone AG
+# Modified by TurboVAS contributors, 2026.
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
@@ -9,18 +10,14 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from pontos.testing import temp_file
-
 from greenbone.feed.sync.config import (
     DEFAULT_DESTINATION_PREFIX,
-    DEFAULT_ENTERPRISE_KEY_PATH,
     DEFAULT_FEED_RELEASE,
     DEFAULT_GROUP,
     DEFAULT_GVMD_LOCK_FILE_PATH,
     DEFAULT_OPENVAS_LOCK_FILE_PATH,
     DEFAULT_USER,
     Config,
-    EnterpriseSettings,
 )
 from greenbone.feed.sync.errors import ConfigError, ConfigFileError
 from greenbone.feed.sync.helper import DEFAULT_FLOCK_WAIT_INTERVAL
@@ -34,7 +31,7 @@ class ConfigTestCase(unittest.TestCase):
     def test_defaults(self):
         values = Config.load()
 
-        self.assertEqual(len(values), 31)
+        self.assertEqual(len(values), 30)
         self.assertEqual(
             values["destination-prefix"], Path(DEFAULT_DESTINATION_PREFIX)
         )
@@ -134,10 +131,6 @@ class ConfigTestCase(unittest.TestCase):
         self.assertIsNone(values["rsync-timeout"])
         self.assertEqual(values["group"], DEFAULT_GROUP)
         self.assertEqual(values["user"], DEFAULT_USER)
-        self.assertEqual(
-            values["greenbone-enterprise-feed-key"],
-            Path(DEFAULT_ENTERPRISE_KEY_PATH),
-        )
         self.assertEqual(values["feed-release"], DEFAULT_FEED_RELEASE)
 
     def test_config_file(self):
@@ -171,7 +164,6 @@ fail-fast = true
 rsync-timeout = 120
 group = "foo"
 user = "bar"
-greenbone-enterprise-feed-key = "/srv/feed.key"
 feed-release = "1.2.3"
 """
         path_mock = MagicMock(spec=Path)
@@ -235,9 +227,6 @@ feed-release = "1.2.3"
         self.assertEqual(values["rsync-timeout"], 120)
         self.assertEqual(values["group"], "foo")
         self.assertEqual(values["user"], "bar")
-        self.assertEqual(
-            values["greenbone-enterprise-feed-key"], Path("/srv/feed.key")
-        )
         self.assertEqual(values["feed-release"], "1.2.3")
 
     def test_destination_prefix(self):
@@ -360,7 +349,6 @@ feed-url = "rsync://foo.bar"
             "GREENBONE_FEED_SYNC_RSYNC_TIMEOUT": "120",
             "GREENBONE_FEED_SYNC_GROUP": "123",
             "GREENBONE_FEED_SYNC_USER": "321",
-            "GREENBONE_FEED_SYNC_ENTERPRISE_FEED_KEY": "/tmp/some.key",
             "GREENBONE_FEED_SYNC_FEED_RELEASE": "1.2.3",
         },
     )
@@ -420,9 +408,6 @@ feed-url = "rsync://foo.bar"
         self.assertEqual(values["rsync-timeout"], 120)
         self.assertEqual(values["group"], 123)
         self.assertEqual(values["user"], 321)
-        self.assertEqual(
-            values["greenbone-enterprise-feed-key"], Path("/tmp/some.key")
-        )
         self.assertEqual(values["feed-release"], "1.2.3")
 
     @patch.dict(
@@ -455,7 +440,6 @@ feed-url = "rsync://foo.bar"
             "GREENBONE_FEED_SYNC_VERBOSE": "5",
             "GREENBONE_FEED_SYNC_FAIL_FAST": "1",
             "GREENBONE_FEED_SYNC_RSYNC_TIMEOUT": "120",
-            "GREENBONE_FEED_SYNC_ENTERPRISE_FEED_KEY": "/tmp/some.key",
             "GREENBONE_FEED_SYNC_FEED_RELEASE": "1.2.3",
         },
     )
@@ -488,7 +472,6 @@ private-directory = "private"
 verbose = 99
 fail-fast = false
 rsync-timeout = 360
-greenbone-enterprise-feed-key = "/srv/feed.key"
 feed-release = "2.3.4"
 """
         path_mock = MagicMock(spec=Path)
@@ -547,9 +530,6 @@ feed-release = "2.3.4"
         self.assertEqual(values["verbose"], 5)
         self.assertTrue(values["fail-fast"])
         self.assertEqual(values["rsync-timeout"], 120)
-        self.assertEqual(
-            values["greenbone-enterprise-feed-key"], Path("/tmp/some.key")
-        )
         self.assertEqual(values["feed-release"], "1.2.3")
 
     def test_feed_release(self):
@@ -716,26 +696,3 @@ private-directory = "private"
         self.assertTrue(config["no-wait"])
         self.assertEqual(config["compression-level"], 7)
         self.assertEqual(config["private-directory"], "private")
-
-
-class EnterpriseSettingsTestCase(unittest.TestCase):
-    def test_from_key(self):
-        content = """a_user@some.feed.server:/feed/
-Lorem ipsum dolor sit amet,
-consetetur sadipscing elitr,
-sed diam nonumy eirmod tempor
-"""
-        with temp_file(content=content, name="enterprise.key") as f:
-            settings = EnterpriseSettings.from_key(f)
-
-            self.assertEqual(settings.key, f)
-            self.assertEqual(settings.host, "some.feed.server")
-            self.assertEqual(settings.user, "a_user")
-
-    def test_feed_url(self):
-        key = Path("/tmp/some.key")
-        settings = EnterpriseSettings("foo", "some.server", key)
-
-        self.assertEqual(
-            settings.feed_url(), "ssh://foo@some.server/enterprise"
-        )

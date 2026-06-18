@@ -1,4 +1,5 @@
 # SPDX-FileCopyrightText: 2023-2024 Greenbone AG
+# Modified by TurboVAS contributors, 2026.
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
@@ -12,12 +13,9 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from pontos.testing import temp_file
-
 from greenbone.feed.sync.config import (
     DEFAULT_CONFIG_FILE,
     DEFAULT_DESTINATION_PREFIX,
-    DEFAULT_ENTERPRISE_KEY_PATH,
     DEFAULT_FEED_RELEASE,
     DEFAULT_GVMD_LOCK_FILE_PATH,
     DEFAULT_OPENVAS_LOCK_FILE_PATH,
@@ -201,10 +199,6 @@ class CliParserTestCase(unittest.TestCase):
         self.assertIsNone(args.verbose)
         self.assertFalse(args.fail_fast)
         self.assertIsNone(args.rsync_timeout)
-        self.assertEqual(
-            args.greenbone_enterprise_feed_key,
-            Path(DEFAULT_ENTERPRISE_KEY_PATH),
-        )
         self.assertEqual(args.feed_release, DEFAULT_FEED_RELEASE)
 
     def test_help(self):
@@ -436,14 +430,22 @@ class CliParserTestCase(unittest.TestCase):
         args = parser.parse_arguments(["--rsync-timeout", "120"])
         self.assertEqual(args.rsync_timeout, 120)
 
-    def test_greenbone_enterprise_feed_key(self):
+    def test_greenbone_enterprise_feed_key_is_not_supported(self):
         parser = CliParser()
-        args = parser.parse_arguments(
-            ["--greenbone-enterprise-feed-key", "/tmp/some.key"]
+
+        with (
+            redirect_stderr(io.StringIO()) as f,
+            self.assertRaises(SystemExit) as cm,
+        ):
+            parser.parse_arguments(
+                ["--greenbone-enterprise-feed-key", "/tmp/some.key"]
+            )
+
+        self.assertIn(
+            "error: unrecognized arguments: --greenbone-enterprise-feed-key",
+            f.getvalue(),
         )
-        self.assertEqual(
-            args.greenbone_enterprise_feed_key, Path("/tmp/some.key")
-        )
+        self.assertEqual(cm.exception.code, 2)
 
     def test_other(self):
         parser = CliParser()
@@ -713,96 +715,6 @@ wait-interval = 100
 
         args = parser.parse_arguments(["--user", "123"])
         self.assertEqual(args.user, 123)
-
-    def test_feed_url_from_enterprise_feed_key(self):
-        parser = CliParser()
-        content = """a_user@some.feed.server:/feed/
-Lorem ipsum dolor sit amet,
-consetetur sadipscing elitr,
-sed diam nonumy eirmod tempor
-"""
-        with temp_file(content=content, name="enterprise.key") as f:
-            args = parser.parse_arguments(
-                ["--greenbone-enterprise-feed-key", str(f)]
-            )
-
-            self.assertEqual(
-                args.feed_url, "ssh://a_user@some.feed.server/enterprise"
-            )
-            self.assertEqual(
-                args.gvmd_data_url,
-                f"ssh://a_user@some.feed.server/enterprise/data-feed/{DEFAULT_FEED_RELEASE}/",
-            )
-            self.assertEqual(
-                args.port_lists_url,
-                f"ssh://a_user@some.feed.server/enterprise/data-feed/{DEFAULT_FEED_RELEASE}/port-lists/",
-            )
-            self.assertEqual(
-                args.report_formats_url,
-                f"ssh://a_user@some.feed.server/enterprise/data-feed/{DEFAULT_FEED_RELEASE}/report-formats/",
-            )
-            self.assertEqual(
-                args.scan_configs_url,
-                f"ssh://a_user@some.feed.server/enterprise/data-feed/{DEFAULT_FEED_RELEASE}/scan-configs/",
-            )
-            self.assertEqual(
-                args.notus_url,
-                f"ssh://a_user@some.feed.server/enterprise/vulnerability-feed/{DEFAULT_FEED_RELEASE}/vt-data/notus/",
-            )
-            self.assertEqual(
-                args.nasl_url,
-                f"ssh://a_user@some.feed.server/enterprise/vulnerability-feed/{DEFAULT_FEED_RELEASE}/vt-data/nasl/",
-            )
-            self.assertEqual(
-                args.scap_data_url,
-                f"ssh://a_user@some.feed.server/enterprise/vulnerability-feed/{DEFAULT_FEED_RELEASE}/scap-data/",
-            )
-            self.assertEqual(
-                args.cert_data_url,
-                f"ssh://a_user@some.feed.server/enterprise/vulnerability-feed/{DEFAULT_FEED_RELEASE}/cert-data/",
-            )
-
-    def test_ignore_non_existing_enterprise_feed_key(self):
-        parser = CliParser()
-        args = parser.parse_arguments(
-            ["--greenbone-enterprise-feed-key", "/tmp/some.key"]
-        )
-
-        self.assertEqual(
-            args.feed_url, "rsync://feed.community.greenbone.net/community"
-        )
-        self.assertEqual(
-            args.gvmd_data_url,
-            f"rsync://feed.community.greenbone.net/community/data-feed/{DEFAULT_FEED_RELEASE}/",
-        )
-        self.assertEqual(
-            args.port_lists_url,
-            f"rsync://feed.community.greenbone.net/community/data-feed/{DEFAULT_FEED_RELEASE}/port-lists/",
-        )
-        self.assertEqual(
-            args.report_formats_url,
-            f"rsync://feed.community.greenbone.net/community/data-feed/{DEFAULT_FEED_RELEASE}/report-formats/",
-        )
-        self.assertEqual(
-            args.scan_configs_url,
-            f"rsync://feed.community.greenbone.net/community/data-feed/{DEFAULT_FEED_RELEASE}/scan-configs/",
-        )
-        self.assertEqual(
-            args.notus_url,
-            f"rsync://feed.community.greenbone.net/community/vulnerability-feed/{DEFAULT_FEED_RELEASE}/vt-data/notus/",
-        )
-        self.assertEqual(
-            args.nasl_url,
-            f"rsync://feed.community.greenbone.net/community/vulnerability-feed/{DEFAULT_FEED_RELEASE}/vt-data/nasl/",
-        )
-        self.assertEqual(
-            args.scap_data_url,
-            f"rsync://feed.community.greenbone.net/community/vulnerability-feed/{DEFAULT_FEED_RELEASE}/scap-data/",
-        )
-        self.assertEqual(
-            args.cert_data_url,
-            f"rsync://feed.community.greenbone.net/community/vulnerability-feed/{DEFAULT_FEED_RELEASE}/cert-data/",
-        )
 
     @patch.object(sys, "argv", ["greenbone-nvt-sync"])
     def test_greenbone_nvt_sync(self):

@@ -42,6 +42,11 @@ subtrees into the runtime feed tree for services to consume. Do not commit,
 bundle, package, or redistribute feed content unless a separate feed-terms review
 explicitly approves that use.
 
+TurboVAS supports the Greenbone Community Feed only. It does not support
+Greenbone Enterprise Feed subscription keys or Enterprise Feed synchronization.
+Operators who need Greenbone Enterprise Feed access, official Greenbone products,
+or vendor support should contact Greenbone directly.
+
 OpenVAS, OSPD, and Notus use runtime feed data and a persistent feed-signature
 keyring. TurboVAS does not disable feed signature verification.
 

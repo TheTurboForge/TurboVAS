@@ -1,4 +1,5 @@
 # SPDX-FileCopyrightText: 2023-2024 Greenbone AG
+# Modified by TurboVAS contributors, 2026.
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
@@ -13,7 +14,6 @@ from typing import (
     Protocol,
     TypeVar,
 )
-from urllib.parse import urlsplit
 
 from greenbone.feed.sync.errors import ConfigError, ConfigFileError
 from greenbone.feed.sync.helper import DEFAULT_FLOCK_WAIT_INTERVAL
@@ -54,8 +54,6 @@ DEFAULT_OPENVAS_LOCK_FILE_PATH = "openvas/feed-update.lock"
 
 DEFAULT_CONFIG_FILE = "/etc/gvm/greenbone-feed-sync.toml"
 DEFAULT_USER_CONFIG_FILE = "~/.config/greenbone-feed-sync.toml"
-
-DEFAULT_ENTERPRISE_KEY_PATH = "/etc/gvm/greenbone-enterprise-feed-key"
 
 DEFAULT_GROUP = "gvm"
 DEFAULT_USER = "gvm"
@@ -121,29 +119,6 @@ class DependentSetting(Generic[T]):
         return None if value is None else self.value_type(value)
 
 
-@dataclass
-class EnterpriseSettings:
-    user: str | None
-    host: str | None
-    key: Path
-
-    @classmethod
-    def from_key(cls, enterprise_key: Path) -> "EnterpriseSettings":
-        with enterprise_key.open("r", encoding="utf8", errors="ignore") as f:
-            line = f.readline()
-
-        url = urlsplit(line)
-        if not url.scheme:
-            # ensure that url gets splitted correctly if line doesn't contain
-            # an url scheme (which is the default)
-            url = urlsplit(f"//{line}")
-
-        return EnterpriseSettings(url.username, url.hostname, enterprise_key)
-
-    def feed_url(self) -> str:
-        return f"ssh://{self.user}@{self.host}/enterprise"
-
-
 _SETTINGS = (
     Setting(
         "destination-prefix",
@@ -173,12 +148,6 @@ _SETTINGS = (
     Setting("rsync-timeout", "GREENBONE_FEED_SYNC_RSYNC_TIMEOUT", None, int),
     Setting("group", "GREENBONE_FEED_SYNC_GROUP", DEFAULT_GROUP, maybe_int),
     Setting("user", "GREENBONE_FEED_SYNC_USER", DEFAULT_USER, maybe_int),
-    Setting(
-        "greenbone-enterprise-feed-key",
-        "GREENBONE_FEED_SYNC_ENTERPRISE_FEED_KEY",
-        DEFAULT_ENTERPRISE_KEY_PATH,
-        Path,
-    ),
     Setting(
         "feed-release",
         "GREENBONE_FEED_SYNC_FEED_RELEASE",

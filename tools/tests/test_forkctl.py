@@ -1520,6 +1520,7 @@ db2:keys=5,expires=0,avg_ttl=0
             self.assertEqual(turbovasctl.gvm_cli_path(root), root / "build" / "venvs" / "gvm-tools" / "bin" / "gvm-cli")
 
     def test_feed_keyring_constants_match_greenbone_community_key(self):
+        self.assertEqual(turbovasctl.GREENBONE_COMMUNITY_FEED_URL, "rsync://feed.community.greenbone.net/community")
         self.assertEqual(turbovasctl.GREENBONE_COMMUNITY_KEY_FPR, "8AE4BE429B60A59B311C2E739823FAA60ED1E580")
         self.assertEqual(turbovasctl.GREENBONE_COMMUNITY_KEY_URL, "https://www.greenbone.net/GBCommunitySigningKey.asc")
 
@@ -1662,7 +1663,24 @@ db2:keys=5,expires=0,avg_ttl=0
             self.assertIn("--type", command)
             self.assertEqual(command[command.index("--type") + 1], "all")
             self.assertEqual(command[command.index("--feed-release") + 1], "22.04")
+            self.assertEqual(command[command.index("--nasl-url") + 1], f"{turbovasctl.GREENBONE_COMMUNITY_FEED_URL}/vulnerability-feed/22.04/vt-data/nasl/")
+            self.assertEqual(command[command.index("--gvmd-data-url") + 1], f"{turbovasctl.GREENBONE_COMMUNITY_FEED_URL}/data-feed/22.04/")
             self.assertEqual(command[command.index("--destination-prefix") + 1], str(turbovasctl.feed_cache_var_lib(root)))
+
+    def test_enterprise_feed_key_support_markers_are_release_blockers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "components" / "greenbone-feed-sync" / "greenbone" / "feed" / "sync" / "parser.py"
+            source.parent.mkdir(parents=True)
+            source.write_text("parser.add_argument('--greenbone-enterprise-feed-key')\n", encoding="utf-8")
+
+            markers = turbovasctl.enterprise_feed_key_support_markers(root)
+            self.assertEqual(markers, [{"path": "components/greenbone-feed-sync/greenbone/feed/sync/parser.py", "line": 1, "marker": "--greenbone-enterprise-feed-key"}])
+            self.assertEqual(turbovasctl.enterprise_feed_key_support_finding(root)["status"], "fail")
+
+            source.write_text("# Community Feed only\n", encoding="utf-8")
+            self.assertEqual(turbovasctl.enterprise_feed_key_support_markers(root), [])
+            self.assertEqual(turbovasctl.enterprise_feed_key_support_finding(root)["status"], "pass")
 
     def test_feed_copy_pairs_are_known_subtrees(self):
         with tempfile.TemporaryDirectory() as tmp:

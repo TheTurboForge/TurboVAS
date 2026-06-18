@@ -1,4 +1,5 @@
 # SPDX-FileCopyrightText: 2022-2024 Greenbone AG
+# Modified by TurboVAS contributors, 2026.
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
@@ -104,7 +105,6 @@ async def feed_sync(console: Console, error_console: Console) -> int:
         private_subdir=args.private_directory,
         verbose=verbose >= 3,
         compression_level=args.compression_level,
-        ssh_key=args.greenbone_enterprise_feed_key,
     )
 
     openvas_syncs = filter_syncs(

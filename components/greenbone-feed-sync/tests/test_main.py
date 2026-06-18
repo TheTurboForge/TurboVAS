@@ -1,14 +1,15 @@
 # SPDX-FileCopyrightText: 2023-2024 Greenbone AG
+# Modified by TurboVAS contributors, 2026.
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 
 import sys
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, call, patch
-
-from pontos.testing import temp_directory
 
 from greenbone.feed.sync.config import DEFAULT_FEED_RELEASE
 from greenbone.feed.sync.errors import GreenboneFeedSyncError, RsyncError
@@ -19,6 +20,12 @@ from greenbone.feed.sync.main import (
     filter_syncs,
     main,
 )
+
+
+@contextmanager
+def temp_directory():
+    with TemporaryDirectory() as temp_dir:
+        yield Path(temp_dir)
 
 
 class FilterSyncsTestCase(unittest.TestCase):
@@ -95,7 +102,6 @@ class FeedSyncTestCase(unittest.IsolatedAsyncioTestCase):
             private_subdir=None,
             verbose=False,
             compression_level=9,
-            ssh_key=Path("/etc/gvm/greenbone-enterprise-feed-key"),
         )
         console.print.assert_has_calls(
             [
@@ -152,7 +158,6 @@ class FeedSyncTestCase(unittest.IsolatedAsyncioTestCase):
                 private_subdir=None,
                 verbose=False,
                 compression_level=9,
-                ssh_key=Path("/etc/gvm/greenbone-enterprise-feed-key"),
             )
             console.print.assert_has_calls(
                 [
@@ -209,7 +214,6 @@ class FeedSyncTestCase(unittest.IsolatedAsyncioTestCase):
                 private_subdir=None,
                 verbose=True,
                 compression_level=9,
-                ssh_key=Path("/etc/gvm/greenbone-enterprise-feed-key"),
             )
             console.print.assert_has_calls(
                 [
@@ -280,7 +284,6 @@ class FeedSyncTestCase(unittest.IsolatedAsyncioTestCase):
                 private_subdir=None,
                 verbose=False,
                 compression_level=9,
-                ssh_key=Path("/etc/gvm/greenbone-enterprise-feed-key"),
             )
             console.print.assert_not_called()
 
@@ -326,7 +329,6 @@ class FeedSyncTestCase(unittest.IsolatedAsyncioTestCase):
                 private_subdir=None,
                 verbose=False,
                 compression_level=9,
-                ssh_key=Path("/etc/gvm/greenbone-enterprise-feed-key"),
             )
             console.print.assert_has_calls(
                 [
@@ -387,7 +389,6 @@ class MainFunctionTestCase(unittest.TestCase):
                 private_subdir=None,
                 verbose=False,
                 compression_level=9,
-                ssh_key=Path("/etc/gvm/greenbone-enterprise-feed-key"),
             )
             console_mock_instance.print.assert_has_calls(
                 [
@@ -452,7 +453,6 @@ class MainFunctionTestCase(unittest.TestCase):
                 private_subdir=None,
                 verbose=False,
                 compression_level=9,
-                ssh_key=Path("/etc/gvm/greenbone-enterprise-feed-key"),
             )
             console_mock_instance.print.assert_has_calls(
                 [

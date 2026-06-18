@@ -47,6 +47,9 @@ artifacts that include the service.
 - Add explicit license information to new TurboVAS-created files.
 - Treat feed content terms separately from source code licensing.
 - Treat development feed caches and runtime feed copies as local, untracked runtime state; do not commit, bundle, package, or redistribute feed content without a separate feed-terms review.
+- Treat TurboVAS as Greenbone Community Feed-only. Do not add or re-enable
+  Greenbone Enterprise Feed subscription-key support without a separate explicit
+  product/legal decision.
 - Mark ambiguous cases for human/legal review before public release or distribution.
 - Run `just license-report` during license-sensitive work. The report checks expected component license files, TurboVAS modification notices on modified imported source files, SPDX headers on new TurboVAS-created files, explicit handling for modified imported files that cannot carry comments, accidental tracking of runtime feed/cache content, and public-release review gate state.
 - Run `just license-public-release-gate` before any public repository, release artifact, publication, packaging, or distribution step. The gate fails until public-release license review items are closed.
@@ -88,7 +91,7 @@ reason it cannot.
 - Review `components/openvas-scanner/license-details.md` before changing scanner/NASL/Rust license-sensitive files.
 - Revisit the provisional `GPL-3.0-or-later` root tooling/documentation default before public release and before adding substantial original application code.
 - Review `components/openvas-smb` Samba-derived provenance before public release or distribution.
-- Review Greenbone Community Feed terms before bundling, redistributing, mirroring, or packaging feed content.
+- Review Greenbone Community Feed terms before bundling, redistributing, mirroring, or packaging feed content. TurboVAS currently supports Community Feed synchronization only and deliberately does not support Greenbone Enterprise Feed subscription keys.
 - Review third-party Rust crate license and security posture for
   `services/turbovas-api` before public release, packaging, or distribution.
 - Define release-time source publication and attribution procedures before making this repository public.

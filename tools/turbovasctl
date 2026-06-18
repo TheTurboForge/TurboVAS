@@ -180,9 +180,28 @@ UUID_PATTERN = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-f
 FEED_RELEASE = "22.04"
 FEED_SYNC_TYPE = "all"
 FEED_SYNC_SESSION = "turbovas-feed-sync"
+GREENBONE_COMMUNITY_FEED_URL = "rsync://feed.community.greenbone.net/community"
 FEED_RSYNC_TIMEOUT_SECONDS = 900
 GREENBONE_COMMUNITY_KEY_URL = "https://www.greenbone.net/GBCommunitySigningKey.asc"
 GREENBONE_COMMUNITY_KEY_FPR = "8AE4BE429B60A59B311C2E739823FAA60ED1E580"
+ENTERPRISE_FEED_KEY_UNSUPPORTED_MARKERS = (
+    "--greenbone-enterprise-feed-key",
+    "greenbone-enterprise-feed-key",
+    "GREENBONE_FEED_SYNC_ENTERPRISE_FEED_KEY",
+    "DEFAULT_ENTERPRISE_KEY_PATH",
+    "EnterpriseSettings",
+)
+ENTERPRISE_FEED_KEY_SUPPORT_SCAN_PATHS = (
+    "components/greenbone-feed-sync/greenbone/feed/sync/config.py",
+    "components/greenbone-feed-sync/greenbone/feed/sync/parser.py",
+    "components/greenbone-feed-sync/greenbone/feed/sync/main.py",
+    "components/greenbone-feed-sync/README.md",
+    "README.md",
+    "UPSTREAMS.md",
+    "LICENSE_AUDIT.md",
+    "docs/USER_MANUAL.md",
+    "docs/PUBLIC_RELEASE_READINESS.md",
+)
 NOTUS_SIGNATURE_SUBTREES = ("advisories", "products")
 FULL_AND_FAST_SCAN_CONFIG_ID = "daba56c8-73ec-11df-a475-002264764cea"
 IANA_TCP_UDP_PORT_LIST_ID = "4a4717fe-57d2-11e1-9a26-406186ea4fc5"
@@ -861,16 +880,48 @@ def feed_sync_binary(repo_root: Path) -> Path:
     return repo_root / "build" / "venvs" / "greenbone-feed-sync" / "bin" / "greenbone-feed-sync"
 
 
+def greenbone_community_feed_urls(release: str = FEED_RELEASE) -> dict[str, str]:
+    base = GREENBONE_COMMUNITY_FEED_URL
+    return {
+        "feed-url": base,
+        "gvmd-data-url": f"{base}/data-feed/{release}/",
+        "report-formats-url": f"{base}/data-feed/{release}/report-formats/",
+        "scan-configs-url": f"{base}/data-feed/{release}/scan-configs/",
+        "port-lists-url": f"{base}/data-feed/{release}/port-lists/",
+        "notus-url": f"{base}/vulnerability-feed/{release}/vt-data/notus/",
+        "nasl-url": f"{base}/vulnerability-feed/{release}/vt-data/nasl/",
+        "scap-data-url": f"{base}/vulnerability-feed/{release}/scap-data/",
+        "cert-data-url": f"{base}/vulnerability-feed/{release}/cert-data/",
+    }
+
+
 def feed_sync_command(repo_root: Path, selftest: bool = False) -> list[str]:
     command = [str(feed_sync_binary(repo_root))]
     if selftest:
         command.append("--selftest")
+    community_urls = greenbone_community_feed_urls(FEED_RELEASE)
     return [
         *command,
         "--type",
         FEED_SYNC_TYPE,
         "--feed-release",
         FEED_RELEASE,
+        "--gvmd-data-url",
+        community_urls["gvmd-data-url"],
+        "--report-formats-url",
+        community_urls["report-formats-url"],
+        "--scan-configs-url",
+        community_urls["scan-configs-url"],
+        "--port-lists-url",
+        community_urls["port-lists-url"],
+        "--notus-url",
+        community_urls["notus-url"],
+        "--nasl-url",
+        community_urls["nasl-url"],
+        "--scap-data-url",
+        community_urls["scap-data-url"],
+        "--cert-data-url",
+        community_urls["cert-data-url"],
         "--destination-prefix",
         str(feed_cache_var_lib(repo_root)),
         "--fail-fast",
@@ -3129,6 +3180,35 @@ def public_readiness_finding(public_release: bool = False) -> dict[str, Any]:
     )
 
 
+def enterprise_feed_key_support_markers(repo_root: Path) -> list[dict[str, Any]]:
+    hits: list[dict[str, Any]] = []
+    for relative in ENTERPRISE_FEED_KEY_SUPPORT_SCAN_PATHS:
+        path = repo_root / relative
+        if not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            hits.append({"path": relative, "line": None, "marker": "<read-error>", "error": str(exc)})
+            continue
+        for line_no, line in enumerate(text.splitlines(), start=1):
+            for marker in sorted(ENTERPRISE_FEED_KEY_UNSUPPORTED_MARKERS, key=len, reverse=True):
+                if marker in line:
+                    hits.append({"path": relative, "line": line_no, "marker": marker})
+                    break
+    return hits
+
+
+def enterprise_feed_key_support_finding(repo_root: Path) -> dict[str, Any]:
+    hits = enterprise_feed_key_support_markers(repo_root)
+    return finding(
+        "pass" if not hits else "fail",
+        "license.feed-enterprise-key-disabled",
+        "Enterprise feed-key support is absent from live TurboVAS feed-sync source and public docs." if not hits else "Enterprise feed-key support markers remain in live TurboVAS feed-sync source or public docs.",
+        details={"markers": list(ENTERPRISE_FEED_KEY_UNSUPPORTED_MARKERS), "scan_paths": list(ENTERPRISE_FEED_KEY_SUPPORT_SCAN_PATHS), "hits": hits},
+    )
+
+
 def command_license_report(repo_root: Path, public_release: bool = False) -> dict[str, Any]:
     findings: list[dict[str, Any]] = []
     for component in COMPONENTS:
@@ -3187,6 +3267,7 @@ def command_license_report(repo_root: Path, public_release: bool = False) -> dic
             )
         )
 
+    findings.append(enterprise_feed_key_support_finding(repo_root))
     findings.append(public_readiness_finding(public_release))
     return make_result("license-report", repo_root, "License/provenance checks completed.", findings)
 

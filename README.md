@@ -11,6 +11,11 @@ This repository is currently in an early private development phase. The initial 
 
 TurboVAS is an independent OpenVAS-derived project. It is not affiliated with, sponsored by, or endorsed by Greenbone AG. Greenbone remains the upstream source for the imported Greenbone/OpenVAS components listed in `UPSTREAMS.md`; organizations looking for official Greenbone/OpenVAS vulnerability-management products, support, or services should contact Greenbone directly at https://www.greenbone.net/.
 
+TurboVAS supports the Greenbone Community Feed only. It does not support
+Greenbone Enterprise Feed subscription keys or Enterprise Feed synchronization.
+Organizations that need Greenbone Enterprise Feed access, official Greenbone
+products, or vendor support should contact Greenbone directly.
+
 ## Components
 
 Imported upstream components live under `components/`.
