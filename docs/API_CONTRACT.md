@@ -23,8 +23,9 @@ The first API phase is read-only and report-focused:
 - scope list and scope detail;
 - target list and target detail summary reads;
 - task list and task detail summary reads;
-- top-level asset/security metadata lists for results, vulnerabilities,
-  operating systems, hosts, TLS certificates, and scanner metadata.
+- top-level asset/security metadata lists for results, vulnerabilities, CVE
+  catalog entries, operating systems, hosts, TLS certificates, and scanner
+  metadata.
 - scope-report list, detail, results, hosts, ports, applications, operating
   systems, CVEs, TLS certificates, error messages, and metrics.
 
@@ -79,7 +80,8 @@ The first runtime implementation proof is scoped in
 `docs/NATIVE_API_PROOF_PLAN.md`. It starts with an internal-only Rust sidecar
 for raw report list/detail/result rows/hosts/ports/applications/operating
 systems/CVEs/TLS certificates/errors, scope list/detail, target list/detail,
-task list/detail, scanner metadata list, scope-report list, Results, Hosts, Ports, Applications,
+task list/detail, scanner metadata list, Security Information CVE catalog
+list/detail, scope-report list, Results, Hosts, Ports, Applications,
 Operating Systems, CVEs, TLS Certificates, Error Messages, scope-report Metrics,
 and raw report Metrics because those read
 paths validate DB-backed evidence, scope membership, provenance, and report
@@ -111,6 +113,13 @@ Native scanner metadata rows include scanner identity, host/socket, port,
 inherited scanner type, safe credential references, relay metadata, and
 timestamps. They do not expose credential secret values or scanner CA material,
 and all scanner control actions remain on the inherited path.
+
+Native Security Information CVE catalog rows include the CVE identifier,
+description, CVSS vector, severity, vulnerable product strings, optional EPSS
+metadata when present, and published/modified timestamps from SCAP-owned
+PostgreSQL state. This catalog is intentionally distinct from `/vulnerabilities`
+and report/scope-report CVE tabs: `/cves` is reference intelligence, while the
+report paths are observed evidence from completed scans.
 
 Native raw and scope-report result rows include host, optional hostname,
 port, NVT OID/name/family, severity, QoD, creation time, source report ID,

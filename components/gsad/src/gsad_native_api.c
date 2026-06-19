@@ -52,12 +52,43 @@ is_uuid_segment (const gchar *value, gsize length)
 }
 
 static gboolean
+is_cve_id_segment (const gchar *value, gsize length)
+{
+  if (value == NULL || length < 13)
+    return FALSE;
+
+  if (g_ascii_strncasecmp (value, "CVE-", 4) != 0)
+    return FALSE;
+
+  for (gsize i = 4; i < length; i++)
+    if (!g_ascii_isdigit (value[i]) && value[i] != '-')
+      return FALSE;
+
+  const gchar *year = value + 4;
+  const gchar *suffix = value + 9;
+  if (value[8] != '-' || strlen (year) < 5 || strlen (suffix) < 4)
+    return FALSE;
+
+  for (gsize i = 0; i < 4; i++)
+    if (!g_ascii_isdigit (year[i]))
+      return FALSE;
+
+  for (const gchar *cursor = suffix; *cursor != '\0'; cursor++)
+    if (!g_ascii_isdigit (*cursor))
+      return FALSE;
+
+  return TRUE;
+}
+
+static gboolean
 native_api_path_is_allowed (const gchar *path)
 {
   const gchar *raw_reports_path = "/api/v1/reports";
   const gchar *raw_report_prefix = "/api/v1/reports/";
   const gchar *results_path = "/api/v1/results";
   const gchar *vulnerabilities_path = "/api/v1/vulnerabilities";
+  const gchar *cves_path = "/api/v1/cves";
+  const gchar *cve_prefix = "/api/v1/cves/";
   const gchar *operating_systems_path = "/api/v1/operating-systems";
   const gchar *hosts_path = "/api/v1/hosts";
   const gchar *tls_certificates_path = "/api/v1/tls-certificates";
@@ -100,6 +131,15 @@ native_api_path_is_allowed (const gchar *path)
 
   if (g_strcmp0 (path, vulnerabilities_path) == 0)
     return TRUE;
+
+  if (g_strcmp0 (path, cves_path) == 0)
+    return TRUE;
+
+  if (g_str_has_prefix (path, cve_prefix))
+    {
+      const gchar *id = path + strlen (cve_prefix);
+      return is_cve_id_segment (id, strlen (id));
+    }
 
   if (g_strcmp0 (path, operating_systems_path) == 0)
     return TRUE;

@@ -272,7 +272,7 @@ async function runForBaseUrl(baseUrl) {
       if (url.pathname.startsWith('/api/v1/')) {
         const entry = { path: url.pathname, status: response.status() };
         nativeApiResponses.push(entry);
-        if (url.pathname === '/api/v1/targets' || url.pathname === '/api/v1/tasks') {
+        if (['/api/v1/cves', '/api/v1/targets', '/api/v1/tasks'].includes(url.pathname)) {
           response.json().then(body => {
             entry.itemIds = Array.isArray(body?.items)
               ? body.items.map(item => item?.id).filter(Boolean)
@@ -301,6 +301,18 @@ async function runForBaseUrl(baseUrl) {
     await gotoRoute(page, '/vulnerabilities', 'vulnerabilities');
     const nativeVulnerabilities = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/vulnerabilities$/);
     add(nativeVulnerabilities ? 'pass' : 'fail', 'vulnerability.list-native-api', nativeVulnerabilities ? 'Top-level Vulnerabilities list loaded through same-origin native API.' : 'Top-level Vulnerabilities list did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => item.path === '/api/v1/vulnerabilities') });
+
+    await gotoRoute(page, '/cves', 'cves');
+    const nativeCves = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/cves$/);
+    add(nativeCves ? 'pass' : 'fail', 'cve.list-native-api', nativeCves ? 'Security Information CVE list loaded through same-origin native API.' : 'Security Information CVE list did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => item.path === '/api/v1/cves') });
+    const cveDetailId = await waitForNativeItemId(page, nativeApiResponses, '/api/v1/cves');
+    add(cveDetailId ? 'pass' : 'warn', 'cve.detail-id', cveDetailId ? 'Found a CVE id from the native list response.' : 'No CVE id was available from the native list response.', { id: cveDetailId });
+    if (cveDetailId) {
+      await gotoRoute(page, `/cve/${cveDetailId}`, 'cve-detail');
+      await assertNoAppError(page, 'cve-detail.app-error');
+      const nativeCveDetail = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/cves\/CVE-[0-9]+-[0-9]+$/i);
+      add(nativeCveDetail ? 'pass' : 'fail', 'cve.detail-native-api', nativeCveDetail ? 'Security Information CVE detail loaded through same-origin native API.' : 'Security Information CVE detail did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => /\/api\/v1\/cves\/CVE-[0-9]+-[0-9]+$/i.test(item.path)) });
+    }
 
     await gotoRoute(page, '/operating-systems', 'operating-systems');
     const nativeOperatingSystems = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/operating-systems$/);

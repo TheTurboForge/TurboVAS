@@ -110,13 +110,16 @@ they are now live internal and browser-proxied endpoints:
 - `GET /api/v1/reports/{report_id}/applications`
 - `GET /api/v1/reports/{report_id}/operating-systems`
 - `GET /api/v1/reports/{report_id}/tls-certificates`
+- `GET /api/v1/cves`
+- `GET /api/v1/cves/{cve_id}`
 - `GET /api/v1/targets`
 - `GET /api/v1/targets/{target_id}`
 - `GET /api/v1/tasks`
 - `GET /api/v1/tasks/{task_id}`
 - `GET /api/v1/scanners`
 
-Together with Results, Hosts, Ports, CVEs, Error Messages, and Metrics, these
+Together with Results, Hosts, Ports, CVEs, Error Messages, Metrics, and the
+Security Information CVE catalog, these
 endpoints complete native browser coverage for current scope-report evidence
 tabs and the high-value raw report evidence tabs. Target list reads are also
 browser-proxied through the authenticated `gsad` same-origin boundary, including

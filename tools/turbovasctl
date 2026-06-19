@@ -2612,6 +2612,16 @@ def summarize_native_tooling(items: list[dict[str, Any]]) -> dict[str, Any]:
                 "replacement_candidates": ["GSA top-level Vulnerabilities list (migrated through gsad same-origin proxy)", "read-only vulnerability automation", "native-api-request helper"],
             },
             {
+                "endpoint": "/api/v1/cves",
+                "status": "implemented_internal_and_browser_proxied",
+                "replacement_candidates": ["GSA Security Information CVE list (migrated through gsad same-origin proxy)", "read-only CVE catalog automation", "native-api-request helper"],
+            },
+            {
+                "endpoint": "/api/v1/cves/{cve_id}",
+                "status": "implemented_internal_and_browser_proxied",
+                "replacement_candidates": ["GSA Security Information CVE detail (migrated through gsad same-origin proxy)", "read-only CVE catalog automation"],
+            },
+            {
                 "endpoint": "/api/v1/operating-systems",
                 "status": "implemented_internal_and_browser_proxied",
                 "replacement_candidates": ["GSA top-level Operating Systems list (migrated through gsad same-origin proxy)", "read-only operating-system asset automation", "native-api-request helper"],
@@ -5662,6 +5672,42 @@ def command_runtime_native_api_smoke(repo_root: Path) -> dict[str, Any]:
             vulnerabilities_json,
         )
     )
+
+    cves = native_api_curl(repo_root, "/api/v1/cves?page_size=1&sort=-severity")
+    cves_json = parse_json_output(cves)
+    details["cves"] = summarize_native_api_response(cves_json)
+    cve_items = cves_json.get("items", []) if isinstance(cves_json, dict) else []
+    findings.append(
+        native_api_probe_finding(
+            "pass" if cves.returncode == 0 and isinstance(cve_items, list) else "fail",
+            "native-api.cves",
+            f"Native API Security Information CVE catalog probe exit code {cves.returncode}.",
+            cves,
+            compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/cves?page_size=1"),
+            cves_json,
+        )
+    )
+    if cve_items:
+        first_cve = cve_items[0]
+        cve_detail_id = first_cve.get("id") if isinstance(first_cve, dict) else None
+        if cve_detail_id:
+            cve_detail = native_api_curl(repo_root, f"/api/v1/cves/{urllib.parse.quote(cve_detail_id)}")
+            cve_detail_json = parse_json_output(cve_detail)
+            details["cve_detail"] = summarize_native_api_response(cve_detail_json)
+            findings.append(
+                native_api_probe_finding(
+                    "pass" if cve_detail.returncode == 0 and isinstance(cve_detail_json, dict) and cve_detail_json.get("id") == cve_detail_id else "fail",
+                    "native-api.cve-detail",
+                    f"Native API Security Information CVE detail probe exit code {cve_detail.returncode}.",
+                    cve_detail,
+                    compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/cves/..."),
+                    cve_detail_json,
+                )
+            )
+        else:
+            findings.append(finding("fail", "native-api.cve-detail", "CVE catalog list did not include a CVE id for the detail probe."))
+    else:
+        findings.append(finding("warn", "native-api.cve-detail", "No CVEs exist yet, so the CVE detail probe was skipped."))
 
     operating_systems = native_api_curl(repo_root, "/api/v1/operating-systems?page_size=1&sort=-latest_severity")
     operating_systems_json = parse_json_output(operating_systems)

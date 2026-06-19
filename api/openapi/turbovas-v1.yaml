@@ -41,6 +41,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VulnerabilityCollection'
+  /cves:
+    get:
+      summary: List Security Information CVEs
+      description: Searchable CVE intelligence catalog backed by SCAP feed metadata in gvmd/PostgreSQL. This is distinct from observed report CVEs and vulnerability findings.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Filter'
+      responses:
+        '200':
+          description: CVE catalog collection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogCveCollection'
+  /cves/{cve_id}:
+    get:
+      summary: Read one Security Information CVE
+      parameters:
+        - $ref: '#/components/parameters/CveId'
+      responses:
+        '200':
+          description: CVE catalog detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogCve'
   /operating-systems:
     get:
       summary: List top-level operating-system assets
@@ -570,6 +598,13 @@ components:
       schema:
         type: string
         format: uuid
+    CveId:
+      name: cve_id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^CVE-[0-9]{4}-[0-9]{4,}$'
     ScopeId:
       name: scope_id
       in: path
@@ -698,6 +733,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Vulnerability'
+    CatalogCveCollection:
+      type: object
+      required: [page, items]
+      properties:
+        page:
+          $ref: '#/components/schemas/PageInfo'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CatalogCve'
     ReportHostCollection:
       type: object
       required: [page, items]
@@ -1581,6 +1626,39 @@ components:
           items:
             type: string
             format: uuid
+    CatalogCve:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        comment:
+          type: string
+        description:
+          type: string
+        cvss_base_vector:
+          type: string
+        severity:
+          type: number
+        products:
+          type: array
+          items:
+            type: string
+        epss:
+          type: object
+          properties:
+            score:
+              type: number
+            percentile:
+              type: number
+        published_at:
+          type: string
+          format: date-time
+        modified_at:
+          type: string
+          format: date-time
     TlsCertificate:
       type: object
       required: [id]

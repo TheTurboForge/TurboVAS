@@ -327,6 +327,27 @@ struct CveItem {
 }
 
 #[derive(Debug, Serialize)]
+struct CatalogEpssItem {
+    score: f64,
+    percentile: f64,
+}
+
+#[derive(Debug, Serialize)]
+struct CatalogCveItem {
+    id: String,
+    name: String,
+    comment: String,
+    description: String,
+    cvss_base_vector: String,
+    severity: f64,
+    products: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    epss: Option<CatalogEpssItem>,
+    published_at: Option<String>,
+    modified_at: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
 struct TlsCertificateItem {
     id: String,
     fingerprint_sha256: String,
@@ -603,6 +624,8 @@ async fn main() -> Result<(), ApiError> {
         .route("/healthz", get(healthz))
         .route("/api/v1/results", get(results))
         .route("/api/v1/vulnerabilities", get(vulnerabilities))
+        .route("/api/v1/cves", get(cve_catalog))
+        .route("/api/v1/cves/:cve_id", get(cve_catalog_detail))
         .route("/api/v1/operating-systems", get(operating_system_assets))
         .route("/api/v1/hosts", get(host_assets))
         .route("/api/v1/tls-certificates", get(tls_certificate_assets))
@@ -1101,6 +1124,104 @@ async fn vulnerabilities(
         page: params.page_info(total),
         items,
     }))
+}
+
+async fn cve_catalog(
+    State(state): State<AppState>,
+    Query(query): Query<CollectionQuery>,
+) -> Result<Json<Collection<CatalogCveItem>>, ApiError> {
+    let params = normalize_collection_query(query, "-severity")?;
+    let sort_sql = sort_clause(
+        &params.sort,
+        &[
+            ("id", "id"),
+            ("name", "name"),
+            ("description", "description"),
+            ("published", "published_at_unix"),
+            ("modified", "modified_at_unix"),
+            ("cvss_base_vector", "cvss_base_vector"),
+            ("cvssBaseVector", "cvss_base_vector"),
+            ("severity", "severity"),
+            ("epss_score", "epss_score"),
+            ("epss_percentile", "epss_percentile"),
+        ],
+    )?;
+    let sql = format!(
+        r#"WITH cve_rows AS (
+             SELECT c.name AS id,
+                    c.name AS name,
+                    coalesce(c.comment, '') AS comment,
+                    coalesce(c.description, '') AS description,
+                    coalesce(c.cvss_vector, '') AS cvss_base_vector,
+                    coalesce(c.severity, 0)::double precision AS severity,
+                    coalesce(c.products, '') AS products,
+                    e.epss::double precision AS epss_score,
+                    e.percentile::double precision AS epss_percentile,
+                    coalesce(c.creation_time, 0)::bigint AS published_at_unix,
+                    coalesce(c.modification_time, 0)::bigint AS modified_at_unix
+               FROM scap.cves c
+               LEFT JOIN scap.epss_scores e ON e.cve = c.name
+         ),
+         filtered AS (
+             SELECT * FROM cve_rows
+              WHERE ($1 = ''
+                     OR lower(id) LIKE '%' || lower($1) || '%'
+                     OR lower(description) LIKE '%' || lower($1) || '%'
+                     OR lower(cvss_base_vector) LIKE '%' || lower($1) || '%'
+                     OR lower(products) LIKE '%' || lower($1) || '%')
+         )
+         SELECT count(*) OVER()::bigint AS total, * FROM filtered
+          ORDER BY {sort_sql}, id ASC LIMIT $2 OFFSET $3;"#,
+    );
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let rows = client
+        .query(&sql, &[&params.filter, &params.page_size, &params.offset])
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "CVE catalog list query failed");
+            ApiError::Database
+        })?;
+    let total = rows
+        .first()
+        .map(|row| row.get::<_, i64>("total"))
+        .unwrap_or(0);
+    let items = rows.iter().map(catalog_cve_from_row).collect();
+    Ok(Json(Collection {
+        page: params.page_info(total),
+        items,
+    }))
+}
+
+async fn cve_catalog_detail(
+    State(state): State<AppState>,
+    Path(cve_id): Path<String>,
+) -> Result<Json<CatalogCveItem>, ApiError> {
+    validate_cve_id(&cve_id)?;
+    let sql = r#"SELECT c.name AS id,
+                        c.name AS name,
+                        coalesce(c.comment, '') AS comment,
+                        coalesce(c.description, '') AS description,
+                        coalesce(c.cvss_vector, '') AS cvss_base_vector,
+                        coalesce(c.severity, 0)::double precision AS severity,
+                        coalesce(c.products, '') AS products,
+                        e.epss::double precision AS epss_score,
+                        e.percentile::double precision AS epss_percentile,
+                        coalesce(c.creation_time, 0)::bigint AS published_at_unix,
+                        coalesce(c.modification_time, 0)::bigint AS modified_at_unix
+                   FROM scap.cves c
+                   LEFT JOIN scap.epss_scores e ON e.cve = c.name
+                  WHERE lower(c.name) = lower($1)
+                  LIMIT 1;"#;
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let row = client
+        .query_opt(sql, &[&cve_id])
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "CVE catalog detail query failed");
+            ApiError::Database
+        })?
+        .ok_or(ApiError::NotFound)?;
+    Ok(Json(catalog_cve_from_row(&row)))
 }
 
 async fn operating_system_assets(
@@ -4238,6 +4359,23 @@ fn parse_uuid(value: &str) -> Result<Uuid, ApiError> {
     Uuid::parse_str(value).map_err(|_| ApiError::BadRequest("path id must be a UUID".to_string()))
 }
 
+fn validate_cve_id(value: &str) -> Result<(), ApiError> {
+    let upper = value.to_ascii_uppercase();
+    let parts: Vec<&str> = upper.split('-').collect();
+    if parts.len() != 3
+        || parts[0] != "CVE"
+        || parts[1].len() != 4
+        || parts[2].len() < 4
+        || !parts[1].chars().all(|ch| ch.is_ascii_digit())
+        || !parts[2].chars().all(|ch| ch.is_ascii_digit())
+    {
+        return Err(ApiError::BadRequest(
+            "path id must be a CVE identifier".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 fn report_reference(id: Option<String>, name: Option<String>) -> Option<ReportReference> {
     let id = id?;
     let name = name.unwrap_or_else(|| id.clone());
@@ -4648,6 +4786,33 @@ fn cve_from_row(row: &Row) -> CveItem {
         result_count: row.get(3),
         max_severity: row.get(4),
         source_report_ids: row.get(5),
+    }
+}
+
+fn split_catalog_products(value: String) -> Vec<String> {
+    value
+        .split_whitespace()
+        .filter(|product| !product.is_empty())
+        .map(ToString::to_string)
+        .collect()
+}
+
+fn catalog_cve_from_row(row: &Row) -> CatalogCveItem {
+    let epss_score: Option<f64> = row.get("epss_score");
+    let epss_percentile: Option<f64> = row.get("epss_percentile");
+    CatalogCveItem {
+        id: row.get("id"),
+        name: row.get("name"),
+        comment: row.get("comment"),
+        description: row.get("description"),
+        cvss_base_vector: row.get("cvss_base_vector"),
+        severity: row.get("severity"),
+        products: split_catalog_products(row.get("products")),
+        epss: epss_score
+            .zip(epss_percentile)
+            .map(|(score, percentile)| CatalogEpssItem { score, percentile }),
+        published_at: unix_ts_to_rfc3339(row.get("published_at_unix")),
+        modified_at: unix_ts_to_rfc3339(row.get("modified_at_unix")),
     }
 }
 
