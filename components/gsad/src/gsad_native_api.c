@@ -81,12 +81,46 @@ is_cve_id_segment (const gchar *value, gsize length)
 }
 
 static gboolean
+is_cpe_id_segment (const gchar *value, gsize length)
+{
+  if (value == NULL || length < 4 || length > 4096)
+    return FALSE;
+
+  if (g_ascii_strncasecmp (value, "cpe:", 4) != 0
+      && g_ascii_strncasecmp (value, "cpe%3a", 6) != 0)
+    return FALSE;
+
+  for (gsize i = 0; i < length; i++)
+    {
+      if (g_ascii_isalnum (value[i]) || value[i] == '-' || value[i] == '_'
+          || value[i] == '.' || value[i] == ':' || value[i] == '~'
+          || value[i] == '/')
+        continue;
+
+      if (value[i] == '%')
+        {
+          if (i + 2 >= length || !g_ascii_isxdigit (value[i + 1])
+              || !g_ascii_isxdigit (value[i + 2]))
+            return FALSE;
+          i += 2;
+          continue;
+        }
+
+      return FALSE;
+    }
+
+  return TRUE;
+}
+
+static gboolean
 native_api_path_is_allowed (const gchar *path)
 {
   const gchar *raw_reports_path = "/api/v1/reports";
   const gchar *raw_report_prefix = "/api/v1/reports/";
   const gchar *results_path = "/api/v1/results";
   const gchar *vulnerabilities_path = "/api/v1/vulnerabilities";
+  const gchar *cpes_path = "/api/v1/cpes";
+  const gchar *cpe_prefix = "/api/v1/cpes/";
   const gchar *cves_path = "/api/v1/cves";
   const gchar *cve_prefix = "/api/v1/cves/";
   const gchar *operating_systems_path = "/api/v1/operating-systems";
@@ -131,6 +165,15 @@ native_api_path_is_allowed (const gchar *path)
 
   if (g_strcmp0 (path, vulnerabilities_path) == 0)
     return TRUE;
+
+  if (g_strcmp0 (path, cpes_path) == 0)
+    return TRUE;
+
+  if (g_str_has_prefix (path, cpe_prefix))
+    {
+      const gchar *id = path + strlen (cpe_prefix);
+      return is_cpe_id_segment (id, strlen (id));
+    }
 
   if (g_strcmp0 (path, cves_path) == 0)
     return TRUE;

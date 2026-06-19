@@ -591,6 +591,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("/hosts", native_api)
         self.assertIn("/ports", native_api)
         self.assertIn("/cves", native_api)
+        self.assertIn("/cpes", native_api)
         self.assertIn("/errors", native_api)
         self.assertIn("native_api_request_target", native_api)
         self.assertIn('append_query_param (target, params, "page")', native_api)
@@ -747,6 +748,8 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertNotIn("components/gvm-tools/scripts/scope-report-metrics.gmp.py", all_paths)
         self.assertIn("remaining gvm-tools write/control scripts", {item["workflow"] for item in details["next_replacement_candidates"]})
         endpoints = {item["endpoint"] for item in details["implemented_native_endpoints"]}
+        self.assertIn("/api/v1/cpes", endpoints)
+        self.assertIn("/api/v1/cpes/{cpe_id}", endpoints)
         self.assertIn("/api/v1/reports", endpoints)
         self.assertIn("/api/v1/reports/{report_id}", endpoints)
         self.assertIn("/api/v1/reports/{report_id}/results", endpoints)

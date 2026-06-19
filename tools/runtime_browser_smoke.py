@@ -272,7 +272,7 @@ async function runForBaseUrl(baseUrl) {
       if (url.pathname.startsWith('/api/v1/')) {
         const entry = { path: url.pathname, status: response.status() };
         nativeApiResponses.push(entry);
-        if (['/api/v1/cves', '/api/v1/targets', '/api/v1/tasks'].includes(url.pathname)) {
+        if (['/api/v1/cves', '/api/v1/cpes', '/api/v1/targets', '/api/v1/tasks'].includes(url.pathname)) {
           response.json().then(body => {
             entry.itemIds = Array.isArray(body?.items)
               ? body.items.map(item => item?.id).filter(Boolean)
@@ -312,6 +312,18 @@ async function runForBaseUrl(baseUrl) {
       await assertNoAppError(page, 'cve-detail.app-error');
       const nativeCveDetail = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/cves\/CVE-[0-9]+-[0-9]+$/i);
       add(nativeCveDetail ? 'pass' : 'fail', 'cve.detail-native-api', nativeCveDetail ? 'Security Information CVE detail loaded through same-origin native API.' : 'Security Information CVE detail did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => /\/api\/v1\/cves\/CVE-[0-9]+-[0-9]+$/i.test(item.path)) });
+    }
+
+    await gotoRoute(page, '/cpes', 'cpes');
+    const nativeCpes = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/cpes$/);
+    add(nativeCpes ? 'pass' : 'fail', 'cpe.list-native-api', nativeCpes ? 'Security Information CPE list loaded through same-origin native API.' : 'Security Information CPE list did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => item.path === '/api/v1/cpes') });
+    const cpeDetailId = await waitForNativeItemId(page, nativeApiResponses, '/api/v1/cpes');
+    add(cpeDetailId ? 'pass' : 'warn', 'cpe.detail-id', cpeDetailId ? 'Found a CPE id from the native list response.' : 'No CPE id was available from the native list response.', { id: cpeDetailId });
+    if (cpeDetailId) {
+      await gotoRoute(page, `/cpe/${encodeURIComponent(cpeDetailId)}`, 'cpe-detail');
+      await assertNoAppError(page, 'cpe-detail.app-error');
+      const nativeCpeDetail = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/cpes\/(?:cpe%3A|cpe:)/i);
+      add(nativeCpeDetail ? 'pass' : 'fail', 'cpe.detail-native-api', nativeCpeDetail ? 'Security Information CPE detail loaded through same-origin native API.' : 'Security Information CPE detail did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => item.path.includes('/api/v1/cpes/')) });
     }
 
     await gotoRoute(page, '/operating-systems', 'operating-systems');

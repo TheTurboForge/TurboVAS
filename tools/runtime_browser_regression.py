@@ -314,6 +314,7 @@ async function runForBaseUrl(baseUrl) {
     await checkTopLevelRoute(page, '/results', 'results', /\/api\/v1\/results$/, /^\/result\/[^/]+/);
     await checkTopLevelRoute(page, '/vulnerabilities', 'vulnerabilities', /\/api\/v1\/vulnerabilities$/, null);
     await checkTopLevelRoute(page, '/cves', 'cves', /\/api\/v1\/cves$/, /^\/cve\/[^/]+/);
+    await checkTopLevelRoute(page, '/cpes', 'cpes', /\/api\/v1\/cpes$/, /^\/cpe\/[^/]+/);
     await checkTopLevelRoute(page, '/hosts', 'hosts', /\/api\/v1\/hosts$/, /^\/host\/[^/]+/);
     await checkTopLevelRoute(page, '/operating-systems', 'operating-systems', /\/api\/v1\/operating-systems$/, null);
     await checkTopLevelRoute(page, '/tls-certificates', 'tls-certificates', /\/api\/v1\/tls-certificates$/, null);

@@ -2631,6 +2631,16 @@ def summarize_native_tooling(items: list[dict[str, Any]]) -> dict[str, Any]:
                 "replacement_candidates": ["GSA Security Information CVE detail (migrated through gsad same-origin proxy)", "read-only CVE catalog automation"],
             },
             {
+                "endpoint": "/api/v1/cpes",
+                "status": "implemented_internal_and_browser_proxied",
+                "replacement_candidates": ["GSA Security Information CPE list (migrated through gsad same-origin proxy)", "read-only CPE catalog automation", "native-api-request helper"],
+            },
+            {
+                "endpoint": "/api/v1/cpes/{cpe_id}",
+                "status": "implemented_internal_and_browser_proxied",
+                "replacement_candidates": ["GSA Security Information CPE detail (migrated through gsad same-origin proxy)", "read-only CPE catalog automation"],
+            },
+            {
                 "endpoint": "/api/v1/operating-systems",
                 "status": "implemented_internal_and_browser_proxied",
                 "replacement_candidates": ["GSA top-level Operating Systems list (migrated through gsad same-origin proxy)", "read-only operating-system asset automation", "native-api-request helper"],
@@ -5717,6 +5727,42 @@ def command_runtime_native_api_smoke(repo_root: Path) -> dict[str, Any]:
             findings.append(finding("fail", "native-api.cve-detail", "CVE catalog list did not include a CVE id for the detail probe."))
     else:
         findings.append(finding("warn", "native-api.cve-detail", "No CVEs exist yet, so the CVE detail probe was skipped."))
+
+    cpes = native_api_curl(repo_root, "/api/v1/cpes?page_size=1&sort=-modified")
+    cpes_json = parse_json_output(cpes)
+    details["cpes"] = summarize_native_api_response(cpes_json)
+    cpe_items = cpes_json.get("items", []) if isinstance(cpes_json, dict) else []
+    findings.append(
+        native_api_probe_finding(
+            "pass" if cpes.returncode == 0 and isinstance(cpe_items, list) else "fail",
+            "native-api.cpes",
+            f"Native API Security Information CPE catalog probe exit code {cpes.returncode}.",
+            cpes,
+            compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/cpes?page_size=1"),
+            cpes_json,
+        )
+    )
+    if cpe_items:
+        first_cpe = cpe_items[0]
+        cpe_detail_id = first_cpe.get("id") if isinstance(first_cpe, dict) else None
+        if cpe_detail_id:
+            cpe_detail = native_api_curl(repo_root, f"/api/v1/cpes/{urllib.parse.quote(cpe_detail_id, safe='')}")
+            cpe_detail_json = parse_json_output(cpe_detail)
+            details["cpe_detail"] = summarize_native_api_response(cpe_detail_json)
+            findings.append(
+                native_api_probe_finding(
+                    "pass" if cpe_detail.returncode == 0 and isinstance(cpe_detail_json, dict) and cpe_detail_json.get("id") == cpe_detail_id else "fail",
+                    "native-api.cpe-detail",
+                    f"Native API Security Information CPE detail probe exit code {cpe_detail.returncode}.",
+                    cpe_detail,
+                    compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/cpes/..."),
+                    cpe_detail_json,
+                )
+            )
+        else:
+            findings.append(finding("fail", "native-api.cpe-detail", "CPE catalog list did not include a CPE id for the detail probe."))
+    else:
+        findings.append(finding("warn", "native-api.cpe-detail", "No CPEs exist yet, so the CPE detail probe was skipped."))
 
     operating_systems = native_api_curl(repo_root, "/api/v1/operating-systems?page_size=1&sort=-latest_severity")
     operating_systems_json = parse_json_output(operating_systems)

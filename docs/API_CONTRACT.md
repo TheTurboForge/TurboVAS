@@ -81,7 +81,8 @@ The first runtime implementation proof is scoped in
 for raw report list/detail/result rows/hosts/ports/applications/operating
 systems/CVEs/TLS certificates/errors, scope list/detail, target list/detail,
 task list/detail, scanner metadata list, Security Information CVE catalog
-list/detail, scope-report list, Results, Hosts, Ports, Applications,
+list/detail, Security Information CPE catalog list/detail, scope-report list,
+Results, Hosts, Ports, Applications,
 Operating Systems, CVEs, TLS Certificates, Error Messages, scope-report Metrics,
 and raw report Metrics because those read
 paths validate DB-backed evidence, scope membership, provenance, and report
@@ -120,6 +121,13 @@ metadata when present, and published/modified timestamps from SCAP-owned
 PostgreSQL state. This catalog is intentionally distinct from `/vulnerabilities`
 and report/scope-report CVE tabs: `/cves` is reference intelligence, while the
 report paths are observed evidence from completed scans.
+
+Native Security Information CPE catalog rows include the CPE URI, title,
+deprecation status, severity, CVE reference count, and reported CVE references
+where available from SCAP-owned PostgreSQL state. This catalog is intentionally
+distinct from observed host, application, operating-system, and report evidence:
+`/cpes` is reference intelligence, while report paths are observed evidence from
+completed scans.
 
 Native raw and scope-report result rows include host, optional hostname,
 port, NVT OID/name/family, severity, QoD, creation time, source report ID,

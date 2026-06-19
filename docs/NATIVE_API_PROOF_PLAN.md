@@ -112,6 +112,8 @@ they are now live internal and browser-proxied endpoints:
 - `GET /api/v1/reports/{report_id}/tls-certificates`
 - `GET /api/v1/cves`
 - `GET /api/v1/cves/{cve_id}`
+- `GET /api/v1/cpes`
+- `GET /api/v1/cpes/{cpe_id}`
 - `GET /api/v1/targets`
 - `GET /api/v1/targets/{target_id}`
 - `GET /api/v1/tasks`

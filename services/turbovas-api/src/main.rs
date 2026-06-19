@@ -348,6 +348,29 @@ struct CatalogCveItem {
 }
 
 #[derive(Debug, Serialize)]
+struct CatalogCpeCveItem {
+    id: String,
+    severity: f64,
+}
+
+#[derive(Debug, Serialize)]
+struct CatalogCpeItem {
+    id: String,
+    name: String,
+    comment: String,
+    title: String,
+    cpe_name_id: String,
+    deprecated: bool,
+    deprecated_by: Option<String>,
+    severity: f64,
+    cve_refs: i64,
+    cves: Vec<CatalogCpeCveItem>,
+    created_at: Option<String>,
+    modified_at: Option<String>,
+    updated_at: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
 struct TlsCertificateItem {
     id: String,
     fingerprint_sha256: String,
@@ -624,6 +647,8 @@ async fn main() -> Result<(), ApiError> {
         .route("/healthz", get(healthz))
         .route("/api/v1/results", get(results))
         .route("/api/v1/vulnerabilities", get(vulnerabilities))
+        .route("/api/v1/cpes", get(cpe_catalog))
+        .route("/api/v1/cpes/*cpe_id", get(cpe_catalog_detail))
         .route("/api/v1/cves", get(cve_catalog))
         .route("/api/v1/cves/:cve_id", get(cve_catalog_detail))
         .route("/api/v1/operating-systems", get(operating_system_assets))
@@ -1124,6 +1149,142 @@ async fn vulnerabilities(
         page: params.page_info(total),
         items,
     }))
+}
+
+async fn cpe_catalog(
+    State(state): State<AppState>,
+    Query(query): Query<CollectionQuery>,
+) -> Result<Json<Collection<CatalogCpeItem>>, ApiError> {
+    let params = normalize_collection_query(query, "-modified")?;
+    let sort_sql = sort_clause(
+        &params.sort,
+        &[
+            ("id", "id"),
+            ("name", "name"),
+            ("title", "title"),
+            ("created", "created_at_unix"),
+            ("modified", "modified_at_unix"),
+            ("severity", "severity"),
+            ("cves", "cve_refs"),
+            ("cpe_name_id", "cpe_name_id"),
+            ("cpeNameId", "cpe_name_id"),
+            ("deprecated", "deprecated_int"),
+        ],
+    )?;
+    let sql = format!(
+        r#"WITH cpe_rows AS (
+             SELECT c.uuid AS id,
+                    c.name AS name,
+                    coalesce(c.comment, '') AS comment,
+                    coalesce(c.title, '') AS title,
+                    coalesce(c.cpe_name_id, '') AS cpe_name_id,
+                    coalesce(c.deprecated, 0)::integer AS deprecated_int,
+                    coalesce(c.severity, 0)::double precision AS severity,
+                    coalesce(c.cve_refs, 0)::bigint AS cve_refs,
+                    coalesce(c.creation_time, 0)::bigint AS created_at_unix,
+                    coalesce(c.modification_time, 0)::bigint AS modified_at_unix
+               FROM scap.cpes c
+         ),
+         filtered AS (
+             SELECT * FROM cpe_rows
+              WHERE ($1 = ''
+                     OR lower(id) LIKE '%' || lower($1) || '%'
+                     OR lower(name) LIKE '%' || lower($1) || '%'
+                     OR lower(title) LIKE '%' || lower($1) || '%'
+                     OR lower(cpe_name_id) LIKE '%' || lower($1) || '%'
+                     OR lower(comment) LIKE '%' || lower($1) || '%')
+         )
+         SELECT count(*) OVER()::bigint AS total, * FROM filtered
+          ORDER BY {sort_sql}, name ASC, id ASC LIMIT $2 OFFSET $3;"#,
+    );
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let rows = client
+        .query(&sql, &[&params.filter, &params.page_size, &params.offset])
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "CPE catalog list query failed");
+            ApiError::Database
+        })?;
+    let total = rows
+        .first()
+        .map(|row| row.get::<_, i64>("total"))
+        .unwrap_or(0);
+    let items = rows
+        .iter()
+        .map(|row| catalog_cpe_from_row(row, Vec::new(), None))
+        .collect();
+    Ok(Json(Collection {
+        page: params.page_info(total),
+        items,
+    }))
+}
+
+async fn cpe_catalog_detail(
+    State(state): State<AppState>,
+    Path(cpe_id): Path<String>,
+) -> Result<Json<CatalogCpeItem>, ApiError> {
+    let cpe_id = cpe_id.strip_prefix('/').unwrap_or(&cpe_id).to_string();
+    validate_cpe_id(&cpe_id)?;
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let row = client
+        .query_opt(
+            r#"SELECT c.uuid AS id,
+                      c.name AS name,
+                      coalesce(c.comment, '') AS comment,
+                      coalesce(c.title, '') AS title,
+                      coalesce(c.cpe_name_id, '') AS cpe_name_id,
+                      coalesce(c.deprecated, 0)::integer AS deprecated_int,
+                      coalesce(c.severity, 0)::double precision AS severity,
+                      coalesce(c.cve_refs, 0)::bigint AS cve_refs,
+                      coalesce(c.creation_time, 0)::bigint AS created_at_unix,
+                      coalesce(c.modification_time, 0)::bigint AS modified_at_unix
+                 FROM scap.cpes c
+                WHERE c.uuid = $1 OR c.name = $1
+                LIMIT 1;"#,
+            &[&cpe_id],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "CPE catalog detail query failed");
+            ApiError::Database
+        })?
+        .ok_or(ApiError::NotFound)?;
+    let cves = client
+        .query(
+            r#"SELECT cv.name AS id,
+                      coalesce(cv.severity, 0)::double precision AS severity
+                 FROM scap.cves cv
+                 JOIN scap.affected_products ap ON ap.cve = cv.id
+                 JOIN scap.cpes c ON c.id = ap.cpe
+                WHERE c.uuid = $1 OR c.name = $1
+                ORDER BY severity DESC, cv.name ASC;"#,
+            &[&cpe_id],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "CPE catalog CVE reference query failed");
+            ApiError::Database
+        })?
+        .iter()
+        .map(catalog_cpe_cve_from_row)
+        .collect();
+    let deprecated_by = client
+        .query_opt(
+            r#"SELECT deprecated_by
+                 FROM scap.cpes_deprecated_by
+                WHERE cpe = $1
+                ORDER BY deprecated_by
+                LIMIT 1;"#,
+            &[&cpe_id],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "CPE catalog deprecated-by query failed");
+            ApiError::Database
+        })?
+        .map(|row| row.get("deprecated_by"));
+
+    Ok(Json(catalog_cpe_from_row(&row, cves, deprecated_by)))
 }
 
 async fn cve_catalog(
@@ -4376,6 +4537,15 @@ fn validate_cve_id(value: &str) -> Result<(), ApiError> {
     Ok(())
 }
 
+fn validate_cpe_id(value: &str) -> Result<(), ApiError> {
+    if value.is_empty() || value.len() > 2048 || !value.starts_with("cpe:") {
+        return Err(ApiError::BadRequest(
+            "path id must be a CPE identifier".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 fn report_reference(id: Option<String>, name: Option<String>) -> Option<ReportReference> {
     let id = id?;
     let name = name.unwrap_or_else(|| id.clone());
@@ -4813,6 +4983,36 @@ fn catalog_cve_from_row(row: &Row) -> CatalogCveItem {
             .map(|(score, percentile)| CatalogEpssItem { score, percentile }),
         published_at: unix_ts_to_rfc3339(row.get("published_at_unix")),
         modified_at: unix_ts_to_rfc3339(row.get("modified_at_unix")),
+    }
+}
+
+fn catalog_cpe_cve_from_row(row: &Row) -> CatalogCpeCveItem {
+    CatalogCpeCveItem {
+        id: row.get("id"),
+        severity: row.get("severity"),
+    }
+}
+
+fn catalog_cpe_from_row(
+    row: &Row,
+    cves: Vec<CatalogCpeCveItem>,
+    deprecated_by: Option<String>,
+) -> CatalogCpeItem {
+    let deprecated_int: i32 = row.get("deprecated_int");
+    CatalogCpeItem {
+        id: row.get("id"),
+        name: row.get("name"),
+        comment: row.get("comment"),
+        title: row.get("title"),
+        cpe_name_id: row.get("cpe_name_id"),
+        deprecated: deprecated_int != 0,
+        deprecated_by,
+        severity: row.get("severity"),
+        cve_refs: row.get("cve_refs"),
+        cves,
+        created_at: unix_ts_to_rfc3339(row.get("created_at_unix")),
+        modified_at: unix_ts_to_rfc3339(row.get("modified_at_unix")),
+        updated_at: unix_ts_to_rfc3339(row.get("modified_at_unix")),
     }
 }
 

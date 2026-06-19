@@ -69,6 +69,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CatalogCve'
+  /cpes:
+    get:
+      summary: List Security Information CPEs
+      description: Searchable CPE intelligence catalog backed by SCAP feed metadata in gvmd/PostgreSQL. This is distinct from observed operating-system and application evidence in raw and scope reports.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Filter'
+      responses:
+        '200':
+          description: CPE catalog collection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogCpeCollection'
+  /cpes/{cpe_id}:
+    get:
+      summary: Read one Security Information CPE
+      parameters:
+        - $ref: '#/components/parameters/CpeId'
+      responses:
+        '200':
+          description: CPE catalog detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogCpe'
   /operating-systems:
     get:
       summary: List top-level operating-system assets
@@ -605,6 +633,13 @@ components:
       schema:
         type: string
         pattern: '^CVE-[0-9]{4}-[0-9]{4,}$'
+    CpeId:
+      name: cpe_id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^cpe:.+'
     ScopeId:
       name: scope_id
       in: path
@@ -743,6 +778,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CatalogCve'
+    CatalogCpeCollection:
+      type: object
+      required: [page, items]
+      properties:
+        page:
+          $ref: '#/components/schemas/PageInfo'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CatalogCpe'
     ReportHostCollection:
       type: object
       required: [page, items]
@@ -1657,6 +1702,52 @@ components:
           type: string
           format: date-time
         modified_at:
+          type: string
+          format: date-time
+    CatalogCpeCve:
+      type: object
+      required: [id, severity]
+      properties:
+        id:
+          type: string
+          pattern: '^CVE-[0-9]{4}-[0-9]{4,}$'
+        severity:
+          type: number
+    CatalogCpe:
+      type: object
+      required: [id, name, deprecated, cve_refs]
+      properties:
+        id:
+          type: string
+          description: CPE URI, for example cpe:/a:vendor:product:version.
+        name:
+          type: string
+        comment:
+          type: string
+        title:
+          type: string
+        cpe_name_id:
+          type: string
+        deprecated:
+          type: boolean
+        deprecated_by:
+          type: string
+        severity:
+          type: number
+          nullable: true
+        cve_refs:
+          type: integer
+        cves:
+          type: array
+          items:
+            $ref: '#/components/schemas/CatalogCpeCve'
+        created_at:
+          type: string
+          format: date-time
+        modified_at:
+          type: string
+          format: date-time
+        updated_at:
           type: string
           format: date-time
     TlsCertificate:

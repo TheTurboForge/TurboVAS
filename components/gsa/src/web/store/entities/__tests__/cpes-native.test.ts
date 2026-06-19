@@ -1,0 +1,106 @@
+/* SPDX-FileCopyrightText: 2026 TurboVAS contributors
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+import {afterEach, describe, expect, test, testing} from '@gsa/testing';
+import {fetchNativeCpe, fetchNativeCpes} from 'gmp/native-api/cpes';
+
+const createGmp = ({jwt, token = 'test-token'}: {jwt?: string; token?: string} = {}) => ({
+  buildUrl: testing.fn((path: string) => `https://turbovas.example/${path}`),
+  session: {jwt, token},
+});
+
+afterEach(() => {
+  testing.unstubAllGlobals();
+});
+
+describe('native API CPE catalog', () => {
+  test('fetches top-level CPEs as inherited Cpe models', async () => {
+    const fetchMock = testing.fn().mockResolvedValue({
+      json: testing.fn().mockResolvedValue({
+        page: {page: 1, page_size: 25, total: 1, sort: '-modified', filter: 'lightllm'},
+        items: [
+          {
+            id: 'cpe:/a:example:lightllm:1.1.0',
+            name: 'cpe:/a:example:lightllm:1.1.0',
+            comment: '',
+            title: 'Example LightLLM 1.1.0',
+            cpe_name_id: 'ABC-123',
+            deprecated: false,
+            severity: 9.8,
+            cve_refs: 1,
+            cves: [],
+            created_at: '2026-06-18T20:00:00Z',
+            modified_at: '2026-06-19T07:00:00Z',
+            updated_at: '2026-06-19T07:00:00Z',
+          },
+        ],
+      }),
+      ok: true,
+      status: 200,
+    });
+    testing.stubGlobal('fetch', fetchMock);
+    const gmp = createGmp({jwt: 'jwt-token'});
+
+    const response = await fetchNativeCpes(gmp, {
+      page: 1,
+      pageSize: 25,
+      sort: '-modified',
+      filter: 'lightllm',
+    });
+
+    const cpe = response.cpes[0];
+    expect(response.counts.filtered).toEqual(1);
+    expect(cpe.id).toEqual('cpe:/a:example:lightllm:1.1.0');
+    expect(cpe.name).toEqual('cpe:/a:example:lightllm:1.1.0');
+    expect(cpe.title).toEqual('Example LightLLM 1.1.0');
+    expect(cpe.cpeNameId).toEqual('ABC-123');
+    expect(cpe.deprecated).toEqual(false);
+    expect(cpe.severity).toEqual(9.8);
+    expect(cpe.cveRefs).toEqual(1);
+    expect(gmp.buildUrl).toHaveBeenCalledWith('api/v1/cpes', {
+      token: 'test-token',
+      page: 1,
+      page_size: 25,
+      sort: '-modified',
+      filter: 'lightllm',
+    });
+    expect(fetchMock).toHaveBeenCalledWith('https://turbovas.example/api/v1/cpes', {
+      credentials: 'include',
+      headers: {
+        Accept: 'application/json',
+        Authorization: 'Bearer jwt-token',
+      },
+    });
+  });
+
+  test('fetches one CPE detail through the native API', async () => {
+    const fetchMock = testing.fn().mockResolvedValue({
+      json: testing.fn().mockResolvedValue({
+        id: 'cpe:/a:example:lightllm:1.1.0',
+        name: 'cpe:/a:example:lightllm:1.1.0',
+        title: 'Example LightLLM 1.1.0',
+        deprecated: true,
+        deprecated_by: 'cpe:/a:example:lightllm:1.2.0',
+        cve_refs: 1,
+        cves: [{id: 'CVE-2026-26220', severity: 9.8}],
+      }),
+      ok: true,
+      status: 200,
+    });
+    testing.stubGlobal('fetch', fetchMock);
+    const gmp = createGmp();
+
+    const cpe = await fetchNativeCpe(gmp, 'cpe:/a:example:lightllm:1.1.0');
+
+    expect(cpe.id).toEqual('cpe:/a:example:lightllm:1.1.0');
+    expect(cpe.deprecated).toEqual(true);
+    expect(cpe.deprecatedBy).toEqual('cpe:/a:example:lightllm:1.2.0');
+    expect(cpe.cves).toEqual([{id: 'CVE-2026-26220', severity: 9.8}]);
+    expect(gmp.buildUrl).toHaveBeenCalledWith(
+      'api/v1/cpes/cpe%3A%2Fa%3Aexample%3Alightllm%3A1.1.0',
+      {token: 'test-token'},
+    );
+  });
+});
