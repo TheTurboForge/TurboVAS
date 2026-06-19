@@ -130,18 +130,40 @@ async function firstHref(page, matcher) {
   return hrefs.find(href => matcher.test(href)) || null;
 }
 
-async function firstExpandedRowDetailHref(page, matcher) {
-  const tableCount = await page.getByTestId('entities-table').count().catch(() => 0);
-  if (!tableCount) return { href: null, reason: 'no-entities-table' };
+async function entityTableState(page) {
+  const text = await bodyText(page).catch(() => '');
+  const emptyText = /No\s+[^.\n]+\s+available|No\s+data|No\s+[^.\n]+\s+found/i.test(text);
+  const table = page.getByTestId('entities-table');
+  const tableCount = await table.count().catch(() => 0);
+  const rowCount = tableCount
+    ? await table.first().locator('tbody tr').count().catch(() => 0)
+    : 0;
   const toggleCount = await page.getByTestId('row-details-toggle').count().catch(() => 0);
-  if (!toggleCount) return { href: null, reason: 'no-row-details-toggle' };
+  const detailLinkCount = await page.getByTestId('details-link').count().catch(() => 0);
+  return { tableCount, rowCount, toggleCount, detailLinkCount, emptyText };
+}
+
+async function firstExpandedRowDetailHref(page, matcher) {
+  const state = await entityTableState(page);
+  if (!state.tableCount) {
+    const reason = state.emptyText ? 'no-live-detail-data' : 'selector-failure-no-entities-table';
+    return { href: null, reason, state };
+  }
+  if (!state.toggleCount) {
+    const reason = state.emptyText
+      ? 'no-live-detail-data'
+      : state.rowCount === 0
+        ? 'no-live-detail-rows'
+        : 'selector-failure-no-row-details-toggle';
+    return { href: null, reason, state };
+  }
 
   const toggle = page.getByTestId('row-details-toggle').first();
   try {
     await toggle.scrollIntoViewIfNeeded({ timeout: config.timeoutMs });
     await toggle.click({ timeout: config.timeoutMs });
   } catch (error) {
-    return { href: null, reason: 'row-details-toggle-click-failed', error: String(error) };
+    return { href: null, reason: 'selector-failure-row-details-toggle-click-failed', error: String(error), state };
   }
 
   await page.waitForLoadState('networkidle', { timeout: config.timeoutMs }).catch(() => null);
@@ -152,7 +174,7 @@ async function firstExpandedRowDetailHref(page, matcher) {
   const detailHrefs = await page.getByTestId('details-link')
     .evaluateAll(anchors => anchors.map(anchor => anchor.getAttribute('href')).filter(Boolean))
     .catch(() => []);
-  return { href: null, reason: detailHrefs.length ? 'details-link-mismatch' : 'no-details-link-after-expand', detailHrefs: detailHrefs.slice(0, 10) };
+  return { href: null, reason: detailHrefs.length ? 'selector-failure-details-link-mismatch' : 'selector-failure-no-details-link-after-expand', detailHrefs: detailHrefs.slice(0, 10), state };
 }
 
 async function assertNativeSuccess(pathPattern, check) {
@@ -173,7 +195,8 @@ async function checkTopLevelRoute(page, route, check, nativePattern, detailPatte
     linkSource = expandedDetails.reason;
   }
   if (!detailHref) {
-    add('warn', `${check}.detail-link`, 'No matching detail link was available from live data after checking visible and expanded row links.', { route, detailPattern: String(detailPattern), expandedDetails });
+    const noLiveDetail = expandedDetails && String(expandedDetails.reason || '').startsWith('no-live-detail');
+    add(noLiveDetail ? 'pass' : 'warn', `${check}.detail-link`, noLiveDetail ? 'No live detail rows/data were available; detail-link route check was skipped.' : 'No matching detail link was available after checking visible and expanded row links.', { route, detailPattern: String(detailPattern), expandedDetails });
     return;
   }
   await page.goto(new URL(detailHref, config.baseUrl).toString(), { waitUntil: 'networkidle', timeout: config.timeoutMs });
@@ -192,22 +215,33 @@ async function clickFirstEnabledPager(page, direction) {
     page.locator(`button:has-text("${direction}")`).last(),
     page.locator(`a:has-text("${direction}")`).last(),
   ];
+  let candidateCount = 0;
+  let disabledCount = 0;
   for (const candidate of candidates) {
-    if (!(await candidate.count())) continue;
+    const count = await candidate.count();
+    if (!count) continue;
+    candidateCount += count;
     const disabled = await candidate.evaluate(element => element.disabled || element.getAttribute('aria-disabled') === 'true' || element.classList.contains('disabled')).catch(() => true);
-    if (disabled) continue;
+    if (disabled) {
+      disabledCount += 1;
+      continue;
+    }
     await candidate.click();
-    return true;
+    return { clicked: true, candidateCount, disabledCount };
   }
-  return false;
+  return { clicked: false, candidateCount, disabledCount, reason: candidateCount ? 'single-page-no-enabled-next' : 'selector-failure-no-pagination-control' };
 }
 
 async function exercisePagination(page, check) {
   const beforePath = new URL(page.url()).pathname;
   let clicks = 0;
+  let finalPager = null;
   for (let index = 0; index < 3; index += 1) {
-    const clicked = await clickFirstEnabledPager(page, 'Next');
-    if (!clicked) break;
+    const pager = await clickFirstEnabledPager(page, 'Next');
+    if (!pager.clicked) {
+      finalPager = pager;
+      break;
+    }
     clicks += 1;
     await page.waitForLoadState('networkidle', { timeout: config.timeoutMs }).catch(() => null);
     await page.waitForTimeout(350);
@@ -219,7 +253,18 @@ async function exercisePagination(page, check) {
     await assertNoAppError(page, `${check}.page-${index + 1}.app-error`);
     await assertNotUnexpectedTasks(page, `${check}.page-${index + 1}.not-tasks`);
   }
-  add(clicks ? 'pass' : 'warn', `${check}.pagination`, clicks ? 'Pagination Next stayed on the intended route.' : 'No enabled Next pagination control was available in live data.', { clicks, path: beforePath });
+  if (clicks) {
+    add('pass', `${check}.pagination`, 'Pagination Next stayed on the intended route.', { clicks, path: beforePath });
+    return;
+  }
+  const state = await entityTableState(page);
+  const reason = state.emptyText
+    ? 'no-live-pagination-data'
+    : finalPager && finalPager.reason === 'single-page-no-enabled-next'
+      ? 'single-page-no-enabled-next'
+      : 'selector-failure-no-pagination-control';
+  const selectorFailure = reason.startsWith('selector-failure');
+  add(selectorFailure ? 'warn' : 'pass', `${check}.pagination`, selectorFailure ? 'No pagination control was found; selector coverage may need an update.' : 'No enabled Next pagination control was available; live data appears single-page or empty, so pagination was skipped.', { clicks, path: beforePath, reason, pager: finalPager, state });
 }
 
 async function checkScopeReport(page) {

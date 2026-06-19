@@ -90,7 +90,7 @@ def parse_args(args: Namespace) -> Namespace:  # pylint: disable=unused-argument
 
     ports.set_defaults(
         port_list_id="730ef368-57e2-11e1-a90f-406186ea4fc5"
-    )  # All IANA assigned TCP and Top 100 UDP, use the list-portlists.gmp.py script to get the UUID for all.
+    )  # All IANA assigned TCP and Top 100 UDP.
     # Defaults are
     # # | Name                          | ID
     # - | ----------------------------- | ------------------------------------

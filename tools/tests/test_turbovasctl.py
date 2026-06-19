@@ -623,6 +623,9 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("runtime-browser-regression", source)
         self.assertIn("scope-report.result-evidence-route", browser_regression)
         self.assertIn("route-stability", browser_regression)
+        self.assertIn("single-page-no-enabled-next", browser_regression)
+        self.assertIn("no-live-detail-data", browser_regression)
+        self.assertIn("selector-failure-no-row-details-toggle", browser_regression)
         self.assertIn("network.native-api-failures", browser_regression)
         self.assertIn("runtime-browser-regression *args:", justfile)
         self.assertIn('tools/turbovasctl runtime-browser-regression "$@"', justfile)
@@ -746,6 +749,17 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertNotIn("tools/runtime_metrics.py", all_paths)
         self.assertNotIn("components/gvm-tools/scripts/report-metrics.gmp.py", all_paths)
         self.assertNotIn("components/gvm-tools/scripts/scope-report-metrics.gmp.py", all_paths)
+        for removed_wrapper in (
+            "components/gvm-tools/scripts/list-hosts.gmp.py",
+            "components/gvm-tools/scripts/list-filters.gmp.py",
+            "components/gvm-tools/scripts/list-portlists.gmp.py",
+            "components/gvm-tools/scripts/list-report-formats.gmp.py",
+            "components/gvm-tools/scripts/list-scanners.gmp.py",
+            "components/gvm-tools/scripts/list-schedules.gmp.py",
+            "components/gvm-tools/scripts/list-targets.gmp.py",
+            "components/gvm-tools/scripts/list-tasks.gmp.py",
+        ):
+            self.assertNotIn(removed_wrapper, all_paths)
         self.assertIn("remaining gvm-tools write/control scripts", {item["workflow"] for item in details["next_replacement_candidates"]})
         endpoints = {item["endpoint"] for item in details["implemented_native_endpoints"]}
         self.assertIn("/api/v1/cpes", endpoints)

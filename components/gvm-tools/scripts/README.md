@@ -176,16 +176,6 @@ This script generates random task data and feeds it to a desired GSM database.
 
 ---
 
-## `list-tasks.gmp.py`
-
-Lists the tasks stored in an GSM Database
-
-### Example
-
-`$ gvm-script --gmp-username name --gmp-password pass ssh --hostname <gsm> scripts/list-tasks.gmp.py`
-
----
-
 ## `monthly-report.gmp.py`
 
 This script will display all vulnerabilities from the hosts of the reports in a given month!
@@ -547,31 +537,6 @@ Lists feeds and their status.
 
 `$ gvm-script --gmp-username *admin-user* --gmp-password *password* socket list-feeds.gmp.py`
 
-## `list-filters.gmp.py`
-
-Lists filters.
-
-### Example
-`$ gvm-script --gmp-username *admin-user* --gmp-password *password* socket list-filters.gmp.py`
-
-Returns Filter Name, uuid, type, and the term (filter)
-
-
-## `list-portlists.gmp.py`
-
-Lists port lists.
-
-### Example
-
-`$ gvm-script --gmp-username *admin-user* --gmp-password *password* socket list-portlists.gmp.py`
-
-## `list-report-formats.gmp.py`
-
-Lists all report formats with name and uuid.
-
-### Example
-`$ gvm-script --gmp-username *admin-user* --gmp-password *password* socket list-report-formats.gmp.py`
-
 ## `list-reports.gmp.py`
 
 Lists all reports that have specified status
@@ -594,24 +559,6 @@ Lists all scan configs.
 
 `$ gvm-script --gmp-username *admin-user* --gmp-password *password* socket list-scan-configs.gmp.py`
 
-## `list-scanners.gmp.py`
-
-Lists all scanners currently configured.
-
-### Example
-
-`$ gvm-script --gmp-username *admin-user* --gmp-password *password* socket list-scanners.gmp.py`
-
-Returns the scanners Name, uuid, & the host on which it resides (note CVE scanner does not return a host and sockets are local)
-
-## `list-schedules.gmp.py`
-
-Lists all schedules configured with name, uuid, timezone, and iCalendar information.
-
-### Example
-
-`$ gvm-script --gmp-username *admin-user* --gmp-password *password* socket list-schedules.gmp.py`
-
 ## `list-tags.gmp.py`
 
 Lists all tags currently configured.
@@ -621,17 +568,6 @@ Lists all tags currently configured.
 `$ gvm-script --gmp-username *admin-user* --gmp-password *password* socket list-tags.gmp.py`
 
 Returns Tag name, uuid, Modified Date, Value, Type, and Count of ressources assigned to tag.
-
-## `list-targets.gmp.py`
-
-Lists all targets currently configured.
-
-### Example
-
-`$ gvm-script --gmp-username *admin-user* --gmp-password *password* socket list-targets.gmp.py`
-
-- No targets configured by default, however using the provided files in this repo, you should now have a few (5).
-- Returns targets Name, uuid, number of Hosts, and credentials (SSH, SMB, ESXi, & SNMP Credentials)
 
 ## `list-users.gmp.py`
 
