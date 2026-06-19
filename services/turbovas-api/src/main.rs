@@ -396,6 +396,31 @@ struct OperatingSystemAssetItem {
     modified_at: Option<String>,
 }
 
+#[derive(Serialize)]
+struct HostIdentifierItem {
+    id: String,
+    name: String,
+    value: String,
+    source_type: String,
+    source_id: String,
+    source_data: String,
+}
+
+#[derive(Serialize)]
+struct HostAssetItem {
+    id: String,
+    name: String,
+    comment: String,
+    hostname: Option<String>,
+    ip: Option<String>,
+    best_os_cpe: Option<String>,
+    best_os_txt: Option<String>,
+    severity: f64,
+    identifiers: Vec<HostIdentifierItem>,
+    created_at: Option<String>,
+    modified_at: Option<String>,
+}
+
 #[derive(Debug, Serialize)]
 struct ReportHostItem {
     host: String,
@@ -536,6 +561,7 @@ async fn main() -> Result<(), ApiError> {
         .route("/api/v1/results", get(results))
         .route("/api/v1/vulnerabilities", get(vulnerabilities))
         .route("/api/v1/operating-systems", get(operating_system_assets))
+        .route("/api/v1/hosts", get(host_assets))
         .route("/api/v1/reports", get(reports))
         .route("/api/v1/reports/:report_id", get(report_detail))
         .route("/api/v1/reports/:report_id/results", get(report_results))
@@ -696,6 +722,120 @@ async fn reports(
         })?;
     let total = rows.first().map(|row| row.get::<_, i64>(0)).unwrap_or(0);
     let items = rows.iter().map(report_from_row).collect();
+    Ok(Json(Collection {
+        page: params.page_info(total),
+        items,
+    }))
+}
+
+async fn host_assets(
+    State(state): State<AppState>,
+    Query(query): Query<CollectionQuery>,
+) -> Result<Json<Collection<HostAssetItem>>, ApiError> {
+    let params = normalize_collection_query(query, "-severity")?;
+    let sort_sql = sort_clause(
+        &params.sort,
+        &[
+            ("id", "id"),
+            ("name", "name"),
+            ("hostname", "hostname"),
+            ("ip", "ip"),
+            ("os", "best_os_cpe"),
+            ("severity", "severity"),
+            ("modified", "modified_at_unix"),
+        ],
+    )?;
+    let sql = format!(
+        r#"WITH latest_ip AS (
+             SELECT DISTINCT ON (host)
+                    host, uuid, value, source_type, source_id, source_data
+               FROM host_identifiers
+              WHERE name = 'ip'
+              ORDER BY host, modification_time DESC, id DESC
+         ),
+         latest_hostname AS (
+             SELECT DISTINCT ON (host)
+                    host, name, uuid, value, source_type, source_id, source_data
+               FROM host_identifiers
+              WHERE name IN ('hostname', 'DNS-via-TargetDefinition')
+              ORDER BY host,
+                       CASE WHEN name = 'hostname' THEN 0 ELSE 1 END,
+                       modification_time DESC,
+                       id DESC
+         ),
+         latest_best_os_cpe AS (
+             SELECT DISTINCT ON (host) host, value
+               FROM host_details
+              WHERE name = 'best_os_cpe'
+              ORDER BY host, id DESC
+         ),
+         latest_best_os_txt AS (
+             SELECT DISTINCT ON (host) host, value
+               FROM host_details
+              WHERE name = 'best_os_txt'
+              ORDER BY host, id DESC
+         ),
+         latest_severity AS (
+             SELECT DISTINCT ON (host)
+                    host,
+                    round(CAST(severity AS numeric), 1)::double precision AS severity
+               FROM host_max_severities
+              ORDER BY host, creation_time DESC, id DESC
+         ),
+         host_rows AS (
+             SELECT h.uuid AS id,
+                    coalesce(h.name, '') AS name,
+                    coalesce(h.comment, '') AS comment,
+                    nullif(lh.value, '') AS hostname,
+                    nullif(li.value, '') AS ip,
+                    nullif(lbo.value, '') AS best_os_cpe,
+                    nullif(lbt.value, '') AS best_os_txt,
+                    coalesce(ls.severity, 0)::double precision AS severity,
+                    coalesce(h.creation_time, 0)::bigint AS created_at_unix,
+                    coalesce(h.modification_time, 0)::bigint AS modified_at_unix,
+                    li.uuid AS ip_identifier_id,
+                    li.source_type AS ip_source_type,
+                    li.source_id AS ip_source_id,
+                    li.source_data AS ip_source_data,
+                    lh.name AS hostname_identifier_name,
+                    lh.uuid AS hostname_identifier_id,
+                    lh.source_type AS hostname_source_type,
+                    lh.source_id AS hostname_source_id,
+                    lh.source_data AS hostname_source_data
+               FROM hosts h
+               LEFT JOIN latest_ip li ON li.host = h.id
+               LEFT JOIN latest_hostname lh ON lh.host = h.id
+               LEFT JOIN latest_best_os_cpe lbo ON lbo.host = h.id
+               LEFT JOIN latest_best_os_txt lbt ON lbt.host = h.id
+               LEFT JOIN latest_severity ls ON ls.host = h.id
+         ),
+         filtered AS (
+             SELECT * FROM host_rows
+              WHERE ($1 = ''
+                     OR lower(id) LIKE '%' || lower($1) || '%'
+                     OR lower(name) LIKE '%' || lower($1) || '%'
+                     OR lower(comment) LIKE '%' || lower($1) || '%'
+                     OR lower(coalesce(hostname, '')) LIKE '%' || lower($1) || '%'
+                     OR lower(coalesce(ip, '')) LIKE '%' || lower($1) || '%'
+                     OR lower(coalesce(best_os_cpe, '')) LIKE '%' || lower($1) || '%'
+                     OR lower(coalesce(best_os_txt, '')) LIKE '%' || lower($1) || '%')
+         )
+         SELECT count(*) OVER()::bigint AS total, * FROM filtered
+          ORDER BY {sort_sql}, name ASC, id ASC LIMIT $2 OFFSET $3;"#,
+    );
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let rows = client
+        .query(&sql, &[&params.filter, &params.page_size, &params.offset])
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "host asset list query failed");
+            ApiError::Database
+        })?;
+    let total = rows
+        .first()
+        .map(|row| row.get::<_, i64>("total"))
+        .unwrap_or(0);
+    let items = rows.iter().map(host_asset_from_row).collect();
     Ok(Json(Collection {
         page: params.page_info(total),
         items,
@@ -3756,6 +3896,75 @@ impl NormalizedQuery {
             sort: self.sort.clone(),
             filter: self.filter.clone(),
         }
+    }
+}
+
+fn host_identifier_from_row(
+    row: &Row,
+    id_field: &str,
+    name: &str,
+    value: Option<String>,
+    source_type_field: &str,
+    source_id_field: &str,
+    source_data_field: &str,
+) -> Option<HostIdentifierItem> {
+    let id: Option<String> = row.get(id_field);
+    let value = value?;
+    id.map(|id| HostIdentifierItem {
+        id,
+        name: name.to_string(),
+        value,
+        source_type: row
+            .get::<_, Option<String>>(source_type_field)
+            .unwrap_or_default(),
+        source_id: row
+            .get::<_, Option<String>>(source_id_field)
+            .unwrap_or_default(),
+        source_data: row
+            .get::<_, Option<String>>(source_data_field)
+            .unwrap_or_default(),
+    })
+}
+
+fn host_asset_from_row(row: &Row) -> HostAssetItem {
+    let hostname: Option<String> = row.get("hostname");
+    let ip: Option<String> = row.get("ip");
+    let hostname_identifier_name: Option<String> = row.get("hostname_identifier_name");
+    let mut identifiers = Vec::new();
+    if let Some(identifier) = host_identifier_from_row(
+        row,
+        "ip_identifier_id",
+        "ip",
+        ip.clone(),
+        "ip_source_type",
+        "ip_source_id",
+        "ip_source_data",
+    ) {
+        identifiers.push(identifier);
+    }
+    if let Some(identifier) = host_identifier_from_row(
+        row,
+        "hostname_identifier_id",
+        hostname_identifier_name.as_deref().unwrap_or("hostname"),
+        hostname.clone(),
+        "hostname_source_type",
+        "hostname_source_id",
+        "hostname_source_data",
+    ) {
+        identifiers.push(identifier);
+    }
+    HostAssetItem {
+        id: row.get("id"),
+        name: row.get("name"),
+        comment: row.get("comment"),
+        hostname,
+        ip,
+        best_os_cpe: row.get("best_os_cpe"),
+        best_os_txt: row.get("best_os_txt"),
+        severity: row.get("severity"),
+        identifiers,
+        created_at: unix_ts_to_rfc3339(row.get("created_at_unix")),
+        modified_at: unix_ts_to_rfc3339(row.get("modified_at_unix")),
     }
 }
 

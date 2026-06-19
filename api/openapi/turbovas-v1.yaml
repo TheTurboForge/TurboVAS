@@ -57,6 +57,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OperatingSystemAssetCollection'
+  /hosts:
+    get:
+      summary: List top-level host assets
+      description: Inherited host asset view backed by gvmd/PostgreSQL host identifiers, details, and severity state.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Filter'
+      responses:
+        '200':
+          description: Host asset collection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HostAssetCollection'
   /reports:
     get:
       summary: List raw scan reports
@@ -710,6 +726,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OperatingSystemAsset'
+    HostAssetCollection:
+      type: object
+      required: [page, items]
+      properties:
+        page:
+          $ref: '#/components/schemas/PageInfo'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/HostAsset'
     CveCollection:
       type: object
       required: [page, items]
@@ -1224,6 +1250,54 @@ components:
         all_hosts:
           type: integer
           description: Hosts with any recorded association to this operating system.
+        created_at:
+          type: string
+          format: date-time
+        modified_at:
+          type: string
+          format: date-time
+    HostAssetIdentifier:
+      type: object
+      required: [id, name, value]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        value:
+          type: string
+        source_type:
+          type: string
+        source_id:
+          type: string
+        source_data:
+          type: string
+    HostAsset:
+      type: object
+      required: [id, name, severity, identifiers]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        comment:
+          type: string
+        hostname:
+          type: string
+        ip:
+          type: string
+        best_os_cpe:
+          type: string
+        best_os_txt:
+          type: string
+        severity:
+          type: number
+        identifiers:
+          type: array
+          items:
+            $ref: '#/components/schemas/HostAssetIdentifier'
         created_at:
           type: string
           format: date-time

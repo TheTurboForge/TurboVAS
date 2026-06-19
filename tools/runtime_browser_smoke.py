@@ -306,6 +306,10 @@ async function runForBaseUrl(baseUrl) {
     const nativeOperatingSystems = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/operating-systems$/);
     add(nativeOperatingSystems ? 'pass' : 'fail', 'operating-system.list-native-api', nativeOperatingSystems ? 'Top-level Operating Systems list loaded through same-origin native API.' : 'Top-level Operating Systems list did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => item.path === '/api/v1/operating-systems') });
 
+    await gotoRoute(page, '/hosts', 'hosts');
+    const nativeHosts = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/hosts$/);
+    add(nativeHosts ? 'pass' : 'fail', 'host.list-native-api', nativeHosts ? 'Top-level Hosts list loaded through same-origin native API.' : 'Top-level Hosts list did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => item.path === '/api/v1/hosts') });
+
     await gotoRoute(page, '/targets', 'targets');
     const nativeTargets = await waitForNativeApiResponse(page, nativeApiResponses, /\/api\/v1\/targets$/);
     add(nativeTargets ? 'pass' : 'fail', 'target.list-native-api', nativeTargets ? 'Target list loaded through same-origin native API.' : 'Target list did not produce a successful same-origin native API response.', { responses: nativeApiResponses.filter(item => item.path === '/api/v1/targets') });
