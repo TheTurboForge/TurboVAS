@@ -114,7 +114,7 @@ Checks to consider:
 
 ### Runtime Artifacts And Logs
 
-Runtime artifacts, browser-smoke outputs, report exports, quality-gate history,
+Runtime artifacts, browser-smoke/browser-regression outputs, report exports, quality-gate history,
 log-review outputs, and performance snapshots live outside git under the runtime
 directory. They support diagnostics and reproducibility, but they are not the
 canonical product database.

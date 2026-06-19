@@ -126,7 +126,7 @@ describe('ResultsTabContent', () => {
             qod: 80,
             created_at: '2024-01-15T10:00:00Z',
             source_report_id: 'report-123',
-            raw_evidence_href: '/report/report-123/result/result-1',
+            raw_evidence_href: '/result/result-1',
           },
         ],
       }),

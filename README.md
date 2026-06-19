@@ -121,6 +121,7 @@ TurboVAS provides a small root command surface for repository health checks:
 - `just runtime-native-api-smoke`: verify the internal DB-backed TurboVAS native API sidecar.
 - `just runtime-webui-smoke`: verify the staged GSA web UI over `gsad`.
 - `just runtime-browser-smoke`: verify raw-report and scope-report workflows through a headless browser.
+- `just runtime-browser-regression`: run deeper browser route, link, and pagination regression checks.
 - `just runtime-credential-smoke`: verify credential creation through a headless browser.
 - `just runtime-app-down`: stop experimental inherited application services.
 - `just gvmd-smoke`: run a narrow experimental manager profile smoke.

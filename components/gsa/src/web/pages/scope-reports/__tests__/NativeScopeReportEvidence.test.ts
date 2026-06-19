@@ -95,7 +95,7 @@ describe('native API scope report evidence collections', () => {
               qod: 80,
               created_at: '2026-06-17T10:00:00Z',
               source_report_id: 'raw-report-1',
-              raw_evidence_href: '/report/raw-report-1/result/result-1',
+              raw_evidence_href: '/result/result-1',
             },
           ],
         }),
@@ -115,7 +115,7 @@ describe('native API scope report evidence collections', () => {
     expect(collection.items[0].name).toEqual('Example finding');
     expect(collection.items[0].severity).toEqual(7.5);
     expect(collection.items[0].rawEvidenceHref).toEqual(
-      '/report/raw-report-1/result/result-1',
+      '/result/result-1',
     );
     expect(gmp.buildUrl).toHaveBeenCalledWith(
       'api/v1/scopes/scope-1/reports/scope-report-1/results',

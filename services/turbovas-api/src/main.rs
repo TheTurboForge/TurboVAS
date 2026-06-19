@@ -4880,7 +4880,7 @@ fn result_from_row(row: &Row) -> ResultItem {
     let id: String = row.get("id");
     let source_report_id: String = row.get("source_report_id");
     ResultItem {
-        raw_evidence_href: format!("/report/{source_report_id}/result/{id}"),
+        raw_evidence_href: format!("/result/{id}"),
         id,
         host: row.get("host"),
         host_asset_id: optional_row_string(row, "host_asset_id"),

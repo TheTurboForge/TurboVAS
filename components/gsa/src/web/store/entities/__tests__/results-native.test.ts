@@ -40,7 +40,7 @@ describe('native API result list', () => {
             report: {id: 'report-1', name: 'Full and fast'},
             task: {id: 'task-1', name: 'LAN scan'},
             source_report_id: 'report-1',
-            raw_evidence_href: '/report/report-1/result/result-1',
+            raw_evidence_href: '/result/result-1',
           },
         ],
       }),

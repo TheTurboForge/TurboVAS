@@ -64,9 +64,12 @@ the underlying target/task reports as evidence and provenance. A scope report
 should also make coverage and freshness visible, because incomplete or stale
 evidence changes the meaning of the report.
 
-The browser-level regression guard `just runtime-browser-smoke --json` checks
-the raw-report and scope-report reading workflow from the operator perspective.
-It does not start scans or mutate feeds.
+The fast browser guard `just runtime-browser-smoke --json` checks the
+raw-report and scope-report reading workflow from the operator perspective. For
+larger UI/API migrations or route/link/pagination symptoms, the deeper
+`just runtime-browser-regression --json` command exercises scope-report detail
+links, tab navigation, pagination stability, and raw-evidence routes. Neither
+command starts scans or mutates feeds.
 
 ## Why Scopes Are Not Folders
 

@@ -90,7 +90,7 @@ describe('ErrorsTab', () => {
     expect(screen.getByText('456/tcp')).toBeInTheDocument();
     expect(screen.getByText('result-1').closest('a')).toHaveAttribute(
       'href',
-      '/report/raw-report-1/result/result-1',
+      '/result/result-1',
     );
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/api/v1/reports/report-123/errors'),

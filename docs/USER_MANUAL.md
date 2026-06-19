@@ -64,6 +64,7 @@ Useful development checks include:
 - `just runtime-native-api-smoke --json`
 - `just runtime-webui-smoke --json`
 - `just runtime-browser-smoke --json`
+- `just runtime-browser-regression --json`
 - `just runtime-credential-smoke --json`
 - `just runtime-scanner-capability-check --json`
 - `just runtime-nmap-capability-check --json`

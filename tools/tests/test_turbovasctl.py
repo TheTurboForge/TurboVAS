@@ -338,6 +338,7 @@ class TurboVASCtlTests(unittest.TestCase):
             "runtime-app-down",
             "runtime-app-smoke",
             "runtime-browser-smoke",
+            "runtime-browser-regression",
             "runtime-credential-smoke",
             "runtime-report-metrics",
             "runtime-scope-report-metrics",
@@ -611,6 +612,19 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("Raw-report list loaded through same-origin native API", browser_smoke)
         self.assertIn("runtime-browser-smoke *args:", justfile)
         self.assertIn('tools/turbovasctl runtime-browser-smoke "$@"', justfile)
+
+    def test_runtime_browser_regression_is_registered(self):
+        source = (Path(__file__).resolve().parents[1] / "turbovasctl").read_text(encoding="utf-8")
+        browser_regression = (Path(__file__).resolve().parents[1] / "runtime_browser_regression.py").read_text(encoding="utf-8")
+        justfile = (Path(__file__).resolve().parents[2] / "justfile").read_text(encoding="utf-8")
+        self.assertIn("def command_runtime_browser_regression", source)
+        self.assertIn("runtime_browser_regression_probe_path", source)
+        self.assertIn("runtime-browser-regression", source)
+        self.assertIn("scope-report.result-evidence-route", browser_regression)
+        self.assertIn("route-stability", browser_regression)
+        self.assertIn("network.native-api-failures", browser_regression)
+        self.assertIn("runtime-browser-regression *args:", justfile)
+        self.assertIn('tools/turbovasctl runtime-browser-regression "$@"', justfile)
 
     def test_runtime_credential_smoke_is_registered(self):
         source = (Path(__file__).resolve().parents[1] / "turbovasctl").read_text(encoding="utf-8")

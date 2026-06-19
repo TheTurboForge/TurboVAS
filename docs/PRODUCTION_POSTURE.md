@@ -38,6 +38,7 @@ Useful non-destructive checks:
 - `just runtime-data-state --json`
 - `just runtime-app-smoke`
 - `just runtime-browser-smoke --json`
+- `just runtime-browser-regression --json` for deeper route/link/pagination checks before demos or publication-facing UI review.
 
 These checks help identify development-runtime drift. `production-posture-check`
 is expected to fail while first-login/password rotation, trusted TLS, and other

@@ -234,9 +234,7 @@ const NativeErrorsTab = ({reportFilter, reportId}: NativeErrorsTabProps) => {
                 <TableData>{errorItem.nvtOid}</TableData>
                 <TableData>{errorItem.description}</TableData>
                 <TableData>
-                  <Link
-                    to={`/report/${errorItem.sourceReportId}/result/${errorItem.id}`}
-                  >
+                  <Link to={`/result/${errorItem.id}`}>
                     {errorItem.id}
                   </Link>
                 </TableData>

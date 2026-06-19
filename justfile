@@ -183,6 +183,9 @@ runtime-webui-smoke *args:
 runtime-browser-smoke *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-browser-smoke "$@"
 
+runtime-browser-regression *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-browser-regression "$@"
+
 runtime-credential-smoke *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-credential-smoke "$@"
 
