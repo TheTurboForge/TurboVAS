@@ -2831,6 +2831,11 @@ def summarize_native_tooling(items: list[dict[str, Any]]) -> dict[str, Any]:
                 "replacement_candidates": ["runtime-scope-report-metrics helper (migrated)", "GSA scope-report Metrics tab (migrated through gsad same-origin proxy)"],
             },
             {
+                "endpoint": "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/retention-plan",
+                "status": "implemented_internal",
+                "replacement_candidates": ["B-143 non-destructive retention preview scaffold", "runtime-native-api-smoke validation"],
+            },
+            {
                 "endpoint": "/api/v1/reports/{report_id}/metrics",
                 "status": "implemented_internal_and_browser_proxied",
                 "replacement_candidates": ["runtime-report-metrics helper (migrated)", "GSA raw report Metrics tab (migrated through gsad same-origin proxy)"],
@@ -5504,10 +5509,16 @@ def summarize_native_api_response(parsed: dict[str, Any] | None) -> dict[str, An
         summary["page"] = parsed["page"]
     if isinstance(parsed.get("summary"), dict):
         summary["summary"] = parsed["summary"]
+    if isinstance(parsed.get("policy"), dict):
+        summary["policy"] = parsed["policy"]
     items = parsed.get("items")
     if isinstance(items, list):
         summary["item_count_in_response"] = len(items)
         summary["items_sample"] = [summarize_native_item(item) for item in items[:3]]
+    sources = parsed.get("sources")
+    if isinstance(sources, list):
+        summary["source_count"] = len(sources)
+        summary["sources_sample"] = [summarize_native_item(item) for item in sources[:3]]
     for key in ("systems", "vulnerabilities"):
         values = parsed.get(key)
         if isinstance(values, list):
@@ -6305,6 +6316,28 @@ def command_runtime_native_api_smoke(repo_root: Path) -> dict[str, Any]:
                     metrics_json,
                 )
             )
+            retention_plan_path = f"/api/v1/scopes/{scope_id}/reports/{scope_report_id}/retention-plan"
+            retention_plan = native_api_curl(repo_root, retention_plan_path)
+            retention_plan_json = parse_json_output(retention_plan)
+            details["retention_plan"] = summarize_native_api_response(retention_plan_json)
+            retention_plan_ok = (
+                retention_plan.returncode == 0
+                and isinstance(retention_plan_json, dict)
+                and isinstance(retention_plan_json.get("policy"), dict)
+                and retention_plan_json["policy"].get("destructive_actions") is False
+                and isinstance(retention_plan_json.get("summary"), dict)
+                and isinstance(retention_plan_json.get("sources"), list)
+            )
+            findings.append(
+                native_api_probe_finding(
+                    "pass" if retention_plan_ok else "fail",
+                    "native-api.scope-report-retention-plan",
+                    f"Native API scope-report retention-plan probe exit code {retention_plan.returncode}.",
+                    retention_plan,
+                    compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/scopes/.../reports/.../retention-plan"),
+                    retention_plan_json,
+                )
+            )
         else:
             findings.append(finding("fail", "native-api.scope-report-results", "Scope-report list did not include a scope/report id pair for the Results probe."))
             findings.append(finding("fail", "native-api.scope-report-hosts", "Scope-report list did not include a scope/report id pair for the host probe."))
@@ -6315,6 +6348,7 @@ def command_runtime_native_api_smoke(repo_root: Path) -> dict[str, Any]:
             findings.append(finding("fail", "native-api.scope-report-tls-certificates", "Scope-report list did not include a scope/report id pair for the TLS Certificates probe."))
             findings.append(finding("fail", "native-api.scope-report-errors", "Scope-report list did not include a scope/report id pair for the Error Messages probe."))
             findings.append(finding("fail", "native-api.scope-report-metrics", "Scope-report list did not include a scope/report id pair for the Metrics probe."))
+            findings.append(finding("fail", "native-api.scope-report-retention-plan", "Scope-report list did not include a scope/report id pair for the retention-plan probe."))
     else:
         findings.append(finding("warn", "native-api.scope-report-results", "No scope reports exist yet, so the Results probe was skipped."))
         findings.append(finding("warn", "native-api.scope-report-hosts", "No scope reports exist yet, so the host collection probe was skipped."))
@@ -6325,6 +6359,7 @@ def command_runtime_native_api_smoke(repo_root: Path) -> dict[str, Any]:
         findings.append(finding("warn", "native-api.scope-report-tls-certificates", "No scope reports exist yet, so the TLS Certificates collection probe was skipped."))
         findings.append(finding("warn", "native-api.scope-report-errors", "No scope reports exist yet, so the Error Messages collection probe was skipped."))
         findings.append(finding("warn", "native-api.scope-report-metrics", "No scope reports exist yet, so the Metrics probe was skipped."))
+        findings.append(finding("warn", "native-api.scope-report-retention-plan", "No scope reports exist yet, so the retention-plan probe was skipped."))
 
     result = make_result("runtime-native-api-smoke", repo_root, "Native API smoke checks completed.", findings, [str(artifact_dir / "native-api-smoke.json")])
     result["details"] = details

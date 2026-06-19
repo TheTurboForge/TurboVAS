@@ -781,6 +781,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("/api/v1/scopes/{scope_id}/reports/{scope_report_id}/cves", endpoints)
         self.assertIn("/api/v1/scopes/{scope_id}/reports/{scope_report_id}/errors", endpoints)
         self.assertIn("/api/v1/scopes/{scope_id}/reports/{scope_report_id}/metrics", endpoints)
+        self.assertIn("/api/v1/scopes/{scope_id}/reports/{scope_report_id}/retention-plan", endpoints)
         self.assertIn("/api/v1/reports/{report_id}/metrics", endpoints)
         raw_reports = next(item for item in details["implemented_native_endpoints"] if item["endpoint"] == "/api/v1/reports")
         self.assertEqual(raw_reports["status"], "implemented_internal_and_browser_proxied")
@@ -825,6 +826,21 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("native-api.raw-report-detail", smoke)
         self.assertIn("native-api.raw-report-results", smoke)
         self.assertIn("native-api.raw-report-ports", smoke)
+
+    def test_openapi_tracks_scope_report_retention_preview(self):
+        root = Path(__file__).resolve().parents[2]
+        openapi = (root / "api" / "openapi" / "turbovas-v1.yaml").read_text(encoding="utf-8")
+        source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
+        smoke = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
+        self.assertIn("/scopes/{scope_id}/reports/{scope_report_id}/retention-plan:", openapi)
+        self.assertIn("ScopeReportRetentionPlan", openapi)
+        self.assertIn("detail_compacted", openapi)
+        self.assertIn("aggregate_only", openapi)
+        self.assertIn("future_tiered_retention_candidate", openapi)
+        self.assertIn("scope_report_retention_plan", source)
+        self.assertIn("destructive_actions: false", source)
+        self.assertIn("/api/v1/scopes/:scope_id/reports/:scope_report_id/retention-plan", source)
+        self.assertIn("native-api.scope-report-retention-plan", smoke)
 
     def test_openapi_tracks_scope_read_contracts(self):
         root = Path(__file__).resolve().parents[2]

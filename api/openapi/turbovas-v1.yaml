@@ -698,6 +698,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReportMetrics'
+  /scopes/{scope_id}/reports/{scope_report_id}/retention-plan:
+    get:
+      summary: Preview non-destructive scope report retention state
+      description: Read-only dry-run scaffold for future tiered raw-report detail retention. It does not compact, delete, or mutate report evidence.
+      parameters:
+        - $ref: '#/components/parameters/ScopeId'
+        - $ref: '#/components/parameters/ScopeReportId'
+      responses:
+        '200':
+          description: Scope report retention preview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScopeReportRetentionPlan'
 components:
   securitySchemes:
     operatorSession:
@@ -1304,6 +1318,103 @@ components:
         modification_time:
           type: string
           format: date-time
+    ScopeReportRetentionPlan:
+      type: object
+      required: [id, name, scope, policy, summary, sources]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        scope:
+          type: object
+          required: [id, name]
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+        generated_at:
+          type: string
+          format: date-time
+        policy:
+          type: object
+          required: [mode, destructive_actions, latest_completed_raw_report_retains_full_detail, detail_compacted_field, aggregate_only_field]
+          properties:
+            mode:
+              enum: [dry_run_preview]
+            destructive_actions:
+              type: boolean
+            latest_completed_raw_report_retains_full_detail:
+              type: boolean
+            detail_compacted_field:
+              type: string
+            aggregate_only_field:
+              type: string
+        summary:
+          type: object
+          required: [source_report_count, current_full_fidelity_count, future_tiered_retention_candidate_count, detail_compacted_count, aggregate_only_count]
+          properties:
+            source_report_count:
+              type: integer
+            current_full_fidelity_count:
+              type: integer
+            future_tiered_retention_candidate_count:
+              type: integer
+            detail_compacted_count:
+              type: integer
+            aggregate_only_count:
+              type: integer
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScopeReportRetentionSource'
+    ScopeReportRetentionSource:
+      type: object
+      required: [source_report_id, target_id, target_name, task_id, task_name, result_count, vulnerability_count, max_severity, retention_state, detail_compacted, aggregate_only, kept_as_latest, pinned_by_scope_report, future_tiered_retention_candidate]
+      properties:
+        source_report_id:
+          type: string
+          format: uuid
+        target_id:
+          type: string
+          format: uuid
+        target_name:
+          type: string
+        task_id:
+          type: string
+          format: uuid
+        task_name:
+          type: string
+        scan_start:
+          type: string
+          format: date-time
+        scan_end:
+          type: string
+          format: date-time
+        selected_time:
+          type: string
+          format: date-time
+        result_count:
+          type: integer
+        vulnerability_count:
+          type: integer
+        max_severity:
+          type: number
+        retention_state:
+          enum: [current_full_fidelity, future_tiered_retention_candidate]
+        detail_compacted:
+          type: boolean
+        aggregate_only:
+          type: boolean
+        kept_as_latest:
+          type: boolean
+        pinned_by_scope_report:
+          type: boolean
+        future_tiered_retention_candidate:
+          type: boolean
     TargetCredentialReference:
       type: object
       required: [id, name, credential_type]
