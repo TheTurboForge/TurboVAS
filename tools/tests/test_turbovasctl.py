@@ -508,9 +508,12 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_runtime_metrics_commands_use_native_api_not_legacy_xml_helper(self):
         root = Path(__file__).resolve().parents[2]
         source = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
+        browser_smoke_command = source.split("def command_runtime_browser_smoke", 1)[1].split("def command_runtime_browser_regression", 1)[0]
+        browser_regression_command = source.split("def command_runtime_browser_regression", 1)[1].split("def command_runtime_credential_smoke", 1)[0]
         self.assertFalse((root / "tools" / "runtime_metrics.py").exists())
         self.assertNotIn("runtime_metrics_probe_path", source)
         self.assertIn("def command_runtime_scope_report_summary_native", source)
+        self.assertIn("def native_scope_report_browser_target", source)
         self.assertIn("def command_runtime_report_summary_native", source)
         self.assertIn("def command_runtime_report_metrics_native", source)
         self.assertIn("def command_runtime_scope_report_metrics_native", source)
@@ -518,6 +521,14 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("/api/v1/reports/{urllib.parse.quote(report_id)}/results", source)
         self.assertIn("/api/v1/reports/{urllib.parse.quote(selected_report_id)}/metrics", source)
         self.assertIn("/api/v1/scopes/{selected_scope_id}/reports/{selected_scope_report_id}/metrics", source)
+        self.assertIn("native_scope_report_browser_target", browser_smoke_command)
+        self.assertIn("native_scope_report_browser_target", browser_regression_command)
+        self.assertNotIn("runtime_scope_probe_path", browser_smoke_command)
+        self.assertNotIn("runtime_scope_probe_path", browser_regression_command)
+        self.assertNotIn("scope_python", browser_smoke_command)
+        self.assertNotIn("scope_python", browser_regression_command)
+        self.assertNotIn("str(scope_probe)", browser_smoke_command)
+        self.assertNotIn("str(scope_probe)", browser_regression_command)
 
     def test_report_metrics_ui_is_exposed_on_raw_and_scope_report_details(self):
         root = Path(__file__).resolve().parents[2]

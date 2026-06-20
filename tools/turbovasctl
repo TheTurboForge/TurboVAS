@@ -5282,13 +5282,8 @@ def command_runtime_scope_report_summary_native(repo_root: Path) -> dict[str, An
     if aggregate_status(findings) == "fail":
         return make_result("runtime-scope-report-summary", repo_root, "Runtime scope report summary stopped at native API prerequisites.", findings, [str(artifact_dir)])
 
-    list_path = "/api/v1/scope-reports?page_size=1&sort=-creation_time&filter=Organization"
-    listing = native_api_curl(repo_root, list_path)
-    listing_json = parse_json_output(listing)
-    items = listing_json.get("items", []) if isinstance(listing_json, dict) else []
-    selected = items[0] if items and isinstance(items[0], dict) else None
-    page = listing_json.get("page", {}) if isinstance(listing_json, dict) and isinstance(listing_json.get("page"), dict) else {}
-    if selected is None or not isinstance(selected.get("scope"), dict):
+    listing, summary_details, listing_json = latest_organization_scope_report_native(repo_root)
+    if summary_details is None:
         payload = {
             "status": "fail",
             "summary": "No Organization scope report exists through the native API.",
@@ -5299,44 +5294,84 @@ def command_runtime_scope_report_summary_native(repo_root: Path) -> dict[str, An
         findings.append(process_step_finding("fail", "runtime-scope.summary-native", payload["summary"], listing, compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/scope-reports?...")))
         return make_result("runtime-scope-report-summary", repo_root, payload["summary"], findings, payload["artifacts"])
 
-    scope = selected["scope"]
-    protection_requirement = str(selected.get("protection_requirement") or "").lower().replace(" ", "_")
     payload = {
         "status": "pass",
         "summary": "Latest Organization scope report read through the native API.",
         "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
-        "details": {
-            "source": "turbovas-api",
-            "scope": {
-                "id": scope.get("id"),
-                "name": scope.get("name"),
-                "global": scope.get("name") == "Organization",
-                "protection_requirement": protection_requirement,
-                "target_count": json_int(selected.get("source_target_count")),
-                "host_count": json_int(selected.get("member_host_count")),
-                "scope_report_count": json_int(page.get("total")),
-            },
-            "scope_report": {
-                "id": selected.get("id"),
-                "name": selected.get("name"),
-                "scope_id": scope.get("id"),
-                "scope_name": scope.get("name"),
-                "created": selected.get("creation_time"),
-                "latest_evidence_time": selected.get("latest_evidence_time"),
-                "source_report_count": json_int(selected.get("source_report_count")),
-                "hosts_total": json_int(selected.get("member_host_count")),
-                "hosts_with_evidence": json_int(selected.get("evidence_host_count")),
-                "hosts_missing_evidence": json_int(selected.get("missing_host_count")),
-                "results_total": json_int(selected.get("result_count")),
-                "vulnerabilities_total": json_int(selected.get("vulnerability_count")),
-                "excluded_candidate_hosts": json_int(selected.get("excluded_candidate_host_count")),
-                "severity": selected.get("severity") if isinstance(selected.get("severity"), dict) else {},
-            },
-        },
+        "details": summary_details,
     }
     payload["artifacts"] = [write_json_artifact(artifact_dir, "summary.json", payload)]
     findings.append(process_step_finding("pass", "runtime-scope.summary-native", payload["summary"], listing, compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/scope-reports?...")))
     return make_result("runtime-scope-report-summary", repo_root, payload["summary"], findings, payload["artifacts"])
+
+
+def latest_organization_scope_report_native(repo_root: Path) -> tuple[subprocess.CompletedProcess[str], dict[str, Any] | None, dict[str, Any]]:
+    list_path = "/api/v1/scope-reports?page_size=1&sort=-creation_time&filter=Organization"
+    listing = native_api_curl(repo_root, list_path)
+    listing_json = parse_json_output(listing)
+    items = listing_json.get("items", []) if isinstance(listing_json, dict) else []
+    selected = items[0] if items and isinstance(items[0], dict) else None
+    page = listing_json.get("page", {}) if isinstance(listing_json, dict) and isinstance(listing_json.get("page"), dict) else {}
+    if selected is None or not isinstance(selected.get("scope"), dict):
+        return listing, None, listing_json if isinstance(listing_json, dict) else {}
+
+    scope = selected["scope"]
+    protection_requirement = str(selected.get("protection_requirement") or "").lower().replace(" ", "_")
+    summary_details = {
+        "source": "turbovas-api",
+        "scope": {
+            "id": scope.get("id"),
+            "name": scope.get("name"),
+            "global": scope.get("name") == "Organization",
+            "protection_requirement": protection_requirement,
+            "target_count": json_int(selected.get("source_target_count")),
+            "host_count": json_int(selected.get("member_host_count")),
+            "scope_report_count": json_int(page.get("total")),
+        },
+        "scope_report": {
+            "id": selected.get("id"),
+            "name": selected.get("name"),
+            "scope_id": scope.get("id"),
+            "scope_name": scope.get("name"),
+            "created": selected.get("creation_time"),
+            "latest_evidence_time": selected.get("latest_evidence_time"),
+            "source_report_count": json_int(selected.get("source_report_count")),
+            "hosts_total": json_int(selected.get("member_host_count")),
+            "hosts_with_evidence": json_int(selected.get("evidence_host_count")),
+            "hosts_missing_evidence": json_int(selected.get("missing_host_count")),
+            "results_total": json_int(selected.get("result_count")),
+            "vulnerabilities_total": json_int(selected.get("vulnerability_count")),
+            "excluded_candidate_hosts": json_int(selected.get("excluded_candidate_host_count")),
+            "severity": selected.get("severity") if isinstance(selected.get("severity"), dict) else {},
+        },
+    }
+    return listing, summary_details, listing_json if isinstance(listing_json, dict) else {}
+
+
+def native_scope_report_browser_target(repo_root: Path, check: str, success_message: str, warning_message: str) -> tuple[str | None, bool, dict[str, Any]]:
+    listing, details, listing_json = latest_organization_scope_report_native(repo_root)
+    scope_report = details.get("scope_report", {}) if isinstance(details, dict) else {}
+    scope_id = scope_report.get("scope_id") if isinstance(scope_report, dict) else None
+    scope_report_id = scope_report.get("id") if isinstance(scope_report, dict) else None
+    if listing.returncode == 0 and scope_id and scope_report_id:
+        scope_report_path = f"/scopes/{scope_id}/reports/{scope_report_id}"
+        return scope_report_path, int(scope_report.get("results_total") or 0) > 0, finding(
+            "pass",
+            check,
+            success_message,
+            details={"path": scope_report_path, "results_total": scope_report.get("results_total"), "source": "turbovas-api"},
+        )
+    return None, False, finding(
+        "warn",
+        check,
+        warning_message,
+        details={
+            "source": "turbovas-api",
+            "exit_code": listing.returncode,
+            "listing": listing_json,
+            "output_tail": output_tail(listing.stdout, 80),
+        },
+    )
 
 
 def command_runtime_scope(repo_root: Path, action: str) -> dict[str, Any]:
@@ -7155,55 +7190,13 @@ def command_runtime_browser_smoke(repo_root: Path, routes: list[str] | None = No
     if aggregate_status(findings) == "fail":
         return make_result("runtime-browser-smoke", repo_root, "Runtime browser smoke stopped at prerequisites.", findings, [str(artifact_dir)])
 
-    scope_report_path: str | None = None
-    expect_result_row = False
-    scope_probe = runtime_scope_probe_path(repo_root)
-    scope_python = venv_python(repo_root, "python-gvm")
-    if gvmd_socket_path(repo_root).is_socket() and scope_probe.is_file() and scope_python.is_file():
-        scope_args = [
-            str(scope_python),
-            str(scope_probe),
-            "summary",
-            "--socket",
-            str(gvmd_socket_path(repo_root)),
-            "--username",
-            DEV_ADMIN_USER,
-            "--password-file",
-            str(secret_path),
-            "--artifact-dir",
-            str(scope_report_artifact_dir(repo_root)),
-        ]
-        scope_summary = run_command(scope_args, repo_root, env=build_env(repo_root), timeout=180)
-        try:
-            scope_payload = json.loads(scope_summary.stdout)
-        except (IndexError, json.JSONDecodeError):
-            scope_payload = None
-        scope_status = scope_payload.get("status") if scope_payload else None
-        scope_details = scope_payload.get("details", {}) if scope_payload else {}
-        scope = scope_details.get("scope", {}) if isinstance(scope_details, dict) else {}
-        scope_report = scope_details.get("scope_report", {}) if isinstance(scope_details, dict) else {}
-        scope_id = scope.get("id") if isinstance(scope, dict) else None
-        scope_report_id = scope_report.get("id") if isinstance(scope_report, dict) else None
-        if scope_summary.returncode == 0 and scope_status == "pass" and scope_id and scope_report_id:
-            scope_report_path = f"/scopes/{scope_id}/reports/{scope_report_id}"
-            expect_result_row = int(scope_report.get("results_total") or 0) > 0
-            findings.append(
-                finding(
-                    "pass",
-                    "browser-smoke.scope-report-target",
-                    "Latest Organization scope-report route selected for browser smoke.",
-                    details={"path": scope_report_path, "results_total": scope_report.get("results_total")},
-                )
-            )
-        else:
-            findings.append(
-                finding(
-                    "warn",
-                    "browser-smoke.scope-report-target",
-                    "Latest Organization scope-report route could not be resolved; browser smoke will use the first visible link.",
-                    details={"exit_code": scope_summary.returncode, "output_tail": output_tail(scope_summary.stdout, 80)},
-                )
-            )
+    scope_report_path, expect_result_row, scope_target_finding = native_scope_report_browser_target(
+        repo_root,
+        "browser-smoke.scope-report-target",
+        "Latest Organization scope-report route selected for browser smoke.",
+        "Latest Organization scope-report route could not be resolved; browser smoke will use the first visible link.",
+    )
+    findings.append(scope_target_finding)
 
     args = [
         sys.executable,
@@ -7268,55 +7261,13 @@ def command_runtime_browser_regression(repo_root: Path) -> dict[str, Any]:
     if aggregate_status(findings) == "fail":
         return make_result("runtime-browser-regression", repo_root, "Runtime browser regression stopped at prerequisites.", findings, [str(artifact_dir)])
 
-    scope_report_path: str | None = None
-    expect_result_row = False
-    scope_probe = runtime_scope_probe_path(repo_root)
-    scope_python = venv_python(repo_root, "python-gvm")
-    if gvmd_socket_path(repo_root).is_socket() and scope_probe.is_file() and scope_python.is_file():
-        scope_args = [
-            str(scope_python),
-            str(scope_probe),
-            "summary",
-            "--socket",
-            str(gvmd_socket_path(repo_root)),
-            "--username",
-            DEV_ADMIN_USER,
-            "--password-file",
-            str(secret_path),
-            "--artifact-dir",
-            str(scope_report_artifact_dir(repo_root)),
-        ]
-        scope_summary = run_command(scope_args, repo_root, env=build_env(repo_root), timeout=180)
-        try:
-            scope_payload = json.loads(scope_summary.stdout)
-        except (IndexError, json.JSONDecodeError):
-            scope_payload = None
-        scope_status = scope_payload.get("status") if scope_payload else None
-        scope_details = scope_payload.get("details", {}) if isinstance(scope_payload, dict) else {}
-        scope = scope_details.get("scope", {}) if isinstance(scope_details, dict) else {}
-        scope_report = scope_details.get("scope_report", {}) if isinstance(scope_details, dict) else {}
-        scope_id = scope.get("id") if isinstance(scope, dict) else None
-        scope_report_id = scope_report.get("id") if isinstance(scope_report, dict) else None
-        if scope_summary.returncode == 0 and scope_status == "pass" and scope_id and scope_report_id:
-            scope_report_path = f"/scopes/{scope_id}/reports/{scope_report_id}"
-            expect_result_row = int(scope_report.get("results_total") or 0) > 0
-            findings.append(
-                finding(
-                    "pass",
-                    "browser-regression.scope-report-target",
-                    "Latest Organization scope-report route selected for deep browser regression.",
-                    details={"path": scope_report_path, "results_total": scope_report.get("results_total")},
-                )
-            )
-        else:
-            findings.append(
-                finding(
-                    "warn",
-                    "browser-regression.scope-report-target",
-                    "Latest Organization scope-report route could not be resolved; deep browser regression will use the first visible link.",
-                    details={"exit_code": scope_summary.returncode, "output_tail": output_tail(scope_summary.stdout, 80)},
-                )
-            )
+    scope_report_path, expect_result_row, scope_target_finding = native_scope_report_browser_target(
+        repo_root,
+        "browser-regression.scope-report-target",
+        "Latest Organization scope-report route selected for deep browser regression.",
+        "Latest Organization scope-report route could not be resolved; deep browser regression will use the first visible link.",
+    )
+    findings.append(scope_target_finding)
 
     args = [
         sys.executable,
