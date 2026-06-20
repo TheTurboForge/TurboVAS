@@ -245,6 +245,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ScheduleAsset'
+  /report-configs:
+    get:
+      summary: List report configs
+      description: Read-only report-config metadata backed by gvmd/PostgreSQL. Create, modify, clone, export, and delete operations remain on inherited compatibility paths while native write semantics are designed.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Filter'
+      responses:
+        '200':
+          description: Report-config collection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportConfigAssetCollection'
+  /report-configs/{report_config_id}:
+    get:
+      summary: Read one report config
+      parameters:
+        - $ref: '#/components/parameters/ReportConfigId'
+      responses:
+        '200':
+          description: Report-config detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportConfigAsset'
   /report-formats:
     get:
       summary: List report formats
@@ -822,6 +850,13 @@ components:
       schema:
         type: string
         format: uuid
+    ReportConfigId:
+      name: report_config_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
   schemas:
     Error:
       type: object
@@ -1062,6 +1097,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ScheduleAsset'
+    ReportConfigAssetCollection:
+      type: object
+      required: [page, items]
+      properties:
+        page:
+          $ref: '#/components/schemas/PageInfo'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportConfigAsset'
     ReportFormatAssetCollection:
       type: object
       required: [page, items]
@@ -1973,6 +2018,77 @@ components:
           format: uuid
         name:
           type: string
+    ReportConfigParam:
+      type: object
+      required: [name, type, value, default, using_default, options, value_report_formats, default_report_formats]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        value:
+          type: string
+        default:
+          type: string
+        using_default:
+          type: boolean
+        min:
+          type: integer
+          nullable: true
+        max:
+          type: integer
+          nullable: true
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportFormatParamOption'
+        value_report_formats:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportFormatReference'
+        default_report_formats:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportFormatReference'
+    ReportConfigAsset:
+      type: object
+      required: [id, name, owner, report_format, writable, in_use, orphan, alerts, params]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        comment:
+          type: string
+        owner:
+          type: object
+          required: [name]
+          properties:
+            name:
+              type: string
+        report_format:
+          $ref: '#/components/schemas/ReportFormatReference'
+        writable:
+          type: boolean
+        in_use:
+          type: boolean
+        orphan:
+          type: boolean
+        alerts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportFormatReference'
+        params:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportConfigParam'
+        created_at:
+          type: string
+          format: date-time
+        modified_at:
+          type: string
+          format: date-time
     ReportFormatParamOption:
       type: object
       properties:

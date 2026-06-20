@@ -90,7 +90,7 @@ The first runtime implementation proof is scoped in
 for raw report list/detail/result rows/hosts/ports/applications/operating
 systems/CVEs/TLS certificates/errors, scope list/detail, target list/detail,
 task list/detail, scanner metadata list, saved filter list/detail, port-list
-list/detail, schedule list/detail, report-format list/detail, Security Information CVE catalog list/detail, Security
+list/detail, schedule list/detail, report-config list/detail, report-format list/detail, Security Information CVE catalog list/detail, Security
 Information CPE catalog list/detail, scope-report list,
 Results, Hosts, Ports, Applications,
 Operating Systems, CVEs, TLS Certificates, Error Messages, scope-report Metrics,
@@ -141,6 +141,13 @@ data, timezone, task backlink references, and timestamps. Schedules are operator
 automation metadata, so these endpoints stay inside the authenticated operator
 boundary. Create, modify, clone, export, and delete actions remain inherited
 until native write semantics are designed.
+
+Native report-config rows include report-config identity, owner, report-format
+reference, alert backlinks, resolved parameter metadata, writable/in-use/orphan
+flags, and timestamps. Report configs are scanner output configuration, so these
+endpoints stay inside the authenticated operator boundary. Create, modify,
+clone, export, and delete actions remain inherited until native write semantics
+are designed.
 
 Native report-format rows include report-format identity, summary/description,
 extension/content type, trust state, active/predefined/configurable/deprecated

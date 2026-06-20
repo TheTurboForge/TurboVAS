@@ -72,7 +72,7 @@ Browser proof work now routes the raw `/reports` list, raw-report Results,
 raw-report Hosts, raw-report Ports, raw-report CVEs, raw-report Error Messages,
 raw-report and scope-report Metrics, plus scope list/detail, target/task list
 reads, top-level asset/security-info lists including Hosts, TLS Certificates,
-Operating Systems, Scanners, and Filters, and every scope-report evidence tab through the authenticated same-origin
+Operating Systems, Scanners, Filters, and Report Configs, and every scope-report evidence tab through the authenticated same-origin
 `gsad` proxy defined in `docs/NATIVE_API_AUTH_BOUNDARY.md`.
 `runtime-report-summary --json` and `runtime-report-export --json` use the
 native raw report detail/result-row endpoints; the remaining heavy raw report
@@ -80,7 +80,7 @@ detail tabs stay inherited follow-ups.
 
 Internal read-only scripting can use `tools/turbovasctl native-api-request
 --json --path '/api/v1/...'` or `just native-api-request -- --json --path
-'/api/v1/...'` for DB-backed report, scope, target, and task reads. This removes
+'/api/v1/...'` for DB-backed report, scope, target, task, and report-config reads. This removes
 the need for covered inherited read-only GMP scripts while keeping write/control
 operations on inherited paths until a separate native write design exists.
 The `just` wrapper intentionally requires the literal `--` separator so the

@@ -143,18 +143,31 @@ async function entityTableState(page) {
   return { tableCount, rowCount, toggleCount, detailLinkCount, emptyText };
 }
 
+function noLiveDetailReason(state) {
+  if (state.emptyText) return 'no-live-detail-data';
+  if (state.tableCount && state.rowCount === 0) return 'no-live-detail-rows';
+  return null;
+}
+
+function noLivePaginationReason(state) {
+  if (state.emptyText) return 'no-live-pagination-data';
+  if (state.tableCount && state.rowCount === 0) return 'no-live-pagination-rows';
+  return null;
+}
+
 async function firstExpandedRowDetailHref(page, matcher) {
   const state = await entityTableState(page);
+  const noLiveReason = noLiveDetailReason(state);
+  if (noLiveReason) {
+    return { href: null, reason: noLiveReason, state };
+  }
   if (!state.tableCount) {
-    const reason = state.emptyText ? 'no-live-detail-data' : 'selector-failure-no-entities-table';
-    return { href: null, reason, state };
+    return { href: null, reason: 'selector-failure-no-entities-table', state };
   }
   if (!state.toggleCount) {
-    const reason = state.emptyText
-      ? 'no-live-detail-data'
-      : state.rowCount === 0
-        ? 'no-live-detail-rows'
-        : 'selector-failure-no-row-details-toggle';
+    const reason = state.detailLinkCount
+      ? 'selector-failure-visible-details-link-mismatch'
+      : 'selector-failure-no-row-details-toggle';
     return { href: null, reason, state };
   }
 
@@ -174,7 +187,7 @@ async function firstExpandedRowDetailHref(page, matcher) {
   const detailHrefs = await page.getByTestId('details-link')
     .evaluateAll(anchors => anchors.map(anchor => anchor.getAttribute('href')).filter(Boolean))
     .catch(() => []);
-  return { href: null, reason: detailHrefs.length ? 'selector-failure-details-link-mismatch' : 'selector-failure-no-details-link-after-expand', detailHrefs: detailHrefs.slice(0, 10), state };
+  return { href: null, reason: detailHrefs.length ? 'selector-failure-expanded-details-link-mismatch' : 'selector-failure-no-details-link-after-expand', detailHrefs: detailHrefs.slice(0, 10), state };
 }
 
 async function assertNativeSuccess(pathPattern, check) {
@@ -196,7 +209,7 @@ async function checkTopLevelRoute(page, route, check, nativePattern, detailPatte
   }
   if (!detailHref) {
     const noLiveDetail = expandedDetails && String(expandedDetails.reason || '').startsWith('no-live-detail');
-    add(noLiveDetail ? 'pass' : 'warn', `${check}.detail-link`, noLiveDetail ? 'No live detail rows/data were available; detail-link route check was skipped.' : 'No matching detail link was available after checking visible and expanded row links.', { route, detailPattern: String(detailPattern), expandedDetails });
+    add(noLiveDetail ? 'pass' : 'warn', `${check}.detail-link`, noLiveDetail ? 'No live detail rows or data were available; detail-link route check was skipped.' : 'Detail rows existed, but no matching detail link was available after checking visible and expanded row links.', { route, detailPattern: String(detailPattern), expandedDetails });
     return;
   }
   await page.goto(new URL(detailHref, config.baseUrl).toString(), { waitUntil: 'networkidle', timeout: config.timeoutMs });
@@ -258,13 +271,17 @@ async function exercisePagination(page, check) {
     return;
   }
   const state = await entityTableState(page);
-  const reason = state.emptyText
-    ? 'no-live-pagination-data'
-    : finalPager && finalPager.reason === 'single-page-no-enabled-next'
-      ? 'single-page-no-enabled-next'
-      : 'selector-failure-no-pagination-control';
+  const noLiveReason = noLivePaginationReason(state);
+  const reason = noLiveReason || (finalPager && finalPager.reason === 'single-page-no-enabled-next'
+    ? 'single-page-no-enabled-next'
+    : 'selector-failure-no-pagination-control');
   const selectorFailure = reason.startsWith('selector-failure');
-  add(selectorFailure ? 'warn' : 'pass', `${check}.pagination`, selectorFailure ? 'No pagination control was found; selector coverage may need an update.' : 'No enabled Next pagination control was available; live data appears single-page or empty, so pagination was skipped.', { clicks, path: beforePath, reason, pager: finalPager, state });
+  const message = selectorFailure
+    ? 'Rows were present, but no pagination control was found; selector coverage may need an update.'
+    : reason === 'single-page-no-enabled-next'
+      ? 'No enabled Next pagination control was available because the live data appears to fit on one page; pagination was skipped.'
+      : 'No live rows or data were available; pagination was skipped.';
+  add(selectorFailure ? 'warn' : 'pass', `${check}.pagination`, message, { clicks, path: beforePath, reason, pager: finalPager, state });
 }
 
 async function checkScopeReport(page) {
