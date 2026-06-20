@@ -153,6 +153,9 @@ runtime-log-review *args:
 runtime-data-state *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-data-state "$@"
 
+runtime-db-introspect *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-db-introspect "$@"
+
 runtime-performance-snapshot *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-performance-snapshot "$@"
 
@@ -176,6 +179,9 @@ runtime-app-smoke *args:
 
 runtime-native-api-smoke *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-native-api-smoke "$@"
+
+runtime-native-api-rebuild *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-native-api-rebuild "$@"
 
 runtime-webui-smoke *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-webui-smoke "$@"

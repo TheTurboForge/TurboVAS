@@ -426,6 +426,29 @@ DATABASE_REMOVED_TABLES = (
     "audits",
     "audit_reports",
 )
+DB_INTROSPECT_TABLES = tuple(("public", table) for table in (*DATABASE_CORE_TABLES, *DATABASE_SCOPE_TABLES)) + (
+    ("public", "nvts"),
+    ("public", "cves"),
+    ("public", "cpes"),
+    ("cert", "cert_bund_advs"),
+    ("cert", "cert_bund_cves"),
+    ("cert", "dfn_cert_advs"),
+    ("cert", "dfn_cert_cves"),
+)
+DB_INTROSPECT_COLUMNS = (
+    ("public", "meta", "name"),
+    ("public", "meta", "value"),
+    ("public", "reports", "id"),
+    ("public", "reports", "task"),
+    ("public", "results", "id"),
+    ("public", "results", "report"),
+    ("public", "tasks", "id"),
+    ("public", "targets", "id"),
+    ("public", "scopes", "id"),
+    ("public", "scope_reports", "id"),
+    ("cert", "cert_bund_advs", "uuid"),
+    ("cert", "dfn_cert_advs", "uuid"),
+)
 DATA_STATE_ARTIFACT_PATHS = (
     ("reports", "db_owned_export", ("artifacts", "reports"), True),
     ("scope-reports", "db_owned_export", ("artifacts", "scope-reports"), True),
@@ -448,6 +471,18 @@ DATA_STATE_DB_OWNED_EXPORT_SOURCES = {
     "scope-reports": ("scope_reports", "scope_report_sources"),
     "metrics": ("reports", "results", "report_hosts", "scope_report_system_metrics", "scope_report_vulnerability_metrics"),
 }
+GSA_FRESHNESS_SOURCE_PATHS = (
+    "components/gsa/src",
+    "components/gsa/public",
+    "components/gsa/index.html",
+    "components/gsa/package.json",
+    "components/gsa/package-lock.json",
+    "components/gsa/vite.config.ts",
+    "components/gsa/tsconfig.json",
+)
+GSA_FRESHNESS_SKIP_DIRS = frozenset({"node_modules", "build", "coverage", "dist", ".vite", ".turbo"})
+GSAD_FRESHNESS_SOURCE_PATHS = ("components/gsad/src/gsad_native_api.c",)
+GSAD_FRESHNESS_BUILD_PATHS = ("build/gsad/src/gsad", "build/prefix/sbin/gsad")
 
 
 @dataclass(frozen=True)
@@ -1139,6 +1174,159 @@ def stage_gsa_static(repo_root: Path) -> list[dict[str, Any]]:
 def first_gsa_asset_rel(index_html: str) -> str | None:
     match = re.search(r"""(?:src|href)=["']/(assets/[^"']+)["']""", index_html)
     return match.group(1) if match else None
+
+
+def path_latest_mtime(path: Path, *, skip_dirs: frozenset[str] = frozenset()) -> float | None:
+    try:
+        if path.is_file():
+            return path.stat().st_mtime
+        if not path.is_dir():
+            return None
+    except OSError:
+        return None
+    latest: float | None = None
+    for root, dirs, files in os.walk(path):
+        dirs[:] = [dirname for dirname in dirs if dirname not in skip_dirs]
+        root_path = Path(root)
+        for filename in files:
+            try:
+                mtime = (root_path / filename).stat().st_mtime
+            except OSError:
+                continue
+            latest = mtime if latest is None else max(latest, mtime)
+    return latest
+
+
+def paths_latest_mtime(repo_root: Path, rel_paths: Iterable[str], *, skip_dirs: frozenset[str] = frozenset()) -> tuple[float | None, str | None]:
+    latest: float | None = None
+    latest_path: str | None = None
+    for rel_path in rel_paths:
+        mtime = path_latest_mtime(repo_root / rel_path, skip_dirs=skip_dirs)
+        if mtime is None:
+            continue
+        if latest is None or mtime > latest:
+            latest = mtime
+            latest_path = rel_path
+    return latest, latest_path
+
+
+def iso_mtime(mtime: float | None) -> str | None:
+    return datetime.fromtimestamp(mtime, timezone.utc).replace(microsecond=0).isoformat() if mtime is not None else None
+
+
+def parse_container_started_at(value: Any) -> float | None:
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed.timestamp()
+
+
+def qualified_table_name(schema: str, table: str) -> str:
+    return f"{sql_identifier(schema)}.{sql_identifier(table)}"
+
+
+def qualified_table_row_count(repo_root: Path, schema: str, table: str) -> int | None:
+    result = psql(repo_root, f"SELECT count(*) FROM {qualified_table_name(schema, table)};")
+    if result.returncode != 0:
+        return None
+    value = psql_value(result)
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+
+def introspection_table_presence(repo_root: Path) -> tuple[subprocess.CompletedProcess[str], dict[str, bool]]:
+    values = ",".join(f"({sql_literal(schema)}, {sql_literal(table)})" for schema, table in DB_INTROSPECT_TABLES)
+    query = (
+        f"WITH wanted(schema_name, table_name) AS (VALUES {values}) "
+        "SELECT wanted.schema_name || '.' || wanted.table_name || '|' || (tables.table_name IS NOT NULL) "
+        "FROM wanted LEFT JOIN information_schema.tables tables "
+        "ON tables.table_schema = wanted.schema_name AND tables.table_name = wanted.table_name "
+        "ORDER BY wanted.schema_name, wanted.table_name;"
+    )
+    result = psql(repo_root, query)
+    rows: dict[str, bool] = {}
+    if result.returncode == 0:
+        for line in result.stdout.splitlines():
+            if "|" not in line:
+                continue
+            name, value = line.strip().split("|", 1)
+            rows[name] = value.strip().lower() in ("t", "true", "1")
+    return result, rows
+
+
+def introspection_column_presence(repo_root: Path) -> tuple[subprocess.CompletedProcess[str], dict[str, bool]]:
+    values = ",".join(f"({sql_literal(schema)}, {sql_literal(table)}, {sql_literal(column)})" for schema, table, column in DB_INTROSPECT_COLUMNS)
+    query = (
+        f"WITH wanted(schema_name, table_name, column_name) AS (VALUES {values}) "
+        "SELECT wanted.schema_name || '.' || wanted.table_name || '.' || wanted.column_name || '|' || (columns.column_name IS NOT NULL) "
+        "FROM wanted LEFT JOIN information_schema.columns columns "
+        "ON columns.table_schema = wanted.schema_name AND columns.table_name = wanted.table_name AND columns.column_name = wanted.column_name "
+        "ORDER BY wanted.schema_name, wanted.table_name, wanted.column_name;"
+    )
+    result = psql(repo_root, query)
+    rows: dict[str, bool] = {}
+    if result.returncode == 0:
+        for line in result.stdout.splitlines():
+            if "|" not in line:
+                continue
+            name, value = line.strip().split("|", 1)
+            rows[name] = value.strip().lower() in ("t", "true", "1")
+    return result, rows
+
+
+def runtime_gsa_freshness_findings(repo_root: Path) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
+    staged = gsad_static_dir(repo_root)
+    staged_latest, staged_latest_path = paths_latest_mtime(repo_root, (str(staged.relative_to(repo_root)),)) if staged.exists() else (None, None)
+    source_latest, source_latest_path = paths_latest_mtime(repo_root, GSA_FRESHNESS_SOURCE_PATHS, skip_dirs=GSA_FRESHNESS_SKIP_DIRS)
+    if staged_latest is not None and source_latest is not None and source_latest > staged_latest:
+        findings.append(
+            finding(
+                "warn",
+                "gsa.static-freshness",
+                "GSA source inputs are newer than staged gsad static assets; run just build-ui before browser validation.",
+                str(staged),
+                {
+                    "latest_source_path": source_latest_path,
+                    "latest_source_mtime": iso_mtime(source_latest),
+                    "latest_staged_path": staged_latest_path,
+                    "latest_staged_mtime": iso_mtime(staged_latest),
+                },
+            )
+        )
+    elif staged_latest is not None:
+        findings.append(finding("pass", "gsa.static-freshness", "Staged GSA static assets are not older than tracked GSA source inputs.", str(staged), {"latest_staged_mtime": iso_mtime(staged_latest), "latest_source_mtime": iso_mtime(source_latest)}))
+
+    gsad_state = docker_container_state(repo_root, "gsad")
+    started_at = parse_container_started_at(gsad_state.get("StartedAt") if gsad_state else None)
+    gsad_source_latest, gsad_source_latest_path = paths_latest_mtime(repo_root, GSAD_FRESHNESS_SOURCE_PATHS)
+    gsad_build_latest, gsad_build_latest_path = paths_latest_mtime(repo_root, GSAD_FRESHNESS_BUILD_PATHS)
+    compare_latest = max([value for value in (staged_latest, gsad_source_latest, gsad_build_latest) if value is not None], default=None)
+    if started_at is not None and compare_latest is not None and compare_latest > started_at:
+        findings.append(
+            finding(
+                "warn",
+                "gsad.runtime-freshness",
+                "Running gsad predates relevant static or native-proxy build inputs; run just build-c-services, just build-ui, then refresh runtime-app-up before browser validation.",
+                details={
+                    "container_id": gsad_state.get("container_id") if gsad_state else None,
+                    "started_at": gsad_state.get("StartedAt") if gsad_state else None,
+                    "latest_gsad_source_path": gsad_source_latest_path,
+                    "latest_gsad_source_mtime": iso_mtime(gsad_source_latest),
+                    "latest_gsad_build_path": gsad_build_latest_path,
+                    "latest_gsad_build_mtime": iso_mtime(gsad_build_latest),
+                    "latest_staged_mtime": iso_mtime(staged_latest),
+                },
+            )
+        )
+    elif started_at is not None:
+        findings.append(finding("pass", "gsad.runtime-freshness", "Running gsad is not older than relevant static or native-proxy build inputs.", details={"started_at": gsad_state.get("StartedAt") if gsad_state else None}))
+    return findings
 
 
 def feed_path_summary(path: Path, markers: tuple[str, ...]) -> dict[str, Any]:
@@ -5402,6 +5590,30 @@ def command_runtime_app_up(repo_root: Path) -> dict[str, Any]:
     return make_result("runtime-app-up", repo_root, "Application runtime startup attempted.", findings, [str(runtime_dir(repo_root))])
 
 
+def command_runtime_native_api_rebuild(repo_root: Path) -> dict[str, Any]:
+    findings = ensure_runtime_dirs(repo_root)
+    findings.extend(ensure_build_runtime_dirs(repo_root))
+    config = run_command(compose_command(repo_root, "config", "--quiet"), repo_root, env=runtime_env(repo_root))
+    findings.append(finding("pass" if config.returncode == 0 else "fail", "compose.config", f"Compose config validation exit code {config.returncode}.", str(compose_file(repo_root).relative_to(repo_root)), {"output_tail": output_tail(config.stdout, 40)}))
+    if aggregate_status(findings) == "fail":
+        return make_result("runtime-native-api-rebuild", repo_root, "Native API rebuild stopped at prerequisites.", findings, [str(runtime_dir(repo_root))])
+
+    build = run_command(compose_command(repo_root, "build", "turbovas-api"), repo_root, env=runtime_env(repo_root), timeout=1200)
+    findings.append(process_step_finding("pass" if build.returncode == 0 else "fail", "compose.turbovas-api-build", f"docker compose build turbovas-api exit code {build.returncode}.", build, compose_command(repo_root, "build", "turbovas-api")))
+    if build.returncode != 0:
+        return make_result("runtime-native-api-rebuild", repo_root, "Native API rebuild stopped because image build failed.", findings, [str(runtime_dir(repo_root))])
+
+    up = run_command(compose_command(repo_root, "--profile", "app", "up", "-d", "--no-deps", "turbovas-api"), repo_root, env=runtime_env(repo_root), timeout=300)
+    findings.append(process_step_finding("pass" if up.returncode == 0 else "fail", "compose.turbovas-api-up", f"docker compose up --no-deps turbovas-api exit code {up.returncode}.", up, compose_command(repo_root, "--profile", "app", "up", "-d", "--no-deps", "turbovas-api")))
+    if up.returncode != 0:
+        return make_result("runtime-native-api-rebuild", repo_root, "Native API rebuild stopped because turbovas-api restart failed.", findings, [str(runtime_dir(repo_root))])
+
+    smoke = command_runtime_native_api_smoke(repo_root)
+    findings.append(finding(smoke["status"], "native-api.smoke", smoke["summary"], details={"status": smoke["status"], "artifacts": smoke.get("artifacts", [])}))
+    artifacts = sorted(set([str(runtime_dir(repo_root)), *smoke.get("artifacts", [])]))
+    return make_result("runtime-native-api-rebuild", repo_root, "Native API sidecar rebuild attempted.", findings, artifacts)
+
+
 def command_runtime_app_down(repo_root: Path) -> dict[str, Any]:
     stop = run_command(compose_command(repo_root, "--profile", "app", "stop", *APP_SERVICES), repo_root, env=runtime_env(repo_root))
     remove = run_command(compose_command(repo_root, "--profile", "app", "rm", "-f", *APP_SERVICES), repo_root, env=runtime_env(repo_root))
@@ -6540,6 +6752,7 @@ def command_runtime_webui_smoke(repo_root: Path) -> dict[str, Any]:
     config_path = static_dir / "config.js"
     findings.append(finding("pass" if index_path.is_file() else "fail", "webui.static-index", "Staged GSA index.html exists." if index_path.is_file() else "Staged GSA index.html is missing; run just build-ui.", str(index_path)))
     findings.append(finding("pass" if config_path.is_file() else "fail", "webui.static-config", "Staged GSA config.js exists." if config_path.is_file() else "Staged GSA config.js is missing; run just build-ui.", str(config_path)))
+    findings.extend(runtime_gsa_freshness_findings(repo_root))
 
     index_text = index_path.read_text(encoding="utf-8") if index_path.is_file() else ""
     asset_rel = first_gsa_asset_rel(index_text)
@@ -6579,6 +6792,7 @@ def command_runtime_browser_smoke(repo_root: Path, routes: list[str] | None = No
 
     base_urls = gsad_base_urls(repo_root)
     findings.append(finding("pass" if base_urls else "fail", "gsad.urls", "Configured gsad base URLs are available." if base_urls else "No gsad base URLs are configured.", details={"base_urls": list(base_urls)}))
+    findings.extend(runtime_gsa_freshness_findings(repo_root))
     if aggregate_status(findings) == "fail":
         return make_result("runtime-browser-smoke", repo_root, "Runtime browser smoke stopped at prerequisites.", findings, [str(artifact_dir)])
 
@@ -6964,6 +7178,58 @@ def command_runtime_data_state(repo_root: Path) -> dict[str, Any]:
     return result
 
 
+def command_runtime_db_introspect(repo_root: Path) -> dict[str, Any]:
+    findings: list[dict[str, Any]] = []
+    details: dict[str, Any] = {"database": {}, "schemas": {}, "tables": {}, "columns": {}}
+    if not container_running(repo_root, "postgres"):
+        findings.append(finding("warn", "db-introspect.postgres", "Postgres is not running; database introspection is unavailable."))
+        result = make_result("runtime-db-introspect", repo_root, "Runtime database introspection could not inspect Postgres.", findings)
+        result["details"] = details
+        return result
+
+    identity = psql(repo_root, "SELECT current_database() || '|' || current_user || '|' || session_user;")
+    if identity.returncode == 0 and "|" in psql_value(identity):
+        database, current_user, session_user = psql_value(identity).split("|", 2)
+        details["database"].update({"name": database, "current_user": current_user, "session_user": session_user})
+        findings.append(finding("pass", "db-introspect.identity", "Database identity captured.", details={"database": details["database"]}))
+    else:
+        findings.append(finding("fail", "db-introspect.identity", "Database identity query failed.", details={"output_tail": output_tail(identity.stdout, 80)}))
+
+    version = psql(repo_root, "SELECT COALESCE((SELECT value FROM meta WHERE name = 'database_version'), 'missing');")
+    db_version = psql_value(version) if version.returncode == 0 else ""
+    details["database"]["manager_database_version"] = db_version
+    findings.append(finding("pass" if version.returncode == 0 and db_version else "fail", "db-introspect.database-version", f"Manager database version is {db_version or 'unknown'}.", details={"output_tail": output_tail(version.stdout, 40)}))
+
+    schemas = psql(repo_root, "SELECT schema_name FROM information_schema.schemata WHERE schema_name IN ('public', 'cert') ORDER BY schema_name;")
+    schema_names = {line.strip() for line in schemas.stdout.splitlines() if line.strip()} if schemas.returncode == 0 else set()
+    details["schemas"] = {schema: {"exists": schema in schema_names} for schema in ("public", "cert")}
+    missing_schemas = [schema for schema, info in details["schemas"].items() if not info["exists"]]
+    findings.append(finding("pass" if schemas.returncode == 0 and not missing_schemas else "warn", "db-introspect.schemas", "Expected database schemas are present." if not missing_schemas else f"Missing expected schemas: {', '.join(missing_schemas)}.", details={"schemas": details["schemas"], "output_tail": output_tail(schemas.stdout, 40)}))
+
+    table_query, table_presence = introspection_table_presence(repo_root)
+    if table_query.returncode == 0:
+        for schema, table in DB_INTROSPECT_TABLES:
+            key = f"{schema}.{table}"
+            exists = table_presence.get(key, False)
+            details["tables"][key] = {"exists": exists}
+            if exists:
+                details["tables"][key]["row_count"] = qualified_table_row_count(repo_root, schema, table)
+        findings.append(finding("pass", "db-introspect.tables", "Fixed database table catalog captured.", details={"table_count": len(details["tables"])}))
+    else:
+        findings.append(finding("fail", "db-introspect.tables", "Fixed database table catalog query failed.", details={"output_tail": output_tail(table_query.stdout, 80)}))
+
+    column_query, column_presence = introspection_column_presence(repo_root)
+    if column_query.returncode == 0:
+        details["columns"] = {key: {"exists": exists} for key, exists in column_presence.items()}
+        findings.append(finding("pass", "db-introspect.columns", "Fixed database column catalog captured.", details={"column_count": len(details["columns"])}))
+    else:
+        findings.append(finding("fail", "db-introspect.columns", "Fixed database column catalog query failed.", details={"output_tail": output_tail(column_query.stdout, 80)}))
+
+    result = make_result("runtime-db-introspect", repo_root, "Runtime database introspection completed.", findings)
+    result["details"] = details
+    return result
+
+
 def command_runtime_performance_snapshot(repo_root: Path) -> dict[str, Any]:
     artifact_dir = performance_artifact_dir(repo_root)
     findings: list[dict[str, Any]] = []
@@ -7170,7 +7436,7 @@ def command_doctor(repo_root: Path) -> dict[str, Any]:
     license_result = command_license_report(repo_root)
     findings.append(finding(license_result["status"], "license.compliance", license_result["summary"], details={"status": license_result["status"], "findings": license_result["findings"]}))
     findings.append(finding("pass", "surface.available", "Build readiness surface is available.", details={"commands": ["just deps", "just configure", "just build", "just build-core-c", "just build-c-services", "just build-ui", "just build-python", "just build-baseline"]}))
-    findings.append(finding("pass" if compose_file(repo_root).is_file() else "warn", "surface.available", "Runtime infrastructure command surface is available." if compose_file(repo_root).is_file() else "Runtime infrastructure command surface is not available.", details={"commands": ["just runtime-plan", "just up", "just down", "just logs", "just runtime-init", "just runtime-certs-init", "just runtime-manager-init", "just runtime-scanner-redis-init", "just runtime-gmp-smoke", "just runtime-scanner-register", "just runtime-scanner-capability-check", "just runtime-scanner-process-check", "just runtime-nmap-capability-check", "just runtime-feed-keyring-init", "just runtime-feed-import-init", "just runtime-full-test-scan-preflight", "just runtime-full-test-scan-start", "just runtime-full-test-scan-status", "just runtime-report-summary", "just runtime-report-export", "just runtime-report-metrics", "just runtime-scope-smoke", "just runtime-scope-report-summary", "just runtime-scope-report-metrics", "just runtime-rbac-smoke", "just feed-state", "just feed-cache-sync", "just feed-copy-to-runtime", "just runtime-status", "just runtime-smoke", "just runtime-log-review", "just runtime-data-state", "just runtime-performance-snapshot", "just runtime-app-up", "just runtime-app-smoke", "just runtime-native-api-smoke", "just runtime-webui-smoke", "just runtime-browser-smoke", "just runtime-browser-regression", "just runtime-credential-smoke", "just runtime-app-down", "just gvmd-smoke", "just quality-gate", "just quality-gate-state", "just quality-gate-schedule"]}))
+    findings.append(finding("pass" if compose_file(repo_root).is_file() else "warn", "surface.available", "Runtime infrastructure command surface is available." if compose_file(repo_root).is_file() else "Runtime infrastructure command surface is not available.", details={"commands": ["just runtime-plan", "just up", "just down", "just logs", "just runtime-init", "just runtime-certs-init", "just runtime-manager-init", "just runtime-scanner-redis-init", "just runtime-gmp-smoke", "just runtime-scanner-register", "just runtime-scanner-capability-check", "just runtime-scanner-process-check", "just runtime-nmap-capability-check", "just runtime-feed-keyring-init", "just runtime-feed-import-init", "just runtime-full-test-scan-preflight", "just runtime-full-test-scan-start", "just runtime-full-test-scan-status", "just runtime-report-summary", "just runtime-report-export", "just runtime-report-metrics", "just runtime-scope-smoke", "just runtime-scope-report-summary", "just runtime-scope-report-metrics", "just runtime-rbac-smoke", "just feed-state", "just feed-cache-sync", "just feed-copy-to-runtime", "just runtime-status", "just runtime-smoke", "just runtime-log-review", "just runtime-data-state", "just runtime-db-introspect", "just runtime-performance-snapshot", "just runtime-app-up", "just runtime-app-smoke", "just runtime-native-api-smoke", "just runtime-native-api-rebuild", "just runtime-webui-smoke", "just runtime-browser-smoke", "just runtime-browser-regression", "just runtime-credential-smoke", "just runtime-app-down", "just gvmd-smoke", "just quality-gate", "just quality-gate-state", "just quality-gate-schedule"]}))
     findings.append(finding("pass", "surface.diagnostics", "Native API, Redis, path-coupling, and security-policy diagnostics are available.", details={"commands": ["just native-tooling-state", "just runtime-redis-state", "just path-coupling-state", "just security-policy-check"]}))
     findings.append(finding("warn", "surface.deferred", "Test command surface is deferred until component checks are mapped.", details={"command": "just test"}))
     findings.append(finding("warn", "surface.deferred", "Full inherited service orchestration remains experimental until feed, scanner registration, and first UI/API connectivity are stabilized.", details={"commands": ["gvmd", "gsad", "ospd-openvas", "notus-scanner"]}))
@@ -7429,6 +7695,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("runtime-smoke", parents=[common], help="run runtime infrastructure smoke checks")
     subparsers.add_parser("runtime-log-review", parents=[common], help="review recent full-stack runtime logs")
     subparsers.add_parser("runtime-data-state", parents=[common], help="inspect database-centered runtime data state")
+    subparsers.add_parser("runtime-db-introspect", parents=[common], help="inspect fixed read-only database catalog facts")
     subparsers.add_parser("runtime-performance-snapshot", parents=[common], help="capture a lightweight runtime performance snapshot")
     subparsers.add_parser("runtime-redis-state", parents=[common], help="inspect Redis dependency and runtime boundary state")
     subparsers.add_parser("security-policy-check", parents=[common], help="validate security-sensitive path policy scaffolding")
@@ -7437,6 +7704,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("runtime-app-down", parents=[common], help="stop experimental application services")
     subparsers.add_parser("runtime-app-smoke", parents=[common], help="run experimental application service smoke checks")
     subparsers.add_parser("runtime-native-api-smoke", parents=[common], help="verify the internal TurboVAS native API sidecar")
+    subparsers.add_parser("runtime-native-api-rebuild", parents=[common], help="rebuild and restart only the internal TurboVAS native API sidecar")
     subparsers.add_parser("runtime-webui-smoke", parents=[common], help="verify the staged GSA web UI over gsad")
     browser_smoke = subparsers.add_parser("runtime-browser-smoke", parents=[common], help="verify report workflows through a headless browser")
     browser_smoke.add_argument("--route", action="append", help="focus browser smoke on one route label or path; may be repeated")
@@ -7555,6 +7823,8 @@ def main(argv: list[str] | None = None) -> int:
         result = command_runtime_log_review(repo_root)
     elif args.command == "runtime-data-state":
         result = command_runtime_data_state(repo_root)
+    elif args.command == "runtime-db-introspect":
+        result = command_runtime_db_introspect(repo_root)
     elif args.command == "runtime-performance-snapshot":
         result = command_runtime_performance_snapshot(repo_root)
     elif args.command == "runtime-redis-state":
@@ -7571,6 +7841,8 @@ def main(argv: list[str] | None = None) -> int:
         result = command_runtime_app_smoke(repo_root)
     elif args.command == "runtime-native-api-smoke":
         result = command_runtime_native_api_smoke(repo_root)
+    elif args.command == "runtime-native-api-rebuild":
+        result = command_runtime_native_api_rebuild(repo_root)
     elif args.command == "runtime-webui-smoke":
         result = command_runtime_webui_smoke(repo_root)
     elif args.command == "runtime-browser-smoke":

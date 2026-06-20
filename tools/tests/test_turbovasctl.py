@@ -654,7 +654,7 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_technical_foundation_commands_are_registered(self):
         source = (Path(__file__).resolve().parents[1] / "turbovasctl").read_text(encoding="utf-8")
         justfile = (Path(__file__).resolve().parents[2] / "justfile").read_text(encoding="utf-8")
-        for command in ("native-tooling-state", "native-api-request", "rust-migration-state", "branding-state", "production-posture-check", "runtime-log-review", "runtime-data-state", "runtime-performance-snapshot", "runtime-redis-state", "security-policy-check", "path-coupling-state", "runtime-native-api-smoke", "quality-gate", "quality-gate-state", "quality-gate-schedule"):
+        for command in ("native-tooling-state", "native-api-request", "rust-migration-state", "branding-state", "production-posture-check", "runtime-log-review", "runtime-data-state", "runtime-db-introspect", "runtime-performance-snapshot", "runtime-redis-state", "security-policy-check", "path-coupling-state", "runtime-native-api-smoke", "runtime-native-api-rebuild", "quality-gate", "quality-gate-state", "quality-gate-schedule"):
             with self.subTest(command=command):
                 self.assertIn(command, source)
                 self.assertIn(f"{command} *args:", justfile)
@@ -665,9 +665,11 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("def command_branding_state", source)
         self.assertIn("def command_runtime_log_review", source)
         self.assertIn("def command_runtime_data_state", source)
+        self.assertIn("def command_runtime_db_introspect", source)
         self.assertIn("def command_runtime_performance_snapshot", source)
         self.assertIn("def command_runtime_redis_state", source)
         self.assertIn("def command_runtime_native_api_smoke", source)
+        self.assertIn("def command_runtime_native_api_rebuild", source)
         self.assertIn("native-api.scope-report-hosts", source)
         self.assertIn("native-api.scope-report-ports", source)
         self.assertIn("native-api.scope-report-cves", source)
@@ -1533,6 +1535,46 @@ db2:keys=5,expires=0,avg_ttl=0
 
         self.assertEqual(findings, [])
 
+    def test_runtime_gsa_freshness_warns_for_stale_static_assets(self):
+        original_state = turbovasctl.docker_container_state
+        try:
+            turbovasctl.docker_container_state = lambda _root, _service: None
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp) / "TurboVAS"
+                source = root / "components" / "gsa" / "src" / "main.tsx"
+                staged = turbovasctl.gsad_static_dir(root) / "index.html"
+                source.parent.mkdir(parents=True)
+                staged.parent.mkdir(parents=True)
+                source.write_text("console.log('new');\n", encoding="utf-8")
+                staged.write_text("<div id='app'></div>", encoding="utf-8")
+                os.utime(staged, (1000, 1000))
+                os.utime(source, (2000, 2000))
+                findings = turbovasctl.runtime_gsa_freshness_findings(root)
+        finally:
+            turbovasctl.docker_container_state = original_state
+
+        stale = [finding for finding in findings if finding["check"] == "gsa.static-freshness"]
+        self.assertEqual(stale[0]["status"], "warn")
+        self.assertEqual(stale[0]["details"]["latest_source_path"], "components/gsa/src")
+
+    def test_runtime_gsa_freshness_warns_for_stale_gsad_container(self):
+        original_state = turbovasctl.docker_container_state
+        try:
+            turbovasctl.docker_container_state = lambda _root, _service: {"container_id": "cid", "StartedAt": "2026-01-01T00:00:00Z"}
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp) / "TurboVAS"
+                build = root / "build" / "gsad" / "src" / "gsad"
+                build.parent.mkdir(parents=True)
+                build.write_text("binary", encoding="utf-8")
+                os.utime(build, (2000000000, 2000000000))
+                findings = turbovasctl.runtime_gsa_freshness_findings(root)
+        finally:
+            turbovasctl.docker_container_state = original_state
+
+        stale = [finding for finding in findings if finding["check"] == "gsad.runtime-freshness"]
+        self.assertEqual(stale[0]["status"], "warn")
+        self.assertEqual(stale[0]["details"]["latest_gsad_build_path"], "build/gsad/src/gsad")
+
     def test_runtime_secret_helper_accepts_default_value(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "TurboVAS"
@@ -2037,6 +2079,75 @@ db2:keys=5,expires=0,avg_ttl=0
     def test_sql_escaping_helpers(self):
         self.assertEqual(turbovasctl.sql_identifier('a"b'), '"a""b"')
         self.assertEqual(turbovasctl.sql_literal("a'b"), "'a''b'")
+
+    def test_runtime_native_api_rebuild_uses_no_deps_restart(self):
+        calls = []
+        original_run_command = turbovasctl.run_command
+        original_smoke = turbovasctl.command_runtime_native_api_smoke
+        try:
+            def fake_run_command(command, *_args, **_kwargs):
+                calls.append(command)
+                return turbovasctl.subprocess.CompletedProcess(command, 0, "ok\n", "")
+
+            turbovasctl.run_command = fake_run_command
+            turbovasctl.command_runtime_native_api_smoke = lambda _root: {"status": "pass", "summary": "smoke passed", "findings": [], "artifacts": ["native-api-smoke.json"]}
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp) / "TurboVAS"
+                root.mkdir()
+                result = turbovasctl.command_runtime_native_api_rebuild(root)
+        finally:
+            turbovasctl.run_command = original_run_command
+            turbovasctl.command_runtime_native_api_smoke = original_smoke
+
+        self.assertEqual(result["status"], "pass")
+        build_commands = [command for command in calls if "build" in command and "turbovas-api" in command]
+        up_commands = [command for command in calls if "up" in command and "turbovas-api" in command]
+        self.assertTrue(build_commands)
+        self.assertTrue(up_commands)
+        self.assertIn("--no-deps", up_commands[-1])
+        self.assertNotIn("--build", up_commands[-1])
+
+    def test_runtime_db_introspect_uses_fixed_catalog_queries(self):
+        calls = []
+        original_psql = turbovasctl.psql
+        original_running = turbovasctl.container_running
+
+        def fake_psql(_root, sql, database=None):
+            calls.append(sql)
+            if "current_database()" in sql:
+                return turbovasctl.subprocess.CompletedProcess([], 0, "turbovas|turbovas|turbovas\n", "")
+            if "database_version" in sql:
+                return turbovasctl.subprocess.CompletedProcess([], 0, "283\n", "")
+            if "information_schema.schemata" in sql:
+                return turbovasctl.subprocess.CompletedProcess([], 0, "cert\npublic\n", "")
+            if "information_schema.tables" in sql:
+                rows = "\n".join(f"{schema}.{table}|t" for schema, table in turbovasctl.DB_INTROSPECT_TABLES)
+                return turbovasctl.subprocess.CompletedProcess([], 0, rows + "\n", "")
+            if "information_schema.columns" in sql:
+                rows = "\n".join(f"{schema}.{table}.{column}|t" for schema, table, column in turbovasctl.DB_INTROSPECT_COLUMNS)
+                return turbovasctl.subprocess.CompletedProcess([], 0, rows + "\n", "")
+            if "SELECT count(*)" in sql:
+                return turbovasctl.subprocess.CompletedProcess([], 0, "7\n", "")
+            return turbovasctl.subprocess.CompletedProcess([], 1, "unexpected\n", "")
+
+        try:
+            turbovasctl.psql = fake_psql
+            turbovasctl.container_running = lambda _root, service: service == "postgres"
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp) / "TurboVAS"
+                root.mkdir()
+                result = turbovasctl.command_runtime_db_introspect(root)
+        finally:
+            turbovasctl.psql = original_psql
+            turbovasctl.container_running = original_running
+
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(result["details"]["database"]["manager_database_version"], "283")
+        self.assertTrue(result["details"]["tables"]["public.meta"]["exists"])
+        self.assertEqual(result["details"]["tables"]["public.meta"]["row_count"], 7)
+        self.assertTrue(any("information_schema.tables" in sql for sql in calls))
+        self.assertTrue(any("information_schema.columns" in sql for sql in calls))
+        self.assertFalse(any(";" in sql.rstrip(";") for sql in calls))
 
     def test_gmp_smoke_parse_version_accepts_text_and_element(self):
         self.assertEqual(runtime_gmp_smoke.parse_version("<get_version_response><version>22.7</version></get_version_response>"), "22.7")
