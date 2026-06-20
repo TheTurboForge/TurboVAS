@@ -665,6 +665,13 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("def command_quality_gate", source)
         self.assertIn("def command_quality_gate_state", source)
         self.assertIn("def command_quality_gate_schedule", source)
+        self.assertIn("Use: just native-api-request -- --json --path '/api/v1/...'", justfile)
+
+    def test_native_api_request_just_recipe_rejects_missing_separator(self):
+        justfile = (Path(__file__).resolve().parents[2] / "justfile").read_text(encoding="utf-8")
+        self.assertIn('native-api-request *args:', justfile)
+        self.assertIn('if [ "${1:-}" = "--" ]; then shift; elif [ "${1:-}" != "" ] && [ "${1#-}" != "$1" ]; then', justfile)
+        self.assertIn("Use: just native-api-request -- --json --path '/api/v1/...'", justfile)
 
     def test_native_api_smoke_summarizes_large_responses(self):
         payload = {

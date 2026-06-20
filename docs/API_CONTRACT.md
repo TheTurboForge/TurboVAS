@@ -82,6 +82,8 @@ Internal read-only automation can use `tools/turbovasctl native-api-request
 read-only GMP scripts for report, scope, target, task, and selected asset
 listing workflows; it
 is not the final externally exposed scriptable API boundary.
+The `just` form intentionally requires the literal `--` separator so the
+forwarded `--json` and `--path` options are not mistaken for `just` flags.
 
 The first runtime implementation proof is scoped in
 `docs/NATIVE_API_PROOF_PLAN.md`. It starts with an internal-only Rust sidecar
