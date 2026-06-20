@@ -97,6 +97,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CatalogCpe'
+  /dfn-cert-advisories:
+    get:
+      summary: List Security Information DFN-CERT advisories
+      description: Searchable DFN-CERT advisory list backed by CERT feed metadata already imported into gvmd/PostgreSQL. Rich advisory detail remains inherited from feed XML/XSLT.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Filter'
+      responses:
+        '200':
+          description: DFN-CERT advisory collection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DfnCertAdvisoryCollection'
   /operating-systems:
     get:
       summary: List top-level operating-system assets
@@ -977,6 +993,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CatalogCpe'
+    DfnCertAdvisoryCollection:
+      type: object
+      required: [page, items]
+      properties:
+        page:
+          $ref: '#/components/schemas/PageInfo'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DfnCertAdvisory'
     ReportHostCollection:
       type: object
       required: [page, items]
@@ -2383,6 +2409,38 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CatalogCpeCve'
+        created_at:
+          type: string
+          format: date-time
+        modified_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    DfnCertAdvisory:
+      type: object
+      required: [id, name, cve_refs]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        comment:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+        severity:
+          type: number
+        cve_refs:
+          type: integer
+        cves:
+          type: array
+          items:
+            type: string
+            pattern: '^CVE-[0-9]{4}-[0-9]{4,}$'
         created_at:
           type: string
           format: date-time

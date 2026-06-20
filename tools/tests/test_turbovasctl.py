@@ -592,6 +592,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("/ports", native_api)
         self.assertIn("/cves", native_api)
         self.assertIn("/cpes", native_api)
+        self.assertIn("/api/v1/dfn-cert-advisories", native_api)
         self.assertIn("/errors", native_api)
         self.assertIn("native_api_request_target", native_api)
         self.assertIn('append_query_param (target, params, "page")', native_api)
@@ -780,6 +781,7 @@ class TurboVASCtlTests(unittest.TestCase):
         endpoints = {item["endpoint"] for item in details["implemented_native_endpoints"]}
         self.assertIn("/api/v1/cpes", endpoints)
         self.assertIn("/api/v1/cpes/{cpe_id}", endpoints)
+        self.assertIn("/api/v1/dfn-cert-advisories", endpoints)
         self.assertIn("/api/v1/reports", endpoints)
         self.assertIn("/api/v1/reports/{report_id}", endpoints)
         self.assertIn("/api/v1/reports/{report_id}/results", endpoints)

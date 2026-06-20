@@ -1,4 +1,6 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
+ * SPDX-FileCopyrightText: 2026 TurboVAS contributors
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -45,6 +47,7 @@ interface DfnCertAdvElement extends ModelElement {
 interface DfnCertAdvProperties extends ModelProperties {
   additionalLinks?: string[];
   advisoryLink?: string;
+  cve_refs?: number;
   cves?: string[];
   severity?: number;
   summary?: string;
@@ -56,6 +59,7 @@ class DfnCertAdv extends Model {
 
   readonly additionalLinks: string[];
   readonly advisoryLink?: string;
+  readonly cve_refs?: number;
   readonly cves: string[];
   readonly severity?: number;
   readonly summary?: string;
@@ -64,6 +68,7 @@ class DfnCertAdv extends Model {
   constructor({
     additionalLinks = [],
     advisoryLink,
+    cve_refs,
     cves = [],
     severity,
     summary,
@@ -74,6 +79,7 @@ class DfnCertAdv extends Model {
 
     this.additionalLinks = additionalLinks;
     this.advisoryLink = advisoryLink;
+    this.cve_refs = cve_refs;
     this.cves = cves;
     this.severity = severity;
     this.summary = summary;
@@ -87,6 +93,7 @@ class DfnCertAdv extends Model {
   static parseElement(element: DfnCertAdvElement = {}): DfnCertAdvProperties {
     const dfnCertAdvElement = element.dfn_cert_adv;
     const ret = super.parseElement(element) as DfnCertAdvProperties;
+    ret.cve_refs = dfnCertAdvElement?.cve_refs;
     ret.severity = parseSeverity(dfnCertAdvElement?.severity);
 
     const {raw_data} = dfnCertAdvElement ?? {};

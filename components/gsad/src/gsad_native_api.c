@@ -123,6 +123,7 @@ native_api_path_is_allowed (const gchar *path)
   const gchar *cpe_prefix = "/api/v1/cpes/";
   const gchar *cves_path = "/api/v1/cves";
   const gchar *cve_prefix = "/api/v1/cves/";
+  const gchar *dfn_cert_advisories_path = "/api/v1/dfn-cert-advisories";
   const gchar *operating_systems_path = "/api/v1/operating-systems";
   const gchar *hosts_path = "/api/v1/hosts";
   const gchar *tls_certificates_path = "/api/v1/tls-certificates";
@@ -193,6 +194,9 @@ native_api_path_is_allowed (const gchar *path)
       const gchar *id = path + strlen (cve_prefix);
       return is_cve_id_segment (id, strlen (id));
     }
+
+  if (g_strcmp0 (path, dfn_cert_advisories_path) == 0)
+    return TRUE;
 
   if (g_strcmp0 (path, operating_systems_path) == 0)
     return TRUE;
