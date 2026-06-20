@@ -1411,7 +1411,9 @@ async fn reports(
             tracing::warn!(%error, "raw report list query failed");
             ApiError::Database
         })?;
-    let total = rows.first().map(|row| row.get::<_, i64>(0)).unwrap_or(0);
+    let total =
+        collection_total_with_empty_page_probe(&client, &rows, &sql, &params, "raw report list")
+            .await?;
     let items = rows.iter().map(report_from_row).collect();
     Ok(Json(Collection {
         page: params.page_info(total),
@@ -1522,10 +1524,9 @@ async fn host_assets(
             tracing::warn!(%error, "host asset list query failed");
             ApiError::Database
         })?;
-    let total = rows
-        .first()
-        .map(|row| row.get::<_, i64>("total"))
-        .unwrap_or(0);
+    let total =
+        collection_total_with_empty_page_probe(&client, &rows, &sql, &params, "host asset list")
+            .await?;
     let items = rows.iter().map(host_asset_from_row).collect();
     Ok(Json(Collection {
         page: params.page_info(total),
@@ -3656,10 +3657,9 @@ async fn vulnerabilities(
             tracing::warn!(%error, "vulnerability list query failed");
             ApiError::Database
         })?;
-    let total = rows
-        .first()
-        .map(|row| row.get::<_, i64>("total"))
-        .unwrap_or(0);
+    let total =
+        collection_total_with_empty_page_probe(&client, &rows, &sql, &params, "vulnerability list")
+            .await?;
     let items = rows.iter().map(vulnerability_from_row).collect();
     Ok(Json(Collection {
         page: params.page_info(total),
@@ -7494,6 +7494,39 @@ impl NormalizedQuery {
     }
 }
 
+fn needs_first_page_total_probe(row_count: usize, offset: i64) -> bool {
+    row_count == 0 && offset > 0
+}
+
+async fn collection_total_with_empty_page_probe(
+    client: &tokio_postgres::Client,
+    rows: &[Row],
+    sql: &str,
+    params: &NormalizedQuery,
+    log_context: &'static str,
+) -> Result<i64, ApiError> {
+    if let Some(row) = rows.first() {
+        return Ok(row.get::<_, i64>("total"));
+    }
+    if !needs_first_page_total_probe(rows.len(), params.offset) {
+        return Ok(0);
+    }
+
+    let probe_page_size = 1_i64;
+    let probe_offset = 0_i64;
+    let probe_rows = client
+        .query(sql, &[&params.filter, &probe_page_size, &probe_offset])
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, %log_context, "collection first-page total probe failed");
+            ApiError::Database
+        })?;
+    Ok(probe_rows
+        .first()
+        .map(|row| row.get::<_, i64>("total"))
+        .unwrap_or(0))
+}
+
 fn host_identifier_from_row(
     row: &Row,
     id_field: &str,
@@ -9049,6 +9082,13 @@ mod tests {
         )
         .unwrap_err();
         assert!(matches!(err, ApiError::BadRequest(_)));
+    }
+
+    #[test]
+    fn empty_page_total_probe_only_runs_for_out_of_range_pages() {
+        assert!(!needs_first_page_total_probe(1, 50));
+        assert!(!needs_first_page_total_probe(0, 0));
+        assert!(needs_first_page_total_probe(0, 50));
     }
 
     #[test]
