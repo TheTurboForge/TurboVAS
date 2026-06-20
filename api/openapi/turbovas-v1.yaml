@@ -245,6 +245,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TlsCertificateAssetCollection'
+  /tls-certificates/{certificate_id}:
+    get:
+      summary: Read one top-level TLS certificate asset
+      description: Read-only TLS certificate asset metadata and source provenance backed by gvmd/PostgreSQL certificate, source, location, and origin tables. Certificate bytes, export, delete, scanner-control, feed-control, and write behavior are intentionally excluded.
+      parameters:
+        - $ref: '#/components/parameters/TlsCertificateId'
+      responses:
+        '200':
+          description: TLS certificate asset detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TlsCertificateAssetDetail'
   /scanners:
     get:
       summary: List scanner metadata
@@ -1001,6 +1014,13 @@ components:
       schema:
         type: string
         format: uuid
+    TlsCertificateId:
+      name: certificate_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     ScopeId:
       name: scope_id
       in: path
@@ -1333,6 +1353,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/TlsCertificateAsset'
+    TlsCertificateAssetDetail:
+      allOf:
+        - $ref: '#/components/schemas/TlsCertificateAsset'
+        - type: object
+          required: [sources]
+          properties:
+            sources:
+              type: array
+              items:
+                $ref: '#/components/schemas/TlsCertificateSource'
     ScannerAssetCollection:
       type: object
       required: [page, items]
@@ -2132,6 +2162,46 @@ components:
         modified_at:
           type: string
           format: date-time
+    TlsCertificateSourceLocation:
+      type: object
+      required: [id, host_ip, port]
+      properties:
+        id:
+          type: string
+          format: uuid
+        host_ip:
+          type: string
+        port:
+          type: string
+    TlsCertificateSourceOrigin:
+      type: object
+      required: [id, origin_type, origin_id, origin_data]
+      properties:
+        id:
+          type: string
+          format: uuid
+        origin_type:
+          type: string
+        origin_id:
+          type: string
+        origin_data:
+          type: string
+    TlsCertificateSource:
+      type: object
+      required: [id, tls_versions]
+      properties:
+        id:
+          type: string
+          format: uuid
+        timestamp:
+          type: string
+          format: date-time
+        tls_versions:
+          type: string
+        location:
+          $ref: '#/components/schemas/TlsCertificateSourceLocation'
+        origin:
+          $ref: '#/components/schemas/TlsCertificateSourceOrigin'
     ScannerCredentialReference:
       type: object
       required: [id, name]

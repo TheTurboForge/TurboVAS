@@ -2940,6 +2940,11 @@ def summarize_native_tooling(items: list[dict[str, Any]]) -> dict[str, Any]:
                 "replacement_candidates": ["GSA top-level TLS Certificates list (migrated through gsad same-origin proxy)", "read-only TLS certificate asset automation", "native-api-request helper"],
             },
             {
+                "endpoint": "/api/v1/tls-certificates/{certificate_id}",
+                "status": "implemented_internal",
+                "replacement_candidates": ["GSA top-level TLS Certificate detail migration", "read-only TLS certificate asset automation", "native-api-request helper"],
+            },
+            {
                 "endpoint": "/api/v1/scanners",
                 "status": "implemented_internal_and_browser_proxied",
                 "replacement_candidates": ["GSA top-level Scanners list (migrated through gsad same-origin proxy)", "read-only scanner metadata automation", "native-api-request helper"],
@@ -6340,6 +6345,28 @@ def command_runtime_native_api_smoke(repo_root: Path) -> dict[str, Any]:
             tls_certificates_json,
         )
     )
+    if tls_certificate_items:
+        first_tls_certificate = tls_certificate_items[0]
+        tls_certificate_detail_id = first_tls_certificate.get("id") if isinstance(first_tls_certificate, dict) else None
+        if tls_certificate_detail_id:
+            tls_certificate_detail_path = f"/api/v1/tls-certificates/{urllib.parse.quote(str(tls_certificate_detail_id), safe='')}"
+            tls_certificate_detail = native_api_curl(repo_root, tls_certificate_detail_path)
+            tls_certificate_detail_json = parse_json_output(tls_certificate_detail)
+            details["tls_certificate_detail"] = summarize_native_api_response(tls_certificate_detail_json)
+            findings.append(
+                native_api_probe_finding(
+                    "pass" if tls_certificate_detail.returncode == 0 and isinstance(tls_certificate_detail_json, dict) and tls_certificate_detail_json.get("id") == tls_certificate_detail_id else "fail",
+                    "native-api.tls-certificate-detail",
+                    f"Native API top-level TLS Certificate detail probe exit code {tls_certificate_detail.returncode}.",
+                    tls_certificate_detail,
+                    compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/tls-certificates/..."),
+                    tls_certificate_detail_json,
+                )
+            )
+        else:
+            findings.append(finding("fail", "native-api.tls-certificate-detail", "TLS Certificates list did not include a certificate id for the detail probe."))
+    else:
+        findings.append(finding("warn", "native-api.tls-certificate-detail", "No TLS Certificates exist yet, so the detail probe was skipped."))
 
     scanners = native_api_curl(repo_root, "/api/v1/scanners?page_size=1&sort=name")
     scanners_json = parse_json_output(scanners)

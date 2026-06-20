@@ -979,6 +979,25 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn('"status": "implemented_internal"', native_tooling)
         self.assertIn('native-api.operating-system-detail', native_tooling)
 
+    def test_tls_certificate_asset_detail_contract_is_internal_and_source_only(self):
+        root = Path(__file__).resolve().parents[2]
+        openapi = (root / "api" / "openapi" / "turbovas-v1.yaml").read_text(encoding="utf-8")
+        api_source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
+        native_tooling = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
+
+        self.assertIn('/api/v1/tls-certificates/:certificate_id', api_source)
+        self.assertIn('parse_uuid(&certificate_id)?;', api_source)
+        self.assertIn('WHERE c.uuid = $1', api_source)
+        self.assertIn('JOIN tls_certificate_sources src ON src.tls_certificate = c.id', api_source)
+        self.assertIn('TlsCertificateSourceItem', api_source)
+        self.assertNotIn('c.certificate', api_source)
+        self.assertIn('/tls-certificates/{certificate_id}:', openapi)
+        self.assertIn("#/components/parameters/TlsCertificateId", openapi)
+        self.assertIn('TlsCertificateAssetDetail', openapi)
+        self.assertIn('TlsCertificateSourceLocation', openapi)
+        self.assertIn('/api/v1/tls-certificates/{certificate_id}', native_tooling)
+        self.assertIn('native-api.tls-certificate-detail', native_tooling)
+
     def test_redis_reference_summary_separates_scanner_and_generic_paths(self):
         references = [
             {"path": "compose/dev.yaml", "category": "scanner_kb", "markers": ["redis-openvas"]},

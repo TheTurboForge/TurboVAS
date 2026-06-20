@@ -403,6 +403,39 @@ struct CatalogCveItem {
     modified_at: Option<String>,
 }
 
+#[derive(Serialize)]
+struct TlsCertificateSourceLocation {
+    id: String,
+    host_ip: String,
+    port: String,
+}
+
+#[derive(Serialize)]
+struct TlsCertificateSourceOrigin {
+    id: String,
+    origin_type: String,
+    origin_id: String,
+    origin_data: String,
+}
+
+#[derive(Serialize)]
+struct TlsCertificateSourceItem {
+    id: String,
+    timestamp: Option<String>,
+    tls_versions: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    location: Option<TlsCertificateSourceLocation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    origin: Option<TlsCertificateSourceOrigin>,
+}
+
+#[derive(Serialize)]
+struct TlsCertificateAssetDetail {
+    #[serde(flatten)]
+    asset: TlsCertificateAssetItem,
+    sources: Vec<TlsCertificateSourceItem>,
+}
+
 #[derive(Debug, Serialize)]
 struct CatalogCpeCveItem {
     id: String,
@@ -1094,6 +1127,10 @@ async fn main() -> Result<(), ApiError> {
         )
         .route("/api/v1/hosts", get(host_assets))
         .route("/api/v1/tls-certificates", get(tls_certificate_assets))
+        .route(
+            "/api/v1/tls-certificates/:certificate_id",
+            get(tls_certificate_asset_detail),
+        )
         .route("/api/v1/scanners", get(scanner_assets))
         .route("/api/v1/scan-configs", get(scan_config_assets))
         .route(
@@ -1487,6 +1524,81 @@ async fn tls_certificate_assets(
     Ok(Json(Collection {
         page: params.page_info(total),
         items,
+    }))
+}
+
+async fn tls_certificate_asset_detail(
+    State(state): State<AppState>,
+    Path(certificate_id): Path<String>,
+) -> Result<Json<TlsCertificateAssetDetail>, ApiError> {
+    parse_uuid(&certificate_id)?;
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let row = client
+        .query_opt(
+            r#"SELECT c.uuid AS id,
+                    coalesce(nullif(c.subject_dn, ''), c.uuid) AS name,
+                    coalesce(c.comment, '') AS comment,
+                    coalesce(c.subject_dn, '') AS subject_dn,
+                    coalesce(c.issuer_dn, '') AS issuer_dn,
+                    coalesce(c.serial, '') AS serial,
+                    coalesce(c.md5_fingerprint, '') AS md5_fingerprint,
+                    coalesce(c.sha256_fingerprint, '') AS sha256_fingerprint,
+                    coalesce(c.activation_time, 0)::bigint AS activation_time_unix,
+                    coalesce(c.expiration_time, 0)::bigint AS expiration_time_unix,
+                    coalesce(max(src.timestamp), 0)::bigint AS last_seen_unix,
+                    count(DISTINCT lower(loc.host_ip))::bigint AS source_host_count,
+                    count(DISTINCT loc.port)::bigint AS source_port_count,
+                    count(DISTINCT src.uuid)::bigint AS source_count,
+                    coalesce(c.creation_time, 0)::bigint AS created_at_unix,
+                    coalesce(c.modification_time, 0)::bigint AS modified_at_unix
+               FROM tls_certificates c
+               LEFT JOIN tls_certificate_sources src ON src.tls_certificate = c.id
+               LEFT JOIN tls_certificate_locations loc ON loc.id = src.location
+              WHERE c.uuid = $1
+              GROUP BY c.id, c.uuid, c.subject_dn, c.comment, c.issuer_dn,
+                       c.serial, c.md5_fingerprint, c.sha256_fingerprint,
+                       c.activation_time, c.expiration_time,
+                       c.creation_time, c.modification_time
+              LIMIT 1;"#,
+            &[&certificate_id],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "TLS certificate asset detail query failed");
+            ApiError::Database
+        })?
+        .ok_or(ApiError::NotFound)?;
+    let source_rows = client
+        .query(
+            r#"SELECT src.uuid AS id,
+                    coalesce(src.timestamp, 0)::bigint AS timestamp_unix,
+                    coalesce(src.tls_versions, '') AS tls_versions,
+                    loc.uuid AS location_id,
+                    coalesce(loc.host_ip, '') AS location_host_ip,
+                    coalesce(loc.port, '') AS location_port,
+                    origin.uuid AS origin_uuid,
+                    coalesce(origin.origin_type, '') AS origin_type,
+                    coalesce(origin.origin_id, '') AS origin_resource_id,
+                    coalesce(origin.origin_data, '') AS origin_data
+               FROM tls_certificates c
+               JOIN tls_certificate_sources src ON src.tls_certificate = c.id
+               LEFT JOIN tls_certificate_locations loc ON loc.id = src.location
+               LEFT JOIN tls_certificate_origins origin ON origin.id = src.origin
+              WHERE c.uuid = $1
+              ORDER BY src.timestamp DESC NULLS LAST, src.uuid ASC;"#,
+            &[&certificate_id],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "TLS certificate asset source query failed");
+            ApiError::Database
+        })?;
+    Ok(Json(TlsCertificateAssetDetail {
+        asset: tls_certificate_asset_from_row(&row),
+        sources: source_rows
+            .iter()
+            .map(tls_certificate_source_from_row)
+            .collect(),
     }))
 }
 
@@ -7666,6 +7778,37 @@ fn tls_certificate_asset_from_row(row: &Row) -> TlsCertificateAssetItem {
         in_use: source_count > 0,
         created_at: unix_ts_to_rfc3339(row.get("created_at_unix")),
         modified_at: unix_ts_to_rfc3339(row.get("modified_at_unix")),
+    }
+}
+
+fn tls_certificate_source_from_row(row: &Row) -> TlsCertificateSourceItem {
+    let location_id: Option<String> = row.get("location_id");
+    let origin_uuid: Option<String> = row.get("origin_uuid");
+    TlsCertificateSourceItem {
+        id: row.get("id"),
+        timestamp: unix_ts_to_rfc3339(row.get("timestamp_unix")),
+        tls_versions: row.get("tls_versions"),
+        location: location_id.map(|id| TlsCertificateSourceLocation {
+            id,
+            host_ip: row
+                .get::<_, Option<String>>("location_host_ip")
+                .unwrap_or_default(),
+            port: row
+                .get::<_, Option<String>>("location_port")
+                .unwrap_or_default(),
+        }),
+        origin: origin_uuid.map(|id| TlsCertificateSourceOrigin {
+            id,
+            origin_type: row
+                .get::<_, Option<String>>("origin_type")
+                .unwrap_or_default(),
+            origin_id: row
+                .get::<_, Option<String>>("origin_resource_id")
+                .unwrap_or_default(),
+            origin_data: row
+                .get::<_, Option<String>>("origin_data")
+                .unwrap_or_default(),
+        }),
     }
 }
 

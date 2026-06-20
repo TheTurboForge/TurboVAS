@@ -77,6 +77,10 @@ Operating Systems, Scanners, Scan Configs, Filters, Tags, Overrides, and Report 
 Internal Operating System detail metadata is available for automation and smoke
 coverage only; the GSA detail route remains inherited until a separate browser
 migration slice.
+Internal TLS Certificate detail metadata/source provenance is available for
+automation and smoke coverage only; the GSA detail route and certificate export
+behavior remain inherited until separate typed browser/detail and file-transfer
+contracts exist.
 `runtime-report-summary --json` and `runtime-report-export --json` use the
 native raw report detail/result-row endpoints; the remaining heavy raw report
 detail tabs stay inherited follow-ups.
@@ -122,6 +126,8 @@ where it exists:
 - `GET /api/v1/cpes/{cpe_id}`
 - `GET /api/v1/operating-systems`
 - `GET /api/v1/operating-systems/{os_id}` metadata only
+- `GET /api/v1/tls-certificates`
+- `GET /api/v1/tls-certificates/{certificate_id}` metadata/source detail only
 - `GET /api/v1/targets`
 - `GET /api/v1/targets/{target_id}`
 - `GET /api/v1/tasks`
