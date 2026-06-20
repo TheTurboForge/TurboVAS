@@ -349,6 +349,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ScheduleAsset'
+  /scan-configs:
+    get:
+      summary: List scan configs
+      description: Read-only scan-config metadata backed by gvmd/PostgreSQL. Preference values, NVT selector expansion, family edit payloads, import/export, scanner control, and create/modify/delete operations remain on inherited compatibility paths while native write/resource semantics are designed.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Filter'
+        - name: predefined
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ['0', '1']
+          description: Optional predefined filter; use 1 for predefined configs and 0 for user-created configs.
+      responses:
+        '200':
+          description: Scan-config metadata collection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanConfigAssetCollection'
+  /scan-configs/{scan_config_id}:
+    get:
+      summary: Read one scan config metadata record
+      description: Metadata-only detail for automation and proof probes. Rich GSA detail tabs still use inherited GMP because they require families, preferences, and selector expansion.
+      parameters:
+        - $ref: '#/components/parameters/ScanConfigId'
+      responses:
+        '200':
+          description: Scan-config metadata detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanConfigAsset'
   /report-configs:
     get:
       summary: List report configs
@@ -961,6 +997,13 @@ components:
       schema:
         type: string
         format: uuid
+    ScanConfigId:
+      name: scan_config_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     ReportFormatId:
       name: report_format_id
       in: path
@@ -1215,6 +1258,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ScannerAsset'
+    ScanConfigAssetCollection:
+      type: object
+      required: [page, items]
+      properties:
+        page:
+          $ref: '#/components/schemas/PageInfo'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScanConfigAsset'
     FilterAssetCollection:
       type: object
       required: [page, items]
@@ -2028,6 +2081,65 @@ components:
           type: string
         relay_port:
           type: integer
+        created_at:
+          type: string
+          format: date-time
+        modified_at:
+          type: string
+          format: date-time
+    ScanConfigTrendCount:
+      type: object
+      required: [total, trend]
+      properties:
+        total:
+          type: integer
+        trend:
+          type: integer
+          description: Inherited trend flag, where 1 means growing/dynamic and 0 means static.
+    ScanConfigAsset:
+      type: object
+      required: [id, name, owner, family_count, families_growing, nvt_count, nvts_growing, families, nvts, predefined, deprecated, writable, in_use, orphan, trash, usage_type]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        comment:
+          type: string
+        owner:
+          type: object
+          required: [name]
+          properties:
+            name:
+              type: string
+        family_count:
+          type: integer
+        families_growing:
+          type: integer
+        nvt_count:
+          type: integer
+        nvts_growing:
+          type: integer
+        families:
+          $ref: '#/components/schemas/ScanConfigTrendCount'
+        nvts:
+          $ref: '#/components/schemas/ScanConfigTrendCount'
+        predefined:
+          type: boolean
+        deprecated:
+          type: boolean
+        writable:
+          type: boolean
+        in_use:
+          type: boolean
+        orphan:
+          type: boolean
+        trash:
+          type: boolean
+        usage_type:
+          type: string
+          enum: [scan]
         created_at:
           type: string
           format: date-time

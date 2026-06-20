@@ -30,6 +30,9 @@ The first API phase is read-only and report-focused:
   backlinks, inside authenticated operator access only.
 - tag list and detail metadata reads, including resource type/count and value,
   inside authenticated operator access only.
+- scan-config list and metadata-detail reads, including family/NVT counts,
+  growth flags and predefined/deprecated state, inside
+  authenticated operator access only.
 - override list and detail metadata reads, including NVT identity, active state,
   task/result links, and severity override values, inside authenticated operator
   access only.
@@ -84,8 +87,8 @@ strangler map in the same slice.
 Internal read-only automation can use `tools/turbovasctl native-api-request
 --json --path '/api/v1/...'` or `just native-api-request --json --path
 '/api/v1/...'` to call the Docker-internal native API. This replaces covered
-read-only GMP scripts for report, scope, target, task, override metadata, and
-tag metadata, and selected asset listing workflows; it is not the final
+read-only GMP scripts for report, scope, target, task, scan-config metadata,
+override metadata, tag metadata, and selected asset listing workflows; it is not the final
 externally exposed scriptable API boundary.
 
 The first runtime implementation proof is scoped in
@@ -93,7 +96,7 @@ The first runtime implementation proof is scoped in
 for raw report list/detail/result rows/hosts/ports/applications/operating
 systems/CVEs/TLS certificates/errors, scope list/detail, target list/detail,
 task list/detail, scanner metadata list, saved filter list/detail, override
-list/detail metadata, tag list/detail metadata, port-list list/detail, schedule list/detail, report-config
+list/detail metadata, tag list/detail metadata, scan-config metadata list/detail, port-list list/detail, schedule list/detail, report-config
 list/detail, report-format list/detail, Security Information CVE catalog list/detail, Security
 Information CPE catalog list/detail, scope-report list,
 Results, Hosts, Ports, Applications,
@@ -140,6 +143,13 @@ is operator labeling data, so these endpoints stay inside the authenticated
 operator boundary. Assigned-resource expansion and tag create, modify, clone,
 enable/disable, export, and delete actions remain inherited until native
 resource/write semantics are designed.
+
+Native scan-config rows include config identity, owner, comment, family/NVT
+counts, growth flags, predefined/deprecated state, in-use state, and
+timestamps. Scanner/NVT preferences, selector/family expansion, task backlink
+identity, import/export, and config writes remain inherited until native
+resource/write semantics are designed. The GSA list reads native metadata;
+rich detail tabs remain inherited for now.
 
 Native override rows include override identity, owner, NVT identity/name, text,
 host/port constraints, original and replacement severity values, active/end-time

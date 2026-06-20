@@ -307,6 +307,7 @@ function focusedRouteCatalog() {
     { label: 'hosts', path: '/hosts', nativePath: '/api/v1/hosts', nativeCheck: 'host.list-native-api', nativePass: 'Top-level Hosts list loaded through same-origin native API.', nativeFail: 'Top-level Hosts list did not produce a successful same-origin native API response.' },
     { label: 'tls-certificates', path: '/tls-certificates', nativePath: '/api/v1/tls-certificates', nativeCheck: 'tls-certificate.list-native-api', nativePass: 'Top-level TLS Certificates list loaded through same-origin native API.', nativeFail: 'Top-level TLS Certificates list did not produce a successful same-origin native API response.' },
     { label: 'scanners', path: '/scanners', nativePath: '/api/v1/scanners', nativeCheck: 'scanner.list-native-api', nativePass: 'Top-level Scanners list loaded through same-origin native API.', nativeFail: 'Top-level Scanners list did not produce a successful same-origin native API response.' },
+    { label: 'scan-configs', path: '/scan-configs', nativePath: '/api/v1/scan-configs', nativeCheck: 'scan-config.list-native-api', nativePass: 'Top-level Scan Configs list loaded through same-origin native API.', nativeFail: 'Top-level Scan Configs list did not produce a successful same-origin native API response.', aliases: ['scanconfigs'] },
     { label: 'filters', path: '/filters', nativePath: '/api/v1/filters', nativeCheck: 'filter.list-native-api', nativePass: 'Top-level Filters list loaded through same-origin native API.', nativeFail: 'Top-level Filters list did not produce a successful same-origin native API response.' },
     { label: 'tags', path: '/tags', nativePath: '/api/v1/tags', nativeCheck: 'tag.list-native-api', nativePass: 'Top-level Tags list loaded through same-origin native API.', nativeFail: 'Top-level Tags list did not produce a successful same-origin native API response.' },
     { label: 'overrides', path: '/overrides', nativePath: '/api/v1/overrides', nativeCheck: 'override.list-native-api', nativePass: 'Top-level Overrides list loaded through same-origin native API.', nativeFail: 'Top-level Overrides list did not produce a successful same-origin native API response.' },
@@ -403,7 +404,7 @@ async function runForBaseUrl(baseUrl) {
       if (url.pathname.startsWith('/api/v1/')) {
         const entry = { path: url.pathname, status: response.status() };
         nativeApiResponses.push(entry);
-        if (['/api/v1/cves', '/api/v1/cpes', '/api/v1/nvts', '/api/v1/targets', '/api/v1/tasks', '/api/v1/filters', '/api/v1/tags', '/api/v1/overrides', '/api/v1/port-lists', '/api/v1/schedules', '/api/v1/report-formats', '/api/v1/report-configs', '/api/v1/cert-bund-advisories', '/api/v1/dfn-cert-advisories'].includes(url.pathname)) {
+        if (['/api/v1/cves', '/api/v1/cpes', '/api/v1/nvts', '/api/v1/targets', '/api/v1/tasks', '/api/v1/scan-configs', '/api/v1/filters', '/api/v1/tags', '/api/v1/overrides', '/api/v1/port-lists', '/api/v1/schedules', '/api/v1/report-formats', '/api/v1/report-configs', '/api/v1/cert-bund-advisories', '/api/v1/dfn-cert-advisories'].includes(url.pathname)) {
           response.json().then(body => {
             entry.itemIds = Array.isArray(body?.items)
               ? body.items.map(item => item?.id).filter(Boolean)

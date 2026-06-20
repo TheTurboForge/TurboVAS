@@ -130,6 +130,7 @@ native_api_path_is_allowed (const gchar *path)
   const gchar *hosts_path = "/api/v1/hosts";
   const gchar *tls_certificates_path = "/api/v1/tls-certificates";
   const gchar *scanners_path = "/api/v1/scanners";
+  const gchar *scan_configs_path = "/api/v1/scan-configs";
   const gchar *filters_path = "/api/v1/filters";
   const gchar *filter_prefix = "/api/v1/filters/";
   const gchar *tags_path = "/api/v1/tags";
@@ -220,6 +221,9 @@ native_api_path_is_allowed (const gchar *path)
     return TRUE;
 
   if (g_strcmp0 (path, scanners_path) == 0)
+    return TRUE;
+
+  if (g_strcmp0 (path, scan_configs_path) == 0)
     return TRUE;
 
   if (g_strcmp0 (path, filters_path) == 0)

@@ -2925,6 +2925,16 @@ def summarize_native_tooling(items: list[dict[str, Any]]) -> dict[str, Any]:
                 "replacement_candidates": ["GSA top-level Scanners list (migrated through gsad same-origin proxy)", "read-only scanner metadata automation", "native-api-request helper"],
             },
             {
+                "endpoint": "/api/v1/scan-configs",
+                "status": "implemented_internal_and_browser_proxied",
+                "replacement_candidates": ["GSA top-level Scan Configs list (migrated through gsad same-origin proxy)", "read-only scan-config metadata automation", "native-api-request helper"],
+            },
+            {
+                "endpoint": "/api/v1/scan-configs/{scan_config_id}",
+                "status": "implemented_internal",
+                "replacement_candidates": ["read-only scan-config metadata automation"],
+            },
+            {
                 "endpoint": "/api/v1/filters",
                 "status": "implemented_internal_and_browser_proxied",
                 "replacement_candidates": ["GSA top-level Filters list (migrated through gsad same-origin proxy)", "read-only filter metadata automation", "native-api-request helper"],
@@ -6409,6 +6419,42 @@ def command_runtime_native_api_smoke(repo_root: Path) -> dict[str, Any]:
             )
     else:
         findings.append(finding("warn", "native-api.schedule-detail", "No schedules exist yet, so the schedule detail probe was skipped."))
+
+    scan_configs = native_api_curl(repo_root, "/api/v1/scan-configs?page_size=1&sort=name")
+    scan_configs_json = parse_json_output(scan_configs)
+    details["scan_configs"] = summarize_native_api_response(scan_configs_json)
+    scan_config_items = scan_configs_json.get("items", []) if isinstance(scan_configs_json, dict) else []
+    findings.append(
+        native_api_probe_finding(
+            "pass" if scan_configs.returncode == 0 and isinstance(scan_config_items, list) else "fail",
+            "native-api.scan-configs",
+            f"Native API top-level Scan Configs probe exit code {scan_configs.returncode}.",
+            scan_configs,
+            compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/scan-configs?page_size=1"),
+            scan_configs_json,
+        )
+    )
+    if scan_config_items:
+        first_scan_config = scan_config_items[0]
+        scan_config_detail_id = first_scan_config.get("id") if isinstance(first_scan_config, dict) else None
+        if scan_config_detail_id:
+            scan_config_detail = native_api_curl(repo_root, f"/api/v1/scan-configs/{urllib.parse.quote(scan_config_detail_id)}")
+            scan_config_detail_json = parse_json_output(scan_config_detail)
+            details["scan_config_detail"] = summarize_native_api_response(scan_config_detail_json)
+            findings.append(
+                native_api_probe_finding(
+                    "pass" if scan_config_detail.returncode == 0 and isinstance(scan_config_detail_json, dict) and scan_config_detail_json.get("id") == scan_config_detail_id else "fail",
+                    "native-api.scan-config-detail",
+                    f"Native API scan-config detail probe exit code {scan_config_detail.returncode}.",
+                    scan_config_detail,
+                    compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/scan-configs/..."),
+                    scan_config_detail_json,
+                )
+            )
+        else:
+            findings.append(finding("fail", "native-api.scan-config-detail", "Scan Configs list did not include a scan config id for the detail probe."))
+    else:
+        findings.append(finding("warn", "native-api.scan-config-detail", "No scan configs exist yet, so the scan-config detail probe was skipped."))
 
     report_formats = native_api_curl(repo_root, "/api/v1/report-formats?page_size=1&sort=name")
     report_formats_json = parse_json_output(report_formats)
