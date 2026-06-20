@@ -72,7 +72,7 @@ Browser proof work now routes the raw `/reports` list, raw-report Results,
 raw-report Hosts, raw-report Ports, raw-report CVEs, raw-report Error Messages,
 raw-report and scope-report Metrics, plus scope list/detail, target/task list
 reads, top-level asset/security-info lists including Hosts, TLS Certificates,
-Operating Systems, Scanners, Filters, and Report Configs, and every scope-report evidence tab through the authenticated same-origin
+Operating Systems, Scanners, Filters, Overrides, and Report Configs, and every scope-report evidence tab through the authenticated same-origin
 `gsad` proxy defined in `docs/NATIVE_API_AUTH_BOUNDARY.md`.
 `runtime-report-summary --json` and `runtime-report-export --json` use the
 native raw report detail/result-row endpoints; the remaining heavy raw report
@@ -80,7 +80,8 @@ detail tabs stay inherited follow-ups.
 
 Internal read-only scripting can use `tools/turbovasctl native-api-request
 --json --path '/api/v1/...'` or `just native-api-request --json --path
-'/api/v1/...'` for DB-backed report, scope, target, task, and report-config reads. This removes
+'/api/v1/...'` for DB-backed report, scope, target, task, override metadata,
+and report-config reads. This removes
 the need for covered inherited read-only GMP scripts while keeping write/control
 operations on inherited paths until a separate native write design exists.
 ## Not In The First Proof
@@ -120,6 +121,8 @@ they are now live internal and browser-proxied endpoints:
 - `GET /api/v1/scanners`
 - `GET /api/v1/filters`
 - `GET /api/v1/filters/{filter_id}`
+- `GET /api/v1/overrides`
+- `GET /api/v1/overrides/{override_id}`
 - `GET /api/v1/port-lists`
 - `GET /api/v1/port-lists/{port_list_id}`
 - `GET /api/v1/schedules`
@@ -138,7 +141,11 @@ operator view. Scanner metadata list reads are browser-proxied, but scanner
 details and scanner writes remain inherited. Target-detail and task-detail reads
 remain internal native endpoints until their browser parity gaps are closed.
 Port-list list/detail reads are browser-proxied, including port ranges and target
-backlinks; port-list writes and import/export actions remain inherited. Schedule
+backlinks; port-list writes and import/export actions remain inherited. Override
+list/detail metadata reads are browser-proxied, including NVT identity, active
+state, task/result links, and severity override values; override create, modify,
+clone, export, delete, trashcan mutation, and result-specific expansion remain
+inherited. Schedule
 list/detail reads are browser-proxied with iCalendar recurrence data and task
 backlinks; schedule writes, clone, export, and delete actions remain inherited.
 Further native API expansion should now move toward remaining helper/tooling

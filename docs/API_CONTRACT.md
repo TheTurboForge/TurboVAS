@@ -28,6 +28,9 @@ The first API phase is read-only and report-focused:
   metadata.
 - saved filter list and detail reads, including filter term metadata and alert
   backlinks, inside authenticated operator access only.
+- override list and detail metadata reads, including NVT identity, active state,
+  task/result links, and severity override values, inside authenticated operator
+  access only.
 - port-list list and detail reads, including port ranges and target backlinks,
 - schedule list and detail reads, including iCalendar recurrence data and task
   backlinks,
@@ -79,15 +82,16 @@ strangler map in the same slice.
 Internal read-only automation can use `tools/turbovasctl native-api-request
 --json --path '/api/v1/...'` or `just native-api-request --json --path
 '/api/v1/...'` to call the Docker-internal native API. This replaces covered
-read-only GMP scripts for report, scope, target, task, and selected asset
-listing workflows; it
-is not the final externally exposed scriptable API boundary.
+read-only GMP scripts for report, scope, target, task, override metadata, and
+selected asset listing workflows; it is not the final externally exposed
+scriptable API boundary.
 The first runtime implementation proof is scoped in
 `docs/NATIVE_API_PROOF_PLAN.md`. It starts with an internal-only Rust sidecar
 for raw report list/detail/result rows/hosts/ports/applications/operating
 systems/CVEs/TLS certificates/errors, scope list/detail, target list/detail,
-task list/detail, scanner metadata list, saved filter list/detail, port-list
-list/detail, schedule list/detail, report-config list/detail, report-format list/detail, Security Information CVE catalog list/detail, Security
+task list/detail, scanner metadata list, saved filter list/detail, override
+list/detail metadata, port-list list/detail, schedule list/detail, report-config
+list/detail, report-format list/detail, Security Information CVE catalog list/detail, Security
 Information CPE catalog list/detail, scope-report list,
 Results, Hosts, Ports, Applications,
 Operating Systems, CVEs, TLS Certificates, Error Messages, scope-report Metrics,
@@ -126,6 +130,14 @@ Native saved filter rows include filter identity, type, term, timestamps, and
 alert backlink references. Filter terms can reveal operator search logic,
 resource naming, and workflow shape, so these endpoints stay inside the
 authenticated operator boundary and are not catalog/public data.
+
+Native override rows include override identity, owner, NVT identity/name, text,
+host/port constraints, original and replacement severity values, active/end-time
+state, shallow task/result links, permissions, and timestamps. Override metadata
+is operator policy data, so these endpoints stay inside the authenticated
+operator boundary. Create, modify, clone, export, delete, trashcan mutation, and
+result-specific override expansion remain inherited until native write/control
+semantics are designed.
 
 Native port-list rows include port-list identity, comment, port counts, concrete
 port ranges, target backlink references, predefined/deprecated flags, and

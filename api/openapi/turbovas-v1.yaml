@@ -237,6 +237,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/FilterAsset'
+  /overrides:
+    get:
+      summary: List overrides
+      description: Read-only override metadata backed by gvmd/PostgreSQL. Create, modify, clone, export, delete, trashcan mutation, and result-specific override expansion remain on inherited compatibility paths while native write semantics are designed.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Filter'
+      responses:
+        '200':
+          description: Override collection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OverrideAssetCollection'
+  /overrides/{override_id}:
+    get:
+      summary: Read one override
+      parameters:
+        - $ref: '#/components/parameters/OverrideId'
+      responses:
+        '200':
+          description: Override detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OverrideAsset'
   /port-lists:
     get:
       summary: List port lists
@@ -877,6 +905,13 @@ components:
       schema:
         type: string
         format: uuid
+    OverrideId:
+      name: override_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     PortListId:
       name: port_list_id
       in: path
@@ -1155,6 +1190,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/FilterAsset'
+    OverrideAssetCollection:
+      type: object
+      required: [page, items]
+      properties:
+        page:
+          $ref: '#/components/schemas/PageInfo'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OverrideAsset'
     PortListAssetCollection:
       type: object
       required: [page, items]
@@ -1975,6 +2020,91 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/FilterAlertReference'
+        created_at:
+          type: string
+          format: date-time
+        modified_at:
+          type: string
+          format: date-time
+    OverrideReference:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+    OverrideNvtReference:
+      type: object
+      required: [id, name, type]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          enum: [nvt, cve]
+    OverrideTaskReference:
+      type: object
+      required: [id, name, trash]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        trash:
+          type: boolean
+    OverrideAsset:
+      type: object
+      required: [id, owner, nvt, text, text_excerpt, hosts, port, writable, in_use, orphan, active, permissions]
+      properties:
+        id:
+          type: string
+          format: uuid
+        owner:
+          type: object
+          required: [name]
+          properties:
+            name:
+              type: string
+        nvt:
+          $ref: '#/components/schemas/OverrideNvtReference'
+        text:
+          type: string
+        text_excerpt:
+          type: boolean
+        hosts:
+          type: string
+        port:
+          type: string
+        severity:
+          type: number
+          nullable: true
+        new_severity:
+          type: number
+          nullable: true
+        writable:
+          type: boolean
+        in_use:
+          type: boolean
+        orphan:
+          type: boolean
+        active:
+          type: boolean
+        end_time:
+          type: string
+          format: date-time
+          nullable: true
+        task:
+          $ref: '#/components/schemas/OverrideTaskReference'
+        result:
+          $ref: '#/components/schemas/OverrideReference'
+        permissions:
+          type: array
+          items:
+            type: string
         created_at:
           type: string
           format: date-time
