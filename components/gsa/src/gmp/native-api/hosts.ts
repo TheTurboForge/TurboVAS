@@ -33,6 +33,8 @@ interface NativeHostIdentifierPayload {
   source_type?: string;
   source_id?: string;
   source_data?: string;
+  created_at?: string;
+  modified_at?: string;
 }
 
 interface NativeHostPayload {
@@ -54,6 +56,16 @@ interface NativeHostsPayload {
   items?: NativeHostPayload[];
 }
 
+interface NativeHostDetailMetadataPayload {
+  name: string;
+  value: string;
+}
+
+interface NativeHostDetailPayload {
+  asset: NativeHostPayload;
+  details?: NativeHostDetailMetadataPayload[];
+}
+
 export interface NativeHostsQuery {
   page: number;
   pageSize: number;
@@ -65,6 +77,10 @@ export interface NativeHostsResponse {
   hosts: Host[];
   counts: CollectionCounts;
   page: NativePage;
+}
+
+export interface NativeHostResponse {
+  host: Host;
 }
 
 const HOST_SORT_FIELDS: Record<string, string> = {
@@ -150,6 +166,8 @@ const nativeIdentifierToElement = (item: NativeHostIdentifierPayload) => ({
   _id: stringValue(item.id),
   name: stringValue(item.name),
   value: stringValue(item.value),
+  creation_time: stringValue(item.created_at),
+  modification_time: stringValue(item.modified_at),
   source: {
     _id: stringValue(item.source_id),
     type: stringValue(item.source_type),
@@ -157,14 +175,40 @@ const nativeIdentifierToElement = (item: NativeHostIdentifierPayload) => ({
   },
 });
 
-const nativeHostToModel = (item: NativeHostPayload): Host => {
-  const details: Array<{name: string; value: string}> = [];
+const nativeDetailToElement = (item: NativeHostDetailMetadataPayload) => ({
+  name: stringValue(item.name),
+  value: stringValue(item.value),
+});
+
+const routeFromTraceroute = (detail?: NativeHostDetailPayload['details']) => {
+  const traceroute = detail?.find(item => item.name === 'traceroute');
+  const hosts = stringValue(traceroute?.value)
+    .split(',')
+    .map(value => value.trim())
+    .filter(value => value.length > 0)
+    .map(ip => ({ip}));
+  return hosts.length > 0 ? {route: {host: hosts}} : undefined;
+};
+
+const nativeHostToModel = (
+  item: NativeHostPayload,
+  detail?: Pick<NativeHostDetailPayload, 'details'>,
+): Host => {
+  const details = new Map<string, {name: string; value: string}>();
   if (item.best_os_cpe) {
-    details.push({name: 'best_os_cpe', value: item.best_os_cpe});
+    details.set('best_os_cpe', {name: 'best_os_cpe', value: item.best_os_cpe});
   }
   if (item.best_os_txt) {
-    details.push({name: 'best_os_txt', value: item.best_os_txt});
+    details.set('best_os_txt', {name: 'best_os_txt', value: item.best_os_txt});
   }
+  for (const metadata of detail?.details ?? []) {
+    details.set(stringValue(metadata.name), nativeDetailToElement(metadata));
+  }
+
+  const identifiers = (item.identifiers ?? []).map(
+    nativeIdentifierToElement,
+  );
+  const route = routeFromTraceroute(detail?.details);
 
   return Host.fromElement({
     _id: stringValue(item.id),
@@ -174,10 +218,11 @@ const nativeHostToModel = (item: NativeHostPayload): Host => {
     modification_time: stringValue(item.modified_at),
     host: {
       severity: {value: String(numberValue(item.severity))},
-      detail: details,
+      detail: Array.from(details.values()),
+      routes: route,
     },
     identifiers: {
-      identifier: (item.identifiers ?? []).map(nativeIdentifierToElement),
+      identifier: identifiers,
     },
   });
 };
@@ -204,10 +249,24 @@ export const fetchNativeHosts = async (
     sort: stringValue(payload.page?.sort),
     filter: stringValue(payload.page?.filter),
   };
-  const hosts = (payload.items ?? []).map(nativeHostToModel);
+  const hosts = (payload.items ?? []).map(item => nativeHostToModel(item));
   return {
     hosts,
     counts: nativeCounts(page, hosts.length),
     page,
+  };
+};
+
+export const fetchNativeHost = async (
+  gmp: NativeApiGmp,
+  id: string,
+): Promise<NativeHostResponse> => {
+  const payload = await fetchNativeJson<NativeHostDetailPayload>(
+    gmp,
+    `api/v1/hosts/${encodeURIComponent(id)}`,
+    {token: gmp.session.token},
+  );
+  return {
+    host: nativeHostToModel(payload.asset, payload),
   };
 };

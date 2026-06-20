@@ -74,14 +74,14 @@ raw-report and scope-report Metrics, plus scope list/detail, target/task list
 reads, top-level asset/security-info lists including Hosts, TLS Certificates,
 Operating Systems, Scanners, Scan Configs, Filters, Tags, Overrides, and Report Configs, and every scope-report evidence tab through the authenticated same-origin
 `gsad` proxy defined in `docs/NATIVE_API_AUTH_BOUNDARY.md`.
-Internal Operating System detail metadata is available for automation and smoke
-coverage only; the GSA detail route remains inherited until a separate browser
-migration slice.
-Internal Host detail metadata is available for automation and smoke coverage
-only. It uses `hosts.uuid`, bounded safe identifier/source metadata, host OS
-associations, and latest whitelisted host details; the GSA detail route and
-GMP-only `details=1` behavior remain inherited until a separate browser
-migration slice.
+Operating System detail Information fields now read native metadata through the
+authenticated `gsad` proxy while inherited GMP context still owns retained
+actions and User Tags.
+Host detail Information fields now read native metadata through the authenticated
+`gsad` proxy while inherited GMP context still owns writes, export, target
+creation, delete identifier, User Tags, and GMP-only `details=1` behavior. The
+native metadata uses `hosts.uuid`, bounded safe identifier/source metadata, host
+OS associations, and latest whitelisted host details.
 Internal TLS Certificate detail metadata/source provenance is available for
 automation and smoke coverage only; the GSA detail route and certificate export
 behavior remain inherited until separate typed browser/detail and file-transfer
