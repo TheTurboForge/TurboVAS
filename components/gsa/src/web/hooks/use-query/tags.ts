@@ -1,15 +1,22 @@
 /* SPDX-FileCopyrightText: 2026 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
 import {type EntityActionResponse} from 'gmp/commands/entity';
+import {type EntitiesMeta} from 'gmp/commands/entities';
 import type Rejection from 'gmp/http/rejection';
-import type Response from 'gmp/http/response';
+import Response from 'gmp/http/response';
 import {type XmlMeta, type XmlResponseData} from 'gmp/http/transform/fast-xml';
-import type Filter from 'gmp/models/filter';
+import Filter, {ALL_FILTER} from 'gmp/models/filter';
 import {isFilter} from 'gmp/models/filter/utils';
 import type Tag from 'gmp/models/tag';
+import {
+  fetchNativeTag,
+  fetchNativeTags,
+  nativeTagsQueryFromFilter,
+} from 'gmp/native-api/tags';
 import useGmp from 'web/hooks/useGmp';
 import type {RefetchIntervalFn} from 'web/queries/helpers';
 import useCloneMutation from 'web/queries/useCloneMutation';
@@ -46,10 +53,25 @@ interface UseModifyTagParams {
 
 type TagBulkInput = Tag[] | Filter;
 
+const canUseNativeApi = (gmp: {buildUrl?: unknown}) =>
+  typeof gmp?.buildUrl === 'function';
+
 export const useGetTags = ({filter}: UseGetTagsParams) => {
   const gmp = useGmp();
   return useGetEntities<Tag>({
-    gmpMethod: gmp.tags.get.bind(gmp.tags),
+    gmpMethod: async () => {
+      if (!canUseNativeApi(gmp)) {
+        return gmp.tags.get({filter});
+      }
+      const nativeResponse = await fetchNativeTags(
+        gmp,
+        nativeTagsQueryFromFilter(filter),
+      );
+      return new Response<Tag[], EntitiesMeta>(nativeResponse.tags, {
+        counts: nativeResponse.counts,
+        filter: filter ?? ALL_FILTER,
+      });
+    },
     queryId: 'get_tags',
     filter,
   });
@@ -58,7 +80,12 @@ export const useGetTags = ({filter}: UseGetTagsParams) => {
 export const useGetTag = ({id, refetchInterval}: UseGetTagParams) => {
   const gmp = useGmp();
   return useGetEntity<Tag>({
-    gmpMethod: gmp.tag.get.bind(gmp.tag),
+    gmpMethod: async ({id}) => {
+      if (!canUseNativeApi(gmp)) {
+        return gmp.tag.get({id});
+      }
+      return new Response<Tag, XmlMeta>(await fetchNativeTag(gmp, id));
+    },
     queryId: 'get_tag',
     id,
     refetchInterval,

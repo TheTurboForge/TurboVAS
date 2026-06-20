@@ -1,0 +1,247 @@
+/* SPDX-FileCopyrightText: 2026 TurboVAS contributors
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+import CollectionCounts from 'gmp/collection/collection-counts';
+import type {UrlParams} from 'gmp/http/utils';
+import type QueryFilter from 'gmp/models/filter';
+import Tag from 'gmp/models/tag';
+import type {ApiType} from 'gmp/utils/entity-type';
+
+interface NativeApiSession {
+  readonly jwt?: string;
+  readonly token?: string;
+}
+
+interface NativeApiGmp {
+  readonly session: NativeApiSession;
+  buildUrl(path: string, params?: UrlParams): string;
+}
+
+interface NativePage {
+  page: number;
+  page_size: number;
+  total: number;
+  sort: string;
+  filter: string;
+}
+
+interface NativeTagOwnerPayload {
+  name?: string;
+}
+
+interface NativeTagResourcesPayload {
+  type?: string;
+  count?: {
+    total?: number;
+  };
+}
+
+interface NativeTagPayload {
+  id: string;
+  name?: string;
+  comment?: string;
+  owner?: NativeTagOwnerPayload;
+  resource_type?: string;
+  resource_count?: number;
+  resources?: NativeTagResourcesPayload;
+  active?: boolean;
+  value?: string | number | null;
+  writable?: boolean;
+  in_use?: boolean;
+  orphan?: boolean;
+  trash?: boolean;
+  permissions?: string[];
+  created_at?: string;
+  modified_at?: string;
+}
+
+interface NativeTagsPayload {
+  page?: Partial<NativePage>;
+  items?: NativeTagPayload[];
+}
+
+export interface NativeTagsQuery {
+  page: number;
+  pageSize: number;
+  sort: string;
+  filter: string;
+  active: string;
+  resourceType: string;
+  value: string;
+}
+
+export interface NativeTagsResponse {
+  tags: Tag[];
+  counts: CollectionCounts;
+  page: NativePage;
+}
+
+const TAG_SORT_FIELDS: Record<string, string> = {
+  name: 'name',
+  value: 'value',
+  active: 'active',
+  resource_type: 'resource_type',
+  resourceCount: 'resource_count',
+  resource_count: 'resource_count',
+  resources: 'resources',
+  created: 'created',
+  modified: 'modified',
+};
+
+const stringValue = (value: unknown): string =>
+  typeof value === 'string' ? value : '';
+
+const integerValue = (value: unknown, fallback = 0): number => {
+  const parsed = Number.parseInt(String(value ?? fallback), 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const yesNoValue = (value?: boolean): 0 | 1 => (value === true ? 1 : 0);
+
+const nativeSortFromFilter = (filter?: QueryFilter): string => {
+  const reverse = filter?.get('sort-reverse');
+  const ascending = filter?.get('sort');
+  const rawField = stringValue(reverse ?? ascending) || 'name';
+  const nativeField = TAG_SORT_FIELDS[rawField] ?? rawField;
+  return reverse !== undefined ? `-${nativeField}` : nativeField;
+};
+
+const nativeSearchFromFilter = (filter?: QueryFilter): string => {
+  const search = filter?.get('search');
+  if (search !== undefined) {
+    return String(search);
+  }
+  const criteria = filter?.toFilterCriteriaString().trim() ?? '';
+  return /[=<>:~]/.test(criteria) ? '' : criteria;
+};
+
+const nativeActiveFromFilter = (filter?: QueryFilter): string => {
+  const value = filter?.get('active');
+  if (value === 1 || value === '1') {
+    return '1';
+  }
+  if (value === 0 || value === '0') {
+    return '0';
+  }
+  return '';
+};
+
+export const nativeTagsQueryFromFilter = (
+  filter?: QueryFilter,
+): NativeTagsQuery => {
+  const pageSize = Math.max(1, integerValue(filter?.get('rows'), 25));
+  const first = Math.max(1, integerValue(filter?.get('first'), 1));
+  return {
+    page: Math.floor((first - 1) / pageSize) + 1,
+    pageSize,
+    sort: nativeSortFromFilter(filter),
+    filter: nativeSearchFromFilter(filter),
+    active: nativeActiveFromFilter(filter),
+    resourceType: stringValue(filter?.get('resource_type')),
+    value: stringValue(filter?.get('value')),
+  };
+};
+
+const nativeCounts = (page: NativePage, length: number): CollectionCounts =>
+  new CollectionCounts({
+    all: page.total,
+    filtered: page.total,
+    length,
+    rows: page.page_size,
+  });
+
+const fetchNativeJson = async <T>(
+  gmp: NativeApiGmp,
+  path: string,
+  params: UrlParams,
+): Promise<T> => {
+  const response = await fetch(gmp.buildUrl(path, params), {
+    credentials: 'include',
+    headers: {
+      Accept: 'application/json',
+      ...(gmp.session.jwt ? {Authorization: `Bearer ${gmp.session.jwt}`} : {}),
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Native API request failed with status ${response.status}`);
+  }
+
+  return (await response.json()) as T;
+};
+
+const nativeTagToModel = (item: NativeTagPayload): Tag => {
+  const resourceType =
+    stringValue(item.resource_type) || stringValue(item.resources?.type);
+  const resourceCount =
+    item.resource_count ?? item.resources?.count?.total ?? 0;
+  return Tag.fromElement({
+    _id: stringValue(item.id),
+    name: stringValue(item.name),
+    comment: stringValue(item.comment),
+    owner: {name: stringValue(item.owner?.name)},
+    creation_time: stringValue(item.created_at),
+    modification_time: stringValue(item.modified_at),
+    writable: yesNoValue(item.writable ?? true),
+    in_use: yesNoValue(item.in_use),
+    orphan: yesNoValue(item.orphan),
+    active: yesNoValue(item.active ?? true),
+    trash: yesNoValue(item.trash),
+    permissions: {
+      permission: (item.permissions ?? ['get_tags']).map(name => ({name})),
+    },
+    resources: {
+      type: resourceType as ApiType,
+      count: {total: resourceCount},
+    },
+    value: item.value ?? undefined,
+  });
+};
+
+const normalizePage = (
+  payloadPage: Partial<NativePage> | undefined,
+  query: NativeTagsQuery,
+): NativePage => ({
+  page: payloadPage?.page ?? query.page,
+  page_size: payloadPage?.page_size ?? query.pageSize,
+  total: payloadPage?.total ?? 0,
+  sort: payloadPage?.sort ?? query.sort,
+  filter: payloadPage?.filter ?? query.filter,
+});
+
+export const fetchNativeTags = async (
+  gmp: NativeApiGmp,
+  query: NativeTagsQuery,
+): Promise<NativeTagsResponse> => {
+  const payload = await fetchNativeJson<NativeTagsPayload>(gmp, 'api/v1/tags', {
+    token: gmp.session.token,
+    page: query.page,
+    page_size: query.pageSize,
+    sort: query.sort,
+    filter: query.filter,
+    active: query.active,
+    resource_type: query.resourceType,
+    value: query.value,
+  });
+  const page = normalizePage(payload.page, query);
+  const tags = (payload.items ?? []).map(nativeTagToModel);
+  return {
+    tags,
+    counts: nativeCounts(page, tags.length),
+    page,
+  };
+};
+
+export const fetchNativeTag = async (
+  gmp: NativeApiGmp,
+  id: string,
+): Promise<Tag> => {
+  const payload = await fetchNativeJson<NativeTagPayload>(
+    gmp,
+    `api/v1/tags/${encodeURIComponent(id)}`,
+    {token: gmp.session.token},
+  );
+  return nativeTagToModel(payload);
+};

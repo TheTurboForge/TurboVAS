@@ -237,6 +237,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/FilterAsset'
+  /tags:
+    get:
+      summary: List tags
+      description: Read-only tag metadata backed by gvmd/PostgreSQL. Tag create, modify, clone, enable/disable, export, delete, and assigned-resource expansion remain on inherited compatibility paths while native write/resource semantics are designed.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Filter'
+      responses:
+        '200':
+          description: Tag collection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TagAssetCollection'
+  /tags/{tag_id}:
+    get:
+      summary: Read one tag
+      parameters:
+        - $ref: '#/components/parameters/TagId'
+      responses:
+        '200':
+          description: Tag detail metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TagAsset'
   /overrides:
     get:
       summary: List overrides
@@ -905,6 +933,13 @@ components:
       schema:
         type: string
         format: uuid
+    TagId:
+      name: tag_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     OverrideId:
       name: override_id
       in: path
@@ -1190,6 +1225,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/FilterAsset'
+    TagAssetCollection:
+      type: object
+      required: [page, items]
+      properties:
+        page:
+          $ref: '#/components/schemas/PageInfo'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TagAsset'
     OverrideAssetCollection:
       type: object
       required: [page, items]
@@ -2020,6 +2065,65 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/FilterAlertReference'
+        created_at:
+          type: string
+          format: date-time
+        modified_at:
+          type: string
+          format: date-time
+    TagResourcesSummary:
+      type: object
+      required: [type, count]
+      properties:
+        type:
+          type: string
+          description: Tagged resource type, such as task, target, config, report, or filter.
+        count:
+          type: object
+          required: [total]
+          properties:
+            total:
+              type: integer
+    TagAsset:
+      type: object
+      required: [id, name, owner, resource_type, resource_count, resources, active, writable, in_use, orphan, trash, permissions]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        comment:
+          type: string
+        owner:
+          type: object
+          required: [name]
+          properties:
+            name:
+              type: string
+        resource_type:
+          type: string
+        resource_count:
+          type: integer
+        resources:
+          $ref: '#/components/schemas/TagResourcesSummary'
+        active:
+          type: boolean
+        value:
+          type: string
+          nullable: true
+        writable:
+          type: boolean
+        in_use:
+          type: boolean
+        orphan:
+          type: boolean
+        trash:
+          type: boolean
+        permissions:
+          type: array
+          items:
+            type: string
         created_at:
           type: string
           format: date-time

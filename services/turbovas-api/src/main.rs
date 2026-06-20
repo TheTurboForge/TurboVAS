@@ -30,8 +30,10 @@ struct CollectionQuery {
     sort: Option<String>,
     filter: Option<String>,
     active: Option<String>,
+    resource_type: Option<String>,
     text: Option<String>,
     task_name: Option<String>,
+    value: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -713,6 +715,44 @@ struct FilterAssetItem {
 }
 
 #[derive(Serialize)]
+struct TagOwner {
+    name: String,
+}
+
+#[derive(Serialize)]
+struct TagResourceCount {
+    total: i64,
+}
+
+#[derive(Serialize)]
+struct TagResourcesSummary {
+    #[serde(rename = "type")]
+    resource_type: String,
+    count: TagResourceCount,
+}
+
+#[derive(Serialize)]
+struct TagAssetItem {
+    id: String,
+    name: String,
+    comment: String,
+    owner: TagOwner,
+    resource_type: String,
+    resource_count: i64,
+    resources: TagResourcesSummary,
+    active: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    value: Option<String>,
+    writable: bool,
+    in_use: bool,
+    orphan: bool,
+    trash: bool,
+    permissions: Vec<String>,
+    created_at: Option<String>,
+    modified_at: Option<String>,
+}
+
+#[derive(Serialize)]
 struct OverrideOwner {
     name: String,
 }
@@ -997,6 +1037,8 @@ async fn main() -> Result<(), ApiError> {
         .route("/api/v1/scanners", get(scanner_assets))
         .route("/api/v1/filters", get(filter_assets))
         .route("/api/v1/filters/:filter_id", get(filter_asset_detail))
+        .route("/api/v1/tags", get(tag_assets))
+        .route("/api/v1/tags/:tag_id", get(tag_asset_detail))
         .route("/api/v1/overrides", get(override_assets))
         .route("/api/v1/overrides/:override_id", get(override_asset_detail))
         .route("/api/v1/port-lists", get(port_list_assets))
@@ -1592,6 +1634,123 @@ async fn filter_asset_detail(
         .map(filter_alert_from_row)
         .collect();
     Ok(Json(filter_asset_from_row(&row, alerts)))
+}
+
+async fn tag_assets(
+    State(state): State<AppState>,
+    Query(query): Query<CollectionQuery>,
+) -> Result<Json<Collection<TagAssetItem>>, ApiError> {
+    let active_filter = query.active.clone().unwrap_or_default();
+    let resource_type_filter = query.resource_type.clone().unwrap_or_default();
+    let value_filter = query.value.clone().unwrap_or_default();
+    let params = normalize_collection_query(query, "name")?;
+    let sort_sql = sort_clause(
+        &params.sort,
+        &[
+            ("id", "id"),
+            ("name", "name"),
+            ("value", "value"),
+            ("active", "active_int"),
+            ("resource_type", "resource_type"),
+            ("resources", "resource_count"),
+            ("resource_count", "resource_count"),
+            ("created", "created_at_unix"),
+            ("modified", "modified_at_unix"),
+        ],
+    )?;
+    let sql = format!(
+        r#"WITH tag_rows AS (
+             SELECT t.uuid AS id,
+                    coalesce(t.name, '') AS name,
+                    coalesce(t.comment, '') AS comment,
+                    coalesce(u.name, '') AS owner_name,
+                    coalesce(t.resource_type, '') AS resource_type,
+                    coalesce(tag_resources_count(t.id, t.resource_type), 0)::bigint AS resource_count,
+                    coalesce(t.active, 0)::integer AS active_int,
+                    coalesce(t.value, '') AS value,
+                    coalesce(t.creation_time, 0)::bigint AS created_at_unix,
+                    coalesce(t.modification_time, 0)::bigint AS modified_at_unix
+               FROM tags t
+          LEFT JOIN users u ON u.id = t.owner
+         ),
+         filtered AS (
+             SELECT * FROM tag_rows
+              WHERE ($1 = ''
+                     OR lower(id) LIKE '%' || lower($1) || '%'
+                     OR lower(name) LIKE '%' || lower($1) || '%'
+                     OR lower(comment) LIKE '%' || lower($1) || '%'
+                     OR lower(owner_name) LIKE '%' || lower($1) || '%'
+                     OR lower(resource_type) LIKE '%' || lower($1) || '%'
+                     OR lower(value) LIKE '%' || lower($1) || '%')
+                AND ($4 = ''
+                     OR ($4 = '1' AND active_int = 1)
+                     OR ($4 = '0' AND active_int = 0))
+                AND ($5 = '' OR lower(resource_type) = lower($5))
+                AND ($6 = '' OR lower(value) LIKE '%' || lower($6) || '%')
+         )
+         SELECT count(*) OVER()::bigint AS total, * FROM filtered
+          ORDER BY {sort_sql}, name ASC, id ASC LIMIT $2 OFFSET $3;"#,
+    );
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let rows = client
+        .query(
+            &sql,
+            &[
+                &params.filter,
+                &params.page_size,
+                &params.offset,
+                &active_filter,
+                &resource_type_filter,
+                &value_filter,
+            ],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "tag asset list query failed");
+            ApiError::Database
+        })?;
+    let total = rows
+        .first()
+        .map(|row| row.get::<_, i64>("total"))
+        .unwrap_or(0);
+    let items = rows.iter().map(tag_asset_from_row).collect();
+    Ok(Json(Collection {
+        page: params.page_info(total),
+        items,
+    }))
+}
+
+async fn tag_asset_detail(
+    State(state): State<AppState>,
+    Path(tag_id): Path<String>,
+) -> Result<Json<TagAssetItem>, ApiError> {
+    parse_uuid(&tag_id)?;
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let row = client
+        .query_opt(
+            r#"SELECT t.uuid AS id,
+                      coalesce(t.name, '') AS name,
+                      coalesce(t.comment, '') AS comment,
+                      coalesce(u.name, '') AS owner_name,
+                      coalesce(t.resource_type, '') AS resource_type,
+                      coalesce(tag_resources_count(t.id, t.resource_type), 0)::bigint AS resource_count,
+                      coalesce(t.active, 0)::integer AS active_int,
+                      coalesce(t.value, '') AS value,
+                      coalesce(t.creation_time, 0)::bigint AS created_at_unix,
+                      coalesce(t.modification_time, 0)::bigint AS modified_at_unix
+                 FROM tags t
+            LEFT JOIN users u ON u.id = t.owner
+                WHERE t.uuid = $1
+                LIMIT 1;"#,
+            &[&tag_id],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "tag asset detail query failed");
+            ApiError::Database
+        })?
+        .ok_or(ApiError::NotFound)?;
+    Ok(Json(tag_asset_from_row(&row)))
 }
 
 async fn override_assets(
@@ -7041,6 +7200,47 @@ fn filter_asset_from_row(row: &Row, alerts: Vec<FilterAlertReference>) -> Filter
     }
 }
 
+fn tag_asset_from_row(row: &Row) -> TagAssetItem {
+    let resource_type: String = row.get("resource_type");
+    let resource_count: i64 = row.get("resource_count");
+    let raw_value: String = row.get("value");
+    let value = if raw_value.trim().is_empty() {
+        None
+    } else {
+        Some(raw_value)
+    };
+    TagAssetItem {
+        id: row.get("id"),
+        name: row.get("name"),
+        comment: row.get("comment"),
+        owner: TagOwner {
+            name: row.get("owner_name"),
+        },
+        resource_type: resource_type.clone(),
+        resource_count,
+        resources: TagResourcesSummary {
+            resource_type,
+            count: TagResourceCount {
+                total: resource_count,
+            },
+        },
+        active: row.get::<_, i32>("active_int") != 0,
+        value,
+        writable: true,
+        in_use: false,
+        orphan: false,
+        trash: false,
+        permissions: vec![
+            "get_tags".to_string(),
+            "modify_tag".to_string(),
+            "delete_tag".to_string(),
+            "create_tag".to_string(),
+        ],
+        created_at: unix_ts_to_rfc3339(row.get("created_at_unix")),
+        modified_at: unix_ts_to_rfc3339(row.get("modified_at_unix")),
+    }
+}
+
 fn override_asset_from_row(row: &Row) -> OverrideAssetItem {
     let task_id: Option<String> = row.get("task_id");
     let task = task_id.map(|id| OverrideTaskReference {
@@ -7440,8 +7640,10 @@ mod tests {
                 sort: None,
                 filter: Some("router".to_string()),
                 active: None,
+                resource_type: None,
                 text: None,
                 task_name: None,
+                value: None,
             },
             "host",
         )
@@ -7462,8 +7664,10 @@ mod tests {
                 sort: None,
                 filter: None,
                 active: None,
+                resource_type: None,
                 text: None,
                 task_name: None,
+                value: None,
             },
             "host",
         )
