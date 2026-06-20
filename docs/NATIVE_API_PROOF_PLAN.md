@@ -135,9 +135,13 @@ they are now live internal and browser-proxied endpoints:
 - `GET /api/v1/schedules/{schedule_id}`
 - `GET /api/v1/report-formats`
 - `GET /api/v1/report-formats/{report_format_id}`
+- `GET /api/v1/cert-bund-advisories`
+- `GET /api/v1/cert-bund-advisories/{advisory_id}` catalog metadata only
+- `GET /api/v1/dfn-cert-advisories`
+- `GET /api/v1/dfn-cert-advisories/{advisory_id}` catalog metadata only
 
 Together with Results, Hosts, Ports, CVEs, Error Messages, Metrics, and the
-Security Information CVE catalog, these
+Security Information CVE/CPE/CERT advisory catalogs, these
 endpoints complete native browser coverage for current scope-report evidence
 tabs and the high-value raw report evidence tabs. Target list reads are also
 browser-proxied through the authenticated `gsad` same-origin boundary, including
@@ -160,6 +164,10 @@ preferences, selector/family expansion, import/export, and writes remain
 inherited. Schedule
 list/detail reads are browser-proxied with iCalendar recurrence data and task
 backlinks; schedule writes, clone, export, and delete actions remain inherited.
+CERT-Bund and DFN-CERT list reads are browser-proxied, while their detail
+metadata endpoints remain internal automation/catalog probes because rich GSA
+detail/export behavior still depends on XML-only feed fields that PostgreSQL
+does not store.
 Further native API expansion should now move toward remaining helper/tooling
 replacements and, later, carefully designed write/control paths that remove
 required GMP/XML, `python-gvm`, or `gvm-tools` dependence.

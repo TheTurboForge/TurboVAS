@@ -1064,7 +1064,15 @@ async fn main() -> Result<(), ApiError> {
         .route("/api/v1/cves", get(cve_catalog))
         .route("/api/v1/cves/:cve_id", get(cve_catalog_detail))
         .route("/api/v1/cert-bund-advisories", get(cert_bund_advisories))
+        .route(
+            "/api/v1/cert-bund-advisories/*advisory_id",
+            get(cert_bund_advisory_detail),
+        )
         .route("/api/v1/dfn-cert-advisories", get(dfn_cert_advisories))
+        .route(
+            "/api/v1/dfn-cert-advisories/*advisory_id",
+            get(dfn_cert_advisory_detail),
+        )
         .route("/api/v1/nvts", get(nvt_catalog))
         .route("/api/v1/operating-systems", get(operating_system_assets))
         .route("/api/v1/hosts", get(host_assets))
@@ -3308,6 +3316,42 @@ async fn dfn_cert_advisories(
     }))
 }
 
+async fn dfn_cert_advisory_detail(
+    State(state): State<AppState>,
+    Path(advisory_id): Path<String>,
+) -> Result<Json<DfnCertAdvisoryItem>, ApiError> {
+    validate_advisory_id(&advisory_id)?;
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let row = client
+        .query_opt(
+            r#"SELECT d.uuid AS id,
+                      d.name AS name,
+                      coalesce(d.comment, '') AS comment,
+                      coalesce(d.title, '') AS title,
+                      coalesce(d.summary, '') AS summary,
+                      coalesce(d.severity, 0)::double precision AS severity,
+                      coalesce(d.cve_refs, 0)::bigint AS cve_refs,
+                      coalesce(d.creation_time, 0)::bigint AS created_at_unix,
+                      coalesce(d.modification_time, 0)::bigint AS modified_at_unix,
+                      coalesce(array_agg(dc.cve_name ORDER BY dc.cve_name)
+                        FILTER (WHERE dc.cve_name IS NOT NULL), ARRAY[]::text[]) AS cves
+                 FROM cert.dfn_cert_advs d
+                 LEFT JOIN cert.dfn_cert_cves dc ON dc.adv_id = d.id
+                WHERE d.uuid = $1 OR d.name = $1
+                GROUP BY d.uuid, d.name, d.comment, d.title, d.summary,
+                         d.severity, d.cve_refs, d.creation_time,
+                         d.modification_time;"#,
+            &[&advisory_id],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "DFN-CERT advisory detail query failed");
+            ApiError::Database
+        })?
+        .ok_or(ApiError::NotFound)?;
+    Ok(Json(dfn_cert_advisory_from_row(&row)))
+}
+
 async fn cert_bund_advisories(
     State(state): State<AppState>,
     Query(query): Query<CollectionQuery>,
@@ -3376,6 +3420,42 @@ async fn cert_bund_advisories(
         page: params.page_info(total),
         items,
     }))
+}
+
+async fn cert_bund_advisory_detail(
+    State(state): State<AppState>,
+    Path(advisory_id): Path<String>,
+) -> Result<Json<CertBundAdvisoryItem>, ApiError> {
+    validate_advisory_id(&advisory_id)?;
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let row = client
+        .query_opt(
+            r#"SELECT d.uuid AS id,
+                      d.name AS name,
+                      coalesce(d.comment, '') AS comment,
+                      coalesce(d.title, '') AS title,
+                      coalesce(d.summary, '') AS summary,
+                      coalesce(d.severity, 0)::double precision AS severity,
+                      coalesce(d.cve_refs, 0)::bigint AS cve_refs,
+                      coalesce(d.creation_time, 0)::bigint AS created_at_unix,
+                      coalesce(d.modification_time, 0)::bigint AS modified_at_unix,
+                      coalesce(array_agg(dc.cve_name::text ORDER BY dc.cve_name)
+                        FILTER (WHERE dc.cve_name IS NOT NULL), ARRAY[]::text[]) AS cves
+                 FROM cert.cert_bund_advs d
+                 LEFT JOIN cert.cert_bund_cves dc ON dc.adv_id = d.id
+                WHERE d.uuid = $1 OR d.name = $1
+                GROUP BY d.uuid, d.name, d.comment, d.title, d.summary,
+                         d.severity, d.cve_refs, d.creation_time,
+                         d.modification_time;"#,
+            &[&advisory_id],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "CERT-Bund advisory detail query failed");
+            ApiError::Database
+        })?
+        .ok_or(ApiError::NotFound)?;
+    Ok(Json(cert_bund_advisory_from_row(&row)))
 }
 
 async fn nvt_catalog(
@@ -6775,6 +6855,20 @@ fn validate_cpe_id(value: &str) -> Result<(), ApiError> {
     Ok(())
 }
 
+fn validate_advisory_id(value: &str) -> Result<(), ApiError> {
+    if value.is_empty()
+        || value.len() > 256
+        || !value
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.' | ':' | '/'))
+    {
+        return Err(ApiError::BadRequest(
+            "path id must be an advisory identifier".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 fn report_reference(id: Option<String>, name: Option<String>) -> Option<ReportReference> {
     let id = id?;
     let name = name.unwrap_or_else(|| id.clone());
@@ -7908,6 +8002,16 @@ mod tests {
             "result_count DESC"
         );
         assert!(sort_clause(";drop", &[("host", "host")]).is_err());
+    }
+
+    #[test]
+    fn advisory_id_validator_allows_feed_ids_but_rejects_unsafe_text() {
+        assert!(validate_advisory_id("DFN-CERT-2026-2178").is_ok());
+        assert!(validate_advisory_id("WID-SEC-2022-1384").is_ok());
+        assert!(validate_advisory_id("CB-K14/0001").is_ok());
+        assert!(validate_advisory_id("").is_err());
+        assert!(validate_advisory_id("CB-K14/0001?download=true").is_err());
+        assert!(validate_advisory_id("CB-K14/0001;drop").is_err());
     }
 
     #[test]

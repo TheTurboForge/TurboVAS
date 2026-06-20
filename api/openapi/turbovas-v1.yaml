@@ -113,6 +113,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CertBundAdvisoryCollection'
+  /cert-bund-advisories/{cert_bund_advisory_id}:
+    get:
+      summary: Read one Security Information CERT-Bund advisory catalog entry
+      description: Catalog-detail metadata backed by CERT feed metadata already imported into gvmd/PostgreSQL. This endpoint intentionally does not reconstruct XML-only rich advisory fields such as revision history, platform, risk, reference URLs, or description blocks.
+      parameters:
+        - $ref: '#/components/parameters/CertBundAdvisoryId'
+      responses:
+        '200':
+          description: CERT-Bund advisory catalog detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CertBundAdvisory'
   /dfn-cert-advisories:
     get:
       summary: List Security Information DFN-CERT advisories
@@ -129,6 +142,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DfnCertAdvisoryCollection'
+  /dfn-cert-advisories/{dfn_cert_advisory_id}:
+    get:
+      summary: Read one Security Information DFN-CERT advisory catalog entry
+      description: Catalog-detail metadata backed by CERT feed metadata already imported into gvmd/PostgreSQL. This endpoint intentionally does not reconstruct XML-only rich advisory fields such as advisory links or additional feed links.
+      parameters:
+        - $ref: '#/components/parameters/DfnCertAdvisoryId'
+      responses:
+        '200':
+          description: DFN-CERT advisory catalog detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DfnCertAdvisory'
   /nvts:
     get:
       summary: List Security Information NVTs
@@ -1018,6 +1044,24 @@ components:
       schema:
         type: string
         format: uuid
+    CertBundAdvisoryId:
+      name: cert_bund_advisory_id
+      in: path
+      required: true
+      description: CERT-Bund advisory identifier as stored in gvmd/PostgreSQL. Slash characters must be URL-encoded when used as a path segment.
+      schema:
+        type: string
+        maxLength: 256
+        pattern: '^[A-Za-z0-9._:/-]+$'
+    DfnCertAdvisoryId:
+      name: dfn_cert_advisory_id
+      in: path
+      required: true
+      description: DFN-CERT advisory identifier as stored in gvmd/PostgreSQL.
+      schema:
+        type: string
+        maxLength: 256
+        pattern: '^[A-Za-z0-9._:/-]+$'
   schemas:
     Error:
       type: object

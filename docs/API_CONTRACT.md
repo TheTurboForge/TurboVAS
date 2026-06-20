@@ -33,6 +33,8 @@ The first API phase is read-only and report-focused:
 - scan-config list and metadata-detail reads, including family/NVT counts,
   growth flags and predefined/deprecated state, inside
   authenticated operator access only.
+- Security Information CERT-Bund and DFN-CERT advisory list reads plus
+  internal catalog-detail metadata reads from imported PostgreSQL state.
 - override list and detail metadata reads, including NVT identity, active state,
   task/result links, and severity override values, inside authenticated operator
   access only.
@@ -97,8 +99,9 @@ for raw report list/detail/result rows/hosts/ports/applications/operating
 systems/CVEs/TLS certificates/errors, scope list/detail, target list/detail,
 task list/detail, scanner metadata list, saved filter list/detail, override
 list/detail metadata, tag list/detail metadata, scan-config metadata list/detail, port-list list/detail, schedule list/detail, report-config
-list/detail, report-format list/detail, Security Information CVE catalog list/detail, Security
-Information CPE catalog list/detail, scope-report list,
+list/detail, report-format list/detail, Security Information CVE catalog list/detail,
+Security Information CPE catalog list/detail, Security Information CERT-Bund and
+DFN-CERT advisory catalog list/detail metadata, scope-report list,
 Results, Hosts, Ports, Applications,
 Operating Systems, CVEs, TLS Certificates, Error Messages, scope-report Metrics,
 and raw report Metrics because those read
@@ -198,6 +201,15 @@ where available from SCAP-owned PostgreSQL state. This catalog is intentionally
 distinct from observed host, application, operating-system, and report evidence:
 `/cpes` is reference intelligence, while report paths are observed evidence from
 completed scans.
+
+Native Security Information CERT-Bund and DFN-CERT advisory catalog rows include
+the advisory identifier, title, summary, severity, CVE reference count, CVE
+list, and timestamps from CERT feed metadata imported into PostgreSQL. The
+internal detail endpoints intentionally do not reconstruct XML-only rich feed
+fields such as CERT-Bund revision history, platform, risk/source URL, rich
+description blocks, DFN advisory links, or additional feed links; the retained
+GSA detail/export paths continue to use inherited feed XML where those fields
+matter.
 
 Native raw and scope-report result rows include host, optional hostname,
 port, NVT OID/name/family, severity, QoD, creation time, source report ID,
