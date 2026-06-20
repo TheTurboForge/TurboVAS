@@ -3041,8 +3041,8 @@ def summarize_native_tooling(items: list[dict[str, Any]]) -> dict[str, Any]:
             },
             {
                 "endpoint": "/api/v1/targets/{target_id}",
-                "status": "implemented_internal",
-                "replacement_candidates": ["future GSA target detail summary reads", "read-only target automation"],
+                "status": "implemented_internal_and_browser_proxied",
+                "replacement_candidates": ["GSA target detail reads (migrated through gsad same-origin proxy)", "read-only target automation"],
             },
             {
                 "endpoint": "/api/v1/tasks",
@@ -3051,8 +3051,8 @@ def summarize_native_tooling(items: list[dict[str, Any]]) -> dict[str, Any]:
             },
             {
                 "endpoint": "/api/v1/tasks/{task_id}",
-                "status": "implemented_internal",
-                "replacement_candidates": ["future GSA task detail summary reads after row/detail parity", "read-only task automation"],
+                "status": "implemented_internal_and_browser_proxied",
+                "replacement_candidates": ["GSA task detail reads (migrated through gsad same-origin proxy)", "read-only task automation"],
             },
             {
                 "endpoint": "/api/v1/scope-reports",
