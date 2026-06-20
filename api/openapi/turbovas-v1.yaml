@@ -356,6 +356,23 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TagAsset'
+  /tags/{tag_id}/resources:
+    get:
+      summary: List assigned tag resource references
+      description: Read-only active-table tag resource references for a strict whitelist of asset and security-information resource types. Tag mutation, trash resources, credentials, users, permissions, filters, alerts, schedules, scanners, overrides, reports, and results remain on inherited compatibility paths while native semantics are designed.
+      parameters:
+        - $ref: '#/components/parameters/TagId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Filter'
+      responses:
+        '200':
+          description: Assigned tag resource references
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TagResourceCollection'
   /overrides:
     get:
       summary: List overrides
@@ -1463,6 +1480,21 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/TagAsset'
+    TagResourceCollection:
+      type: object
+      required: [tag_id, resource_type, page, items]
+      properties:
+        tag_id:
+          type: string
+          format: uuid
+        resource_type:
+          type: string
+        page:
+          $ref: '#/components/schemas/PageInfo'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TagResourceReference'
     OverrideAssetCollection:
       type: object
       required: [page, items]
@@ -2496,6 +2528,16 @@ components:
           properties:
             total:
               type: integer
+    TagResourceReference:
+      type: object
+      required: [id, type, name]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        name:
+          type: string
     TagAsset:
       type: object
       required: [id, name, owner, resource_type, resource_count, resources, active, writable, in_use, orphan, trash, permissions]

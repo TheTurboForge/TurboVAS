@@ -833,6 +833,22 @@ struct TagAssetItem {
 }
 
 #[derive(Serialize)]
+struct TagResourceItem {
+    id: String,
+    #[serde(rename = "type")]
+    resource_type: String,
+    name: String,
+}
+
+#[derive(Serialize)]
+struct TagResourceCollection {
+    tag_id: String,
+    resource_type: String,
+    page: PageInfo,
+    items: Vec<TagResourceItem>,
+}
+
+#[derive(Serialize)]
 struct OverrideOwner {
     name: String,
 }
@@ -1192,6 +1208,7 @@ async fn main() -> Result<(), ApiError> {
         .route("/api/v1/filters", get(filter_assets))
         .route("/api/v1/filters/:filter_id", get(filter_asset_detail))
         .route("/api/v1/tags", get(tag_assets))
+        .route("/api/v1/tags/:tag_id/resources", get(tag_asset_resources))
         .route("/api/v1/tags/:tag_id", get(tag_asset_detail))
         .route("/api/v1/overrides", get(override_assets))
         .route("/api/v1/overrides/:override_id", get(override_asset_detail))
@@ -2384,6 +2401,60 @@ async fn tag_asset_detail(
         })?
         .ok_or(ApiError::NotFound)?;
     Ok(Json(tag_asset_from_row(&row)))
+}
+
+async fn tag_asset_resources(
+    State(state): State<AppState>,
+    Path(tag_id): Path<String>,
+    Query(query): Query<CollectionQuery>,
+) -> Result<Json<TagResourceCollection>, ApiError> {
+    let tag_id = parse_uuid(&tag_id)?.to_string();
+    let params = normalize_collection_query(query, "name")?;
+    let sort_sql = sort_clause(&params.sort, &[("id", "id"), ("name", "name")])?;
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let tag_row = client
+        .query_opt(
+            r#"SELECT id, uuid, coalesce(resource_type, '') AS resource_type
+                 FROM tags
+                WHERE uuid = $1
+                LIMIT 1;"#,
+            &[&tag_id],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "tag lookup for resource expansion failed");
+            ApiError::Database
+        })?
+        .ok_or(ApiError::NotFound)?;
+    let tag_internal_id: i32 = tag_row.get("id");
+    let resource_type = normalize_tag_resource_type(tag_row.get("resource_type"));
+    let sql = tag_resource_collection_sql(&resource_type, &sort_sql)?;
+    let rows = client
+        .query(
+            &sql,
+            &[
+                &tag_internal_id,
+                &params.filter,
+                &params.page_size,
+                &params.offset,
+            ],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, %resource_type, "tag resource query failed");
+            ApiError::Database
+        })?;
+    let total = rows
+        .first()
+        .map(|row| row.get::<_, i64>("total"))
+        .unwrap_or(0);
+    let items = rows.iter().map(tag_resource_from_row).collect();
+    Ok(Json(TagResourceCollection {
+        tag_id,
+        resource_type,
+        page: params.page_info(total),
+        items,
+    }))
 }
 
 async fn override_assets(
@@ -8217,6 +8288,154 @@ fn tag_asset_from_row(row: &Row) -> TagAssetItem {
     }
 }
 
+fn normalize_tag_resource_type(value: String) -> String {
+    value.trim().to_ascii_lowercase()
+}
+
+fn tag_resource_from_row(row: &Row) -> TagResourceItem {
+    TagResourceItem {
+        id: row.get("id"),
+        resource_type: row.get("resource_type"),
+        name: row.get("name"),
+    }
+}
+
+fn tag_resource_collection_sql(resource_type: &str, sort_sql: &str) -> Result<String, ApiError> {
+    let (table, join_on, id_expr, name_expr, extra_where) = match resource_type {
+        "target" => (
+            "targets",
+            "r.id = tr.resource",
+            "r.uuid",
+            "coalesce(nullif(r.name, ''), r.uuid)",
+            "",
+        ),
+        "task" => (
+            "tasks",
+            "r.id = tr.resource",
+            "r.uuid",
+            "coalesce(nullif(r.name, ''), r.uuid)",
+            "coalesce(r.usage_type, 'scan') = 'scan' AND coalesce(r.hidden, 0) = 0",
+        ),
+        "host" => (
+            "hosts",
+            "r.id = tr.resource",
+            "r.uuid",
+            "coalesce(nullif(r.name, ''), r.uuid)",
+            "",
+        ),
+        "os" => (
+            "oss",
+            "r.id = tr.resource",
+            "r.uuid",
+            "coalesce(nullif(r.name, ''), r.uuid)",
+            "",
+        ),
+        "tls_certificate" => (
+            "tls_certificates",
+            "r.id = tr.resource",
+            "r.uuid",
+            "coalesce(nullif(r.name, ''), nullif(r.subject_dn, ''), r.uuid)",
+            "",
+        ),
+        "port_list" => (
+            "port_lists",
+            "r.id = tr.resource",
+            "r.uuid",
+            "coalesce(nullif(r.name, ''), r.uuid)",
+            "",
+        ),
+        "config" => (
+            "configs",
+            "r.id = tr.resource",
+            "r.uuid",
+            "coalesce(nullif(r.name, ''), r.uuid)",
+            "coalesce(r.usage_type, 'scan') = 'scan'",
+        ),
+        "report_config" => (
+            "report_configs",
+            "r.id = tr.resource",
+            "r.uuid",
+            "coalesce(nullif(r.name, ''), r.uuid)",
+            "",
+        ),
+        "report_format" => (
+            "report_formats",
+            "r.id = tr.resource",
+            "r.uuid",
+            "coalesce(nullif(r.name, ''), r.uuid)",
+            "",
+        ),
+        "nvt" => (
+            "nvts",
+            "r.id = tr.resource OR r.oid = tr.resource_uuid OR r.uuid = tr.resource_uuid",
+            "r.oid",
+            "coalesce(nullif(r.name, ''), r.oid)",
+            "",
+        ),
+        "cve" => (
+            "scap.cves",
+            "r.id = tr.resource OR r.uuid = tr.resource_uuid OR lower(r.name) = lower(tr.resource_uuid)",
+            "r.name",
+            "r.name",
+            "",
+        ),
+        "cpe" => (
+            "scap.cpes",
+            "r.id = tr.resource OR r.uuid = tr.resource_uuid OR r.name = tr.resource_uuid",
+            "r.uuid",
+            "coalesce(nullif(r.title, ''), nullif(r.name, ''), r.uuid)",
+            "",
+        ),
+        "cert_bund_adv" => (
+            "cert.cert_bund_advs",
+            "r.id = tr.resource OR r.uuid = tr.resource_uuid OR r.name = tr.resource_uuid",
+            "r.uuid",
+            "coalesce(nullif(r.title, ''), nullif(r.name, ''), r.uuid)",
+            "",
+        ),
+        "dfn_cert_adv" => (
+            "cert.dfn_cert_advs",
+            "r.id = tr.resource OR r.uuid = tr.resource_uuid OR r.name = tr.resource_uuid",
+            "r.uuid",
+            "coalesce(nullif(r.title, ''), nullif(r.name, ''), r.uuid)",
+            "",
+        ),
+        _ => {
+            return Err(ApiError::BadRequest(format!(
+                "unsupported tag resource type: {resource_type}"
+            )));
+        }
+    };
+    let extra_where = if extra_where.is_empty() {
+        String::new()
+    } else {
+        format!("\n                AND {extra_where}")
+    };
+
+    Ok(format!(
+        r#"WITH resource_rows AS (
+             SELECT ({id_expr})::text AS id,
+                    '{resource_type}'::text AS resource_type,
+                    ({name_expr})::text AS name
+               FROM tag_resources tr
+               JOIN {table} r ON {join_on}
+              WHERE tr.tag = $1
+                AND tr.resource_type = '{resource_type}'
+                AND tr.resource_location = 0{extra_where}
+         ),
+         filtered AS (
+             SELECT * FROM resource_rows
+              WHERE ($2 = ''
+                     OR lower(id) LIKE '%' || lower($2) || '%'
+                     OR lower(name) LIKE '%' || lower($2) || '%')
+         )
+         SELECT count(*) OVER()::bigint AS total, id, resource_type, name
+           FROM filtered
+          ORDER BY {sort_sql}, name ASC, id ASC
+          LIMIT $3 OFFSET $4;"#,
+    ))
+}
+
 fn override_asset_from_row(row: &Row) -> OverrideAssetItem {
     let task_id: Option<String> = row.get("task_id");
     let task = task_id.map(|id| OverrideTaskReference {
@@ -8664,6 +8883,33 @@ mod tests {
             "result_count DESC"
         );
         assert!(sort_clause(";drop", &[("host", "host")]).is_err());
+    }
+
+    #[test]
+    fn tag_resource_sql_is_strictly_whitelisted() {
+        let sort_sql = sort_clause("name", &[("id", "id"), ("name", "name")]).unwrap();
+        let sql = tag_resource_collection_sql("target", &sort_sql).unwrap();
+        assert!(sql.contains("FROM tag_resources tr"));
+        assert!(sql.contains("JOIN targets r ON r.id = tr.resource"));
+        assert!(sql.contains("AND tr.resource_type = 'target'"));
+        assert!(sql.contains("AND tr.resource_location = 0"));
+        assert!(tag_resource_collection_sql("credential", &sort_sql).is_err());
+        assert!(tag_resource_collection_sql("scanner", &sort_sql).is_err());
+        assert!(tag_resource_collection_sql("report", &sort_sql).is_err());
+        assert!(tag_resource_collection_sql("result", &sort_sql).is_err());
+    }
+
+    #[test]
+    fn tag_resource_sql_supports_info_catalogs_by_reference() {
+        let sort_sql = sort_clause("id", &[("id", "id"), ("name", "name")]).unwrap();
+        let cve_sql = tag_resource_collection_sql("cve", &sort_sql).unwrap();
+        assert!(cve_sql.contains("JOIN scap.cves r ON"));
+        assert!(cve_sql.contains("lower(r.name) = lower(tr.resource_uuid)"));
+        let nvt_sql = tag_resource_collection_sql("nvt", &sort_sql).unwrap();
+        assert!(nvt_sql.contains("JOIN nvts r ON"));
+        assert!(nvt_sql.contains("r.oid = tr.resource_uuid"));
+        let cert_sql = tag_resource_collection_sql("cert_bund_adv", &sort_sql).unwrap();
+        assert!(cert_sql.contains("JOIN cert.cert_bund_advs r ON"));
     }
 
     #[test]
