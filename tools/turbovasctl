@@ -1028,6 +1028,67 @@ def gsad_port_bindings(repo_root: Path) -> tuple[str, ...]:
     return tuple(f"{host}:{GSAD_PORT}:{GSAD_CONTAINER_PORT}" for host in gsad_hosts(repo_root))
 
 
+def host_is_loopback(host: str) -> bool:
+    normalized = host.strip().lower().strip("[]")
+    return normalized in {"localhost", "::1"} or normalized.startswith("127.")
+
+
+def external_hosts(hosts: Iterable[str]) -> tuple[str, ...]:
+    return tuple(host for host in hosts if not host_is_loopback(host))
+
+
+def current_gsad_published_hosts(repo_root: Path) -> tuple[str, ...]:
+    cid = container_id(repo_root, "gsad")
+    if not cid:
+        return ()
+    result = run_command(["docker", "inspect", "-f", "{{json .NetworkSettings.Ports}}", cid], repo_root, env=runtime_env(repo_root))
+    if result.returncode != 0 or not result.stdout.strip():
+        return ()
+    try:
+        ports = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return ()
+    bindings = ports.get(f"{GSAD_CONTAINER_PORT}/tcp") or []
+    hosts: list[str] = []
+    seen: set[str] = set()
+    for binding in bindings:
+        if not isinstance(binding, dict):
+            continue
+        host = str(binding.get("HostIp") or "").strip()
+        port = str(binding.get("HostPort") or "").strip()
+        if not host or port != GSAD_PORT or host in seen:
+            continue
+        hosts.append(host)
+        seen.add(host)
+    return tuple(hosts)
+
+
+def gsad_binding_transition_findings(repo_root: Path) -> list[dict[str, Any]]:
+    current = current_gsad_published_hosts(repo_root)
+    if not current:
+        return []
+    requested = gsad_hosts(repo_root)
+    current_external = external_hosts(current)
+    requested_external = external_hosts(requested)
+    lost_external = tuple(host for host in current_external if host not in requested_external)
+    if not lost_external:
+        return []
+    return [
+        finding(
+            "warn",
+            "gsad.host-binding.transition",
+            "gsad is currently published on non-loopback host bindings that this runtime-app-up request will not keep; set TURBOVAS_GSAD_HOSTS if LAN/Tailscale browser access should remain available.",
+            details={
+                "current_published_hosts": current,
+                "requested_hosts": requested,
+                "lost_external_hosts": lost_external,
+                "host_env": GSAD_HOST_ENV,
+                "hosts_env": GSAD_HOSTS_ENV,
+            },
+        )
+    ]
+
+
 def gsad_ports_override_file(repo_root: Path) -> Path:
     return repo_root / "build" / "compose" / "gsad-ports.override.yaml"
 
@@ -5329,6 +5390,7 @@ def command_runtime_app_up(repo_root: Path) -> dict[str, Any]:
         cert_findings = [dict(item, status="fail") for item in cert_findings]
     findings.extend(cert_findings)
     findings.extend(stage_gsa_static(repo_root))
+    findings.extend(gsad_binding_transition_findings(repo_root))
     if aggregate_status(findings) == "fail":
         return make_result("runtime-app-up", repo_root, "Application runtime startup stopped at prerequisites.", findings, [str(runtime_dir(repo_root))])
 

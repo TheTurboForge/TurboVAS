@@ -16,7 +16,7 @@ native-tooling-state *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl native-tooling-state "$@"
 
 native-api-request *args:
-    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; elif [ "${1:-}" != "" ] && [ "${1#-}" != "$1" ]; then printf '%s\n' "Use: just native-api-request -- --json --path '/api/v1/...'" >&2; exit 64; fi; tools/turbovasctl native-api-request "$@"
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl native-api-request "$@"
 
 rust-migration-state *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl rust-migration-state "$@"

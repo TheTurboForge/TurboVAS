@@ -1,10 +1,11 @@
 /* SPDX-FileCopyrightText: 2026 Greenbone AG
+ * TurboVAS modifications: 2026 stabilize timezone hook update test timing.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
 import {describe, test, expect} from '@gsa/testing';
-import {rendererWith, wait} from 'web/testing';
+import {act, rendererWith, waitFor} from 'web/testing';
 import {createSession} from 'gmp/testing';
 import useTimezone from 'web/hooks/useUserTimezone';
 
@@ -33,10 +34,12 @@ describe('useUserTimezone tests', () => {
 
     expect(timezone).toBe('initial-timezone');
 
-    setTimezone('updated-timezone');
+    act(() => {
+      setTimezone('updated-timezone');
+    });
 
-    await wait();
-
-    expect(result.current[0]).toBe('updated-timezone');
+    await waitFor(() => {
+      expect(result.current[0]).toBe('updated-timezone');
+    });
   });
 });

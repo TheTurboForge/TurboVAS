@@ -681,13 +681,13 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("def command_quality_gate", source)
         self.assertIn("def command_quality_gate_state", source)
         self.assertIn("def command_quality_gate_schedule", source)
-        self.assertIn("Use: just native-api-request -- --json --path '/api/v1/...'", justfile)
+        self.assertNotIn("Use: just native-api-request -- --json --path '/api/v1/...'", justfile)
 
-    def test_native_api_request_just_recipe_rejects_missing_separator(self):
+    def test_native_api_request_just_recipe_accepts_direct_options(self):
         justfile = (Path(__file__).resolve().parents[2] / "justfile").read_text(encoding="utf-8")
         self.assertIn('native-api-request *args:', justfile)
-        self.assertIn('if [ "${1:-}" = "--" ]; then shift; elif [ "${1:-}" != "" ] && [ "${1#-}" != "$1" ]; then', justfile)
-        self.assertIn("Use: just native-api-request -- --json --path '/api/v1/...'", justfile)
+        self.assertIn('if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl native-api-request "$@"', justfile)
+        self.assertNotIn('elif [ "${1:-}" != "" ] && [ "${1#-}" != "$1" ]; then', justfile)
 
     def test_native_api_smoke_summarizes_large_responses(self):
         payload = {
@@ -1502,6 +1502,36 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertEqual(turbovasctl.TURBOVAS_API_CONTAINER_PORT, "9080")
         self.assertEqual(turbovasctl.DEV_ADMIN_USER, "admin")
         self.assertEqual(turbovasctl.DEV_ADMIN_PASSWORD, "admin")
+
+    def test_gsad_binding_transition_warns_before_dropping_external_hosts(self):
+        original = turbovasctl.current_gsad_published_hosts
+        try:
+            turbovasctl.current_gsad_published_hosts = lambda _root: ("192.168.178.42", "100.80.139.13")
+            with tempfile.TemporaryDirectory() as tmp, unittest.mock.patch.dict(os.environ, {}, clear=True):
+                root = Path(tmp) / "TurboVAS"
+                root.mkdir()
+                findings = turbovasctl.gsad_binding_transition_findings(root)
+        finally:
+            turbovasctl.current_gsad_published_hosts = original
+
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0]["status"], "warn")
+        self.assertEqual(findings[0]["check"], "gsad.host-binding.transition")
+        self.assertEqual(findings[0]["details"]["requested_hosts"], ("127.0.0.1",))
+        self.assertEqual(findings[0]["details"]["lost_external_hosts"], ("192.168.178.42", "100.80.139.13"))
+
+    def test_gsad_binding_transition_allows_explicit_external_hosts(self):
+        original = turbovasctl.current_gsad_published_hosts
+        try:
+            turbovasctl.current_gsad_published_hosts = lambda _root: ("192.168.178.42", "100.80.139.13")
+            with tempfile.TemporaryDirectory() as tmp, unittest.mock.patch.dict(os.environ, {turbovasctl.GSAD_HOSTS_ENV: "192.168.178.42,100.80.139.13"}, clear=True):
+                root = Path(tmp) / "TurboVAS"
+                root.mkdir()
+                findings = turbovasctl.gsad_binding_transition_findings(root)
+        finally:
+            turbovasctl.current_gsad_published_hosts = original
+
+        self.assertEqual(findings, [])
 
     def test_runtime_secret_helper_accepts_default_value(self):
         with tempfile.TemporaryDirectory() as tmp:

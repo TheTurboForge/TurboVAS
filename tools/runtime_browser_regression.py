@@ -53,10 +53,43 @@ function artifactPath(name) {
   return path.join(config.artifactDir, name);
 }
 
+async function screenshotContentEvidence(page) {
+  return await page.evaluate(() => {
+    const isVisible = element => {
+      const style = window.getComputedStyle(element);
+      if (style.visibility === 'hidden' || style.display === 'none' || Number(style.opacity) === 0) return false;
+      const rect = element.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    };
+    const visibleElements = Array.from(document.querySelectorAll('body *')).filter(isVisible);
+    const contentElements = visibleElements.filter(element => element.matches('a, button, input, select, textarea, table, tbody tr, img, svg, canvas, [role="button"], [role="grid"], [role="table"], [role="tab"], [data-testid="entities-table"]'));
+    const bodyText = (document.body?.innerText || '').replace(/\s+/g, ' ').trim();
+    return {
+      title: document.title || '',
+      textLength: bodyText.length,
+      textSample: bodyText.slice(0, 120),
+      visibleElementCount: visibleElements.length,
+      contentElementCount: contentElements.length,
+      bodyChildCount: document.body ? document.body.children.length : 0,
+      url: window.location.href,
+    };
+  }).catch(error => ({ error: String(error) }));
+}
+
 async function screenshot(page, name) {
   const target = artifactPath(`${name}.png`);
-  await page.screenshot({ path: target, fullPage: true }).catch(() => null);
-  artifacts.push(target);
+  try {
+    await page.screenshot({ path: target, fullPage: true });
+    artifacts.push(target);
+  } catch (error) {
+    add('warn', `${name}.screenshot`, 'Screenshot capture failed.', { artifact: target, error: String(error) });
+    return;
+  }
+  const evidence = await screenshotContentEvidence(page);
+  const emptyLooking = !evidence.error && evidence.textLength < 8 && evidence.contentElementCount === 0 && evidence.visibleElementCount < 4;
+  if (emptyLooking) {
+    add('warn', `${name}.screenshot-content`, 'Screenshot page looked empty or weak at capture time.', { artifact: target, evidence });
+  }
 }
 
 async function bodyText(page) {
