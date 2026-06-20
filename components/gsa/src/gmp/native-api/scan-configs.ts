@@ -54,6 +54,20 @@ interface NativeScanConfigPayload {
   modified_at?: string;
 }
 
+interface NativeScanConfigFamilyPayload {
+  name?: string;
+  nvt_count?: number;
+  max_nvt_count?: number;
+  growing?: number;
+}
+
+interface NativeScanConfigFamiliesPayload {
+  scan_config_id: string;
+  family_count?: number;
+  families_growing?: number;
+  families?: NativeScanConfigFamilyPayload[];
+}
+
 interface NativeScanConfigsPayload {
   page?: Partial<NativePage>;
   items?: NativeScanConfigPayload[];
@@ -74,6 +88,10 @@ export interface NativeScanConfigsResponse {
 }
 
 export interface NativeScanConfigResponse {
+  scanConfig: ScanConfig;
+}
+
+export interface NativeScanConfigFamiliesResponse {
   scanConfig: ScanConfig;
 }
 
@@ -216,6 +234,27 @@ const nativeScanConfigToModel = (item: NativeScanConfigPayload): ScanConfig => {
   });
 };
 
+const nativeScanConfigFamiliesToModel = (
+  item: NativeScanConfigFamiliesPayload,
+): ScanConfig => {
+  const families = item.families ?? [];
+  return ScanConfig.fromElement({
+    _id: stringValue(item.scan_config_id),
+    family_count: {
+      __text: String(item.family_count ?? families.length),
+      growing: trendValue(item.families_growing ?? 0),
+    },
+    families: {
+      family: families.map(family => ({
+        name: stringValue(family.name),
+        nvt_count: String(family.nvt_count ?? 0),
+        max_nvt_count: String(family.max_nvt_count ?? 0),
+        growing: trendValue(family.growing ?? 0),
+      })),
+    },
+  });
+};
+
 const normalizePage = (
   payloadPage: Partial<NativePage> | undefined,
   query: NativeScanConfigsQuery,
@@ -263,5 +302,19 @@ export const fetchNativeScanConfig = async (
   );
   return {
     scanConfig: nativeScanConfigToModel(payload),
+  };
+};
+
+export const fetchNativeScanConfigFamilies = async (
+  gmp: NativeApiGmp,
+  id: string,
+): Promise<NativeScanConfigFamiliesResponse> => {
+  const payload = await fetchNativeJson<NativeScanConfigFamiliesPayload>(
+    gmp,
+    `api/v1/scan-configs/${encodeURIComponent(id)}/families`,
+    {token: gmp.session.token},
+  );
+  return {
+    scanConfig: nativeScanConfigFamiliesToModel(payload),
   };
 };

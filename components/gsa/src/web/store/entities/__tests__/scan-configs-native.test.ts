@@ -7,6 +7,7 @@ import {afterEach, describe, expect, test, testing} from '@gsa/testing';
 import ScanConfig from 'gmp/models/scan-config';
 import {
   fetchNativeScanConfig,
+  fetchNativeScanConfigFamilies,
   fetchNativeScanConfigs,
 } from 'gmp/native-api/scan-configs';
 import {loadEntity} from 'web/store/entities/scanconfigs';
@@ -132,6 +133,54 @@ describe('native API scan configs', () => {
     });
   });
 
+  test('fetches scan config NVT families from the native detail endpoint', async () => {
+    const id = 'daba56c8-73ec-11df-a475-002264764cea';
+    const fetchMock = testing.fn().mockResolvedValue({
+      json: testing.fn().mockResolvedValue({
+        scan_config_id: id,
+        family_count: 2,
+        families_growing: 1,
+        families: [
+          {
+            name: 'General',
+            nvt_count: 12,
+            max_nvt_count: 12,
+            growing: 1,
+          },
+          {
+            name: 'Port scanners',
+            nvt_count: 3,
+            max_nvt_count: 8,
+            growing: 0,
+          },
+        ],
+      }),
+      ok: true,
+      status: 200,
+    });
+    testing.stubGlobal('fetch', fetchMock);
+    const gmp = createGmp({jwt: 'jwt-token'});
+
+    const response = await fetchNativeScanConfigFamilies(gmp, id);
+
+    const config = response.scanConfig;
+    expect(config.id).toEqual(id);
+    expect(config.families?.count).toEqual(2);
+    expect(config.families?.trend).toEqual(1);
+    expect(config.family_list?.[0].name).toEqual('General');
+    expect(config.family_list?.[0].nvts?.count).toEqual(12);
+    expect(config.family_list?.[0].nvts?.max).toEqual(12);
+    expect(config.family_list?.[0].trend).toEqual(1);
+    expect(config.family_list?.[1].name).toEqual('Port scanners');
+    expect(config.family_list?.[1].nvts?.count).toEqual(3);
+    expect(config.family_list?.[1].nvts?.max).toEqual(8);
+    expect(config.family_list?.[1].trend).toEqual(0);
+    expect(gmp.buildUrl).toHaveBeenCalledWith(
+      `api/v1/scan-configs/${id}/families`,
+      {token: 'test-token'},
+    );
+  });
+
   test('loads inherited detail context before overlaying native Information fields', async () => {
     const id = 'daba56c8-73ec-11df-a475-002264764cea';
     const calls: string[] = [];
@@ -184,8 +233,28 @@ describe('native API scan configs', () => {
         tag: [{_id: 'tag-1', name: 'Retained tag', value: 'true'}],
       },
     });
-    const fetchMock = testing.fn().mockImplementation(() => {
-      calls.push('native');
+    const fetchMock = testing.fn().mockImplementation((url: string) => {
+      if (url.endsWith('/families')) {
+        calls.push('native-families');
+        return Promise.resolve({
+          json: testing.fn().mockResolvedValue({
+            scan_config_id: id,
+            family_count: 60,
+            families_growing: 1,
+            families: [
+              {
+                name: 'Native family',
+                nvt_count: 7,
+                max_nvt_count: 9,
+                growing: 1,
+              },
+            ],
+          }),
+          ok: true,
+          status: 200,
+        });
+      }
+      calls.push('native-detail');
       return Promise.resolve({
         json: testing.fn().mockResolvedValue({
           id,
@@ -238,7 +307,7 @@ describe('native API scan configs', () => {
       action => action.type === 'ENTITY_LOADING_SUCCESS',
     );
     const config = success?.data;
-    expect(calls).toEqual(['gmp', 'native']);
+    expect(calls).toEqual(['gmp', 'native-detail', 'native-families']);
     expect(gmp.scanconfig.get).toHaveBeenCalledWith({id});
     expect(config).toBeInstanceOf(ScanConfig);
     expect(config?.name).toEqual('Native Full and fast');
@@ -250,7 +319,9 @@ describe('native API scan configs', () => {
     expect(config?.deprecated).toEqual(false);
     expect(config?.isWritable()).toEqual(false);
     expect(config?.isInUse()).toEqual(true);
-    expect(config?.family_list?.[0].name).toEqual('Inherited family');
+    expect(config?.family_list?.[0].name).toEqual('Native family');
+    expect(config?.family_list?.[0].nvts?.count).toEqual(7);
+    expect(config?.family_list?.[0].nvts?.max).toEqual(9);
     expect(config?.preferences.scanner[0].name).toEqual('scanner-pref');
     expect(config?.preferences.nvt[0].nvt?.oid).toEqual(
       '1.3.6.1.4.1.25623.1.0.1',

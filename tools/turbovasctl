@@ -2970,6 +2970,11 @@ def summarize_native_tooling(items: list[dict[str, Any]]) -> dict[str, Any]:
                 "replacement_candidates": ["GSA Scan Config detail Information fields (migrated through gsad same-origin proxy)", "read-only scan-config metadata automation", "native-api-request helper"],
             },
             {
+                "endpoint": "/api/v1/scan-configs/{scan_config_id}/families",
+                "status": "implemented_internal_and_browser_proxied",
+                "replacement_candidates": ["GSA Scan Config detail NVT Families tab (migrated through gsad same-origin proxy)", "read-only scan-config metadata automation", "native-api-request helper"],
+            },
+            {
                 "endpoint": "/api/v1/filters",
                 "status": "implemented_internal_and_browser_proxied",
                 "replacement_candidates": ["GSA top-level Filters list (migrated through gsad same-origin proxy)", "read-only filter metadata automation", "native-api-request helper"],
@@ -6706,6 +6711,20 @@ def command_runtime_native_api_smoke(repo_root: Path) -> dict[str, Any]:
                     scan_config_detail,
                     compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/scan-configs/..."),
                     scan_config_detail_json,
+                )
+            )
+            scan_config_families = native_api_curl(repo_root, f"/api/v1/scan-configs/{urllib.parse.quote(scan_config_detail_id)}/families")
+            scan_config_families_json = parse_json_output(scan_config_families)
+            details["scan_config_families"] = summarize_native_api_response(scan_config_families_json)
+            scan_config_family_items = scan_config_families_json.get("families", []) if isinstance(scan_config_families_json, dict) else []
+            findings.append(
+                native_api_probe_finding(
+                    "pass" if scan_config_families.returncode == 0 and isinstance(scan_config_family_items, list) and scan_config_families_json.get("scan_config_id") == scan_config_detail_id else "fail",
+                    "native-api.scan-config-families",
+                    f"Native API scan-config families probe exit code {scan_config_families.returncode}.",
+                    scan_config_families,
+                    compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/scan-configs/.../families"),
+                    scan_config_families_json,
                 )
             )
         else:

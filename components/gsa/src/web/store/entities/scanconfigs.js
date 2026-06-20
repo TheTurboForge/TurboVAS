@@ -7,6 +7,7 @@
 import {createAll} from 'web/store/entities/utils/main';
 import {
   fetchNativeScanConfig,
+  fetchNativeScanConfigFamilies,
   fetchNativeScanConfigs,
   nativeScanConfigsQueryFromFilter,
 } from 'gmp/native-api/scan-configs';
@@ -23,14 +24,15 @@ const {
 
 const canUseNativeApi = gmp => typeof gmp?.buildUrl === 'function';
 
-const mergeNativeInformation = (inherited, native) =>
+const mergeNativeInformation = (inherited, native, nativeFamilies) =>
   Object.assign(Object.create(Object.getPrototypeOf(inherited)), inherited, {
     name: native.name,
     comment: native.comment,
     creationTime: native.creationTime,
     modificationTime: native.modificationTime,
     owner: native.owner,
-    families: native.families,
+    family_list: nativeFamilies.family_list,
+    families: nativeFamilies.families,
     nvts: native.nvts,
     predefined: native.predefined,
     deprecated: native.deprecated,
@@ -88,13 +90,17 @@ const nativeLoadEntity = gmp => id => (dispatch, getState) => {
   return gmp.scanconfig
     .get({id})
     .then(inheritedResponse =>
-      fetchNativeScanConfig(gmp, id).then(nativeResponse =>
+      Promise.all([
+        fetchNativeScanConfig(gmp, id),
+        fetchNativeScanConfigFamilies(gmp, id),
+      ]).then(([nativeResponse, nativeFamiliesResponse]) =>
         dispatch(
           entityLoadingActions.success(
             id,
             mergeNativeInformation(
               inheritedResponse.data,
               nativeResponse.scanConfig,
+              nativeFamiliesResponse.scanConfig,
             ),
           ),
         ),

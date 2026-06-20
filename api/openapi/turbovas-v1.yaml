@@ -483,7 +483,7 @@ paths:
   /scan-configs/{scan_config_id}:
     get:
       summary: Read one scan config metadata record
-      description: Metadata-only detail for automation and proof probes. Rich GSA detail tabs still use inherited GMP because they require families, preferences, and selector expansion.
+      description: Metadata-only detail for automation and proof probes. Preferences, import/export, scanner control, and write operations remain on inherited compatibility paths while native contracts are designed.
       parameters:
         - $ref: '#/components/parameters/ScanConfigId'
       responses:
@@ -493,6 +493,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ScanConfigAsset'
+  /scan-configs/{scan_config_id}/families:
+    get:
+      summary: Read scan config NVT family selection summary
+      description: Read-only expansion of the NVT Families detail tab. Scanner preferences, NVT preferences, selector edit payloads, import/export, and writes remain on inherited compatibility paths.
+      parameters:
+        - $ref: '#/components/parameters/ScanConfigId'
+      responses:
+        '200':
+          description: Scan-config NVT family selection summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanConfigFamilies'
   /report-configs:
     get:
       summary: List report configs
@@ -2478,6 +2491,37 @@ components:
         modified_at:
           type: string
           format: date-time
+    ScanConfigFamily:
+      type: object
+      required: [name, nvt_count, max_nvt_count, growing]
+      properties:
+        name:
+          type: string
+        nvt_count:
+          type: integer
+          description: Number of NVTs selected by this config in the family.
+        max_nvt_count:
+          type: integer
+          description: Number of known NVTs currently available in the family.
+        growing:
+          type: integer
+          description: Inherited per-family trend flag, where 1 means new NVTs in the family are selected automatically and 0 means static.
+    ScanConfigFamilies:
+      type: object
+      required: [scan_config_id, family_count, families_growing, families]
+      properties:
+        scan_config_id:
+          type: string
+          format: uuid
+        family_count:
+          type: integer
+        families_growing:
+          type: integer
+          description: Inherited config-level family trend flag, where 1 means new families are selected automatically and 0 means static.
+        families:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScanConfigFamily'
     FilterAlertReference:
       type: object
       required: [id, name]
