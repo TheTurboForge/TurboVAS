@@ -188,6 +188,29 @@ function noLivePaginationReason(state) {
   return null;
 }
 
+async function paginationRanges(page) {
+  const text = await bodyText(page).catch(() => '');
+  return [...text.matchAll(/\b(\d+)\s*-\s*(\d+)\s+of\s+(\d+)\b/g)]
+    .map(match => ({ first: Number(match[1]), last: Number(match[2]), total: Number(match[3]), text: match[0] }));
+}
+
+async function assertCoherentPaginationCounts(page, check) {
+  const ranges = await paginationRanges(page);
+  const state = await entityTableState(page);
+  if (!ranges.length) {
+    if (!state.tableCount && !state.rowCount && !state.toggleCount && !state.detailLinkCount) {
+      add('pass', `${check}.pagination-counts`, 'No standard entity-table pagination text was found; count coherence check is not applicable for this table.', { reason: 'no-standard-pagination-text', state });
+      return ranges;
+    }
+    const reason = noLivePaginationReason(state) || 'selector-failure-no-pagination-text';
+    add(reason.startsWith('selector-failure') ? 'warn' : 'pass', `${check}.pagination-counts`, reason.startsWith('selector-failure') ? 'No pagination text was found for a row-bearing table. Selector coverage may need an update.' : 'No live rows or data were available; pagination count check was skipped.', { reason, state });
+    return ranges;
+  }
+  const badRanges = ranges.filter(range => range.total > 0 && (range.first < 1 || range.last < range.first || range.last > range.total));
+  add(badRanges.length ? 'fail' : 'pass', `${check}.pagination-counts`, badRanges.length ? 'Pagination text contains an incoherent non-empty range.' : 'Pagination text contains coherent non-empty ranges.', { ranges, badRanges });
+  return ranges;
+}
+
 async function firstExpandedRowDetailHref(page, matcher) {
   const state = await entityTableState(page);
   const noLiveReason = noLiveDetailReason(state);
@@ -280,6 +303,7 @@ async function clickFirstEnabledPager(page, direction) {
 
 async function exercisePagination(page, check) {
   const beforePath = new URL(page.url()).pathname;
+  await assertCoherentPaginationCounts(page, check);
   let clicks = 0;
   let finalPager = null;
   for (let index = 0; index < 3; index += 1) {
@@ -298,6 +322,7 @@ async function exercisePagination(page, check) {
     }
     await assertNoAppError(page, `${check}.page-${index + 1}.app-error`);
     await assertNotUnexpectedTasks(page, `${check}.page-${index + 1}.not-tasks`);
+    await assertCoherentPaginationCounts(page, `${check}.page-${index + 1}`);
   }
   if (clicks) {
     add('pass', `${check}.pagination`, 'Pagination Next stayed on the intended route.', { clicks, path: beforePath });
@@ -315,6 +340,35 @@ async function exercisePagination(page, check) {
       ? 'No enabled Next pagination control was available because the live data appears to fit on one page; pagination was skipped.'
       : 'No live rows or data were available; pagination was skipped.';
   add(selectorFailure ? 'warn' : 'pass', `${check}.pagination`, message, { clicks, path: beforePath, reason, pager: finalPager, state });
+}
+
+async function checkVulnerabilitiesRoute(page) {
+  await gotoRoute(page, '/vulnerabilities', 'vulnerabilities');
+  await assertNativeSuccess(/\/api\/v1\/vulnerabilities$/, 'vulnerabilities.native-api');
+  await assertCoherentPaginationCounts(page, 'vulnerabilities');
+
+  const beforeUrl = page.url();
+  const state = await entityTableState(page);
+  const noLiveReason = noLiveDetailReason(state);
+  if (noLiveReason) {
+    add('pass', 'vulnerabilities.inline-details', 'No live vulnerability rows were available; inline detail check was skipped.', { reason: noLiveReason, state });
+  } else if (!state.toggleCount) {
+    add('fail', 'vulnerabilities.inline-details', 'Vulnerability rows were present, but no row-detail toggle was available.', { state });
+  } else {
+    const toggle = page.getByTestId('row-details-toggle').first();
+    await toggle.scrollIntoViewIfNeeded({ timeout: config.timeoutMs });
+    await toggle.click({ timeout: config.timeoutMs });
+    await page.waitForLoadState('networkidle', { timeout: config.timeoutMs }).catch(() => null);
+    await page.waitForTimeout(300);
+    await screenshot(page, 'vulnerabilities-inline-details');
+    const afterUrl = page.url();
+    const text = await bodyText(page).catch(() => '');
+    const hasInlineDetails = /\bOID\b/.test(text) && /1\.3\.6\.1\.4\.1\.25623/.test(text);
+    add(afterUrl === beforeUrl ? 'pass' : 'fail', 'vulnerabilities.inline-details-route', afterUrl === beforeUrl ? 'Clicking a vulnerability row title stayed on the list route.' : 'Clicking a vulnerability row title navigated away instead of expanding inline.', { beforeUrl, afterUrl });
+    add(hasInlineDetails ? 'pass' : 'fail', 'vulnerabilities.inline-details-content', hasInlineDetails ? 'Clicking a vulnerability row title exposed inline vulnerability detail content.' : 'Clicking a vulnerability row title did not expose inline vulnerability detail content.', { textSample: text.slice(0, 1000) });
+  }
+
+  await exercisePagination(page, 'vulnerabilities');
 }
 
 async function checkScopeReport(page) {
@@ -407,7 +461,7 @@ async function runForBaseUrl(baseUrl) {
     await login(page);
     await checkTopLevelRoute(page, '/reports', 'raw-reports', /\/api\/v1\/reports$/, /^\/report\/[^/]+/);
     await checkTopLevelRoute(page, '/results', 'results', /\/api\/v1\/results$/, /^\/result\/[^/]+/);
-    await checkTopLevelRoute(page, '/vulnerabilities', 'vulnerabilities', /\/api\/v1\/vulnerabilities$/, null);
+    await checkVulnerabilitiesRoute(page);
     await checkTopLevelRoute(page, '/cves', 'cves', /\/api\/v1\/cves$/, /^\/cve\/[^/]+/);
     await checkTopLevelRoute(page, '/cpes', 'cpes', /\/api\/v1\/cpes$/, /^\/cpe\/[^/]+/);
     await checkTopLevelRoute(page, '/hosts', 'hosts', /\/api\/v1\/hosts$/, /^\/host\/[^/]+/);
