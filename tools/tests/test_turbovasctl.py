@@ -964,6 +964,21 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("complete native browser coverage for current scope-report evidence", plan)
         self.assertNotIn("not live endpoint promises yet", plan)
 
+    def test_operating_system_asset_detail_contract_is_internal_and_parameterized(self):
+        root = Path(__file__).resolve().parents[2]
+        openapi = (root / "api" / "openapi" / "turbovas-v1.yaml").read_text(encoding="utf-8")
+        api_source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
+        native_tooling = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
+
+        self.assertIn('/api/v1/operating-systems/:os_id', api_source)
+        self.assertIn('parse_uuid(&os_id)?;', api_source)
+        self.assertIn('WHERE oss.uuid = $1', api_source)
+        self.assertIn('/operating-systems/{os_id}:', openapi)
+        self.assertIn("#/components/parameters/OperatingSystemId", openapi)
+        self.assertIn('/api/v1/operating-systems/{os_id}', native_tooling)
+        self.assertIn('"status": "implemented_internal"', native_tooling)
+        self.assertIn('native-api.operating-system-detail', native_tooling)
+
     def test_redis_reference_summary_separates_scanner_and_generic_paths(self):
         references = [
             {"path": "compose/dev.yaml", "category": "scanner_kb", "markers": ["redis-openvas"]},

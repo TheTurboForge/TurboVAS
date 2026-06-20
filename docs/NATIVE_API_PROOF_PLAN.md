@@ -74,6 +74,9 @@ raw-report and scope-report Metrics, plus scope list/detail, target/task list
 reads, top-level asset/security-info lists including Hosts, TLS Certificates,
 Operating Systems, Scanners, Scan Configs, Filters, Tags, Overrides, and Report Configs, and every scope-report evidence tab through the authenticated same-origin
 `gsad` proxy defined in `docs/NATIVE_API_AUTH_BOUNDARY.md`.
+Internal Operating System detail metadata is available for automation and smoke
+coverage only; the GSA detail route remains inherited until a separate browser
+migration slice.
 `runtime-report-summary --json` and `runtime-report-export --json` use the
 native raw report detail/result-row endpoints; the remaining heavy raw report
 detail tabs stay inherited follow-ups.
@@ -117,6 +120,8 @@ where it exists:
 - `GET /api/v1/cves/{cve_id}`
 - `GET /api/v1/cpes`
 - `GET /api/v1/cpes/{cpe_id}`
+- `GET /api/v1/operating-systems`
+- `GET /api/v1/operating-systems/{os_id}` metadata only
 - `GET /api/v1/targets`
 - `GET /api/v1/targets/{target_id}`
 - `GET /api/v1/tasks`

@@ -92,7 +92,7 @@ Internal read-only automation can use `tools/turbovasctl native-api-request
 --json --path '/api/v1/...'` or `just native-api-request --json --path
 '/api/v1/...'` to call the Docker-internal native API. This replaces covered
 read-only GMP scripts for report, scope, target, task, scan-config metadata,
-override metadata, tag metadata, and selected asset listing workflows; it is not the final
+override metadata, tag metadata, and selected asset listing/detail workflows; it is not the final
 externally exposed scriptable API boundary.
 
 The first runtime implementation proof is scoped in
@@ -100,7 +100,8 @@ The first runtime implementation proof is scoped in
 for raw report list/detail/result rows/hosts/ports/applications/operating
 systems/CVEs/TLS certificates/errors, scope list/detail, target list/detail,
 task list/detail, scanner metadata list, saved filter list/detail, override
-list/detail metadata, tag list/detail metadata, scan-config metadata list/detail, port-list list/detail, schedule list/detail, report-config
+list/detail metadata, tag list/detail metadata, operating-system asset
+list/detail metadata, scan-config metadata list/detail, port-list list/detail, schedule list/detail, report-config
 list/detail, report-format list/detail, Security Information CVE catalog list/detail,
 Security Information CPE catalog list/detail, Security Information CERT-Bund and
 DFN-CERT advisory catalog list/detail metadata, scope-report list,
@@ -136,6 +137,13 @@ Native scanner metadata rows include scanner identity, host/socket, port,
 inherited scanner type, safe credential references, relay metadata, and
 timestamps. They do not expose credential secret values or scanner CA material,
 and all scanner control actions remain on the inherited path.
+
+Native operating-system asset rows include the `oss.uuid` identity, CPE/name,
+title, latest/highest/average host severity, current best-OS host count, all
+associated host count, and timestamps from gvmd/PostgreSQL asset tables. The
+detail endpoint returns the same bounded metadata for one OS asset by UUID;
+delete, export, and other asset writes remain inherited until native write
+semantics are designed.
 
 Native saved filter rows include filter identity, type, term, timestamps, and
 alert backlink references. Filter terms can reveal operator search logic,

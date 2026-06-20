@@ -200,6 +200,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OperatingSystemAssetCollection'
+  /operating-systems/{os_id}:
+    get:
+      summary: Read one top-level operating-system asset
+      description: Read-only asset metadata backed by gvmd/PostgreSQL `oss` records, associated host operating-system evidence, host details, and host severity state. This endpoint does not expose export, delete, scanner-control, feed-control, or write behavior.
+      parameters:
+        - $ref: '#/components/parameters/OperatingSystemId'
+      responses:
+        '200':
+          description: Operating-system asset detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperatingSystemAsset'
   /hosts:
     get:
       summary: List top-level host assets
@@ -981,6 +994,13 @@ components:
         type: string
         pattern: '^([0-9]+\.)+[0-9]+$'
         maxLength: 128
+    OperatingSystemId:
+      name: os_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     ScopeId:
       name: scope_id
       in: path

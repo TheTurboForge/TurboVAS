@@ -1088,6 +1088,10 @@ async fn main() -> Result<(), ApiError> {
         .route("/api/v1/nvts", get(nvt_catalog))
         .route("/api/v1/nvts/:nvt_id", get(nvt_catalog_detail))
         .route("/api/v1/operating-systems", get(operating_system_assets))
+        .route(
+            "/api/v1/operating-systems/:os_id",
+            get(operating_system_asset_detail),
+        )
         .route("/api/v1/hosts", get(host_assets))
         .route("/api/v1/tls-certificates", get(tls_certificate_assets))
         .route("/api/v1/scanners", get(scanner_assets))
@@ -3785,6 +3789,77 @@ async fn operating_system_assets(
         page: params.page_info(total),
         items,
     }))
+}
+
+async fn operating_system_asset_detail(
+    State(state): State<AppState>,
+    Path(os_id): Path<String>,
+) -> Result<Json<OperatingSystemAssetItem>, ApiError> {
+    parse_uuid(&os_id)?;
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let row = client
+        .query_opt(
+            r#"WITH latest_best_os AS (
+             SELECT DISTINCT ON (hd.host)
+                    hd.host, hd.value AS cpe
+               FROM host_details hd
+              WHERE hd.name = 'best_os_cpe'
+              ORDER BY hd.host, hd.id DESC
+         ),
+         latest_host_severity AS (
+             SELECT DISTINCT ON (hms.host)
+                    hms.host,
+                    round(CAST(hms.severity AS numeric), 1)::double precision AS severity
+               FROM host_max_severities hms
+              ORDER BY hms.host, hms.creation_time DESC
+         )
+         SELECT oss.uuid AS id,
+                oss.name AS name,
+                coalesce(cpe_title(oss.name), '') AS title,
+                (
+                  SELECT lhs.severity
+                    FROM host_oss ho_latest
+                    LEFT JOIN latest_host_severity lhs ON lhs.host = ho_latest.host
+                   WHERE ho_latest.os = oss.id
+                   ORDER BY ho_latest.creation_time DESC
+                   LIMIT 1
+                ) AS latest_severity,
+                (
+                  SELECT max(lhs.severity)
+                    FROM host_oss ho_highest
+                    LEFT JOIN latest_host_severity lhs ON lhs.host = ho_highest.host
+                   WHERE ho_highest.os = oss.id
+                ) AS highest_severity,
+                (
+                  SELECT round(CAST(avg(lhs.severity) AS numeric), 2)::double precision
+                    FROM host_oss ho_average
+                    LEFT JOIN latest_host_severity lhs ON lhs.host = ho_average.host
+                   WHERE ho_average.os = oss.id
+                ) AS average_severity,
+                (
+                  SELECT count(DISTINCT lbo.host)::bigint
+                    FROM latest_best_os lbo
+                   WHERE lbo.cpe = oss.name
+                ) AS hosts,
+                (
+                  SELECT count(DISTINCT ho_all.host)::bigint
+                    FROM host_oss ho_all
+                   WHERE ho_all.os = oss.id
+                ) AS all_hosts,
+                coalesce(oss.creation_time, 0)::bigint AS created_at_unix,
+                coalesce(oss.modification_time, 0)::bigint AS modified_at_unix
+           FROM oss
+          WHERE oss.uuid = $1
+          LIMIT 1;"#,
+            &[&os_id],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "operating system asset detail query failed");
+            ApiError::Database
+        })?
+        .ok_or(ApiError::NotFound)?;
+    Ok(Json(operating_system_asset_from_row(&row)))
 }
 
 async fn report_ports(
