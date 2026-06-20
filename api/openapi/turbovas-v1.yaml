@@ -26,6 +26,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ResultCollection'
+  /results/{result_id}:
+    get:
+      summary: Read one scan result metadata row
+      description: Basic read-only raw result metadata backed by gvmd/PostgreSQL. Rich inherited detail content such as overrides, tags, EPSS/CVE context, exports, actions, and create-override workflows remains on the inherited result detail path until native parity is explicitly proven.
+      parameters:
+        - $ref: '#/components/parameters/ResultId'
+      responses:
+        '200':
+          description: Result metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Result'
   /vulnerabilities:
     get:
       summary: List top-level vulnerabilities from scan results
@@ -1047,6 +1060,13 @@ components:
         type: string
     ReportId:
       name: report_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ResultId:
+      name: result_id
       in: path
       required: true
       schema:

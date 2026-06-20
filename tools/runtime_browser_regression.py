@@ -251,7 +251,7 @@ async function assertNativeSuccess(pathPattern, check) {
   add(match ? 'pass' : 'fail', check, match ? 'Expected native API response was observed.' : 'Expected native API response was not observed.', { pattern: String(pathPattern), responses: network.filter(item => pathPattern.test(item.path)).slice(-10) });
 }
 
-async function checkTopLevelRoute(page, route, check, nativePattern, detailPattern = null) {
+async function checkTopLevelRoute(page, route, check, nativePattern, detailPattern = null, detailNativePattern = null) {
   await gotoRoute(page, route, check);
   if (nativePattern) await assertNativeSuccess(nativePattern, `${check}.native-api`);
   if (!detailPattern) return;
@@ -273,6 +273,7 @@ async function checkTopLevelRoute(page, route, check, nativePattern, detailPatte
   const pathname = new URL(page.url()).pathname;
   const expected = detailPattern.test(pathname);
   add(expected ? 'pass' : 'fail', `${check}.detail-route`, expected ? 'Detail link landed on the intended route class.' : 'Detail link landed on an unexpected route.', { href: detailHref, pathname, linkSource });
+  if (detailNativePattern) await assertNativeSuccess(detailNativePattern, `${check}.detail-native-api`);
   await assertNoAppError(page, `${check}.detail-app-error`);
   await assertNotUnexpectedTasks(page, `${check}.detail-not-tasks`);
 }
@@ -398,6 +399,7 @@ async function checkScopeReport(page) {
       await screenshot(page, 'scope-report-result-evidence');
       const pathname = new URL(page.url()).pathname;
       add(/^\/result\/[^/]+$/.test(pathname) ? 'pass' : 'fail', 'scope-report.result-evidence-route', /^\/result\/[^/]+$/.test(pathname) ? 'Result evidence link opened the raw result detail route.' : 'Result evidence link opened the wrong route.', { resultHref, pathname });
+      await assertNativeSuccess(/\/api\/v1\/results\/[0-9a-fA-F-]{36}$/, 'scope-report.result-evidence-native-api');
       await assertNoAppError(page, 'scope-report.result-evidence-app-error');
       await assertNotUnexpectedTasks(page, 'scope-report.result-evidence-not-tasks');
       await page.goto(new URL(detailPath, config.baseUrl).toString(), { waitUntil: 'networkidle', timeout: config.timeoutMs });
@@ -460,7 +462,7 @@ async function runForBaseUrl(baseUrl) {
   try {
     await login(page);
     await checkTopLevelRoute(page, '/reports', 'raw-reports', /\/api\/v1\/reports$/, /^\/report\/[^/]+/);
-    await checkTopLevelRoute(page, '/results', 'results', /\/api\/v1\/results$/, /^\/result\/[^/]+/);
+    await checkTopLevelRoute(page, '/results', 'results', /\/api\/v1\/results$/, /^\/result\/[^/]+/, /\/api\/v1\/results\/[0-9a-fA-F-]{36}$/);
     await checkVulnerabilitiesRoute(page);
     await checkTopLevelRoute(page, '/cves', 'cves', /\/api\/v1\/cves$/, /^\/cve\/[^/]+/);
     await checkTopLevelRoute(page, '/cpes', 'cpes', /\/api\/v1\/cpes$/, /^\/cpe\/[^/]+/);

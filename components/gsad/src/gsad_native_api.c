@@ -298,6 +298,13 @@ native_api_path_is_allowed (const gchar *path)
   if (g_strcmp0 (path, results_path) == 0)
     return TRUE;
 
+  if (g_str_has_prefix (path, results_path)
+      && path[strlen (results_path)] == '/')
+    {
+      const gchar *id = path + strlen (results_path) + 1;
+      return is_uuid_segment (id, strlen (id));
+    }
+
   if (g_strcmp0 (path, vulnerabilities_path) == 0)
     return TRUE;
 

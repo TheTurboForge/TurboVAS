@@ -99,7 +99,7 @@ is not the final externally exposed scriptable API boundary.
 
 The first runtime implementation proof is scoped in
 `docs/NATIVE_API_PROOF_PLAN.md`. It starts with an internal-only Rust sidecar
-for raw report list/detail/result rows/hosts/ports/applications/operating
+for raw report list/detail/result rows/result metadata/hosts/ports/applications/operating
 systems/CVEs/TLS certificates/errors, scope list/detail, target list/detail,
 task list/detail, scanner metadata list/detail Information, saved filter list/detail, override
 list/detail metadata, tag list/detail metadata, operating-system asset
@@ -271,6 +271,11 @@ port, NVT OID/name/family, severity, QoD, creation time, source report ID,
 raw evidence link, and a bounded description excerpt. These fields are enough
 for summary views and report-export artifacts without asking GSA or runtime
 helpers to stitch raw XML report payloads together client-side.
+`GET /api/v1/results/{result_id}` returns the same basic metadata for one raw
+result row so the GSA result detail page can overlay native read-only metadata
+after loading the inherited GMP detail context. The native detail intentionally
+does not replace inherited overrides, tags, EPSS/CVE context, export, actions,
+create-override, or rich NVT/result detail surfaces.
 `runtime-report-export --json` and the raw report Results tab now read native
 raw-report detail/result-row endpoints, then write or render their familiar
 JSON/table views. The

@@ -253,6 +253,10 @@ export interface NativeResultsResponse {
   page: NativeReportPage;
 }
 
+export interface NativeResultResponse {
+  result: Result;
+}
+
 export interface NativeReportHostItem {
   host: string;
   hostname?: string;
@@ -1044,6 +1048,18 @@ export const fetchNativeResults = async (
     counts: nativeCounts(page, results.length),
     page,
   };
+};
+
+export const fetchNativeResult = async (
+  gmp: NativeApiGmp,
+  id: string,
+): Promise<NativeResultResponse> => {
+  const payload = await fetchNativeJson<NativeReportResultPayload>(
+    gmp,
+    `api/v1/results/${encodeURIComponent(id)}`,
+    {token: gmp.session.token},
+  );
+  return {result: nativeResultToModel(payload)};
 };
 
 export const fetchNativeReportResults = async (

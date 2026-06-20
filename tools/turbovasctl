@@ -2887,6 +2887,11 @@ def summarize_native_tooling(items: list[dict[str, Any]], repo_root: Path | None
                 "replacement_candidates": ["GSA top-level Results list (migrated through gsad same-origin proxy)", "read-only result automation", "native-api-request helper"],
             },
             {
+                "endpoint": "/api/v1/results/{result_id}",
+                "status": "implemented_internal_and_browser_proxied",
+                "replacement_candidates": ["GSA Result detail metadata overlay (migrated through gsad same-origin proxy)", "read-only result automation", "native-api-request helper"],
+            },
+            {
                 "endpoint": "/api/v1/vulnerabilities",
                 "status": "implemented_internal_and_browser_proxied",
                 "replacement_candidates": ["GSA top-level Vulnerabilities list (migrated through gsad same-origin proxy)", "read-only vulnerability automation", "native-api-request helper"],
@@ -6923,6 +6928,25 @@ def command_runtime_native_api_smoke(repo_root: Path) -> dict[str, Any]:
                     raw_report_results_json,
                 )
             )
+            if raw_report_result_items:
+                first_raw_report_result = raw_report_result_items[0]
+                raw_result_detail_id = first_raw_report_result.get("id") if isinstance(first_raw_report_result, dict) else None
+                if raw_result_detail_id:
+                    raw_result_detail = native_api_curl(repo_root, f"/api/v1/results/{urllib.parse.quote(raw_result_detail_id)}")
+                    raw_result_detail_json = parse_json_output(raw_result_detail)
+                    details["raw_result_detail"] = summarize_native_api_response(raw_result_detail_json)
+                    findings.append(
+                        native_api_probe_finding(
+                            "pass" if raw_result_detail.returncode == 0 and isinstance(raw_result_detail_json, dict) and raw_result_detail_json.get("id") == raw_result_detail_id else "fail",
+                            "native-api.raw-result-detail",
+                            f"Native API raw-result detail probe exit code {raw_result_detail.returncode}.",
+                            raw_result_detail,
+                            compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/results/..."),
+                            raw_result_detail_json,
+                        )
+                    )
+            else:
+                findings.append(finding("warn", "native-api.raw-result-detail", "Raw report Results probe returned no rows, so the result detail probe was skipped."))
             raw_report_hosts = native_api_curl(repo_root, f"/api/v1/reports/{urllib.parse.quote(raw_report_detail_id)}/hosts?page_size=5&sort=host")
             raw_report_hosts_json = parse_json_output(raw_report_hosts)
             details["raw_report_hosts"] = summarize_native_api_response(raw_report_hosts_json)

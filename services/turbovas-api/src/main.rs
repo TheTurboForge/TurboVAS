@@ -1198,6 +1198,7 @@ async fn main() -> Result<(), ApiError> {
     let app = Router::new()
         .route("/healthz", get(healthz))
         .route("/api/v1/results", get(results))
+        .route("/api/v1/results/:result_id", get(result_detail))
         .route("/api/v1/vulnerabilities", get(vulnerabilities))
         .route("/api/v1/cpes", get(cpe_catalog))
         .route("/api/v1/cpes/*cpe_id", get(cpe_catalog_detail))
@@ -5238,6 +5239,52 @@ async fn results(
         page: params.page_info(total),
         items,
     }))
+}
+
+async fn result_detail(
+    State(state): State<AppState>,
+    Path(result_id): Path<String>,
+) -> Result<Json<ResultItem>, ApiError> {
+    parse_uuid(&result_id)?;
+    let sql = r#"SELECT r.uuid AS id,
+                         lower(coalesce(nullif(r.host, ''), r.hostname, '')) AS host,
+                         h.uuid AS host_asset_id,
+                         nullif(r.hostname, '') AS hostname,
+                         coalesce(r.port, '') AS port,
+                         coalesce(r.nvt, '') AS nvt_oid,
+                         coalesce(n.name, r.nvt, '') AS name,
+                         nullif(n.family, '') AS nvt_family,
+                         nullif(left(coalesce(r.description, ''), 240), '') AS description_excerpt,
+                         nullif(n.solution_type, '') AS solution_type,
+                         nullif(n.solution, '') AS solution,
+                         coalesce(r.severity, 0)::double precision AS severity,
+                         coalesce(r.qod, 0)::bigint AS qod,
+                         nullif(r.nvt_version, '') AS scan_nvt_version,
+                         coalesce(r.date, 0)::bigint AS created_at_unix,
+                         rep.uuid AS source_report_id,
+                         coalesce(nullif(t.name, ''), rep.uuid) AS source_report_name,
+                         t.uuid AS task_id,
+                         t.name AS task_name
+                    FROM results r
+                    JOIN reports rep ON rep.id = r.report
+                    LEFT JOIN tasks t ON t.id = coalesce(r.task, rep.task)
+                    LEFT JOIN hosts h ON lower(h.name) = lower(coalesce(nullif(r.host, ''), r.hostname, ''))
+                    LEFT JOIN nvts n ON n.oid = r.nvt
+                   WHERE lower(r.uuid) = lower($1)
+                     AND coalesce(r.severity, 0) != -3.0
+                     AND coalesce(nullif(r.host, ''), r.hostname, '') <> ''
+                     AND (t.id IS NULL OR coalesce(t.usage_type, 'scan') = 'scan')
+                   LIMIT 1;"#;
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let row = client
+        .query_opt(sql, &[&result_id])
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "result detail query failed");
+            ApiError::Database
+        })?
+        .ok_or(ApiError::NotFound)?;
+    Ok(Json(result_from_row(&row)))
 }
 
 async fn report_results(
