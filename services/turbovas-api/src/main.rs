@@ -1532,6 +1532,7 @@ async fn tls_certificate_asset_detail(
     Path(certificate_id): Path<String>,
 ) -> Result<Json<TlsCertificateAssetDetail>, ApiError> {
     parse_uuid(&certificate_id)?;
+    let certificate_id = certificate_id.to_ascii_lowercase();
     let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
     let row = client
         .query_opt(
@@ -3908,6 +3909,7 @@ async fn operating_system_asset_detail(
     Path(os_id): Path<String>,
 ) -> Result<Json<OperatingSystemAssetItem>, ApiError> {
     parse_uuid(&os_id)?;
+    let os_id = os_id.to_ascii_lowercase();
     let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
     let row = client
         .query_opt(
