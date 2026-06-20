@@ -145,9 +145,16 @@ async function assertNoAppError(page, check) {
   return !bad;
 }
 
-async function gotoRoute(page, route, label) {
+async function gotoRoute(page, route, label, options = {}) {
   const url = new URL(route, config.baseUrl).toString();
-  await page.goto(url, { waitUntil: 'networkidle', timeout: config.timeoutMs });
+  await page.goto(url, { waitUntil: options.waitUntil || 'networkidle', timeout: config.timeoutMs });
+  if (options.readyText) {
+    await page.waitForFunction(
+      pattern => new RegExp(pattern, 'i').test(document.body?.innerText || ''),
+      options.readyText,
+      { timeout: config.timeoutMs },
+    ).catch(() => null);
+  }
   await screenshot(page, label);
   await assertNoAppError(page, `${label}.app-error`);
   return await bodyText(page);
@@ -317,6 +324,7 @@ function focusedRouteCatalog() {
     { label: 'report-configs', path: '/reportconfigs', nativePath: '/api/v1/report-configs', nativeCheck: 'report-config.list-native-api', nativePass: 'Top-level Report Configs loaded through same-origin native API.', nativeFail: 'Top-level Report Configs did not produce a successful same-origin native API response.', aliases: ['reportconfigs'] },
     { label: 'targets', path: '/targets', nativePath: '/api/v1/targets', nativeCheck: 'target.list-native-api', nativePass: 'Target list loaded through same-origin native API.', nativeFail: 'Target list did not produce a successful same-origin native API response.' },
     { label: 'tasks', path: '/tasks', nativePath: '/api/v1/tasks', nativeCheck: 'task.list-native-api', nativePass: 'Task list loaded through same-origin native API.', nativeFail: 'Task list did not produce a successful same-origin native API response.', forbidden: [/Resume/i, /Task Wizard/i, /Advanced Task Wizard/i, /Import Task/i, /Delta Report/i] },
+    { label: 'trashcan', path: '/trashcan', nativePath: '/api/v1/trashcan/summary', nativeCheck: 'trashcan.summary-native-api', nativePass: 'Trashcan counts summary loaded through same-origin native API.', nativeFail: 'Trashcan route did not produce a successful same-origin native API summary response.', aliases: ['trash'], waitUntil: 'domcontentloaded', readyText: 'Trashcan|Contents' },
     { label: 'scopes', path: '/scopes', nativePath: '/api/v1/scopes', nativeCheck: 'scope.list-native-api', nativePass: 'Scope list loaded through same-origin native API.', nativeFail: 'Scope list did not produce a successful same-origin native API response.' },
     { label: 'scope-reports', path: '/scopes/reports', nativePath: '/api/v1/scope-reports', nativeCheck: 'scope-report.list-native-api', nativePass: 'Scope-report list loaded through same-origin native API.', nativeFail: 'Scope-report list did not produce a successful same-origin native API response.', aliases: ['scopes/reports'] },
     { label: 'cert-bund-advisories', path: '/cert-bund-advisories', nativePath: '/api/v1/cert-bund-advisories', nativeCheck: 'cert-bund-advisory.list-native-api', nativePass: 'CERT-Bund Advisory list loaded through same-origin native API.', nativeFail: 'CERT-Bund Advisory list did not produce a successful same-origin native API response.', aliases: ['certbunds', 'cert-bund'] },
@@ -373,7 +381,7 @@ function focusedRouteSpecs() {
 
 async function validateFocusedRoute(page, nativeApiResponses, spec) {
   const startIndex = nativeApiResponses.length;
-  await gotoRoute(page, spec.path, spec.label);
+  await gotoRoute(page, spec.path, spec.label, { waitUntil: spec.waitUntil, readyText: spec.readyText });
   if (spec.forbidden) {
     await assertNoForbiddenText(page, spec.label, spec.forbidden);
   }

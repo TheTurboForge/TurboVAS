@@ -130,4 +130,69 @@ describe('TrashCanPage tests', () => {
     fireEvent.click(cancelButton);
     expect(cancelButton).not.toBeVisible();
   });
+
+  test('Should render native trashcan summary counts when available', async () => {
+    const previousFetch = globalThis.fetch;
+    const fetchMock = testing.fn().mockResolvedValue({
+      ok: true,
+      json: testing.fn().mockResolvedValue({
+        items: [
+          {resource_type: 'credentials', title: 'Credentials', count: 4},
+          {resource_type: 'targets', title: 'Targets', count: 1},
+        ],
+        total: 5,
+      }),
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const nativeGmp = {
+      ...gmp,
+      buildUrl: testing.fn((path: string) => path),
+      session: {token: 'token-1'},
+      trashcan: {
+        ...gmp.trashcan,
+        get: testing.fn().mockResolvedValue({
+          data: {
+            alerts: [],
+            scanConfigs: [],
+            credentials: [],
+            filters: [],
+            overrides: [],
+            portLists: [],
+            reportConfigs: [],
+            reportFormats: [],
+            scanners: [],
+            schedules: [],
+            tags: [],
+            targets: [],
+            tasks: [],
+          },
+        }),
+      },
+    };
+    const {render} = rendererWith({
+      gmp: nativeGmp,
+      capabilities,
+      store: true,
+    });
+
+    try {
+      render(<TrashcanPage />);
+      await wait();
+
+      expect(nativeGmp.buildUrl).toHaveBeenCalledWith(
+        'api/v1/trashcan/summary',
+        {token: 'token-1'},
+      );
+      expect(fetchMock).toHaveBeenCalledWith('api/v1/trashcan/summary', {
+        credentials: 'include',
+        headers: {Accept: 'application/json'},
+      });
+      expect(screen.getByRole('link', {name: /Credentials/i})).toBeVisible();
+      expect(screen.getByText('4')).toBeVisible();
+      expect(screen.getByRole('link', {name: /Targets/i})).toBeVisible();
+      expect(screen.getByText('1')).toBeVisible();
+    } finally {
+      globalThis.fetch = previousFetch;
+    }
+  });
 });

@@ -2850,7 +2850,29 @@ def native_tooling_inventory(repo_root: Path) -> list[dict[str, Any]]:
     return sorted(items, key=lambda item: (NATIVE_TOOLING_CATEGORIES.index(item["category"]), item["path"]))
 
 
-def summarize_native_tooling(items: list[dict[str, Any]]) -> dict[str, Any]:
+def source_file_contains(repo_root: Path | None, relative_path: str, needle: str) -> bool:
+    if repo_root is None:
+        return False
+    try:
+        return needle in (repo_root / relative_path).read_text(encoding="utf-8")
+    except OSError:
+        return False
+
+
+def trashcan_summary_endpoint_status(repo_root: Path | None) -> str:
+    if repo_root is None:
+        return "planned_internal_and_browser_proxied"
+    endpoint = "/api/v1/trashcan/summary"
+    api_declared = source_file_contains(repo_root, "services/turbovas-api/src/main.rs", f'.route("{endpoint}"')
+    proxy_declared = source_file_contains(repo_root, "components/gsad/src/gsad_native_api.c", endpoint)
+    if api_declared and proxy_declared:
+        return "implemented_internal_and_browser_proxied"
+    if api_declared or proxy_declared:
+        return "partial_internal_browser_proxy_mismatch"
+    return "planned_internal_and_browser_proxied"
+
+
+def summarize_native_tooling(items: list[dict[str, Any]], repo_root: Path | None = None) -> dict[str, Any]:
     by_category: dict[str, dict[str, Any]] = {}
     for category in NATIVE_TOOLING_CATEGORIES:
         category_items = [item for item in items if item["category"] == category]
@@ -3050,6 +3072,19 @@ def summarize_native_tooling(items: list[dict[str, Any]]) -> dict[str, Any]:
                 "replacement_candidates": ["GSA Report Format detail (migrated through gsad same-origin proxy)", "read-only report-format automation"],
             },
             {
+                "endpoint": "/api/v1/trashcan/summary",
+                "status": trashcan_summary_endpoint_status(repo_root),
+                "replacement_candidates": [
+                    "GSA Trashcan counts summary (counts-only same-origin native read)",
+                    "read-only Trashcan count automation",
+                    "row-level Trashcan data remains inherited/deferred",
+                ],
+                "notes": [
+                    "Counts only; no row-level trash resource fields.",
+                    "Credential, target, and scanner trash tables are secret-adjacent and stay on inherited paths until separately designed.",
+                ],
+            },
+            {
                 "endpoint": "/api/v1/reports",
                 "status": "implemented_internal_and_browser_proxied",
                 "replacement_candidates": ["GSA raw report list (migrated through gsad same-origin proxy)", "runtime-report-summary helper", "native-api-request helper"],
@@ -3192,13 +3227,14 @@ def summarize_native_tooling(items: list[dict[str, Any]]) -> dict[str, Any]:
         ],
         "next_replacement_candidates": [
             {"workflow": "remaining gvm-tools write/control scripts", "current_dependency": "gvm-tools GMP scripts", "native_target": "native write/control API after separate safety design"},
+            {"workflow": "row-level Trashcan resource reads and mutations", "current_dependency": "GSA/GMP get_trash_* plus restore/delete/empty_trashcan", "native_target": "deferred; counts-only summary first because row-level trash data is secret-adjacent"},
         ],
     }
 
 
 def command_native_tooling_state(repo_root: Path) -> dict[str, Any]:
     items = native_tooling_inventory(repo_root)
-    summary = summarize_native_tooling(items)
+    summary = summarize_native_tooling(items, repo_root)
     unknown_count = summary["by_category"]["unknown"]["count"]
     findings = [
         finding("pass", "native-tooling.inventory", f"Classified {len(items)} inherited tooling dependency surface(s).", details=summary),
@@ -6024,6 +6060,54 @@ def command_runtime_native_api_smoke(repo_root: Path) -> dict[str, Any]:
             health_json,
         )
     )
+
+    if source_file_contains(repo_root, "services/turbovas-api/src/main.rs", '.route("/api/v1/trashcan/summary"'):
+        trashcan_summary = native_api_curl(repo_root, "/api/v1/trashcan/summary")
+        trashcan_summary_json = parse_json_output(trashcan_summary)
+        details["trashcan_summary"] = summarize_native_api_response(trashcan_summary_json)
+        summary_items = trashcan_summary_json.get("items") if isinstance(trashcan_summary_json, dict) else None
+        summary_total = trashcan_summary_json.get("total") if isinstance(trashcan_summary_json, dict) else None
+        forbidden_payload_keys = [
+            key
+            for key in ("rows", "resources", "credentials", "targets", "scanners")
+            if isinstance(trashcan_summary_json, dict) and key in trashcan_summary_json
+        ]
+        summary_items_are_counts = isinstance(summary_items, list) and all(
+            isinstance(item, dict)
+            and set(item.keys()) <= {"resource_type", "title", "count"}
+            and isinstance(item.get("resource_type"), str)
+            and isinstance(item.get("title"), str)
+            and isinstance(item.get("count"), int)
+            for item in summary_items
+        )
+        trashcan_summary_ok = (
+            trashcan_summary.returncode == 0
+            and isinstance(trashcan_summary_json, dict)
+            and summary_items_are_counts
+            and isinstance(summary_total, int)
+            and not forbidden_payload_keys
+        )
+        findings.append(
+            native_api_probe_finding(
+                "pass" if trashcan_summary_ok else "fail",
+                "native-api.trashcan-summary",
+                "Native API Trashcan counts-only summary probe returned summary JSON."
+                if trashcan_summary_ok
+                else "Native API Trashcan summary probe failed or returned non-summary payload data.",
+                trashcan_summary,
+                compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", "http://127.0.0.1:9080/api/v1/trashcan/summary"),
+                trashcan_summary_json,
+            )
+        )
+    else:
+        findings.append(
+            finding(
+                "pass",
+                "native-api.trashcan-summary.deferred",
+                "Trashcan counts-only summary route is not declared yet; runtime probe is deferred until the implementation lands.",
+                details={"path": "/api/v1/trashcan/summary", "row_level_trash_data": "inherited/deferred"},
+            )
+        )
 
     reports = native_api_curl(repo_root, "/api/v1/scope-reports?page_size=1&sort=-creation_time")
     reports_json = parse_json_output(reports)

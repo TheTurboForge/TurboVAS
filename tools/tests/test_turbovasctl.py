@@ -639,6 +639,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("tag.list-native-api", browser_smoke)
         self.assertIn("override.list-native-api", browser_smoke)
         self.assertIn("cert-bund-advisory.list-native-api", browser_smoke)
+        self.assertIn("trashcan.summary-native-api", browser_smoke)
         self.assertIn("Raw-report list loaded through same-origin native API", browser_smoke)
         self.assertIn("browser_smoke.add_argument(\"--route\"", source)
         self.assertIn('args.extend(["--route", route])', source)
@@ -723,10 +724,12 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("native-api.scan-configs", source)
         self.assertIn("native-api.tags", source)
         self.assertIn("native-api.overrides", source)
+        self.assertIn("native-api.trashcan-summary", source)
         self.assertIn("/api/v1/report-configs", source)
         self.assertIn("/api/v1/report-configs/{report_config_id}", source)
         self.assertIn("/api/v1/scan-configs", source)
         self.assertIn("/api/v1/scan-configs/{scan_config_id}", source)
+        self.assertIn("/api/v1/trashcan/summary", source)
         self.assertIn("/api/v1/tags", source)
         self.assertIn("/api/v1/tags/{tag_id}", source)
         self.assertIn("/api/v1/tags/{tag_id}/resources", source)
@@ -869,6 +872,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("/api/v1/overrides/{override_id}", endpoints)
         self.assertIn("/api/v1/schedules", endpoints)
         self.assertIn("/api/v1/schedules/{schedule_id}", endpoints)
+        self.assertIn("/api/v1/trashcan/summary", endpoints)
         self.assertIn("/api/v1/scopes", endpoints)
         self.assertIn("/api/v1/scopes/{scope_id}", endpoints)
         self.assertIn("/api/v1/targets", endpoints)
@@ -903,6 +907,14 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(scope_report_candidates["status"], "implemented_internal_and_browser_proxied")
         self.assertIn("runtime-scope-report-summary helper (migrated)", scope_report_candidates["replacement_candidates"])
         self.assertIn("GSA scope-report list reads (migrated through gsad same-origin proxy)", scope_report_candidates["replacement_candidates"])
+        trashcan_summary = next(item for item in details["implemented_native_endpoints"] if item["endpoint"] == "/api/v1/trashcan/summary")
+        api_source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
+        proxy_source = (root / "components" / "gsad" / "src" / "gsad_native_api.c").read_text(encoding="utf-8")
+        if "/api/v1/trashcan/summary" in api_source or "/api/v1/trashcan/summary" in proxy_source:
+            self.assertEqual(trashcan_summary["status"], "implemented_internal_and_browser_proxied")
+        else:
+            self.assertEqual(trashcan_summary["status"], "planned_internal_and_browser_proxied")
+        self.assertIn("row-level Trashcan data remains inherited/deferred", trashcan_summary["replacement_candidates"])
 
     def test_native_api_request_validates_relative_api_paths(self):
         self.assertEqual(turbovasctl.validate_native_api_request_path("/api/v1/reports?page_size=1"), "/api/v1/reports?page_size=1")
@@ -993,6 +1005,30 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(turbovasctl.native_tooling_category("components/gvm-tools/scripts/generate-scope-report.gmp.py")[0], "product_workflow")
         self.assertEqual(turbovasctl.native_tooling_category("components/gvm-tools/scripts/empty-trash.gmp.py")[0], "candidate_for_removal")
         self.assertEqual(turbovasctl.native_tooling_category("docs/GMP_XML_STRANGLER.md")[0], "compatibility_bridge")
+
+    def test_trashcan_summary_contract_is_counts_only_and_row_details_deferred(self):
+        root = Path(__file__).resolve().parents[2]
+        contract = (root / "docs" / "API_CONTRACT.md").read_text(encoding="utf-8")
+        strangler = (root / "docs" / "GMP_XML_STRANGLER.md").read_text(encoding="utf-8")
+        plan = (root / "docs" / "NATIVE_API_PROOF_PLAN.md").read_text(encoding="utf-8")
+        native_tooling = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
+        browser_smoke = (root / "tools" / "runtime_browser_smoke.py").read_text(encoding="utf-8")
+        docs = "\n".join([contract, strangler, plan])
+
+        self.assertIn("/api/v1/trashcan/summary", docs)
+        self.assertIn("counts-only", docs)
+        self.assertIn("row-level Trashcan", docs)
+        self.assertIn("credential/target/scanner", docs)
+        self.assertIn("/api/v1/trashcan/summary", native_tooling)
+        self.assertIn("native-api.trashcan-summary", native_tooling)
+        self.assertIn("trashcan.summary-native-api", browser_smoke)
+        for forbidden in (
+            "/api/v1/trashcan/credentials",
+            "/api/v1/trashcan/targets",
+            "/api/v1/trashcan/scanners",
+            "/api/v1/trashcan/items",
+        ):
+            self.assertNotIn(forbidden, docs)
 
     def test_openapi_tracks_scope_report_evidence_contracts(self):
         root = Path(__file__).resolve().parents[2]

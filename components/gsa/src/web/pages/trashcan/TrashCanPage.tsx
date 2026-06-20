@@ -13,6 +13,11 @@ import styled from 'styled-components';
 import {type TrashCanGetData} from 'gmp/commands/trashcan';
 import type Rejection from 'gmp/http/rejection';
 import type Model from 'gmp/models/model';
+import {
+  fetchNativeTrashcanSummary,
+  type NativeTrashcanApiGmp,
+  type NativeTrashcanSummary,
+} from 'gmp/native-api/trashcan';
 import {isDefined} from 'gmp/utils/identity';
 import ConfirmationDialog from 'web/components/dialog/ConfirmationDialog';
 import {DELETE_ACTION} from 'web/components/dialog/DialogTwoButtonFooter';
@@ -65,6 +70,15 @@ const hasEntities = (entities: Model[] | undefined): entities is Model[] => {
   return isDefined(entities) && entities.length > 0;
 };
 
+const hasNativeTrashcanApi = (
+  candidate: unknown,
+): candidate is NativeTrashcanApiGmp => {
+  return (
+    typeof (candidate as Partial<NativeTrashcanApiGmp>).buildUrl ===
+    'function'
+  );
+};
+
 const TrashCan = () => {
   const gmp = useGmp();
   const [isLoading, setIsLoading] = useState(false);
@@ -73,6 +87,9 @@ const TrashCan = () => {
   const [isErrorEmptyingTrash, setIsErrorEmptyingTrash] = useState(false);
   const [isEmptyingTrash, setIsEmptyingTrash] = useState(false);
   let [trash, setTrash] = useState<TrashCanGetData | undefined>();
+  const [trashSummary, setTrashSummary] = useState<
+    NativeTrashcanSummary | undefined
+  >();
   const [_] = useTranslation();
   const {
     dialogState: notificationDialogState,
@@ -82,11 +99,17 @@ const TrashCan = () => {
 
   const loadTrash = useCallback(() => {
     setIsLoading(true);
+    const summaryRequest = hasNativeTrashcanApi(gmp)
+      ? fetchNativeTrashcanSummary(gmp).catch(() => undefined)
+      : Promise.resolve(undefined);
+
     gmp.trashcan
       .get()
       .then(
-        response => {
+        async response => {
+          const summary = await summaryRequest;
           setTrash(response.data);
+          setTrashSummary(summary);
           setIsLoading(false);
 
           if (
@@ -103,6 +126,7 @@ const TrashCan = () => {
         },
         error => {
           showError(error);
+          setTrashSummary(undefined);
           setIsLoading(false);
         },
       );
@@ -230,7 +254,7 @@ const TrashCan = () => {
               <TableHead>{_('Items')}</TableHead>
             </TableRow>
           </TableHeader>
-          <TrashCanTableContents trash={trash} />
+          <TrashCanTableContents summary={trashSummary} trash={trash} />
         </Table>
 
         {hasEntities(trash?.alerts) && (

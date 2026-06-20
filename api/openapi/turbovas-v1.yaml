@@ -562,6 +562,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReportFormatAsset'
+  /trashcan/summary:
+    get:
+      summary: Summarize Trashcan item counts
+      description: Counts-only read of base Trashcan resources backed by gvmd/PostgreSQL. The endpoint returns all supported resource types, including zero-count rows, and intentionally excludes row payloads, identifiers, names, comments, credential data, target hosts, scanner fields, scan-config preferences, alert method data, results_trash, and child trash tables. The native sidecar remains Docker-internal and read-only.
+      responses:
+        '200':
+          description: Trashcan resource counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrashcanSummary'
   /reports:
     get:
       summary: List raw scan reports
@@ -1430,7 +1441,7 @@ components:
             $ref: '#/components/schemas/HostAssetOperatingSystem'
         details:
           type: array
-          description: Latest whitelisted host detail rows only: best_os_cpe, best_os_txt, and traceroute.
+          description: 'Latest whitelisted host detail rows only: best_os_cpe, best_os_txt, and traceroute.'
           items:
             $ref: '#/components/schemas/HostAssetDetailMetadata'
     TlsCertificateAssetCollection:
@@ -1558,6 +1569,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ReportFormatAsset'
+    TrashcanSummary:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrashcanSummaryItem'
+        total:
+          type: integer
+          minimum: 0
+    TrashcanSummaryItem:
+      type: object
+      required: [resource_type, title, count]
+      properties:
+        resource_type:
+          type: string
+          enum: [alerts, scan_configs, credentials, filters, overrides, port_lists, report_configs, report_formats, scanners, schedules, tags, targets, tasks]
+        title:
+          type: string
+        count:
+          type: integer
+          minimum: 0
     CveCollection:
       type: object
       required: [page, items]

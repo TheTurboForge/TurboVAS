@@ -218,6 +218,15 @@ endpoints stay inside the authenticated operator boundary. Create, modify,
 clone, export, and delete actions remain inherited until native write semantics
 are designed.
 
+Native Trashcan summary reads are counts-only at
+`/api/v1/trashcan/summary`. The endpoint returns all supported Trashcan
+resource types with `resource_type`, `title`, and `count`, plus an aggregate
+`total`. It intentionally excludes row-level Trashcan payloads, identifiers,
+names, comments, credential data, target hosts, scanner fields, scan-config
+preferences, alert method data, `results_trash`, and child trash tables.
+Row-level Trashcan resource reads and restore/delete/empty mutations remain
+inherited because credential/target/scanner trash data is secret-adjacent.
+
 Native report-format rows include report-format identity, summary/description,
 extension/content type, trust state, active/predefined/configurable/deprecated
 flags, alert/report-config backlinks, parameters, and timestamps. Report formats

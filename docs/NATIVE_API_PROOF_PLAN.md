@@ -204,7 +204,10 @@ backlinks; schedule writes, clone, export, and delete actions remain inherited.
 CERT-Bund and DFN-CERT list reads are browser-proxied, while their detail
 metadata endpoints remain internal automation/catalog probes because rich GSA
 detail/export behavior still depends on XML-only feed fields that PostgreSQL
-does not store.
+does not store. Trashcan Contents reads can use
+`/api/v1/trashcan/summary` for counts-only native JSON, but row-level
+Trashcan data and restore/delete/empty mutations remain inherited because
+credential/target/scanner trash tables contain secret-adjacent payloads.
 Further native API expansion should now move toward remaining helper/tooling
 replacements and, later, carefully designed write/control paths that remove
 required GMP/XML, `python-gvm`, or `gvm-tools` dependence.
