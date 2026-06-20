@@ -2990,6 +2990,11 @@ def summarize_native_tooling(items: list[dict[str, Any]]) -> dict[str, Any]:
                 "replacement_candidates": ["GSA Tag detail metadata (migrated through gsad same-origin proxy)", "read-only tag metadata automation"],
             },
             {
+                "endpoint": "/api/v1/tags/{tag_id}/resources",
+                "status": "implemented_internal",
+                "replacement_candidates": ["read-only tag assigned-resource references", "native-api-request helper"],
+            },
+            {
                 "endpoint": "/api/v1/overrides",
                 "status": "implemented_internal_and_browser_proxied",
                 "replacement_candidates": ["GSA top-level Overrides list (migrated through gsad same-origin proxy)", "read-only override metadata automation", "native-api-request helper"],
@@ -4458,6 +4463,33 @@ def command_runtime_gmp_smoke(repo_root: Path) -> dict[str, Any]:
     probe_status = parsed.get("status") if parsed else None
     findings.append(finding("pass" if result.returncode == 0 and probe_status == "pass" else "fail", "gvmd.gmp", f"python-gvm authenticated get_version exit code {result.returncode}.", details={"probe": parsed, "output_tail": output_tail(result.stdout, 60)}))
     return make_result("runtime-gmp-smoke", repo_root, "Runtime GMP smoke completed.", findings, [str(runtime_dir(repo_root))])
+
+
+def wait_for_runtime_gmp_smoke(repo_root: Path, *, attempts: int = 3, interval_seconds: int = 5) -> tuple[dict[str, Any], int]:
+    last_result: dict[str, Any] | None = None
+    for attempt in range(1, attempts + 1):
+        last_result = command_runtime_gmp_smoke(repo_root)
+        if last_result.get("status") == "pass":
+            return last_result, attempt
+        if attempt < attempts:
+            time.sleep(interval_seconds)
+    return last_result or make_result("runtime-gmp-smoke", repo_root, "Runtime GMP smoke did not run.", []), attempts
+
+
+def browser_gmp_readiness_finding(repo_root: Path, *, check: str) -> dict[str, Any]:
+    gmp_result, attempts = wait_for_runtime_gmp_smoke(repo_root)
+    status = "pass" if gmp_result.get("status") == "pass" else "fail"
+    return finding(
+        status,
+        check,
+        "Authenticated GMP readiness was verified before browser validation." if status == "pass" else "Authenticated GMP readiness did not become available before browser validation.",
+        details={
+            "attempts": attempts,
+            "status": gmp_result.get("status"),
+            "summary": gmp_result.get("summary"),
+            "failed_checks": [item for item in gmp_result.get("findings", []) if item.get("status") == "fail"],
+        },
+    )
 
 
 def command_runtime_scanner_register(repo_root: Path) -> dict[str, Any]:
@@ -7119,6 +7151,7 @@ def command_runtime_browser_smoke(repo_root: Path, routes: list[str] | None = No
     base_urls = gsad_base_urls(repo_root)
     findings.append(finding("pass" if base_urls else "fail", "gsad.urls", "Configured gsad base URLs are available." if base_urls else "No gsad base URLs are configured.", details={"base_urls": list(base_urls)}))
     findings.extend(runtime_gsa_freshness_findings(repo_root))
+    findings.append(browser_gmp_readiness_finding(repo_root, check="browser-smoke.gmp-ready"))
     if aggregate_status(findings) == "fail":
         return make_result("runtime-browser-smoke", repo_root, "Runtime browser smoke stopped at prerequisites.", findings, [str(artifact_dir)])
 
@@ -7230,6 +7263,8 @@ def command_runtime_browser_regression(repo_root: Path) -> dict[str, Any]:
 
     base_urls = gsad_base_urls(repo_root)
     findings.append(finding("pass" if base_urls else "fail", "gsad.urls", "Configured gsad base URLs are available." if base_urls else "No gsad base URLs are configured.", details={"base_urls": list(base_urls)}))
+    findings.extend(runtime_gsa_freshness_findings(repo_root))
+    findings.append(browser_gmp_readiness_finding(repo_root, check="browser-regression.gmp-ready"))
     if aggregate_status(findings) == "fail":
         return make_result("runtime-browser-regression", repo_root, "Runtime browser regression stopped at prerequisites.", findings, [str(artifact_dir)])
 

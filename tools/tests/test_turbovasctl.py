@@ -611,6 +611,7 @@ class TurboVASCtlTests(unittest.TestCase):
         browser_smoke = (Path(__file__).resolve().parents[1] / "runtime_browser_smoke.py").read_text(encoding="utf-8")
         justfile = (Path(__file__).resolve().parents[2] / "justfile").read_text(encoding="utf-8")
         self.assertIn("def command_runtime_browser_smoke", source)
+        self.assertIn("browser_gmp_readiness_finding(repo_root, check=\"browser-smoke.gmp-ready\")", source)
         self.assertIn("runtime_browser_smoke_probe_path", source)
         self.assertIn("runtime-browser-smoke", source)
         self.assertIn("raw-report.list-native-api", browser_smoke)
@@ -631,6 +632,7 @@ class TurboVASCtlTests(unittest.TestCase):
         browser_regression = (Path(__file__).resolve().parents[1] / "runtime_browser_regression.py").read_text(encoding="utf-8")
         justfile = (Path(__file__).resolve().parents[2] / "justfile").read_text(encoding="utf-8")
         self.assertIn("def command_runtime_browser_regression", source)
+        self.assertIn("browser_gmp_readiness_finding(repo_root, check=\"browser-regression.gmp-ready\")", source)
         self.assertIn("runtime_browser_regression_probe_path", source)
         self.assertIn("runtime-browser-regression", source)
         self.assertIn("scope-report.result-evidence-route", browser_regression)
@@ -646,6 +648,23 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("network.native-api-failures", browser_regression)
         self.assertIn("runtime-browser-regression *args:", justfile)
         self.assertIn('tools/turbovasctl runtime-browser-regression "$@"', justfile)
+
+    def test_browser_gmp_readiness_retries_until_authenticated(self):
+        with unittest.mock.patch.object(
+            turbovasctl,
+            "command_runtime_gmp_smoke",
+            side_effect=[
+                {"status": "fail", "summary": "not ready", "findings": [{"status": "fail", "check": "gvmd.gmp"}]},
+                {"status": "pass", "summary": "ready", "findings": []},
+            ],
+        ) as smoke, unittest.mock.patch.object(turbovasctl.time, "sleep") as sleep:
+            item = turbovasctl.browser_gmp_readiness_finding(Path("/tmp"), check="browser-smoke.gmp-ready")
+
+        self.assertEqual(item["status"], "pass")
+        self.assertEqual(item["check"], "browser-smoke.gmp-ready")
+        self.assertEqual(item["details"]["attempts"], 2)
+        self.assertEqual(smoke.call_count, 2)
+        sleep.assert_called_once_with(5)
 
     def test_runtime_credential_smoke_is_registered(self):
         source = (Path(__file__).resolve().parents[1] / "turbovasctl").read_text(encoding="utf-8")
@@ -688,6 +707,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("/api/v1/scan-configs/{scan_config_id}", source)
         self.assertIn("/api/v1/tags", source)
         self.assertIn("/api/v1/tags/{tag_id}", source)
+        self.assertIn("/api/v1/tags/{tag_id}/resources", source)
         self.assertIn("/api/v1/overrides", source)
         self.assertIn("/api/v1/overrides/{override_id}", source)
         self.assertIn('compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", f"http://127.0.0.1:9080{request_path}"),\n            parsed,', source)
@@ -819,6 +839,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("/api/v1/scan-configs/{scan_config_id}", endpoints)
         self.assertIn("/api/v1/tags", endpoints)
         self.assertIn("/api/v1/tags/{tag_id}", endpoints)
+        self.assertIn("/api/v1/tags/{tag_id}/resources", endpoints)
         self.assertIn("/api/v1/overrides", endpoints)
         self.assertIn("/api/v1/overrides/{override_id}", endpoints)
         self.assertIn("/api/v1/schedules", endpoints)
