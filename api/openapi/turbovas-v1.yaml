@@ -2130,6 +2130,7 @@ components:
       in: query
       schema:
         type: string
+        maxLength: 4096
     FilterType:
       name: filter_type
       in: query

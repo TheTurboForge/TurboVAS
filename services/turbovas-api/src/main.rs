@@ -107,6 +107,71 @@ struct CollectionQuery {
     value: Option<String>,
 }
 
+const DEFAULT_COLLECTION_PAGE_SIZE: i64 = 50;
+const MAX_COLLECTION_PAGE_SIZE: i64 = 500;
+const MAX_COLLECTION_FILTER_LENGTH: usize = 4096;
+
+const REPORT_SORT_FIELDS: &[(&str, &str)] = &[
+    ("id", "uuid"),
+    ("name", "name"),
+    ("status", "status"),
+    ("task", "task_name"),
+    ("target", "target_name"),
+    ("creation_time", "creation_time"),
+    ("scan_start", "scan_start"),
+    ("scan_end", "scan_end"),
+    ("modification_time", "modification_time"),
+    ("result_count", "result_count"),
+    ("vulnerability_count", "vulnerability_count"),
+    ("host_count", "host_count"),
+    ("cve_count", "cve_count"),
+    ("severity", "max_severity"),
+    ("max_severity", "max_severity"),
+    ("critical", "severity_critical"),
+    ("high", "severity_high"),
+    ("medium", "severity_medium"),
+    ("low", "severity_low"),
+    ("log", "severity_log"),
+    ("false_positive", "severity_false_positive"),
+];
+const VULNERABILITY_SORT_FIELDS: &[(&str, &str)] = &[
+    ("id", "id"),
+    ("name", "name"),
+    ("oldest", "oldest_result_unix"),
+    ("newest", "newest_result_unix"),
+    ("severity", "severity"),
+    ("qod", "qod"),
+    ("results", "result_count"),
+    ("hosts", "host_count"),
+];
+const RESULT_SORT_FIELDS: &[(&str, &str)] = &[
+    ("id", "id"),
+    ("host", "host"),
+    ("hostname", "hostname"),
+    ("port", "port"),
+    ("nvt_oid", "nvt_oid"),
+    ("nvt", "nvt_oid"),
+    ("name", "name"),
+    ("vulnerability", "name"),
+    ("severity", "severity"),
+    ("qod", "qod"),
+    ("solution_type", "solution_type"),
+    ("created", "created_at_unix"),
+    ("created_at", "created_at_unix"),
+    ("report", "source_report_name"),
+    ("task", "task_name"),
+];
+const REPORT_RESULT_SORT_FIELDS: &[(&str, &str)] = &[
+    ("id", "id"),
+    ("host", "host"),
+    ("port", "port"),
+    ("nvt_oid", "nvt_oid"),
+    ("name", "name"),
+    ("severity", "severity"),
+    ("qod", "qod"),
+    ("created_at", "created_at_unix"),
+];
+
 #[derive(Debug, Serialize)]
 struct ErrorBody {
     error: ErrorPayload,
@@ -2092,32 +2157,7 @@ async fn reports(
     Query(query): Query<CollectionQuery>,
 ) -> Result<Json<Collection<ReportItem>>, ApiError> {
     let params = normalize_collection_query(query, "-creation_time")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("id", "uuid"),
-            ("name", "name"),
-            ("status", "status"),
-            ("task", "task_name"),
-            ("target", "target_name"),
-            ("creation_time", "creation_time"),
-            ("scan_start", "scan_start"),
-            ("scan_end", "scan_end"),
-            ("modification_time", "modification_time"),
-            ("result_count", "result_count"),
-            ("vulnerability_count", "vulnerability_count"),
-            ("host_count", "host_count"),
-            ("cve_count", "cve_count"),
-            ("severity", "max_severity"),
-            ("max_severity", "max_severity"),
-            ("critical", "severity_critical"),
-            ("high", "severity_high"),
-            ("medium", "severity_medium"),
-            ("low", "severity_low"),
-            ("log", "severity_log"),
-            ("false_positive", "severity_false_positive"),
-        ],
-    )?;
+    let sort_sql = sort_clause(&params.sort, REPORT_SORT_FIELDS)?;
     let sql = raw_report_sql(
         "($1 = ''\n\
             OR lower(uuid) = lower($1)\n\
@@ -4547,19 +4587,7 @@ async fn vulnerabilities(
     Query(query): Query<CollectionQuery>,
 ) -> Result<Json<Collection<VulnerabilityItem>>, ApiError> {
     let params = normalize_collection_query(query, "-severity")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("id", "id"),
-            ("name", "name"),
-            ("oldest", "oldest_result_unix"),
-            ("newest", "newest_result_unix"),
-            ("severity", "severity"),
-            ("qod", "qod"),
-            ("results", "result_count"),
-            ("hosts", "host_count"),
-        ],
-    )?;
+    let sort_sql = sort_clause(&params.sort, VULNERABILITY_SORT_FIELDS)?;
     let sql = format!(
         r#"WITH vulnerability_rows AS (
              SELECT coalesce(nullif(r.nvt, ''), r.uuid::text) AS id,
@@ -6030,26 +6058,7 @@ async fn results(
     Query(query): Query<CollectionQuery>,
 ) -> Result<Json<Collection<ResultItem>>, ApiError> {
     let params = normalize_collection_query(query, "-severity")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("id", "id"),
-            ("host", "host"),
-            ("hostname", "hostname"),
-            ("port", "port"),
-            ("nvt_oid", "nvt_oid"),
-            ("nvt", "nvt_oid"),
-            ("name", "name"),
-            ("vulnerability", "name"),
-            ("severity", "severity"),
-            ("qod", "qod"),
-            ("solution_type", "solution_type"),
-            ("created", "created_at_unix"),
-            ("created_at", "created_at_unix"),
-            ("report", "source_report_name"),
-            ("task", "task_name"),
-        ],
-    )?;
+    let sort_sql = sort_clause(&params.sort, RESULT_SORT_FIELDS)?;
     let sql = format!(
         r#"WITH result_rows AS (
              SELECT r.uuid AS id,
@@ -6224,19 +6233,7 @@ async fn report_results(
 ) -> Result<Json<Collection<ResultItem>>, ApiError> {
     parse_uuid(&report_id)?;
     let params = normalize_collection_query(query, "-severity")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("id", "id"),
-            ("host", "host"),
-            ("port", "port"),
-            ("nvt_oid", "nvt_oid"),
-            ("name", "name"),
-            ("severity", "severity"),
-            ("qod", "qod"),
-            ("created_at", "created_at_unix"),
-        ],
-    )?;
+    let sort_sql = sort_clause(&params.sort, REPORT_RESULT_SORT_FIELDS)?;
     let sql = format!(
         "WITH selected_report AS (\n\
              SELECT id, uuid FROM reports WHERE lower(uuid) = lower($1)\n\
@@ -7202,19 +7199,7 @@ async fn scope_report_results(
     parse_uuid(&scope_id)?;
     parse_uuid(&scope_report_id)?;
     let params = normalize_collection_query(query, "-severity")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("id", "id"),
-            ("host", "host"),
-            ("port", "port"),
-            ("nvt_oid", "nvt_oid"),
-            ("name", "name"),
-            ("severity", "severity"),
-            ("qod", "qod"),
-            ("created_at", "created_at_unix"),
-        ],
-    )?;
+    let sort_sql = sort_clause(&params.sort, REPORT_RESULT_SORT_FIELDS)?;
     let sql = format!(
         "WITH selected_scope_report AS (\n\
              SELECT sr.id, sr.scope, coalesce(s.is_global, 0)::int AS is_global\n\
@@ -8931,22 +8916,27 @@ fn normalize_collection_query(
     default_sort: &str,
 ) -> Result<NormalizedQuery, ApiError> {
     let page = query.page.unwrap_or(1);
-    let page_size = query.page_size.unwrap_or(50);
+    let page_size = query.page_size.unwrap_or(DEFAULT_COLLECTION_PAGE_SIZE);
     if page < 1 {
         return Err(ApiError::BadRequest(
             "page must be greater than or equal to 1".to_string(),
         ));
     }
-    if !(1..=500).contains(&page_size) {
-        return Err(ApiError::BadRequest(
-            "page_size must be between 1 and 500".to_string(),
-        ));
+    if !(1..=MAX_COLLECTION_PAGE_SIZE).contains(&page_size) {
+        return Err(ApiError::BadRequest(format!(
+            "page_size must be between 1 and {MAX_COLLECTION_PAGE_SIZE}"
+        )));
     }
     let sort = query
         .sort
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| default_sort.to_string());
     let filter = query.filter.unwrap_or_default();
+    if filter.len() > MAX_COLLECTION_FILTER_LENGTH {
+        return Err(ApiError::BadRequest(format!(
+            "filter must be at most {MAX_COLLECTION_FILTER_LENGTH} bytes"
+        )));
+    }
     Ok(NormalizedQuery {
         page,
         page_size,
@@ -10447,6 +10437,65 @@ fn unix_ts_to_rfc3339(value: i64) -> Option<String> {
 mod tests {
     use super::*;
 
+    struct PriorityCollectionContract {
+        path: &'static str,
+        default_sort: &'static str,
+        allowed_sort_fields: &'static [(&'static str, &'static str)],
+        filter_fields: &'static [&'static str],
+        tie_breakers: &'static [&'static str],
+    }
+
+    const PRIORITY_COLLECTION_CONTRACTS: &[PriorityCollectionContract] = &[
+        PriorityCollectionContract {
+            path: "/api/v1/vulnerabilities",
+            default_sort: "-severity",
+            allowed_sort_fields: VULNERABILITY_SORT_FIELDS,
+            filter_fields: &["id", "name"],
+            tie_breakers: &["name", "id"],
+        },
+        PriorityCollectionContract {
+            path: "/api/v1/results",
+            default_sort: "-severity",
+            allowed_sort_fields: RESULT_SORT_FIELDS,
+            filter_fields: &[
+                "id",
+                "host",
+                "hostname",
+                "port",
+                "nvt_oid",
+                "name",
+                "task_name",
+                "source_report_name",
+            ],
+            tie_breakers: &["created_at_unix", "id"],
+        },
+        PriorityCollectionContract {
+            path: "/api/v1/reports",
+            default_sort: "-creation_time",
+            allowed_sort_fields: REPORT_SORT_FIELDS,
+            filter_fields: &["uuid", "name", "status", "task_name", "target_name"],
+            tie_breakers: &["creation_time", "uuid"],
+        },
+        PriorityCollectionContract {
+            path: "/api/v1/reports/{report_id}/results",
+            default_sort: "-severity",
+            allowed_sort_fields: REPORT_RESULT_SORT_FIELDS,
+            filter_fields: &["id", "host", "port", "nvt_oid", "name"],
+            tie_breakers: &["created_at_unix", "id"],
+        },
+        PriorityCollectionContract {
+            path: "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/results",
+            default_sort: "-severity",
+            allowed_sort_fields: REPORT_RESULT_SORT_FIELDS,
+            filter_fields: &["id", "host", "port", "nvt_oid", "name"],
+            tie_breakers: &["created_at_unix", "id"],
+        },
+    ];
+
+    fn sort_field_names(fields: &[(&'static str, &'static str)]) -> Vec<&'static str> {
+        fields.iter().map(|(name, _)| *name).collect()
+    }
+
     #[test]
     fn normalize_collection_defaults_and_offset() {
         let query = normalize_collection_query(
@@ -10496,6 +10545,30 @@ mod tests {
     }
 
     #[test]
+    fn normalize_collection_rejects_oversized_filter() {
+        let err = normalize_collection_query(
+            CollectionQuery {
+                page: Some(1),
+                page_size: Some(25),
+                sort: None,
+                filter: Some("x".repeat(MAX_COLLECTION_FILTER_LENGTH + 1)),
+                filter_type: None,
+                active: None,
+                predefined: None,
+                resource_type: None,
+                text: None,
+                task_name: None,
+                value: None,
+            },
+            "host",
+        )
+        .unwrap_err();
+        assert!(
+            matches!(err, ApiError::BadRequest(message) if message.contains("filter must be at most"))
+        );
+    }
+
+    #[test]
     fn empty_page_total_probe_only_runs_for_out_of_range_pages() {
         assert!(!needs_first_page_total_probe(1, 50));
         assert!(!needs_first_page_total_probe(0, 0));
@@ -10513,6 +10586,42 @@ mod tests {
             "result_count DESC"
         );
         assert!(sort_clause(";drop", &[("host", "host")]).is_err());
+    }
+
+    #[test]
+    fn priority_collection_contracts_define_sort_filter_and_tie_breakers() {
+        let paths: Vec<&str> = PRIORITY_COLLECTION_CONTRACTS
+            .iter()
+            .map(|contract| contract.path)
+            .collect();
+        assert_eq!(
+            paths,
+            vec![
+                "/api/v1/vulnerabilities",
+                "/api/v1/results",
+                "/api/v1/reports",
+                "/api/v1/reports/{report_id}/results",
+                "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/results",
+            ]
+        );
+        for contract in PRIORITY_COLLECTION_CONTRACTS {
+            assert!(
+                !contract.filter_fields.is_empty(),
+                "{} needs filter fields",
+                contract.path
+            );
+            assert!(
+                !contract.tie_breakers.is_empty(),
+                "{} needs tie breakers",
+                contract.path
+            );
+            assert!(sort_clause(contract.default_sort, contract.allowed_sort_fields).is_ok());
+            assert!(sort_clause("unsupported_field", contract.allowed_sort_fields).is_err());
+        }
+        assert!(sort_field_names(VULNERABILITY_SORT_FIELDS).contains(&"severity"));
+        assert!(sort_field_names(RESULT_SORT_FIELDS).contains(&"hostname"));
+        assert!(sort_field_names(REPORT_SORT_FIELDS).contains(&"creation_time"));
+        assert!(!sort_field_names(REPORT_RESULT_SORT_FIELDS).contains(&"hostname"));
     }
 
     #[test]
