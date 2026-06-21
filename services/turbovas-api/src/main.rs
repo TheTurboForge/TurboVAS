@@ -14,7 +14,6 @@ use axum::{
 };
 use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
 use serde::Serialize;
-use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use tokio_postgres::{Config as PgConfig, NoTls, Row};
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -22,6 +21,7 @@ mod auth;
 mod collections;
 mod errors;
 mod feeds;
+mod formatters;
 mod path_ids;
 mod query;
 mod request_ids;
@@ -31,6 +31,7 @@ use auth::*;
 use collections::*;
 use errors::ApiError;
 use feeds::feeds;
+use formatters::*;
 use path_ids::*;
 use query::*;
 use request_ids::*;
@@ -8240,15 +8241,6 @@ fn scope_report_retention_source_from_row(row: &Row) -> ScopeReportRetentionSour
     }
 }
 
-fn normalize_protection_requirement(value: &str) -> String {
-    match value {
-        "normal" | "Normal" => "Normal".to_string(),
-        "high" | "High" => "High".to_string(),
-        "very_high" | "very high" | "Very High" => "Very High".to_string(),
-        _ => value.to_string(),
-    }
-}
-
 fn host_from_row(row: &Row) -> HostItem {
     HostItem {
         host: row.get(1),
@@ -9244,25 +9236,6 @@ fn summarize_metrics(systems: &[MetricsSystem], vulnerability_count: i64) -> Met
     }
 }
 
-fn normalize_authentication_state(state: &str) -> String {
-    match state {
-        "authenticated" | "Authenticated" => "Authenticated".to_string(),
-        "authentication_failed" | "Authentication Failed" => "Authentication Failed".to_string(),
-        "no_credential_path" | "No Credential Path" => "No Credential Path".to_string(),
-        _ => "Unknown".to_string(),
-    }
-}
-
-fn unix_ts_to_rfc3339(value: i64) -> Option<String> {
-    if value <= 0 {
-        return None;
-    }
-    OffsetDateTime::from_unix_timestamp(value)
-        .ok()?
-        .format(&Rfc3339)
-        .ok()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -9977,31 +9950,6 @@ mod tests {
     }
 
     #[test]
-    fn authentication_state_is_public_contract_shape() {
-        assert_eq!(
-            normalize_authentication_state("authenticated"),
-            "Authenticated"
-        );
-        assert_eq!(
-            normalize_authentication_state("authentication_failed"),
-            "Authentication Failed"
-        );
-        assert_eq!(
-            normalize_authentication_state("no_credential_path"),
-            "No Credential Path"
-        );
-        assert_eq!(normalize_authentication_state("ambiguous"), "Unknown");
-    }
-
-    #[test]
-    fn protection_requirement_is_public_contract_shape() {
-        assert_eq!(normalize_protection_requirement("normal"), "Normal");
-        assert_eq!(normalize_protection_requirement("high"), "High");
-        assert_eq!(normalize_protection_requirement("very_high"), "Very High");
-        assert_eq!(normalize_protection_requirement("Very High"), "Very High");
-    }
-
-    #[test]
     fn scope_candidate_hosts_sql_keeps_candidates_out_of_membership() {
         let sql = scope_candidate_hosts_sql();
         assert!(sql.contains("SELECT DISTINCT ON (t.id)"));
@@ -10017,12 +9965,6 @@ mod tests {
         assert!(!sql.contains("INSERT"));
         assert!(!sql.contains("UPDATE"));
         assert!(!sql.contains("DELETE"));
-    }
-
-    #[test]
-    fn unix_timestamp_formats_as_rfc3339() {
-        assert_eq!(unix_ts_to_rfc3339(0), None);
-        assert_eq!(unix_ts_to_rfc3339(1).unwrap(), "1970-01-01T00:00:01Z");
     }
 
     #[test]
