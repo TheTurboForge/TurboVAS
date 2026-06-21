@@ -1,9 +1,10 @@
 /* SPDX-FileCopyrightText: 2026 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import {describe, test, expect, testing} from '@gsa/testing';
+import {afterEach, describe, test, expect, testing} from '@gsa/testing';
 import {screen, rendererWith, fireEvent, waitFor} from 'web/testing';
 import date from 'gmp/models/date';
 import type Nvt from 'gmp/models/nvt';
@@ -69,6 +70,7 @@ type NvtDataMock = MockFunction<() => Promise<{data: NvtData}>>;
 type ScannersMock = MockFunction<() => Promise<{data: Scanner[]}>>;
 
 interface GmpObject {
+  buildUrl?: (path: string, params?: Record<string, unknown>) => string;
   scanconfig: {
     get: ConfigMock;
     save: RecordPromiseMock;
@@ -77,6 +79,10 @@ interface GmpObject {
     saveScanConfigNvt: RecordPromiseMock;
     import: RecordPromiseMock;
     export: RecordPromiseMock;
+  };
+  session: {
+    jwt?: string;
+    token?: string;
   };
   nvtfamilies: {
     get: AllFamiliesMock;
@@ -95,6 +101,8 @@ interface GmpObject {
 }
 
 interface GmpMocks {
+  buildUrl: ReturnType<typeof testing.fn>;
+  fetchNativeScanners: ReturnType<typeof testing.fn>;
   getScanConfig: ConfigMock;
   saveScanConfig: RecordPromiseMock;
   editScanConfigFamilySettings: FamilyNvtsMock;
@@ -189,6 +197,10 @@ const allFamilies: AllFamily[] = [
 ];
 
 const scannersData: Scanner[] = [{id: 's1', name: 'Scanner 1'}];
+const nativeScannersPayload = {
+  page: {page: 1, page_size: 500, total: 1, sort: 'name', filter: ''},
+  items: [{id: 's1', name: 'Scanner 1', scanner_type: 2}],
+};
 
 const familyNvts: FamilyNvt[] = [
   {oid: 'nvt-1', name: 'NVT One', severity: 5, selected: YES_VALUE},
@@ -224,7 +236,21 @@ const currentSettings: RecordPromiseMock = testing
   .fn()
   .mockResolvedValue(currentSettingsDefaultResponse);
 
+afterEach(() => {
+  testing.unstubAllGlobals();
+});
+
 const createGmp = (overrides: Record<string, unknown> = {}): GmpFactory => {
+  const buildUrl = testing.fn(
+    (path: string) => `https://turbovas.example/${path}`,
+  );
+  const fetchNativeScanners = testing.fn().mockResolvedValue({
+    json: testing.fn().mockResolvedValue(nativeScannersPayload),
+    ok: true,
+    status: 200,
+  });
+  testing.stubGlobal('fetch', fetchNativeScanners);
+
   const getScanConfig: ConfigMock = testing
     .fn()
     .mockResolvedValue({data: config});
@@ -253,6 +279,7 @@ const createGmp = (overrides: Record<string, unknown> = {}): GmpFactory => {
 
   return {
     gmp: {
+      buildUrl,
       scanconfig: {
         get: getScanConfig,
         save: saveScanConfig,
@@ -274,13 +301,19 @@ const createGmp = (overrides: Record<string, unknown> = {}): GmpFactory => {
       settings: {
         manualUrl: 'http://test/',
       },
-      session: createSession(),
+      session: {
+        ...createSession(),
+        token: 'test-token',
+        jwt: 'jwt-token',
+      },
       user: {
         currentSettings,
       },
       ...overrides,
     } as GmpObject,
     mocks: {
+      buildUrl,
+      fetchNativeScanners,
       getScanConfig,
       saveScanConfig,
       editScanConfigFamilySettings,
@@ -369,7 +402,15 @@ describe('ScanConfigComponent', () => {
       create(undefined);
 
       await waitFor(() => {
-        expect(mocks.getScannersAll).toHaveBeenCalled();
+        expect(mocks.fetchNativeScanners).toHaveBeenCalled();
+      });
+      expect(mocks.getScannersAll).not.toHaveBeenCalled();
+      expect(mocks.buildUrl).toHaveBeenCalledWith('api/v1/scanners', {
+        token: 'test-token',
+        page: 1,
+        page_size: 500,
+        sort: 'name',
+        filter: '',
       });
 
       await screen.findByText('New Scan Config');
@@ -391,8 +432,9 @@ describe('ScanConfigComponent', () => {
       await waitFor(() => {
         expect(mocks.getScanConfig).toHaveBeenCalledWith({id: 'c1'});
         expect(mocks.getNvtFamilies).toHaveBeenCalled();
-        expect(mocks.getScannersAll).toHaveBeenCalled();
+        expect(mocks.fetchNativeScanners).toHaveBeenCalled();
       });
+      expect(mocks.getScannersAll).not.toHaveBeenCalled();
 
       await screen.findByText('Edit Scan Config Test Config');
     });

@@ -1,9 +1,11 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
 import {useState} from 'react';
+import {fetchNativeScanners} from 'gmp/native-api/scanners';
 import {YES_VALUE} from 'gmp/parser';
 import {forEach} from 'gmp/utils/array';
 import {selectSaveId} from 'gmp/utils/id';
@@ -18,6 +20,10 @@ import EditScanConfigDialog from 'web/pages/scanconfigs/EditDialog';
 import EditNvtDetailsDialog from 'web/pages/scanconfigs/EditNvtDetailsDialog';
 import ImportDialog from 'web/pages/scanconfigs/ImportDialog';
 import PropTypes from 'web/utils/PropTypes';
+
+const NATIVE_SCANNER_PAGE_SIZE = 500;
+
+const canUseNativeApi = gmp => typeof gmp?.buildUrl === 'function';
 
 export const createSelectedNvts = (configFamily, nvts) => {
   const selected = {};
@@ -88,19 +94,44 @@ const ScanConfigComponent = ({
   const [editNvtDetailsDialogTitle, setEditNvtDetailsDialogTitle] = useState();
   const [editScanConfigDialogError, setEditScanConfigDialogError] = useState();
 
-  const loadScanners = () => {
+  const loadScanners = async () => {
     setIsLoadingScanners(true);
 
-    return gmp.scanners
-      .getAll()
-      .then(response => {
+    try {
+      if (!canUseNativeApi(gmp)) {
+        const response = await gmp.scanners.getAll();
         const {data: scannersData} = response;
         setScanners(scannersData);
         setScannerId(selectSaveId(scannersData));
-      })
-      .finally(() => {
-        setIsLoadingScanners(false);
-      });
+        return;
+      }
+
+      const scannersData = [];
+      let page = 1;
+      let total = Number.POSITIVE_INFINITY;
+
+      while (scannersData.length < total) {
+        const response = await fetchNativeScanners(gmp, {
+          page,
+          pageSize: NATIVE_SCANNER_PAGE_SIZE,
+          sort: 'name',
+          filter: '',
+        });
+        scannersData.push(...response.scanners);
+        total = response.counts.filtered;
+
+        if (response.scanners.length === 0) {
+          break;
+        }
+
+        page += 1;
+      }
+
+      setScanners(scannersData);
+      setScannerId(selectSaveId(scannersData));
+    } finally {
+      setIsLoadingScanners(false);
+    }
   };
 
   const loadScanConfig = (configId, silent = false) => {
