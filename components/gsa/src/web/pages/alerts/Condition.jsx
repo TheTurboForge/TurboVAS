@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -17,10 +18,17 @@ import {isDefined} from 'gmp/utils/identity';
 import useTranslation from 'web/hooks/useTranslation';
 import PropTypes from 'web/utils/PropTypes';
 
+const hasConditionDataValues = data =>
+  isDefined(data) && Object.keys(data).length > 0;
+
 const Condition = ({condition = {}, event}) => {
   const [_] = useTranslation();
-  if (!isDefined(condition.type) || !isDefined(condition.data)) {
+  if (!isDefined(condition.type)) {
     return null;
+  }
+
+  if (!hasConditionDataValues(condition.data)) {
+    return condition.type;
   }
 
   let count = _('undefined');

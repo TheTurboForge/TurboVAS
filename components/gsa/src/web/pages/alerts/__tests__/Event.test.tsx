@@ -14,9 +14,14 @@ import {
 import Event from 'web/pages/alerts/Event';
 
 describe('Event Component', () => {
-  test('should render null when event type or data is undefined', () => {
+  test('should render null when event type is undefined', () => {
     const {container} = render(<Event />);
     expect(container.firstChild).toBeNull();
+  });
+
+  test('should render event type when only redacted type metadata is available', () => {
+    render(<Event event={{type: EVENT_TYPE_TASK_RUN_STATUS_CHANGED}} />);
+    expect(screen.getByText('Task run status changed')).toBeInTheDocument();
   });
 
   test('should render "New CVE arrived" for EVENT_TYPE_NEW_SECINFO', () => {

@@ -44,8 +44,12 @@ const secInfoTypeName = (
 
 const Event = ({event = {}}: EventProps) => {
   const [_] = useTranslation();
-  if (!isDefined(event.type) || !isDefined(event.data)) {
+  if (!isDefined(event.type)) {
     return null;
+  }
+
+  if (!isDefined(event.data)) {
+    return event.type;
   }
 
   if (event.type === EVENT_TYPE_NEW_SECINFO) {

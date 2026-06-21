@@ -53,6 +53,28 @@ const alert = Alert.fromElement({
   },
 });
 
+const nativeRedactedAlert = Alert.fromElement({
+  _id: '5678',
+  owner: {name: 'admin'},
+  name: 'native redacted',
+  comment: 'list metadata only',
+  permissions: {permission: [{name: 'everything'}]},
+  active: 1,
+  condition: {
+    __text: 'Filter count at least',
+  },
+  event: {
+    __text: 'Task run status changed',
+  },
+  filter: {
+    _id: 'filter id',
+    name: 'report results filter',
+  },
+  method: {
+    __text: 'SCP',
+  },
+});
+
 const createGmp = ({
   getAlerts = testing.fn().mockResolvedValue({
     data: [alert],
@@ -173,6 +195,58 @@ describe('Alert ListPage tests', () => {
     expect(row[1]).toHaveTextContent('SMB');
     expect(row[1]).toHaveTextContent('report results filter');
     expect(row[1]).toHaveTextContent('Yes');
+  });
+
+  test('should render redacted native alert type labels', async () => {
+    const gmp = createGmp({
+      getAlerts: testing.fn().mockResolvedValue({
+        data: [nativeRedactedAlert],
+        meta: {
+          filter: Filter.fromString(),
+          counts: new CollectionCounts(),
+        },
+      }),
+    });
+    const {render, store} = rendererWith({
+      gmp,
+      capabilities: true,
+      store: true,
+      router: true,
+    });
+
+    const defaultSettingFilter = Filter.fromString('foo=bar');
+    store.dispatch(loadingActions.success({rowsperpage: {value: '2'}}));
+    store.dispatch(
+      defaultFilterLoadingActions.success('alert', defaultSettingFilter),
+    );
+
+    const counts = new CollectionCounts({
+      first: 1,
+      all: 1,
+      filtered: 1,
+      length: 1,
+      rows: 10,
+    });
+    const filter = Filter.fromString('first=1 rows=10');
+    store.dispatch(
+      entitiesLoadingActions.success(
+        [nativeRedactedAlert],
+        filter,
+        filter,
+        counts,
+      ),
+    );
+
+    const {baseElement} = render(<AlertPage />);
+
+    await wait();
+
+    const row = baseElement.querySelectorAll('tr');
+    expect(row[1]).toHaveTextContent('native redacted');
+    expect(row[1]).toHaveTextContent('Task run status changed');
+    expect(row[1]).toHaveTextContent('Filter count at least');
+    expect(row[1]).toHaveTextContent('SCP');
+    expect(row[1]).not.toHaveTextContent('undefined');
   });
 
   test('should allow to bulk action on page contents', async () => {

@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -46,6 +47,9 @@ const Pre = styled.pre`
   word-wrap: break-word;
 `;
 
+const hasMethodDataValues = data =>
+  isDefined(data) && Object.keys(data).length > 0;
+
 const Method = ({
   method = {},
   details = false,
@@ -57,6 +61,11 @@ const Method = ({
   if (!isDefined(method.type)) {
     return null;
   }
+
+  if (!hasMethodDataValues(method.data)) {
+    return method.type;
+  }
+
   const getReportFormatName = id => {
     const reportFormat = reportFormats.find(format => format.id === id);
     if (isDefined(reportFormat)) {
