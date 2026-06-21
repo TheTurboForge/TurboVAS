@@ -1211,8 +1211,8 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(contract["unexpected_turbovas_operation_fields"], [])
         self.assertEqual(contract["allowed_exposure_values"], ["direct-read", "internal-only"])
         self.assertEqual(contract["allowed_maturity_values"], ["live-read", "preview-read"])
-        self.assertEqual(contract["allowed_replaces_values"], ["alert-metadata-list-read", "cert-bund-advisory-catalog-detail-read", "cert-bund-advisory-list-read", "cpe-catalog-detail-read", "cpe-catalog-list-read", "cve-catalog-detail-read", "cve-catalog-list-read", "dfn-cert-advisory-catalog-detail-read", "dfn-cert-advisory-list-read", "feed-status-read", "host-asset-detail-info-read", "host-asset-list-read", "none", "nvt-catalog-detail-read", "nvt-catalog-list-read", "operating-system-asset-detail-info-read", "operating-system-asset-list-read", "scan-config-family-summary-read", "scan-config-metadata-detail-info-read", "scan-config-metadata-list-read", "scanner-metadata-detail-info-read", "scanner-metadata-list-read", "tag-metadata-read", "tag-resource-name-read", "tag-resource-reference-read", "tls-certificate-asset-detail-info-read", "tls-certificate-asset-list-read", "trashcan-count-summary-read"])
-        self.assertEqual(contract["allowed_inherited_still_owns_values"], ["alert-detail-delivery-control", "cert-advisory-rich-detail-export", "feed-sync-import-control", "host-target-creation-tags-writes-and-rich-history", "nvt-rich-detail", "operating-system-writes-deletes-and-rich-history", "retention-mutations", "scan-config-preferences-export-import-writes-and-deletes", "scanner-control-credentials-writes-and-deletes", "scap-rich-context", "tag-write-control", "tls-certificate-export-delete-and-rich-history", "trashcan-row-data-and-mutations"])
+        self.assertEqual(contract["allowed_replaces_values"], ["alert-metadata-list-read", "cert-bund-advisory-catalog-detail-read", "cert-bund-advisory-list-read", "cpe-catalog-detail-read", "cpe-catalog-list-read", "cve-catalog-detail-read", "cve-catalog-list-read", "dfn-cert-advisory-catalog-detail-read", "dfn-cert-advisory-list-read", "feed-status-read", "host-asset-detail-info-read", "host-asset-list-read", "none", "nvt-catalog-detail-read", "nvt-catalog-list-read", "operating-system-asset-detail-info-read", "operating-system-asset-list-read", "raw-report-application-evidence-read", "raw-report-cve-evidence-read", "raw-report-error-message-evidence-read", "raw-report-host-evidence-read", "raw-report-metrics-read", "raw-report-operating-system-evidence-read", "raw-report-port-evidence-read", "raw-report-result-evidence-read", "raw-report-tls-certificate-evidence-read", "scan-config-family-summary-read", "scan-config-metadata-detail-info-read", "scan-config-metadata-list-read", "scanner-metadata-detail-info-read", "scanner-metadata-list-read", "scope-report-application-evidence-read", "scope-report-cve-evidence-read", "scope-report-error-message-evidence-read", "scope-report-host-evidence-read", "scope-report-metrics-read", "scope-report-operating-system-evidence-read", "scope-report-port-evidence-read", "scope-report-result-evidence-read", "scope-report-tls-certificate-evidence-read", "tag-metadata-read", "tag-resource-name-read", "tag-resource-reference-read", "tls-certificate-asset-detail-info-read", "tls-certificate-asset-list-read", "trashcan-count-summary-read"])
+        self.assertEqual(contract["allowed_inherited_still_owns_values"], ["alert-detail-delivery-control", "cert-advisory-rich-detail-export", "feed-sync-import-control", "host-target-creation-tags-writes-and-rich-history", "nvt-rich-detail", "operating-system-writes-deletes-and-rich-history", "raw-report-generation-xml-export-retention-and-mutations", "retention-mutations", "scan-config-preferences-export-import-writes-and-deletes", "scanner-control-credentials-writes-and-deletes", "scap-rich-context", "scope-report-generation-retention-and-mutations", "tag-write-control", "tls-certificate-export-delete-and-rich-history", "trashcan-row-data-and-mutations"])
         self.assertEqual(contract["missing_exposure_operations"], [])
         self.assertEqual(contract["invalid_exposure_operations"], [])
         self.assertEqual(contract["exposure_mismatches"], [])
@@ -1236,8 +1236,8 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(details["summary"]["total_rows"], 73)
         self.assertEqual(details["summary"]["openapi_operation_rows"], 73)
         self.assertEqual(details["summary"]["inventory_rows"], 72)
-        self.assertEqual(details["summary"]["rows_with_checked_migration_metadata"], 29)
-        self.assertEqual(details["summary"]["checked_migration_field_counts"]["x_turbovas_exposure"], 29)
+        self.assertEqual(details["summary"]["rows_with_checked_migration_metadata"], 47)
+        self.assertEqual(details["summary"]["checked_migration_field_counts"]["x_turbovas_exposure"], 47)
         self.assertIn("native-api-migration-matrix", source)
         self.assertIn("def command_native_api_migration_matrix", source)
 
@@ -1298,6 +1298,44 @@ class TurboVASCtlTests(unittest.TestCase):
             self.assertEqual(row["x_turbovas_maturity"], "live-read")
             self.assertEqual(row["x_turbovas_replaces"], replaces)
             self.assertEqual(row["x_turbovas_inherited_still_owns"], inherited_still_owns)
+
+        expected_raw_report_metadata = {
+            "/api/v1/reports/{report_id}/results": ("getReportsByReportIdResults", "raw-report-result-evidence-read"),
+            "/api/v1/reports/{report_id}/hosts": ("getReportsByReportIdHosts", "raw-report-host-evidence-read"),
+            "/api/v1/reports/{report_id}/ports": ("getReportsByReportIdPorts", "raw-report-port-evidence-read"),
+            "/api/v1/reports/{report_id}/applications": ("getReportsByReportIdApplications", "raw-report-application-evidence-read"),
+            "/api/v1/reports/{report_id}/operating-systems": ("getReportsByReportIdOperatingSystems", "raw-report-operating-system-evidence-read"),
+            "/api/v1/reports/{report_id}/cves": ("getReportsByReportIdCves", "raw-report-cve-evidence-read"),
+            "/api/v1/reports/{report_id}/tls-certificates": ("getReportsByReportIdTlsCertificates", "raw-report-tls-certificate-evidence-read"),
+            "/api/v1/reports/{report_id}/errors": ("getReportsByReportIdErrors", "raw-report-error-message-evidence-read"),
+            "/api/v1/reports/{report_id}/metrics": ("getReportsByReportIdMetrics", "raw-report-metrics-read"),
+        }
+        for endpoint, (operation_id, replaces) in expected_raw_report_metadata.items():
+            row = rows[endpoint]
+            self.assertEqual(row["operation_id"], operation_id)
+            self.assertEqual(row["x_turbovas_exposure"], "direct-read")
+            self.assertEqual(row["x_turbovas_maturity"], "live-read")
+            self.assertEqual(row["x_turbovas_replaces"], replaces)
+            self.assertEqual(row["x_turbovas_inherited_still_owns"], "raw-report-generation-xml-export-retention-and-mutations")
+
+        expected_scope_report_metadata = {
+            "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/results": ("getScopesByScopeIdReportsByScopeReportIdResults", "scope-report-result-evidence-read"),
+            "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/hosts": ("getScopesByScopeIdReportsByScopeReportIdHosts", "scope-report-host-evidence-read"),
+            "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/ports": ("getScopesByScopeIdReportsByScopeReportIdPorts", "scope-report-port-evidence-read"),
+            "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/applications": ("getScopesByScopeIdReportsByScopeReportIdApplications", "scope-report-application-evidence-read"),
+            "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/operating-systems": ("getScopesByScopeIdReportsByScopeReportIdOperatingSystems", "scope-report-operating-system-evidence-read"),
+            "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/cves": ("getScopesByScopeIdReportsByScopeReportIdCves", "scope-report-cve-evidence-read"),
+            "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/tls-certificates": ("getScopesByScopeIdReportsByScopeReportIdTlsCertificates", "scope-report-tls-certificate-evidence-read"),
+            "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/errors": ("getScopesByScopeIdReportsByScopeReportIdErrors", "scope-report-error-message-evidence-read"),
+            "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/metrics": ("getScopesByScopeIdReportsByScopeReportIdMetrics", "scope-report-metrics-read"),
+        }
+        for endpoint, (operation_id, replaces) in expected_scope_report_metadata.items():
+            row = rows[endpoint]
+            self.assertEqual(row["operation_id"], operation_id)
+            self.assertEqual(row["x_turbovas_exposure"], "direct-read")
+            self.assertEqual(row["x_turbovas_maturity"], "live-read")
+            self.assertEqual(row["x_turbovas_replaces"], replaces)
+            self.assertEqual(row["x_turbovas_inherited_still_owns"], "scope-report-generation-retention-and-mutations")
 
         tags = rows["/api/v1/tags"]
         self.assertEqual(tags["operation_id"], "getTags")
@@ -1432,6 +1470,24 @@ class TurboVASCtlTests(unittest.TestCase):
                 "GET /tags/{tag_id}",
                 "GET /tags/{tag_id}/resources",
                 "GET /trashcan/summary",
+                "GET /reports/{report_id}/results",
+                "GET /reports/{report_id}/hosts",
+                "GET /reports/{report_id}/ports",
+                "GET /reports/{report_id}/applications",
+                "GET /reports/{report_id}/operating-systems",
+                "GET /reports/{report_id}/cves",
+                "GET /reports/{report_id}/tls-certificates",
+                "GET /reports/{report_id}/errors",
+                "GET /reports/{report_id}/metrics",
+                "GET /scopes/{scope_id}/reports/{scope_report_id}/results",
+                "GET /scopes/{scope_id}/reports/{scope_report_id}/hosts",
+                "GET /scopes/{scope_id}/reports/{scope_report_id}/ports",
+                "GET /scopes/{scope_id}/reports/{scope_report_id}/applications",
+                "GET /scopes/{scope_id}/reports/{scope_report_id}/operating-systems",
+                "GET /scopes/{scope_id}/reports/{scope_report_id}/cves",
+                "GET /scopes/{scope_id}/reports/{scope_report_id}/tls-certificates",
+                "GET /scopes/{scope_id}/reports/{scope_report_id}/errors",
+                "GET /scopes/{scope_id}/reports/{scope_report_id}/metrics",
                 "GET /scopes/{scope_id}/reports/{scope_report_id}/retention-plan",
             },
         )
@@ -1442,7 +1498,7 @@ class TurboVASCtlTests(unittest.TestCase):
                     "operation": "GET /reports",
                     "field": "x-turbovas-inherited-still-owns",
                     "actual": "all-the-things",
-                    "allowed": ["alert-detail-delivery-control", "cert-advisory-rich-detail-export", "feed-sync-import-control", "host-target-creation-tags-writes-and-rich-history", "nvt-rich-detail", "operating-system-writes-deletes-and-rich-history", "retention-mutations", "scan-config-preferences-export-import-writes-and-deletes", "scanner-control-credentials-writes-and-deletes", "scap-rich-context", "tag-write-control", "tls-certificate-export-delete-and-rich-history", "trashcan-row-data-and-mutations"],
+                    "allowed": ["alert-detail-delivery-control", "cert-advisory-rich-detail-export", "feed-sync-import-control", "host-target-creation-tags-writes-and-rich-history", "nvt-rich-detail", "operating-system-writes-deletes-and-rich-history", "raw-report-generation-xml-export-retention-and-mutations", "retention-mutations", "scan-config-preferences-export-import-writes-and-deletes", "scanner-control-credentials-writes-and-deletes", "scap-rich-context", "scope-report-generation-retention-and-mutations", "tag-write-control", "tls-certificate-export-delete-and-rich-history", "trashcan-row-data-and-mutations"],
                 },
                 {
                     "operation": "GET /reports",
@@ -1454,7 +1510,7 @@ class TurboVASCtlTests(unittest.TestCase):
                     "operation": "GET /reports",
                     "field": "x-turbovas-replaces",
                     "actual": "everything",
-                    "allowed": ["alert-metadata-list-read", "cert-bund-advisory-catalog-detail-read", "cert-bund-advisory-list-read", "cpe-catalog-detail-read", "cpe-catalog-list-read", "cve-catalog-detail-read", "cve-catalog-list-read", "dfn-cert-advisory-catalog-detail-read", "dfn-cert-advisory-list-read", "feed-status-read", "host-asset-detail-info-read", "host-asset-list-read", "none", "nvt-catalog-detail-read", "nvt-catalog-list-read", "operating-system-asset-detail-info-read", "operating-system-asset-list-read", "scan-config-family-summary-read", "scan-config-metadata-detail-info-read", "scan-config-metadata-list-read", "scanner-metadata-detail-info-read", "scanner-metadata-list-read", "tag-metadata-read", "tag-resource-name-read", "tag-resource-reference-read", "tls-certificate-asset-detail-info-read", "tls-certificate-asset-list-read", "trashcan-count-summary-read"],
+                    "allowed": ["alert-metadata-list-read", "cert-bund-advisory-catalog-detail-read", "cert-bund-advisory-list-read", "cpe-catalog-detail-read", "cpe-catalog-list-read", "cve-catalog-detail-read", "cve-catalog-list-read", "dfn-cert-advisory-catalog-detail-read", "dfn-cert-advisory-list-read", "feed-status-read", "host-asset-detail-info-read", "host-asset-list-read", "none", "nvt-catalog-detail-read", "nvt-catalog-list-read", "operating-system-asset-detail-info-read", "operating-system-asset-list-read", "raw-report-application-evidence-read", "raw-report-cve-evidence-read", "raw-report-error-message-evidence-read", "raw-report-host-evidence-read", "raw-report-metrics-read", "raw-report-operating-system-evidence-read", "raw-report-port-evidence-read", "raw-report-result-evidence-read", "raw-report-tls-certificate-evidence-read", "scan-config-family-summary-read", "scan-config-metadata-detail-info-read", "scan-config-metadata-list-read", "scanner-metadata-detail-info-read", "scanner-metadata-list-read", "scope-report-application-evidence-read", "scope-report-cve-evidence-read", "scope-report-error-message-evidence-read", "scope-report-host-evidence-read", "scope-report-metrics-read", "scope-report-operating-system-evidence-read", "scope-report-port-evidence-read", "scope-report-result-evidence-read", "scope-report-tls-certificate-evidence-read", "tag-metadata-read", "tag-resource-name-read", "tag-resource-reference-read", "tls-certificate-asset-detail-info-read", "tls-certificate-asset-list-read", "trashcan-count-summary-read"],
                 },
             ],
         )
@@ -1481,6 +1537,10 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn(("GET /tags/{tag_id}", "x-turbovas-maturity"), missing_migration)
         self.assertIn(("GET /tags/{tag_id}/resources", "x-turbovas-replaces"), missing_migration)
         self.assertIn(("GET /trashcan/summary", "x-turbovas-inherited-still-owns"), missing_migration)
+        self.assertIn(("GET /reports/{report_id}/results", "x-turbovas-replaces"), missing_migration)
+        self.assertIn(("GET /reports/{report_id}/metrics", "x-turbovas-inherited-still-owns"), missing_migration)
+        self.assertIn(("GET /scopes/{scope_id}/reports/{scope_report_id}/results", "x-turbovas-maturity"), missing_migration)
+        self.assertIn(("GET /scopes/{scope_id}/reports/{scope_report_id}/metrics", "x-turbovas-replaces"), missing_migration)
         self.assertIn(("GET /scopes/{scope_id}/reports/{scope_report_id}/retention-plan", "x-turbovas-replaces"), missing_migration)
         self.assertEqual(summary["migration_metadata_mismatches"], [])
         self.assertEqual(summary["exposure_mismatches"], [])

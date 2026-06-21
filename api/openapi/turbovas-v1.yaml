@@ -1366,6 +1366,10 @@ paths:
     get:
       operationId: getReportsByReportIdResults
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: raw-report-result-evidence-read
+      x-turbovas-inherited-still-owns: raw-report-generation-xml-export-retention-and-mutations
       summary: List raw scan report results
       parameters:
         - $ref: '#/components/parameters/ReportId'
@@ -1396,6 +1400,10 @@ paths:
     get:
       operationId: getReportsByReportIdHosts
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: raw-report-host-evidence-read
+      x-turbovas-inherited-still-owns: raw-report-generation-xml-export-retention-and-mutations
       summary: List raw scan report hosts
       parameters:
         - $ref: '#/components/parameters/ReportId'
@@ -1426,6 +1434,10 @@ paths:
     get:
       operationId: getReportsByReportIdPorts
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: raw-report-port-evidence-read
+      x-turbovas-inherited-still-owns: raw-report-generation-xml-export-retention-and-mutations
       summary: List raw scan report ports
       parameters:
         - $ref: '#/components/parameters/ReportId'
@@ -1456,6 +1468,10 @@ paths:
     get:
       operationId: getReportsByReportIdApplications
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: raw-report-application-evidence-read
+      x-turbovas-inherited-still-owns: raw-report-generation-xml-export-retention-and-mutations
       summary: List raw scan report applications
       parameters:
         - $ref: '#/components/parameters/ReportId'
@@ -1486,6 +1502,10 @@ paths:
     get:
       operationId: getReportsByReportIdOperatingSystems
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: raw-report-operating-system-evidence-read
+      x-turbovas-inherited-still-owns: raw-report-generation-xml-export-retention-and-mutations
       summary: List raw scan report operating systems
       parameters:
         - $ref: '#/components/parameters/ReportId'
@@ -1516,6 +1536,10 @@ paths:
     get:
       operationId: getReportsByReportIdCves
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: raw-report-cve-evidence-read
+      x-turbovas-inherited-still-owns: raw-report-generation-xml-export-retention-and-mutations
       summary: List raw scan report CVEs
       parameters:
         - $ref: '#/components/parameters/ReportId'
@@ -1546,6 +1570,10 @@ paths:
     get:
       operationId: getReportsByReportIdTlsCertificates
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: raw-report-tls-certificate-evidence-read
+      x-turbovas-inherited-still-owns: raw-report-generation-xml-export-retention-and-mutations
       summary: List raw scan report TLS certificates
       parameters:
         - $ref: '#/components/parameters/ReportId'
@@ -1576,6 +1604,10 @@ paths:
     get:
       operationId: getReportsByReportIdErrors
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: raw-report-error-message-evidence-read
+      x-turbovas-inherited-still-owns: raw-report-generation-xml-export-retention-and-mutations
       summary: List raw scan report Error Messages
       parameters:
         - $ref: '#/components/parameters/ReportId'
@@ -1606,6 +1638,10 @@ paths:
     get:
       operationId: getReportsByReportIdMetrics
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: raw-report-metrics-read
+      x-turbovas-inherited-still-owns: raw-report-generation-xml-export-retention-and-mutations
       summary: Read raw report metrics
       parameters:
         - $ref: '#/components/parameters/ReportId'
@@ -1870,6 +1906,10 @@ paths:
     get:
       operationId: getScopesByScopeIdReportsByScopeReportIdResults
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: scope-report-result-evidence-read
+      x-turbovas-inherited-still-owns: scope-report-generation-retention-and-mutations
       summary: List deduplicated scope report results
       parameters:
         - $ref: '#/components/parameters/ScopeId'
@@ -1901,6 +1941,10 @@ paths:
     get:
       operationId: getScopesByScopeIdReportsByScopeReportIdHosts
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: scope-report-host-evidence-read
+      x-turbovas-inherited-still-owns: scope-report-generation-retention-and-mutations
       summary: List scope report hosts
       parameters:
         - $ref: '#/components/parameters/ScopeId'
@@ -1932,6 +1976,10 @@ paths:
     get:
       operationId: getScopesByScopeIdReportsByScopeReportIdPorts
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: scope-report-port-evidence-read
+      x-turbovas-inherited-still-owns: scope-report-generation-retention-and-mutations
       summary: List scope report ports
       parameters:
         - $ref: '#/components/parameters/ScopeId'
@@ -1963,6 +2011,10 @@ paths:
     get:
       operationId: getScopesByScopeIdReportsByScopeReportIdApplications
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: scope-report-application-evidence-read
+      x-turbovas-inherited-still-owns: scope-report-generation-retention-and-mutations
       summary: List scope report applications
       parameters:
         - $ref: '#/components/parameters/ScopeId'
@@ -1994,6 +2046,10 @@ paths:
     get:
       operationId: getScopesByScopeIdReportsByScopeReportIdOperatingSystems
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: scope-report-operating-system-evidence-read
+      x-turbovas-inherited-still-owns: scope-report-generation-retention-and-mutations
       summary: List scope report operating systems
       parameters:
         - $ref: '#/components/parameters/ScopeId'
@@ -2025,6 +2081,10 @@ paths:
     get:
       operationId: getScopesByScopeIdReportsByScopeReportIdCves
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: scope-report-cve-evidence-read
+      x-turbovas-inherited-still-owns: scope-report-generation-retention-and-mutations
       summary: List scope report CVEs
       parameters:
         - $ref: '#/components/parameters/ScopeId'
@@ -2056,6 +2116,10 @@ paths:
     get:
       operationId: getScopesByScopeIdReportsByScopeReportIdTlsCertificates
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: scope-report-tls-certificate-evidence-read
+      x-turbovas-inherited-still-owns: scope-report-generation-retention-and-mutations
       summary: List scope report TLS certificates
       parameters:
         - $ref: '#/components/parameters/ScopeId'
@@ -2087,6 +2151,10 @@ paths:
     get:
       operationId: getScopesByScopeIdReportsByScopeReportIdErrors
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: scope-report-error-message-evidence-read
+      x-turbovas-inherited-still-owns: scope-report-generation-retention-and-mutations
       summary: List scope report Error Messages
       parameters:
         - $ref: '#/components/parameters/ScopeId'
@@ -2118,6 +2186,10 @@ paths:
     get:
       operationId: getScopesByScopeIdReportsByScopeReportIdMetrics
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: scope-report-metrics-read
+      x-turbovas-inherited-still-owns: scope-report-generation-retention-and-mutations
       summary: Read scope report metrics
       parameters:
         - $ref: '#/components/parameters/ScopeId'
