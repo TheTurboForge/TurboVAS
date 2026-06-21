@@ -28,10 +28,11 @@ script/curl -> opt-in direct bearer listener -> turbovas-api -> PostgreSQL
 - The direct listener rejects valid-token non-GET `/api/v1` requests with JSON
   `405 method_not_allowed`. This prevents future native write/control routes
   from becoming direct-scriptable without a separate safety design.
-- Direct listener exposure is explicitly classified, not simply every
-  bearer-authenticated `GET`. Internal-only preview/scaffold endpoints, starting
-  with the scope-report retention plan preview, return JSON `404 not_found` on
-  the direct listener even when the bearer token is valid.
+- Direct listener exposure is a positive allowlist, not simply every
+  bearer-authenticated `GET`. Unclassified `/api/v1` routes and internal-only
+  preview/scaffold endpoints, starting with the scope-report retention plan
+  preview, return JSON `404 not_found` on the direct listener even when the
+  bearer token is valid.
 - Direct listener responses include `X-Request-Id`. A client may provide a
   bounded ASCII request ID for correlation; unsafe, empty, or oversized values
   are replaced with a generated `tv-...` ID. Auth failures and direct-listener

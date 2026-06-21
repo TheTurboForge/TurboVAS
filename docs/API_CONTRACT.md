@@ -75,10 +75,10 @@ separate TLS/bootstrap/host-binding posture tracked outside this v1 read API.
   valid-token non-GET requests until native write/control APIs are separately
   designed.
 - Direct v1 endpoint boundary: bearer-authenticated direct access exposes only
-  explicitly classified scriptable read endpoints. Internal-only native previews
-  such as the scope-report retention plan preview return JSON `404 not_found`
-  on the direct listener even though they remain available to internal runtime
-  validation.
+  explicitly allowlisted scriptable read endpoints. Unclassified `/api/v1`
+  routes and internal-only native previews such as the scope-report retention
+  plan preview return JSON `404 not_found` on the direct listener even though
+  they remain available to internal runtime validation.
 - Response body: JSON objects only; no XML payloads in native product APIs.
 - IDs: UUID strings matching the underlying gvmd resource identifiers.
 - Timestamps: RFC 3339 UTC strings.

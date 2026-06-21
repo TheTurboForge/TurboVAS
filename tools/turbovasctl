@@ -6320,6 +6320,16 @@ def command_runtime_native_api_direct_smoke(repo_root: Path) -> dict[str, Any]:
     non_get_ok = non_get.returncode == 0 and non_get_status == 405 and isinstance(non_get_json, dict) and non_get_json.get("error", {}).get("code") == "method_not_allowed"
     findings.append(native_api_probe_finding("pass" if non_get_ok else "fail", "native-api-direct.read-only-method-guard", "Direct native API rejects valid-token non-GET /api/v1 requests with JSON 405." if non_get_ok else "Direct native API did not reject a valid-token non-GET /api/v1 request correctly.", non_get, direct_native_api_display_command("/api/v1/reports?page_size=1", token=env[TURBOVAS_API_BEARER_TOKEN_ENV], env=env, method="POST"), non_get_json, {"http_status": non_get_status, **summarize_native_api_response(non_get_json)}))
 
+    unclassified = direct_native_api_curl(
+        repo_root,
+        "/api/v1/__unclassified_probe__",
+        token=env[TURBOVAS_API_BEARER_TOKEN_ENV],
+        env=env,
+    )
+    unclassified_json, unclassified_status = parse_json_output_with_http_status(unclassified)
+    unclassified_ok = unclassified.returncode == 0 and unclassified_status == 404 and isinstance(unclassified_json, dict) and unclassified_json.get("error", {}).get("code") == "not_found"
+    findings.append(native_api_probe_finding("pass" if unclassified_ok else "fail", "native-api-direct.positive-allowlist", "Direct native API denies unclassified /api/v1 GET routes with JSON 404." if unclassified_ok else "Direct native API did not deny an unclassified /api/v1 GET route correctly.", unclassified, direct_native_api_display_command("/api/v1/__unclassified_probe__", token=env[TURBOVAS_API_BEARER_TOKEN_ENV], env=env), unclassified_json, {"http_status": unclassified_status, **summarize_native_api_response(unclassified_json)}))
+
     scope_reports = native_api_curl(repo_root, "/api/v1/scope-reports?page_size=1&sort=-creation_time")
     scope_reports_json = parse_json_output(scope_reports)
     scope_report_items = scope_reports_json.get("items", []) if isinstance(scope_reports_json, dict) else []
