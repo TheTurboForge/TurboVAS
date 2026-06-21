@@ -110,7 +110,9 @@ struct CollectionQuery {
 const DEFAULT_COLLECTION_PAGE_SIZE: i64 = 50;
 const MAX_COLLECTION_PAGE_SIZE: i64 = 500;
 const MAX_COLLECTION_FILTER_LENGTH: usize = 4096;
+const TAG_RESOURCE_NAME_MAX_PAGE_SIZE: i64 = 200;
 
+const REPORT_DEFAULT_SORT: &str = "-creation_time";
 const REPORT_SORT_FIELDS: &[(&str, &str)] = &[
     ("id", "uuid"),
     ("name", "name"),
@@ -134,6 +136,7 @@ const REPORT_SORT_FIELDS: &[(&str, &str)] = &[
     ("log", "severity_log"),
     ("false_positive", "severity_false_positive"),
 ];
+const VULNERABILITY_DEFAULT_SORT: &str = "-severity";
 const VULNERABILITY_SORT_FIELDS: &[(&str, &str)] = &[
     ("id", "id"),
     ("name", "name"),
@@ -144,6 +147,7 @@ const VULNERABILITY_SORT_FIELDS: &[(&str, &str)] = &[
     ("results", "result_count"),
     ("hosts", "host_count"),
 ];
+const RESULT_DEFAULT_SORT: &str = "-severity";
 const RESULT_SORT_FIELDS: &[(&str, &str)] = &[
     ("id", "id"),
     ("host", "host"),
@@ -161,6 +165,7 @@ const RESULT_SORT_FIELDS: &[(&str, &str)] = &[
     ("report", "source_report_name"),
     ("task", "task_name"),
 ];
+const REPORT_RESULT_DEFAULT_SORT: &str = "-severity";
 const REPORT_RESULT_SORT_FIELDS: &[(&str, &str)] = &[
     ("id", "id"),
     ("host", "host"),
@@ -170,6 +175,77 @@ const REPORT_RESULT_SORT_FIELDS: &[(&str, &str)] = &[
     ("severity", "severity"),
     ("qod", "qod"),
     ("created_at", "created_at_unix"),
+];
+const ALERT_DEFAULT_SORT: &str = "name";
+const ALERT_SORT_FIELDS: &[(&str, &str)] = &[
+    ("id", "id"),
+    ("name", "name"),
+    ("event", "event_type"),
+    ("condition", "condition_type"),
+    ("method", "method_type"),
+    ("filter", "filter_name"),
+    ("active", "active_int"),
+    ("tasks", "task_count"),
+    ("task_count", "task_count"),
+    ("created", "created_at_unix"),
+    ("modified", "modified_at_unix"),
+];
+const TAG_DEFAULT_SORT: &str = "name";
+const TAG_SORT_FIELDS: &[(&str, &str)] = &[
+    ("id", "id"),
+    ("name", "name"),
+    ("value", "value"),
+    ("active", "active_int"),
+    ("resource_type", "resource_type"),
+    ("resources", "resource_count"),
+    ("resource_count", "resource_count"),
+    ("created", "created_at_unix"),
+    ("modified", "modified_at_unix"),
+];
+const TAG_RESOURCE_DEFAULT_SORT: &str = "name";
+const TAG_RESOURCE_SORT_FIELDS: &[(&str, &str)] = &[("id", "id"), ("name", "name")];
+const PORT_LIST_DEFAULT_SORT: &str = "name";
+const PORT_LIST_SORT_FIELDS: &[(&str, &str)] = &[
+    ("id", "id"),
+    ("name", "name"),
+    ("total", "port_count_all"),
+    ("tcp", "port_count_tcp"),
+    ("udp", "port_count_udp"),
+    ("predefined", "predefined_int"),
+    ("created", "created_at_unix"),
+    ("modified", "modified_at_unix"),
+];
+const SCHEDULE_DEFAULT_SORT: &str = "name";
+const SCHEDULE_SORT_FIELDS: &[(&str, &str)] = &[
+    ("id", "id"),
+    ("name", "name"),
+    ("first_run", "first_run_unix"),
+    ("next_run", "next_run_unix"),
+    ("period", "period_seconds"),
+    ("duration", "duration_seconds"),
+    ("tasks", "task_count"),
+    ("created", "created_at_unix"),
+    ("modified", "modified_at_unix"),
+];
+const REPORT_FORMAT_DEFAULT_SORT: &str = "name";
+const REPORT_FORMAT_SORT_FIELDS: &[(&str, &str)] = &[
+    ("id", "id"),
+    ("name", "name"),
+    ("extension", "extension"),
+    ("content_type", "content_type"),
+    ("trust", "trust_int"),
+    ("active", "active_int"),
+    ("predefined", "predefined_int"),
+    ("created", "created_at_unix"),
+    ("modified", "modified_at_unix"),
+];
+const REPORT_CONFIG_DEFAULT_SORT: &str = "name";
+const REPORT_CONFIG_SORT_FIELDS: &[(&str, &str)] = &[
+    ("id", "id"),
+    ("name", "name"),
+    ("report_format", "report_format_name"),
+    ("created", "created_at_unix"),
+    ("modified", "modified_at_unix"),
 ];
 
 #[derive(Debug, Serialize)]
@@ -2156,7 +2232,7 @@ async fn reports(
     State(state): State<AppState>,
     Query(query): Query<CollectionQuery>,
 ) -> Result<Json<Collection<ReportItem>>, ApiError> {
-    let params = normalize_collection_query(query, "-creation_time")?;
+    let params = normalize_collection_query(query, REPORT_DEFAULT_SORT)?;
     let sort_sql = sort_clause(&params.sort, REPORT_SORT_FIELDS)?;
     let sql = raw_report_sql(
         "($1 = ''\n\
@@ -3319,23 +3395,8 @@ async fn alert_assets(
     State(state): State<AppState>,
     Query(query): Query<CollectionQuery>,
 ) -> Result<Json<Collection<AlertAssetItem>>, ApiError> {
-    let params = normalize_collection_query(query, "name")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("id", "id"),
-            ("name", "name"),
-            ("event", "event_type"),
-            ("condition", "condition_type"),
-            ("method", "method_type"),
-            ("filter", "filter_name"),
-            ("active", "active_int"),
-            ("tasks", "task_count"),
-            ("task_count", "task_count"),
-            ("created", "created_at_unix"),
-            ("modified", "modified_at_unix"),
-        ],
-    )?;
+    let params = normalize_collection_query(query, ALERT_DEFAULT_SORT)?;
+    let sort_sql = sort_clause(&params.sort, ALERT_SORT_FIELDS)?;
     let sql = alert_assets_sql(&sort_sql);
     let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
     let rows = client
@@ -3362,21 +3423,8 @@ async fn tag_assets(
     let active_filter = query.active.clone().unwrap_or_default();
     let resource_type_filter = query.resource_type.clone().unwrap_or_default();
     let value_filter = query.value.clone().unwrap_or_default();
-    let params = normalize_collection_query(query, "name")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("id", "id"),
-            ("name", "name"),
-            ("value", "value"),
-            ("active", "active_int"),
-            ("resource_type", "resource_type"),
-            ("resources", "resource_count"),
-            ("resource_count", "resource_count"),
-            ("created", "created_at_unix"),
-            ("modified", "modified_at_unix"),
-        ],
-    )?;
+    let params = normalize_collection_query(query, TAG_DEFAULT_SORT)?;
+    let sort_sql = sort_clause(&params.sort, TAG_SORT_FIELDS)?;
     let sql = format!(
         r#"WITH tag_rows AS (
              SELECT t.uuid AS id,
@@ -3478,8 +3526,8 @@ async fn tag_asset_resources(
     Query(query): Query<CollectionQuery>,
 ) -> Result<Json<TagResourceCollection>, ApiError> {
     let tag_id = parse_uuid(&tag_id)?.to_string();
-    let params = normalize_collection_query(query, "name")?;
-    let sort_sql = sort_clause(&params.sort, &[("id", "id"), ("name", "name")])?;
+    let params = normalize_collection_query(query, TAG_RESOURCE_DEFAULT_SORT)?;
+    let sort_sql = sort_clause(&params.sort, TAG_RESOURCE_SORT_FIELDS)?;
     let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
     let tag_row = client
         .query_opt(
@@ -3532,13 +3580,13 @@ async fn tag_resource_names(
     Query(query): Query<CollectionQuery>,
 ) -> Result<Json<Collection<TagResourceItem>>, ApiError> {
     let resource_type = normalize_tag_resource_type(resource_type);
-    let params = normalize_collection_query(query, "name")?;
-    if params.page_size > 200 {
-        return Err(ApiError::BadRequest(
-            "page_size must be between 1 and 200".to_string(),
-        ));
+    let params = normalize_collection_query(query, TAG_RESOURCE_DEFAULT_SORT)?;
+    if params.page_size > TAG_RESOURCE_NAME_MAX_PAGE_SIZE {
+        return Err(ApiError::BadRequest(format!(
+            "page_size must be between 1 and {TAG_RESOURCE_NAME_MAX_PAGE_SIZE}"
+        )));
     }
-    let sort_sql = sort_clause(&params.sort, &[("id", "id"), ("name", "name")])?;
+    let sort_sql = sort_clause(&params.sort, TAG_RESOURCE_SORT_FIELDS)?;
     let (filter, exact_id_filter) = tag_resource_name_filter(&params.filter);
     let sql = tag_resource_name_collection_sql(&resource_type, &sort_sql)?;
     let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
@@ -3735,20 +3783,8 @@ async fn port_list_assets(
     State(state): State<AppState>,
     Query(query): Query<CollectionQuery>,
 ) -> Result<Json<Collection<PortListAssetItem>>, ApiError> {
-    let params = normalize_collection_query(query, "name")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("id", "id"),
-            ("name", "name"),
-            ("total", "port_count_all"),
-            ("tcp", "port_count_tcp"),
-            ("udp", "port_count_udp"),
-            ("predefined", "predefined_int"),
-            ("created", "created_at_unix"),
-            ("modified", "modified_at_unix"),
-        ],
-    )?;
+    let params = normalize_collection_query(query, PORT_LIST_DEFAULT_SORT)?;
+    let sort_sql = sort_clause(&params.sort, PORT_LIST_SORT_FIELDS)?;
     let sql = format!(
         r#"WITH port_list_rows AS (
              SELECT pl.id AS internal_id,
@@ -3899,21 +3935,8 @@ async fn schedule_assets(
     State(state): State<AppState>,
     Query(query): Query<CollectionQuery>,
 ) -> Result<Json<Collection<ScheduleAssetItem>>, ApiError> {
-    let params = normalize_collection_query(query, "name")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("id", "id"),
-            ("name", "name"),
-            ("first_run", "first_run_unix"),
-            ("next_run", "next_run_unix"),
-            ("period", "period_seconds"),
-            ("duration", "duration_seconds"),
-            ("tasks", "task_count"),
-            ("created", "created_at_unix"),
-            ("modified", "modified_at_unix"),
-        ],
-    )?;
+    let params = normalize_collection_query(query, SCHEDULE_DEFAULT_SORT)?;
+    let sort_sql = sort_clause(&params.sort, SCHEDULE_SORT_FIELDS)?;
     let sql = format!(
         r#"WITH schedule_rows AS (
              SELECT s.id AS internal_id,
@@ -4033,21 +4056,8 @@ async fn report_format_assets(
     State(state): State<AppState>,
     Query(query): Query<CollectionQuery>,
 ) -> Result<Json<Collection<ReportFormatAssetItem>>, ApiError> {
-    let params = normalize_collection_query(query, "name")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("id", "id"),
-            ("name", "name"),
-            ("extension", "extension"),
-            ("content_type", "content_type"),
-            ("trust", "trust_int"),
-            ("active", "active_int"),
-            ("predefined", "predefined_int"),
-            ("created", "created_at_unix"),
-            ("modified", "modified_at_unix"),
-        ],
-    )?;
+    let params = normalize_collection_query(query, REPORT_FORMAT_DEFAULT_SORT)?;
+    let sort_sql = sort_clause(&params.sort, REPORT_FORMAT_SORT_FIELDS)?;
     let sql = format!(
         r#"WITH report_format_rows AS (
              SELECT rf.id AS internal_id,
@@ -4436,17 +4446,8 @@ async fn report_config_assets(
     State(state): State<AppState>,
     Query(query): Query<CollectionQuery>,
 ) -> Result<Json<Collection<ReportConfigAssetItem>>, ApiError> {
-    let params = normalize_collection_query(query, "name")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("id", "id"),
-            ("name", "name"),
-            ("report_format", "report_format_name"),
-            ("created", "created_at_unix"),
-            ("modified", "modified_at_unix"),
-        ],
-    )?;
+    let params = normalize_collection_query(query, REPORT_CONFIG_DEFAULT_SORT)?;
+    let sort_sql = sort_clause(&params.sort, REPORT_CONFIG_SORT_FIELDS)?;
     let sql = format!(
         r#"SELECT count(*) OVER()::bigint AS total,
                   rc.id::bigint AS internal_id,
@@ -4586,7 +4587,7 @@ async fn vulnerabilities(
     State(state): State<AppState>,
     Query(query): Query<CollectionQuery>,
 ) -> Result<Json<Collection<VulnerabilityItem>>, ApiError> {
-    let params = normalize_collection_query(query, "-severity")?;
+    let params = normalize_collection_query(query, VULNERABILITY_DEFAULT_SORT)?;
     let sort_sql = sort_clause(&params.sort, VULNERABILITY_SORT_FIELDS)?;
     let sql = format!(
         r#"WITH vulnerability_rows AS (
@@ -6057,7 +6058,7 @@ async fn results(
     State(state): State<AppState>,
     Query(query): Query<CollectionQuery>,
 ) -> Result<Json<Collection<ResultItem>>, ApiError> {
-    let params = normalize_collection_query(query, "-severity")?;
+    let params = normalize_collection_query(query, RESULT_DEFAULT_SORT)?;
     let sort_sql = sort_clause(&params.sort, RESULT_SORT_FIELDS)?;
     let sql = format!(
         r#"WITH result_rows AS (
@@ -6232,7 +6233,7 @@ async fn report_results(
     Query(query): Query<CollectionQuery>,
 ) -> Result<Json<Collection<ResultItem>>, ApiError> {
     parse_uuid(&report_id)?;
-    let params = normalize_collection_query(query, "-severity")?;
+    let params = normalize_collection_query(query, REPORT_RESULT_DEFAULT_SORT)?;
     let sort_sql = sort_clause(&params.sort, REPORT_RESULT_SORT_FIELDS)?;
     let sql = format!(
         "WITH selected_report AS (\n\
@@ -7198,7 +7199,7 @@ async fn scope_report_results(
 ) -> Result<Json<Collection<ResultItem>>, ApiError> {
     parse_uuid(&scope_id)?;
     parse_uuid(&scope_report_id)?;
-    let params = normalize_collection_query(query, "-severity")?;
+    let params = normalize_collection_query(query, REPORT_RESULT_DEFAULT_SORT)?;
     let sort_sql = sort_clause(&params.sort, REPORT_RESULT_SORT_FIELDS)?;
     let sql = format!(
         "WITH selected_scope_report AS (\n\
@@ -10437,7 +10438,7 @@ fn unix_ts_to_rfc3339(value: i64) -> Option<String> {
 mod tests {
     use super::*;
 
-    struct PriorityCollectionContract {
+    struct CollectionContract {
         path: &'static str,
         default_sort: &'static str,
         allowed_sort_fields: &'static [(&'static str, &'static str)],
@@ -10445,17 +10446,17 @@ mod tests {
         tie_breakers: &'static [&'static str],
     }
 
-    const PRIORITY_COLLECTION_CONTRACTS: &[PriorityCollectionContract] = &[
-        PriorityCollectionContract {
+    const PRIORITY_COLLECTION_CONTRACTS: &[CollectionContract] = &[
+        CollectionContract {
             path: "/api/v1/vulnerabilities",
-            default_sort: "-severity",
+            default_sort: VULNERABILITY_DEFAULT_SORT,
             allowed_sort_fields: VULNERABILITY_SORT_FIELDS,
             filter_fields: &["id", "name"],
             tie_breakers: &["name", "id"],
         },
-        PriorityCollectionContract {
+        CollectionContract {
             path: "/api/v1/results",
-            default_sort: "-severity",
+            default_sort: RESULT_DEFAULT_SORT,
             allowed_sort_fields: RESULT_SORT_FIELDS,
             filter_fields: &[
                 "id",
@@ -10469,31 +10470,121 @@ mod tests {
             ],
             tie_breakers: &["created_at_unix", "id"],
         },
-        PriorityCollectionContract {
+        CollectionContract {
             path: "/api/v1/reports",
-            default_sort: "-creation_time",
+            default_sort: REPORT_DEFAULT_SORT,
             allowed_sort_fields: REPORT_SORT_FIELDS,
             filter_fields: &["uuid", "name", "status", "task_name", "target_name"],
             tie_breakers: &["creation_time", "uuid"],
         },
-        PriorityCollectionContract {
+        CollectionContract {
             path: "/api/v1/reports/{report_id}/results",
-            default_sort: "-severity",
+            default_sort: REPORT_RESULT_DEFAULT_SORT,
             allowed_sort_fields: REPORT_RESULT_SORT_FIELDS,
             filter_fields: &["id", "host", "port", "nvt_oid", "name"],
             tie_breakers: &["created_at_unix", "id"],
         },
-        PriorityCollectionContract {
+        CollectionContract {
             path: "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/results",
-            default_sort: "-severity",
+            default_sort: REPORT_RESULT_DEFAULT_SORT,
             allowed_sort_fields: REPORT_RESULT_SORT_FIELDS,
             filter_fields: &["id", "host", "port", "nvt_oid", "name"],
             tie_breakers: &["created_at_unix", "id"],
         },
     ];
 
+    const MANAGEMENT_COLLECTION_CONTRACTS: &[CollectionContract] = &[
+        CollectionContract {
+            path: "/api/v1/alerts",
+            default_sort: ALERT_DEFAULT_SORT,
+            allowed_sort_fields: ALERT_SORT_FIELDS,
+            filter_fields: &[
+                "id",
+                "name",
+                "comment",
+                "owner_name",
+                "event_type",
+                "condition_type",
+                "method_type",
+                "filter_name",
+            ],
+            tie_breakers: &["name", "id"],
+        },
+        CollectionContract {
+            path: "/api/v1/tags",
+            default_sort: TAG_DEFAULT_SORT,
+            allowed_sort_fields: TAG_SORT_FIELDS,
+            filter_fields: &[
+                "id",
+                "name",
+                "comment",
+                "owner_name",
+                "resource_type",
+                "value",
+            ],
+            tie_breakers: &["name", "id"],
+        },
+        CollectionContract {
+            path: "/api/v1/tags/{tag_id}/resources",
+            default_sort: TAG_RESOURCE_DEFAULT_SORT,
+            allowed_sort_fields: TAG_RESOURCE_SORT_FIELDS,
+            filter_fields: &["id", "name"],
+            tie_breakers: &["name", "id"],
+        },
+        CollectionContract {
+            path: "/api/v1/tags/resource-names/{resource_type}",
+            default_sort: TAG_RESOURCE_DEFAULT_SORT,
+            allowed_sort_fields: TAG_RESOURCE_SORT_FIELDS,
+            filter_fields: &["id", "name"],
+            tie_breakers: &["name", "id"],
+        },
+        CollectionContract {
+            path: "/api/v1/port-lists",
+            default_sort: PORT_LIST_DEFAULT_SORT,
+            allowed_sort_fields: PORT_LIST_SORT_FIELDS,
+            filter_fields: &["id", "name", "comment"],
+            tie_breakers: &["name", "id"],
+        },
+        CollectionContract {
+            path: "/api/v1/schedules",
+            default_sort: SCHEDULE_DEFAULT_SORT,
+            allowed_sort_fields: SCHEDULE_SORT_FIELDS,
+            filter_fields: &["id", "name", "comment", "timezone"],
+            tie_breakers: &["name", "id"],
+        },
+        CollectionContract {
+            path: "/api/v1/report-configs",
+            default_sort: REPORT_CONFIG_DEFAULT_SORT,
+            allowed_sort_fields: REPORT_CONFIG_SORT_FIELDS,
+            filter_fields: &["id", "name", "comment", "report_format_name"],
+            tie_breakers: &["name", "id"],
+        },
+        CollectionContract {
+            path: "/api/v1/report-formats",
+            default_sort: REPORT_FORMAT_DEFAULT_SORT,
+            allowed_sort_fields: REPORT_FORMAT_SORT_FIELDS,
+            filter_fields: &["id", "name", "summary", "extension", "content_type"],
+            tie_breakers: &["name", "id"],
+        },
+    ];
+
     fn sort_field_names(fields: &[(&'static str, &'static str)]) -> Vec<&'static str> {
         fields.iter().map(|(name, _)| *name).collect()
+    }
+
+    fn assert_collection_contract(contract: &CollectionContract) {
+        assert!(
+            !contract.filter_fields.is_empty(),
+            "{} needs filter fields",
+            contract.path
+        );
+        assert!(
+            !contract.tie_breakers.is_empty(),
+            "{} needs tie breakers",
+            contract.path
+        );
+        assert!(sort_clause(contract.default_sort, contract.allowed_sort_fields).is_ok());
+        assert!(sort_clause("unsupported_field", contract.allowed_sort_fields).is_err());
     }
 
     #[test]
@@ -10605,18 +10696,7 @@ mod tests {
             ]
         );
         for contract in PRIORITY_COLLECTION_CONTRACTS {
-            assert!(
-                !contract.filter_fields.is_empty(),
-                "{} needs filter fields",
-                contract.path
-            );
-            assert!(
-                !contract.tie_breakers.is_empty(),
-                "{} needs tie breakers",
-                contract.path
-            );
-            assert!(sort_clause(contract.default_sort, contract.allowed_sort_fields).is_ok());
-            assert!(sort_clause("unsupported_field", contract.allowed_sort_fields).is_err());
+            assert_collection_contract(contract);
         }
         assert!(sort_field_names(VULNERABILITY_SORT_FIELDS).contains(&"severity"));
         assert!(sort_field_names(RESULT_SORT_FIELDS).contains(&"hostname"));
@@ -10625,8 +10705,44 @@ mod tests {
     }
 
     #[test]
+    fn management_collection_contracts_define_sort_filter_and_tie_breakers() {
+        let paths: Vec<&str> = MANAGEMENT_COLLECTION_CONTRACTS
+            .iter()
+            .map(|contract| contract.path)
+            .collect();
+        assert_eq!(
+            paths,
+            vec![
+                "/api/v1/alerts",
+                "/api/v1/tags",
+                "/api/v1/tags/{tag_id}/resources",
+                "/api/v1/tags/resource-names/{resource_type}",
+                "/api/v1/port-lists",
+                "/api/v1/schedules",
+                "/api/v1/report-configs",
+                "/api/v1/report-formats",
+            ]
+        );
+        for contract in MANAGEMENT_COLLECTION_CONTRACTS {
+            assert_collection_contract(contract);
+        }
+        assert!(sort_field_names(ALERT_SORT_FIELDS).contains(&"task_count"));
+        assert!(sort_field_names(TAG_SORT_FIELDS).contains(&"resource_type"));
+        assert_eq!(
+            sort_field_names(TAG_RESOURCE_SORT_FIELDS),
+            vec!["id", "name"]
+        );
+        assert!(sort_field_names(PORT_LIST_SORT_FIELDS).contains(&"total"));
+        assert!(sort_field_names(SCHEDULE_SORT_FIELDS).contains(&"next_run"));
+        assert!(sort_field_names(REPORT_CONFIG_SORT_FIELDS).contains(&"report_format"));
+        assert!(sort_field_names(REPORT_FORMAT_SORT_FIELDS).contains(&"content_type"));
+        assert!(sort_clause("-modified", REPORT_FORMAT_SORT_FIELDS).is_ok());
+        assert!(sort_clause("created_at", ALERT_SORT_FIELDS).is_err());
+    }
+
+    #[test]
     fn alert_assets_sql_redacts_payload_tables() {
-        let sort_sql = sort_clause("name", &[("id", "id"), ("name", "name")]).unwrap();
+        let sort_sql = sort_clause(ALERT_DEFAULT_SORT, ALERT_SORT_FIELDS).unwrap();
         let sql = alert_assets_sql(&sort_sql);
         assert!(sql.contains("FROM alerts a"));
         assert!(sql.contains("LEFT JOIN users u ON u.id = a.owner"));
@@ -10639,7 +10755,7 @@ mod tests {
 
     #[test]
     fn tag_resource_sql_is_strictly_whitelisted() {
-        let sort_sql = sort_clause("name", &[("id", "id"), ("name", "name")]).unwrap();
+        let sort_sql = sort_clause(TAG_RESOURCE_DEFAULT_SORT, TAG_RESOURCE_SORT_FIELDS).unwrap();
         let sql = tag_resource_collection_sql("target", &sort_sql).unwrap();
         assert!(sql.contains("FROM tag_resources tr"));
         assert!(sql.contains("JOIN targets r ON r.id = tr.resource"));
@@ -10661,7 +10777,7 @@ mod tests {
 
     #[test]
     fn tag_resource_name_sql_is_strictly_whitelisted() {
-        let sort_sql = sort_clause("name", &[("id", "id"), ("name", "name")]).unwrap();
+        let sort_sql = sort_clause(TAG_RESOURCE_DEFAULT_SORT, TAG_RESOURCE_SORT_FIELDS).unwrap();
         let sql = tag_resource_name_collection_sql("task", &sort_sql).unwrap();
         assert!(sql.contains("FROM tasks r"));
         assert!(sql.contains("coalesce(r.usage_type, 'scan') = 'scan'"));
@@ -10683,7 +10799,7 @@ mod tests {
 
     #[test]
     fn tag_resource_name_sql_supports_info_catalogs_by_reference() {
-        let sort_sql = sort_clause("id", &[("id", "id"), ("name", "name")]).unwrap();
+        let sort_sql = sort_clause("id", TAG_RESOURCE_SORT_FIELDS).unwrap();
         let cve_sql = tag_resource_name_collection_sql("cve", &sort_sql).unwrap();
         assert!(cve_sql.contains("FROM scap.cves r"));
         assert!(cve_sql.contains("r.name"));
@@ -10712,7 +10828,7 @@ mod tests {
 
     #[test]
     fn tag_resource_sql_supports_info_catalogs_by_reference() {
-        let sort_sql = sort_clause("id", &[("id", "id"), ("name", "name")]).unwrap();
+        let sort_sql = sort_clause("id", TAG_RESOURCE_SORT_FIELDS).unwrap();
         let cve_sql = tag_resource_collection_sql("cve", &sort_sql).unwrap();
         assert!(cve_sql.contains("JOIN scap.cves r ON"));
         assert!(cve_sql.contains("lower(r.name) = lower(tr.resource_uuid)"));
