@@ -345,6 +345,10 @@ paths:
     get:
       operationId: getNvtsByNvtId
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: nvt-catalog-detail-read
+      x-turbovas-inherited-still-owns: nvt-rich-detail
       summary: Read one Security Information NVT catalog entry
       description: Catalog-detail metadata backed by NVT feed metadata already imported into gvmd/PostgreSQL. This endpoint uses NVT numeric dotted OIDs and intentionally excludes preferences, selector/config expansion, export, feed-control, scanner-control, and write semantics.
       parameters:
@@ -650,6 +654,9 @@ paths:
       description: Read-only runtime feed inventory and sync-status metadata from fixed allowlisted runtime feed files. This allowlisted direct-listener endpoint does not sync, import, update, download, mirror, bundle, redistribute, or mutate feed content, and it does not control scanner services.
       x-turbovas-direct: true
       x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: feed-status-read
+      x-turbovas-inherited-still-owns: feed-sync-import-control
       responses:
         '200':
           description: Feed inventory metadata collection
@@ -730,6 +737,9 @@ paths:
       description: Read-only resource-name lookup for the Tag dialog, limited to native-safe asset, scanner/schedule id-name, and security-information resource types used by tag assigned-resource expansion. Alerts are included here only as redacted id/name resource-name lookup; alert delivery, method/event/condition payloads remain on inherited compatibility paths. Credentials, users, filters, overrides, reports, results, and all other write/control surfaces remain on inherited compatibility paths.
       x-turbovas-direct: true
       x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: tag-resource-name-read
+      x-turbovas-inherited-still-owns: tag-write-control
       parameters:
         - name: resource_type
           in: path
@@ -2037,6 +2047,9 @@ paths:
       summary: Preview non-destructive scope report retention state
       description: Read-only dry-run scaffold for future tiered raw-report detail retention. It does not compact, delete, or mutate report evidence.
       x-turbovas-exposure: internal-only
+      x-turbovas-maturity: preview-read
+      x-turbovas-replaces: none
+      x-turbovas-inherited-still-owns: retention-mutations
       parameters:
         - $ref: '#/components/parameters/ScopeId'
         - $ref: '#/components/parameters/ScopeReportId'

@@ -1198,12 +1198,27 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(contract["missing_operation_ids"], [])
         self.assertEqual(contract["duplicate_operation_ids"], [])
         self.assertEqual(contract["nondeterministic_operation_ids"], [])
-        self.assertEqual(contract["allowed_turbovas_operation_fields"], ["x-turbovas-direct", "x-turbovas-exposure"])
+        self.assertEqual(
+            contract["allowed_turbovas_operation_fields"],
+            [
+                "x-turbovas-direct",
+                "x-turbovas-exposure",
+                "x-turbovas-inherited-still-owns",
+                "x-turbovas-maturity",
+                "x-turbovas-replaces",
+            ],
+        )
         self.assertEqual(contract["unexpected_turbovas_operation_fields"], [])
         self.assertEqual(contract["allowed_exposure_values"], ["direct-read", "internal-only"])
+        self.assertEqual(contract["allowed_maturity_values"], ["live-read", "preview-read"])
+        self.assertEqual(contract["allowed_replaces_values"], ["feed-status-read", "none", "nvt-catalog-detail-read", "tag-resource-name-read"])
+        self.assertEqual(contract["allowed_inherited_still_owns_values"], ["feed-sync-import-control", "nvt-rich-detail", "retention-mutations", "tag-write-control"])
         self.assertEqual(contract["missing_exposure_operations"], [])
         self.assertEqual(contract["invalid_exposure_operations"], [])
         self.assertEqual(contract["exposure_mismatches"], [])
+        self.assertEqual(contract["missing_migration_metadata_operations"], [])
+        self.assertEqual(contract["invalid_migration_metadata_operations"], [])
+        self.assertEqual(contract["migration_metadata_mismatches"], [])
         self.assertEqual(contract["missing_shared_error_responses"], [])
         self.assertEqual(contract["invalid_shared_error_responses"], [])
         self.assertEqual(contract["operations_missing_error_responses"], [])
@@ -1239,6 +1254,9 @@ class TurboVASCtlTests(unittest.TestCase):
                 "      operationId: customReports\n"
                 "      x-turbovas-direct: true\n"
                 "      x-turbovas-exposure: banana\n"
+                "      x-turbovas-maturity: stale\n"
+                "      x-turbovas-replaces: everything\n"
+                "      x-turbovas-inherited-still-owns: all-the-things\n"
                 "      x-turbovas-surprise: true\n"
                 "      responses:\n"
                 "        '200':\n"
@@ -1272,10 +1290,40 @@ class TurboVASCtlTests(unittest.TestCase):
             missing_exposure,
             {
                 "GET /feeds",
+                "GET /nvts/{nvt_id}",
                 "GET /tags/resource-names/{resource_type}",
                 "GET /scopes/{scope_id}/reports/{scope_report_id}/retention-plan",
             },
         )
+        self.assertEqual(
+            summary["invalid_migration_metadata_operations"],
+            [
+                {
+                    "operation": "GET /reports",
+                    "field": "x-turbovas-inherited-still-owns",
+                    "actual": "all-the-things",
+                    "allowed": ["feed-sync-import-control", "nvt-rich-detail", "retention-mutations", "tag-write-control"],
+                },
+                {
+                    "operation": "GET /reports",
+                    "field": "x-turbovas-maturity",
+                    "actual": "stale",
+                    "allowed": ["live-read", "preview-read"],
+                },
+                {
+                    "operation": "GET /reports",
+                    "field": "x-turbovas-replaces",
+                    "actual": "everything",
+                    "allowed": ["feed-status-read", "none", "nvt-catalog-detail-read", "tag-resource-name-read"],
+                },
+            ],
+        )
+        missing_migration = {(item["operation"], item["field"]) for item in summary["missing_migration_metadata_operations"]}
+        self.assertIn(("GET /feeds", "x-turbovas-maturity"), missing_migration)
+        self.assertIn(("GET /nvts/{nvt_id}", "x-turbovas-replaces"), missing_migration)
+        self.assertIn(("GET /tags/resource-names/{resource_type}", "x-turbovas-inherited-still-owns"), missing_migration)
+        self.assertIn(("GET /scopes/{scope_id}/reports/{scope_report_id}/retention-plan", "x-turbovas-replaces"), missing_migration)
+        self.assertEqual(summary["migration_metadata_mismatches"], [])
         self.assertEqual(summary["exposure_mismatches"], [])
         self.assertIn("Unauthorized", summary["missing_shared_error_responses"])
         self.assertEqual(summary["invalid_shared_error_responses"], [{"response": "BadRequest", "actual": "#/components/schemas/Other", "expected": "#/components/schemas/Error"}])
@@ -1382,15 +1430,28 @@ class TurboVASCtlTests(unittest.TestCase):
         boundary = (root / "docs" / "NATIVE_API_AUTH_BOUNDARY.md").read_text(encoding="utf-8")
         operations = {(item["method"], item["path"]): item for item in turbovasctl.openapi_contract_operations(root)}
         feeds = operations[("get", "/feeds")]
+        nvt_detail = operations[("get", "/nvts/{nvt_id}")]
         tag_resource_names = operations[("get", "/tags/resource-names/{resource_type}")]
 
         self.assertEqual(feeds["operation_id"], "getFeeds")
         self.assertIn("x-turbovas-direct", feeds["x_turbovas_fields"])
         self.assertEqual(feeds["x_turbovas_values"]["x-turbovas-exposure"], "direct-read")
+        self.assertEqual(feeds["x_turbovas_values"]["x-turbovas-maturity"], "live-read")
+        self.assertEqual(feeds["x_turbovas_values"]["x-turbovas-replaces"], "feed-status-read")
+        self.assertEqual(feeds["x_turbovas_values"]["x-turbovas-inherited-still-owns"], "feed-sync-import-control")
         self.assertEqual(feeds["responses"]["400"], "#/components/responses/BadRequest")
+        self.assertEqual(nvt_detail["operation_id"], "getNvtsByNvtId")
+        self.assertIn("x-turbovas-direct", nvt_detail["x_turbovas_fields"])
+        self.assertEqual(nvt_detail["x_turbovas_values"]["x-turbovas-exposure"], "direct-read")
+        self.assertEqual(nvt_detail["x_turbovas_values"]["x-turbovas-maturity"], "live-read")
+        self.assertEqual(nvt_detail["x_turbovas_values"]["x-turbovas-replaces"], "nvt-catalog-detail-read")
+        self.assertEqual(nvt_detail["x_turbovas_values"]["x-turbovas-inherited-still-owns"], "nvt-rich-detail")
         self.assertEqual(tag_resource_names["operation_id"], "getTagsResourceNamesByResourceType")
         self.assertIn("x-turbovas-direct", tag_resource_names["x_turbovas_fields"])
         self.assertEqual(tag_resource_names["x_turbovas_values"]["x-turbovas-exposure"], "direct-read")
+        self.assertEqual(tag_resource_names["x_turbovas_values"]["x-turbovas-maturity"], "live-read")
+        self.assertEqual(tag_resource_names["x_turbovas_values"]["x-turbovas-replaces"], "tag-resource-name-read")
+        self.assertEqual(tag_resource_names["x_turbovas_values"]["x-turbovas-inherited-still-owns"], "tag-write-control")
         self.assertEqual(tag_resource_names["responses"]["404"], "#/components/responses/NotFound")
         self.assertIn("summary: List feed inventory metadata", openapi)
         self.assertIn("does not sync, import, update, download, mirror, bundle, redistribute, or mutate feed content", openapi)
@@ -1437,6 +1498,9 @@ class TurboVASCtlTests(unittest.TestCase):
         operations = {(item["method"], item["path"]): item for item in turbovasctl.openapi_contract_operations(root)}
         retention = operations[("get", "/scopes/{scope_id}/reports/{scope_report_id}/retention-plan")]
         self.assertEqual(retention["x_turbovas_values"]["x-turbovas-exposure"], "internal-only")
+        self.assertEqual(retention["x_turbovas_values"]["x-turbovas-maturity"], "preview-read")
+        self.assertEqual(retention["x_turbovas_values"]["x-turbovas-replaces"], "none")
+        self.assertEqual(retention["x_turbovas_values"]["x-turbovas-inherited-still-owns"], "retention-mutations")
         self.assertNotIn("x-turbovas-direct", retention["x_turbovas_fields"])
         self.assertIn("ScopeReportRetentionPlan", openapi)
         self.assertIn("detail_compacted", openapi)

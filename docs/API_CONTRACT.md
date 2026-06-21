@@ -95,8 +95,13 @@ separate TLS/bootstrap/host-binding posture tracked outside this v1 read API.
   `x-turbovas-direct: true` in `api/openapi/turbovas-v1.yaml`. The
   `native-tooling-state` command compares those markers with the implementation
   inventory and reports drift as `native-tooling.direct-api-contract`.
-- Exposure contract metadata: boundary seed operations carry
-  `x-turbovas-exposure: direct-read` or `internal-only` in OpenAPI, and
+- Exposure and migration contract metadata: boundary seed operations carry
+  `x-turbovas-exposure: direct-read` or `internal-only`, plus compact enforced
+  migration metadata: `x-turbovas-maturity` (`live-read` or `preview-read`),
+  `x-turbovas-replaces` (`feed-status-read`, `tag-resource-name-read`,
+  `nvt-catalog-detail-read`, or `none`), and
+  `x-turbovas-inherited-still-owns` (`feed-sync-import-control`,
+  `tag-write-control`, `nvt-rich-detail`, or `retention-mutations`).
   `native-tooling-state` reports missing, invalid, or mismatched seed metadata
   as `native-tooling.openapi-contract` drift. Extend this enforced seed before
   adding broader free-form migration metadata.

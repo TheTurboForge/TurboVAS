@@ -301,12 +301,51 @@ NATIVE_TOOLING_PRODUCT_GVM_TOOLS_SCRIPTS = frozenset(
 )
 NATIVE_API_TEMPLATE_PLACEHOLDER = re.compile(r"\{[^/{}]+\}")
 OPENAPI_HTTP_METHODS = frozenset({"get", "put", "post", "delete", "patch", "options", "head", "trace"})
-OPENAPI_ALLOWED_TURBOVAS_OPERATION_FIELDS = frozenset({"x-turbovas-direct", "x-turbovas-exposure"})
+OPENAPI_ALLOWED_TURBOVAS_OPERATION_FIELDS = frozenset(
+    {
+        "x-turbovas-direct",
+        "x-turbovas-exposure",
+        "x-turbovas-inherited-still-owns",
+        "x-turbovas-maturity",
+        "x-turbovas-replaces",
+    }
+)
 OPENAPI_ALLOWED_EXPOSURE_VALUES = frozenset({"direct-read", "internal-only"})
+OPENAPI_ALLOWED_MATURITY_VALUES = frozenset({"live-read", "preview-read"})
+OPENAPI_ALLOWED_REPLACES_VALUES = frozenset({"feed-status-read", "nvt-catalog-detail-read", "none", "tag-resource-name-read"})
+OPENAPI_ALLOWED_INHERITED_STILL_OWNS_VALUES = frozenset({"feed-sync-import-control", "nvt-rich-detail", "retention-mutations", "tag-write-control"})
+OPENAPI_ALLOWED_MIGRATION_METADATA_VALUES = {
+    "x-turbovas-inherited-still-owns": OPENAPI_ALLOWED_INHERITED_STILL_OWNS_VALUES,
+    "x-turbovas-maturity": OPENAPI_ALLOWED_MATURITY_VALUES,
+    "x-turbovas-replaces": OPENAPI_ALLOWED_REPLACES_VALUES,
+}
 OPENAPI_REQUIRED_EXPOSURE = {
     ("get", "/feeds"): "direct-read",
+    ("get", "/nvts/{nvt_id}"): "direct-read",
     ("get", "/tags/resource-names/{resource_type}"): "direct-read",
     ("get", "/scopes/{scope_id}/reports/{scope_report_id}/retention-plan"): "internal-only",
+}
+OPENAPI_REQUIRED_MIGRATION_METADATA = {
+    ("get", "/feeds"): {
+        "x-turbovas-inherited-still-owns": "feed-sync-import-control",
+        "x-turbovas-maturity": "live-read",
+        "x-turbovas-replaces": "feed-status-read",
+    },
+    ("get", "/nvts/{nvt_id}"): {
+        "x-turbovas-inherited-still-owns": "nvt-rich-detail",
+        "x-turbovas-maturity": "live-read",
+        "x-turbovas-replaces": "nvt-catalog-detail-read",
+    },
+    ("get", "/tags/resource-names/{resource_type}"): {
+        "x-turbovas-inherited-still-owns": "tag-write-control",
+        "x-turbovas-maturity": "live-read",
+        "x-turbovas-replaces": "tag-resource-name-read",
+    },
+    ("get", "/scopes/{scope_id}/reports/{scope_report_id}/retention-plan"): {
+        "x-turbovas-inherited-still-owns": "retention-mutations",
+        "x-turbovas-maturity": "preview-read",
+        "x-turbovas-replaces": "none",
+    },
 }
 OPENAPI_SHARED_ERROR_RESPONSES = {
     "BadRequest": "#/components/schemas/Error",
@@ -3846,6 +3885,55 @@ def openapi_exposure_contract_drift(operations: list[dict[str, Any]]) -> dict[st
     }
 
 
+def openapi_migration_metadata_contract_drift(operations: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    by_key = {(str(item.get("method", "")), str(item.get("path", ""))): item for item in operations}
+    missing: list[dict[str, Any]] = []
+    invalid: list[dict[str, Any]] = []
+    mismatches: list[dict[str, Any]] = []
+
+    for item in operations:
+        values = item.get("x_turbovas_values", {}) if isinstance(item.get("x_turbovas_values"), dict) else {}
+        for field, allowed_values in sorted(OPENAPI_ALLOWED_MIGRATION_METADATA_VALUES.items()):
+            if field in values and values.get(field) not in allowed_values:
+                invalid.append(
+                    {
+                        "operation": openapi_operation_label(item),
+                        "field": field,
+                        "actual": values.get(field),
+                        "allowed": sorted(allowed_values),
+                    }
+                )
+
+    for key, expected_fields in sorted(OPENAPI_REQUIRED_MIGRATION_METADATA.items()):
+        item = by_key.get(key)
+        operation = f"{key[0].upper()} {key[1]}"
+        if item is None:
+            for field, expected in sorted(expected_fields.items()):
+                missing.append({"operation": operation, "field": field, "expected": expected, "reason": "operation_missing"})
+            continue
+        fields = set(item.get("x_turbovas_fields", [])) if isinstance(item.get("x_turbovas_fields"), list) else set()
+        values = item.get("x_turbovas_values", {}) if isinstance(item.get("x_turbovas_values"), dict) else {}
+        for field, expected in sorted(expected_fields.items()):
+            if field not in fields:
+                missing.append({"operation": operation, "field": field, "expected": expected, "reason": "field_missing"})
+                continue
+            actual = values.get(field)
+            if actual != expected:
+                mismatches.append(
+                    {
+                        "operation": operation,
+                        "field": field,
+                        "actual": actual,
+                        "expected": expected,
+                    }
+                )
+    return {
+        "missing_migration_metadata_operations": missing,
+        "invalid_migration_metadata_operations": invalid,
+        "migration_metadata_mismatches": mismatches,
+    }
+
+
 def openapi_components_response_refs(repo_root: Path | None) -> dict[str, str | None]:
     lines = openapi_contract_lines(repo_root)
     in_components = False
@@ -3907,6 +3995,7 @@ def native_api_openapi_contract_summary(repo_root: Path | None) -> dict[str, Any
         if sorted(set(item.get("x_turbovas_fields", [])) - OPENAPI_ALLOWED_TURBOVAS_OPERATION_FIELDS)
     ]
     exposure_drift = openapi_exposure_contract_drift(operations)
+    migration_metadata_drift = openapi_migration_metadata_contract_drift(operations)
 
     shared_response_refs = openapi_components_response_refs(repo_root)
     missing_shared_responses = sorted(set(OPENAPI_SHARED_ERROR_RESPONSES) - set(shared_response_refs))
@@ -3938,6 +4027,9 @@ def native_api_openapi_contract_summary(repo_root: Path | None) -> dict[str, Any
         or exposure_drift["missing_exposure_operations"]
         or exposure_drift["invalid_exposure_operations"]
         or exposure_drift["exposure_mismatches"]
+        or migration_metadata_drift["missing_migration_metadata_operations"]
+        or migration_metadata_drift["invalid_migration_metadata_operations"]
+        or migration_metadata_drift["migration_metadata_mismatches"]
         or missing_shared_responses
         or invalid_shared_responses
         or operations_missing_error_responses
@@ -3952,7 +4044,11 @@ def native_api_openapi_contract_summary(repo_root: Path | None) -> dict[str, Any
         "allowed_turbovas_operation_fields": sorted(OPENAPI_ALLOWED_TURBOVAS_OPERATION_FIELDS),
         "unexpected_turbovas_operation_fields": unexpected_turbovas_fields,
         "allowed_exposure_values": sorted(OPENAPI_ALLOWED_EXPOSURE_VALUES),
+        "allowed_maturity_values": sorted(OPENAPI_ALLOWED_MATURITY_VALUES),
+        "allowed_replaces_values": sorted(OPENAPI_ALLOWED_REPLACES_VALUES),
+        "allowed_inherited_still_owns_values": sorted(OPENAPI_ALLOWED_INHERITED_STILL_OWNS_VALUES),
         **exposure_drift,
+        **migration_metadata_drift,
         "shared_error_responses": shared_response_refs,
         "missing_shared_error_responses": missing_shared_responses,
         "invalid_shared_error_responses": invalid_shared_responses,
@@ -4588,6 +4684,9 @@ def compact_native_tooling_summary(summary: dict[str, Any]) -> dict[str, Any]:
         "missing_exposure_operation_count": len(openapi_contract.get("missing_exposure_operations", [])) if isinstance(openapi_contract, dict) else 0,
         "invalid_exposure_operation_count": len(openapi_contract.get("invalid_exposure_operations", [])) if isinstance(openapi_contract, dict) else 0,
         "exposure_mismatch_count": len(openapi_contract.get("exposure_mismatches", [])) if isinstance(openapi_contract, dict) else 0,
+        "missing_migration_metadata_count": len(openapi_contract.get("missing_migration_metadata_operations", [])) if isinstance(openapi_contract, dict) else 0,
+        "invalid_migration_metadata_count": len(openapi_contract.get("invalid_migration_metadata_operations", [])) if isinstance(openapi_contract, dict) else 0,
+        "migration_metadata_mismatch_count": len(openapi_contract.get("migration_metadata_mismatches", [])) if isinstance(openapi_contract, dict) else 0,
         "missing_shared_error_response_count": len(openapi_contract.get("missing_shared_error_responses", [])) if isinstance(openapi_contract, dict) else 0,
         "invalid_shared_error_response_count": len(openapi_contract.get("invalid_shared_error_responses", [])) if isinstance(openapi_contract, dict) else 0,
         "operations_missing_error_response_count": len(openapi_contract.get("operations_missing_error_responses", [])) if isinstance(openapi_contract, dict) else 0,
@@ -4641,9 +4740,9 @@ def command_native_tooling_state(repo_root: Path, compact: bool = False) -> dict
         finding(
             "pass" if openapi_alignment_status == "pass" else "warn",
             "native-tooling.openapi-contract",
-            "Native API OpenAPI operations have deterministic operation IDs, exposure metadata, and shared Error responses."
+            "Native API OpenAPI operations have deterministic operation IDs, exposure/migration metadata, and shared Error responses."
             if openapi_alignment_status == "pass"
-            else "Native API OpenAPI operation IDs, x-turbovas exposure fields, or shared Error responses need attention.",
+            else "Native API OpenAPI operation IDs, x-turbovas exposure/migration fields, or shared Error responses need attention.",
             details=openapi_contract,
         ),
         finding("warn" if unknown_count else "pass", "native-tooling.unknown", f"{unknown_count} inherited tooling surface(s) are outside the current classification map." if unknown_count else "No inherited tooling surfaces were left unclassified.", details={"paths": summary["by_category"]["unknown"]["paths"]}),
