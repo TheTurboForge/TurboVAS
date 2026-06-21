@@ -6303,6 +6303,47 @@ def command_runtime_native_api_direct_smoke(repo_root: Path) -> dict[str, Any]:
     non_get_ok = non_get.returncode == 0 and non_get_status == 405 and isinstance(non_get_json, dict) and non_get_json.get("error", {}).get("code") == "method_not_allowed"
     findings.append(native_api_probe_finding("pass" if non_get_ok else "fail", "native-api-direct.read-only-method-guard", "Direct native API rejects valid-token non-GET /api/v1 requests with JSON 405." if non_get_ok else "Direct native API did not reject a valid-token non-GET /api/v1 request correctly.", non_get, direct_native_api_display_command("/api/v1/reports?page_size=1", token=env[TURBOVAS_API_BEARER_TOKEN_ENV], env=env, method="POST"), non_get_json, {"http_status": non_get_status, **summarize_native_api_response(non_get_json)}))
 
+    scope_reports = native_api_curl(repo_root, "/api/v1/scope-reports?page_size=1&sort=-creation_time")
+    scope_reports_json = parse_json_output(scope_reports)
+    scope_report_items = scope_reports_json.get("items", []) if isinstance(scope_reports_json, dict) else []
+    selected_scope_report = scope_report_items[0] if scope_report_items else None
+    selected_scope = selected_scope_report.get("scope") if isinstance(selected_scope_report, dict) else None
+    if (
+        isinstance(selected_scope_report, dict)
+        and isinstance(selected_scope, dict)
+        and selected_scope_report.get("id")
+        and selected_scope.get("id")
+    ):
+        retention_path = f"/api/v1/scopes/{urllib.parse.quote(str(selected_scope['id']))}/reports/{urllib.parse.quote(str(selected_scope_report['id']))}/retention-plan"
+        retention_direct = direct_native_api_curl(
+            repo_root,
+            retention_path,
+            token=env[TURBOVAS_API_BEARER_TOKEN_ENV],
+            env=env,
+        )
+        retention_direct_json, retention_direct_status = parse_json_output_with_http_status(retention_direct)
+        retention_direct_ok = (
+            retention_direct.returncode == 0
+            and retention_direct_status == 404
+            and isinstance(retention_direct_json, dict)
+            and retention_direct_json.get("error", {}).get("code") == "not_found"
+        )
+        findings.append(
+            native_api_probe_finding(
+                "pass" if retention_direct_ok else "fail",
+                "native-api-direct.internal-only-retention-plan",
+                "Direct native API denies the internal-only retention preview with JSON 404."
+                if retention_direct_ok
+                else "Direct native API did not deny the internal-only retention preview correctly.",
+                retention_direct,
+                direct_native_api_display_command(retention_path, token=env[TURBOVAS_API_BEARER_TOKEN_ENV], env=env),
+                retention_direct_json,
+                {"http_status": retention_direct_status, **summarize_native_api_response(retention_direct_json)},
+            )
+        )
+    else:
+        findings.append(finding("warn", "native-api-direct.internal-only-retention-plan", "No scope report exists yet, so the direct internal-only retention preview denial probe was skipped."))
+
     internal = command_runtime_native_api_smoke(repo_root)
     findings.append(finding(internal["status"], "native-api.internal-smoke", internal["summary"], details={"status": internal["status"], "artifacts": internal.get("artifacts", [])}))
     result = make_result("runtime-native-api-direct-smoke", repo_root, "Direct native API smoke checks completed.", findings, [str(artifact_dir), *internal.get("artifacts", [])])

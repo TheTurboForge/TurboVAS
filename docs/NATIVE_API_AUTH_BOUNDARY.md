@@ -28,6 +28,10 @@ script/curl -> opt-in direct bearer listener -> turbovas-api -> PostgreSQL
 - The direct listener rejects valid-token non-GET `/api/v1` requests with JSON
   `405 method_not_allowed`. This prevents future native write/control routes
   from becoming direct-scriptable without a separate safety design.
+- Direct listener exposure is explicitly classified, not simply every
+  bearer-authenticated `GET`. Internal-only preview/scaffold endpoints, starting
+  with the scope-report retention plan preview, return JSON `404 not_found` on
+  the direct listener even when the bearer token is valid.
 - Direct listener responses include `X-Request-Id`. A client may provide a
   bounded ASCII request ID for correlation; unsafe, empty, or oversized values
   are replaced with a generated `tv-...` ID. Auth failures and direct-listener
@@ -66,9 +70,10 @@ tools/turbovasctl native-api-request --direct --json --request-id 'operator-chec
 
 The direct smoke proves health access, missing-token rejection, wrong-token
 rejection, valid-token JSON access, valid-token non-GET rejection, and
-continued internal native API smoke. `native-api-request --request-id` sends a
-safe `X-Request-Id` value for correlation; it is not an authentication or audit
-identity.
+internal-only endpoint denial for the retention preview when a scope report is
+available, plus continued internal native API smoke.
+`native-api-request --request-id` sends a safe `X-Request-Id` value for
+correlation; it is not an authentication or audit identity.
 
 ## Remaining Hardening Questions
 

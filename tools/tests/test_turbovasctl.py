@@ -2135,6 +2135,12 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertEqual(status, 401)
         self.assertEqual(parsed["error"]["code"], "unauthorized")
 
+    def test_direct_native_api_direct_smoke_tracks_internal_only_denial(self):
+        root = Path(__file__).resolve().parents[2]
+        native_tooling = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
+        self.assertIn("native-api-direct.internal-only-retention-plan", native_tooling)
+        self.assertIn("/retention-plan", native_tooling)
+
     def test_scanner_redis_paths_live_under_runtime_dir(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "TurboVAS"

@@ -117,6 +117,10 @@ read-only GMP scripts while keeping write/control operations on inherited paths
 until a separate native write design exists.
 Direct probes may add `--request-id 'operator-check-1'`; the value is sent as
 `X-Request-Id` and must use the bounded safe request-ID character set.
+Direct scriptable access is narrower than the internal listener: endpoints must
+be explicitly classified for direct use. Internal-only scaffolds such as the
+scope-report retention preview stay available to internal validation but return
+JSON `404 not_found` on the direct bearer listener.
 
 ## Not In The First Proof
 

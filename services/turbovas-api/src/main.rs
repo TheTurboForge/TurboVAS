@@ -1474,7 +1474,9 @@ async fn require_direct_api_auth(
     let mut response = if !api_path {
         next.run(request).await
     } else if bearer_token_matches(request.headers(), &auth.token) {
-        if request.method() == axum::http::Method::GET {
+        if !direct_api_v1_path_is_allowed(&path) {
+            ApiError::NotFound.into_response()
+        } else if request.method() == axum::http::Method::GET {
             next.run(request).await
         } else {
             ApiError::MethodNotAllowed.into_response()
@@ -1490,6 +1492,19 @@ async fn require_direct_api_auth(
     }
     attach_request_id_header(&mut response, &request_id);
     response
+}
+
+fn direct_api_v1_path_is_allowed(path: &str) -> bool {
+    !direct_api_v1_path_is_internal_only(path)
+}
+
+fn direct_api_v1_path_is_internal_only(path: &str) -> bool {
+    let parts = path.split('/').collect::<Vec<_>>();
+    matches!(
+        parts.as_slice(),
+        ["", "api", "v1", "scopes", scope_id, "reports", scope_report_id, "retention-plan"]
+            if !scope_id.is_empty() && !scope_report_id.is_empty()
+    )
 }
 
 fn bearer_token_matches(headers: &HeaderMap, expected: &str) -> bool {
@@ -9863,6 +9878,20 @@ mod tests {
         assert_eq!(error.status_code(), StatusCode::METHOD_NOT_ALLOWED);
         assert_eq!(error.code(), "method_not_allowed");
         assert!(error.public_message().contains("GET"));
+    }
+
+    #[test]
+    fn direct_api_path_classifier_keeps_internal_only_retention_preview_out() {
+        assert!(direct_api_v1_path_is_allowed("/api/v1/reports"));
+        assert!(direct_api_v1_path_is_allowed(
+            "/api/v1/scopes/scope-id/reports/report-id/results"
+        ));
+        assert!(!direct_api_v1_path_is_allowed(
+            "/api/v1/scopes/scope-id/reports/report-id/retention-plan"
+        ));
+        assert!(direct_api_v1_path_is_allowed(
+            "/api/v1/scopes//reports/report-id/retention-plan"
+        ));
     }
 
     #[test]
