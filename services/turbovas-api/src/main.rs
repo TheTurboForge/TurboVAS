@@ -26,6 +26,7 @@ mod path_ids;
 mod query;
 mod request_ids;
 mod request_shapes;
+mod row_helpers;
 
 use auth::*;
 use collections::*;
@@ -36,6 +37,7 @@ use path_ids::*;
 use query::*;
 use request_ids::*;
 use request_shapes::*;
+use row_helpers::*;
 
 #[derive(Clone)]
 struct AppState {
@@ -7855,14 +7857,6 @@ fn report_reference(id: Option<String>, name: Option<String>) -> Option<ReportRe
     Some(ReportReference { id, name })
 }
 
-fn optional_row_string(row: &Row, name: &str) -> Option<String> {
-    row.try_get::<_, Option<String>>(name).ok().flatten()
-}
-
-fn optional_row_strings(row: &Row, name: &str) -> Vec<String> {
-    row.try_get::<_, Vec<String>>(name).unwrap_or_default()
-}
-
 fn target_reference(id: Option<String>, name: Option<String>) -> Option<TargetReference> {
     let id = id?;
     let name = name.unwrap_or_else(|| id.clone());
@@ -7942,15 +7936,6 @@ fn target_credentials(row: &Row) -> TargetCredentials {
     }
 }
 
-fn csv_values(value: &str) -> Vec<String> {
-    value
-        .split(',')
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(ToString::to_string)
-        .collect()
-}
-
 fn alive_test_labels(value: i64) -> Vec<String> {
     let label = match value {
         0 => "Scan Config Default",
@@ -7962,10 +7947,6 @@ fn alive_test_labels(value: i64) -> Vec<String> {
         _ => "Unknown",
     };
     vec![label.to_string()]
-}
-
-fn boolean_int(value: i32) -> bool {
-    value != 0
 }
 
 fn target_task_references(row: &Row) -> Vec<TargetReference> {
@@ -8018,13 +7999,6 @@ fn task_report_reference(
         scan_end: unix_ts_to_rfc3339(row.get(scan_end_field)),
         severity: row.get(severity_field),
     })
-}
-
-fn task_has_active_current_report(status: &str) -> bool {
-    matches!(
-        status,
-        "Requested" | "Queued" | "Running" | "Processing" | "Stop Requested"
-    )
 }
 
 fn task_from_row(row: &Row) -> TaskItem {
