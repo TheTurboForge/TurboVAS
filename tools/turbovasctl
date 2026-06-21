@@ -312,8 +312,55 @@ OPENAPI_ALLOWED_TURBOVAS_OPERATION_FIELDS = frozenset(
 )
 OPENAPI_ALLOWED_EXPOSURE_VALUES = frozenset({"direct-read", "internal-only"})
 OPENAPI_ALLOWED_MATURITY_VALUES = frozenset({"live-read", "preview-read"})
-OPENAPI_ALLOWED_REPLACES_VALUES = frozenset({"alert-metadata-list-read", "cert-bund-advisory-catalog-detail-read", "cert-bund-advisory-list-read", "cpe-catalog-detail-read", "cpe-catalog-list-read", "cve-catalog-detail-read", "cve-catalog-list-read", "dfn-cert-advisory-catalog-detail-read", "dfn-cert-advisory-list-read", "feed-status-read", "nvt-catalog-detail-read", "nvt-catalog-list-read", "none", "tag-metadata-read", "tag-resource-name-read", "tag-resource-reference-read", "trashcan-count-summary-read"})
-OPENAPI_ALLOWED_INHERITED_STILL_OWNS_VALUES = frozenset({"alert-detail-delivery-control", "cert-advisory-rich-detail-export", "feed-sync-import-control", "nvt-rich-detail", "retention-mutations", "scap-rich-context", "tag-write-control", "trashcan-row-data-and-mutations"})
+OPENAPI_ALLOWED_REPLACES_VALUES = frozenset(
+    {
+        "alert-metadata-list-read",
+        "cert-bund-advisory-catalog-detail-read",
+        "cert-bund-advisory-list-read",
+        "cpe-catalog-detail-read",
+        "cpe-catalog-list-read",
+        "cve-catalog-detail-read",
+        "cve-catalog-list-read",
+        "dfn-cert-advisory-catalog-detail-read",
+        "dfn-cert-advisory-list-read",
+        "feed-status-read",
+        "host-asset-detail-info-read",
+        "host-asset-list-read",
+        "none",
+        "nvt-catalog-detail-read",
+        "nvt-catalog-list-read",
+        "operating-system-asset-detail-info-read",
+        "operating-system-asset-list-read",
+        "scan-config-family-summary-read",
+        "scan-config-metadata-detail-info-read",
+        "scan-config-metadata-list-read",
+        "scanner-metadata-detail-info-read",
+        "scanner-metadata-list-read",
+        "tag-metadata-read",
+        "tag-resource-name-read",
+        "tag-resource-reference-read",
+        "tls-certificate-asset-detail-info-read",
+        "tls-certificate-asset-list-read",
+        "trashcan-count-summary-read",
+    }
+)
+OPENAPI_ALLOWED_INHERITED_STILL_OWNS_VALUES = frozenset(
+    {
+        "alert-detail-delivery-control",
+        "cert-advisory-rich-detail-export",
+        "feed-sync-import-control",
+        "host-target-creation-tags-writes-and-rich-history",
+        "nvt-rich-detail",
+        "operating-system-writes-deletes-and-rich-history",
+        "retention-mutations",
+        "scanner-control-credentials-writes-and-deletes",
+        "scan-config-preferences-export-import-writes-and-deletes",
+        "scap-rich-context",
+        "tag-write-control",
+        "tls-certificate-export-delete-and-rich-history",
+        "trashcan-row-data-and-mutations",
+    }
+)
 OPENAPI_ALLOWED_MIGRATION_METADATA_VALUES = {
     "x-turbovas-inherited-still-owns": OPENAPI_ALLOWED_INHERITED_STILL_OWNS_VALUES,
     "x-turbovas-maturity": OPENAPI_ALLOWED_MATURITY_VALUES,
@@ -332,6 +379,17 @@ OPENAPI_REQUIRED_EXPOSURE = {
     ("get", "/feeds"): "direct-read",
     ("get", "/nvts"): "direct-read",
     ("get", "/nvts/{nvt_id}"): "direct-read",
+    ("get", "/operating-systems"): "direct-read",
+    ("get", "/operating-systems/{os_id}"): "direct-read",
+    ("get", "/hosts"): "direct-read",
+    ("get", "/hosts/{host_id}"): "direct-read",
+    ("get", "/tls-certificates"): "direct-read",
+    ("get", "/tls-certificates/{certificate_id}"): "direct-read",
+    ("get", "/scanners"): "direct-read",
+    ("get", "/scanners/{scanner_id}"): "direct-read",
+    ("get", "/scan-configs"): "direct-read",
+    ("get", "/scan-configs/{scan_config_id}"): "direct-read",
+    ("get", "/scan-configs/{scan_config_id}/families"): "direct-read",
     ("get", "/tags/resource-names/{resource_type}"): "direct-read",
     ("get", "/tags"): "direct-read",
     ("get", "/tags/{tag_id}"): "direct-read",
@@ -399,6 +457,61 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-inherited-still-owns": "nvt-rich-detail",
         "x-turbovas-maturity": "live-read",
         "x-turbovas-replaces": "nvt-catalog-detail-read",
+    },
+    ("get", "/operating-systems"): {
+        "x-turbovas-inherited-still-owns": "operating-system-writes-deletes-and-rich-history",
+        "x-turbovas-maturity": "live-read",
+        "x-turbovas-replaces": "operating-system-asset-list-read",
+    },
+    ("get", "/operating-systems/{os_id}"): {
+        "x-turbovas-inherited-still-owns": "operating-system-writes-deletes-and-rich-history",
+        "x-turbovas-maturity": "live-read",
+        "x-turbovas-replaces": "operating-system-asset-detail-info-read",
+    },
+    ("get", "/hosts"): {
+        "x-turbovas-inherited-still-owns": "host-target-creation-tags-writes-and-rich-history",
+        "x-turbovas-maturity": "live-read",
+        "x-turbovas-replaces": "host-asset-list-read",
+    },
+    ("get", "/hosts/{host_id}"): {
+        "x-turbovas-inherited-still-owns": "host-target-creation-tags-writes-and-rich-history",
+        "x-turbovas-maturity": "live-read",
+        "x-turbovas-replaces": "host-asset-detail-info-read",
+    },
+    ("get", "/tls-certificates"): {
+        "x-turbovas-inherited-still-owns": "tls-certificate-export-delete-and-rich-history",
+        "x-turbovas-maturity": "live-read",
+        "x-turbovas-replaces": "tls-certificate-asset-list-read",
+    },
+    ("get", "/tls-certificates/{certificate_id}"): {
+        "x-turbovas-inherited-still-owns": "tls-certificate-export-delete-and-rich-history",
+        "x-turbovas-maturity": "live-read",
+        "x-turbovas-replaces": "tls-certificate-asset-detail-info-read",
+    },
+    ("get", "/scanners"): {
+        "x-turbovas-inherited-still-owns": "scanner-control-credentials-writes-and-deletes",
+        "x-turbovas-maturity": "live-read",
+        "x-turbovas-replaces": "scanner-metadata-list-read",
+    },
+    ("get", "/scanners/{scanner_id}"): {
+        "x-turbovas-inherited-still-owns": "scanner-control-credentials-writes-and-deletes",
+        "x-turbovas-maturity": "live-read",
+        "x-turbovas-replaces": "scanner-metadata-detail-info-read",
+    },
+    ("get", "/scan-configs"): {
+        "x-turbovas-inherited-still-owns": "scan-config-preferences-export-import-writes-and-deletes",
+        "x-turbovas-maturity": "live-read",
+        "x-turbovas-replaces": "scan-config-metadata-list-read",
+    },
+    ("get", "/scan-configs/{scan_config_id}"): {
+        "x-turbovas-inherited-still-owns": "scan-config-preferences-export-import-writes-and-deletes",
+        "x-turbovas-maturity": "live-read",
+        "x-turbovas-replaces": "scan-config-metadata-detail-info-read",
+    },
+    ("get", "/scan-configs/{scan_config_id}/families"): {
+        "x-turbovas-inherited-still-owns": "scan-config-preferences-export-import-writes-and-deletes",
+        "x-turbovas-maturity": "live-read",
+        "x-turbovas-replaces": "scan-config-family-summary-read",
     },
     ("get", "/tags/resource-names/{resource_type}"): {
         "x-turbovas-inherited-still-owns": "tag-write-control",

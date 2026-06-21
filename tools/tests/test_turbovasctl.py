@@ -1211,8 +1211,8 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(contract["unexpected_turbovas_operation_fields"], [])
         self.assertEqual(contract["allowed_exposure_values"], ["direct-read", "internal-only"])
         self.assertEqual(contract["allowed_maturity_values"], ["live-read", "preview-read"])
-        self.assertEqual(contract["allowed_replaces_values"], ["alert-metadata-list-read", "cert-bund-advisory-catalog-detail-read", "cert-bund-advisory-list-read", "cpe-catalog-detail-read", "cpe-catalog-list-read", "cve-catalog-detail-read", "cve-catalog-list-read", "dfn-cert-advisory-catalog-detail-read", "dfn-cert-advisory-list-read", "feed-status-read", "none", "nvt-catalog-detail-read", "nvt-catalog-list-read", "tag-metadata-read", "tag-resource-name-read", "tag-resource-reference-read", "trashcan-count-summary-read"])
-        self.assertEqual(contract["allowed_inherited_still_owns_values"], ["alert-detail-delivery-control", "cert-advisory-rich-detail-export", "feed-sync-import-control", "nvt-rich-detail", "retention-mutations", "scap-rich-context", "tag-write-control", "trashcan-row-data-and-mutations"])
+        self.assertEqual(contract["allowed_replaces_values"], ["alert-metadata-list-read", "cert-bund-advisory-catalog-detail-read", "cert-bund-advisory-list-read", "cpe-catalog-detail-read", "cpe-catalog-list-read", "cve-catalog-detail-read", "cve-catalog-list-read", "dfn-cert-advisory-catalog-detail-read", "dfn-cert-advisory-list-read", "feed-status-read", "host-asset-detail-info-read", "host-asset-list-read", "none", "nvt-catalog-detail-read", "nvt-catalog-list-read", "operating-system-asset-detail-info-read", "operating-system-asset-list-read", "scan-config-family-summary-read", "scan-config-metadata-detail-info-read", "scan-config-metadata-list-read", "scanner-metadata-detail-info-read", "scanner-metadata-list-read", "tag-metadata-read", "tag-resource-name-read", "tag-resource-reference-read", "tls-certificate-asset-detail-info-read", "tls-certificate-asset-list-read", "trashcan-count-summary-read"])
+        self.assertEqual(contract["allowed_inherited_still_owns_values"], ["alert-detail-delivery-control", "cert-advisory-rich-detail-export", "feed-sync-import-control", "host-target-creation-tags-writes-and-rich-history", "nvt-rich-detail", "operating-system-writes-deletes-and-rich-history", "retention-mutations", "scan-config-preferences-export-import-writes-and-deletes", "scanner-control-credentials-writes-and-deletes", "scap-rich-context", "tag-write-control", "tls-certificate-export-delete-and-rich-history", "trashcan-row-data-and-mutations"])
         self.assertEqual(contract["missing_exposure_operations"], [])
         self.assertEqual(contract["invalid_exposure_operations"], [])
         self.assertEqual(contract["exposure_mismatches"], [])
@@ -1236,8 +1236,8 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(details["summary"]["total_rows"], 73)
         self.assertEqual(details["summary"]["openapi_operation_rows"], 73)
         self.assertEqual(details["summary"]["inventory_rows"], 72)
-        self.assertEqual(details["summary"]["rows_with_checked_migration_metadata"], 18)
-        self.assertEqual(details["summary"]["checked_migration_field_counts"]["x_turbovas_exposure"], 18)
+        self.assertEqual(details["summary"]["rows_with_checked_migration_metadata"], 29)
+        self.assertEqual(details["summary"]["checked_migration_field_counts"]["x_turbovas_exposure"], 29)
         self.assertIn("native-api-migration-matrix", source)
         self.assertIn("def command_native_api_migration_matrix", source)
 
@@ -1271,6 +1271,27 @@ class TurboVASCtlTests(unittest.TestCase):
             "/api/v1/nvts/{nvt_id}": ("getNvtsByNvtId", "nvt-catalog-detail-read", "nvt-rich-detail"),
         }
         for endpoint, (operation_id, replaces, inherited_still_owns) in expected_catalog_metadata.items():
+            row = rows[endpoint]
+            self.assertEqual(row["operation_id"], operation_id)
+            self.assertEqual(row["x_turbovas_exposure"], "direct-read")
+            self.assertEqual(row["x_turbovas_maturity"], "live-read")
+            self.assertEqual(row["x_turbovas_replaces"], replaces)
+            self.assertEqual(row["x_turbovas_inherited_still_owns"], inherited_still_owns)
+
+        expected_asset_metadata = {
+            "/api/v1/operating-systems": ("getOperatingSystems", "operating-system-asset-list-read", "operating-system-writes-deletes-and-rich-history"),
+            "/api/v1/operating-systems/{os_id}": ("getOperatingSystemsByOsId", "operating-system-asset-detail-info-read", "operating-system-writes-deletes-and-rich-history"),
+            "/api/v1/hosts": ("getHosts", "host-asset-list-read", "host-target-creation-tags-writes-and-rich-history"),
+            "/api/v1/hosts/{host_id}": ("getHostsByHostId", "host-asset-detail-info-read", "host-target-creation-tags-writes-and-rich-history"),
+            "/api/v1/tls-certificates": ("getTlsCertificates", "tls-certificate-asset-list-read", "tls-certificate-export-delete-and-rich-history"),
+            "/api/v1/tls-certificates/{certificate_id}": ("getTlsCertificatesByCertificateId", "tls-certificate-asset-detail-info-read", "tls-certificate-export-delete-and-rich-history"),
+            "/api/v1/scanners": ("getScanners", "scanner-metadata-list-read", "scanner-control-credentials-writes-and-deletes"),
+            "/api/v1/scanners/{scanner_id}": ("getScannersByScannerId", "scanner-metadata-detail-info-read", "scanner-control-credentials-writes-and-deletes"),
+            "/api/v1/scan-configs": ("getScanConfigs", "scan-config-metadata-list-read", "scan-config-preferences-export-import-writes-and-deletes"),
+            "/api/v1/scan-configs/{scan_config_id}": ("getScanConfigsByScanConfigId", "scan-config-metadata-detail-info-read", "scan-config-preferences-export-import-writes-and-deletes"),
+            "/api/v1/scan-configs/{scan_config_id}/families": ("getScanConfigsByScanConfigIdFamilies", "scan-config-family-summary-read", "scan-config-preferences-export-import-writes-and-deletes"),
+        }
+        for endpoint, (operation_id, replaces, inherited_still_owns) in expected_asset_metadata.items():
             row = rows[endpoint]
             self.assertEqual(row["operation_id"], operation_id)
             self.assertEqual(row["x_turbovas_exposure"], "direct-read")
@@ -1395,6 +1416,17 @@ class TurboVASCtlTests(unittest.TestCase):
                 "GET /feeds",
                 "GET /nvts",
                 "GET /nvts/{nvt_id}",
+                "GET /operating-systems",
+                "GET /operating-systems/{os_id}",
+                "GET /hosts",
+                "GET /hosts/{host_id}",
+                "GET /tls-certificates",
+                "GET /tls-certificates/{certificate_id}",
+                "GET /scanners",
+                "GET /scanners/{scanner_id}",
+                "GET /scan-configs",
+                "GET /scan-configs/{scan_config_id}",
+                "GET /scan-configs/{scan_config_id}/families",
                 "GET /tags",
                 "GET /tags/resource-names/{resource_type}",
                 "GET /tags/{tag_id}",
@@ -1410,7 +1442,7 @@ class TurboVASCtlTests(unittest.TestCase):
                     "operation": "GET /reports",
                     "field": "x-turbovas-inherited-still-owns",
                     "actual": "all-the-things",
-                    "allowed": ["alert-detail-delivery-control", "cert-advisory-rich-detail-export", "feed-sync-import-control", "nvt-rich-detail", "retention-mutations", "scap-rich-context", "tag-write-control", "trashcan-row-data-and-mutations"],
+                    "allowed": ["alert-detail-delivery-control", "cert-advisory-rich-detail-export", "feed-sync-import-control", "host-target-creation-tags-writes-and-rich-history", "nvt-rich-detail", "operating-system-writes-deletes-and-rich-history", "retention-mutations", "scan-config-preferences-export-import-writes-and-deletes", "scanner-control-credentials-writes-and-deletes", "scap-rich-context", "tag-write-control", "tls-certificate-export-delete-and-rich-history", "trashcan-row-data-and-mutations"],
                 },
                 {
                     "operation": "GET /reports",
@@ -1422,7 +1454,7 @@ class TurboVASCtlTests(unittest.TestCase):
                     "operation": "GET /reports",
                     "field": "x-turbovas-replaces",
                     "actual": "everything",
-                    "allowed": ["alert-metadata-list-read", "cert-bund-advisory-catalog-detail-read", "cert-bund-advisory-list-read", "cpe-catalog-detail-read", "cpe-catalog-list-read", "cve-catalog-detail-read", "cve-catalog-list-read", "dfn-cert-advisory-catalog-detail-read", "dfn-cert-advisory-list-read", "feed-status-read", "none", "nvt-catalog-detail-read", "nvt-catalog-list-read", "tag-metadata-read", "tag-resource-name-read", "tag-resource-reference-read", "trashcan-count-summary-read"],
+                    "allowed": ["alert-metadata-list-read", "cert-bund-advisory-catalog-detail-read", "cert-bund-advisory-list-read", "cpe-catalog-detail-read", "cpe-catalog-list-read", "cve-catalog-detail-read", "cve-catalog-list-read", "dfn-cert-advisory-catalog-detail-read", "dfn-cert-advisory-list-read", "feed-status-read", "host-asset-detail-info-read", "host-asset-list-read", "none", "nvt-catalog-detail-read", "nvt-catalog-list-read", "operating-system-asset-detail-info-read", "operating-system-asset-list-read", "scan-config-family-summary-read", "scan-config-metadata-detail-info-read", "scan-config-metadata-list-read", "scanner-metadata-detail-info-read", "scanner-metadata-list-read", "tag-metadata-read", "tag-resource-name-read", "tag-resource-reference-read", "tls-certificate-asset-detail-info-read", "tls-certificate-asset-list-read", "trashcan-count-summary-read"],
                 },
             ],
         )
@@ -1439,6 +1471,11 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn(("GET /feeds", "x-turbovas-maturity"), missing_migration)
         self.assertIn(("GET /nvts", "x-turbovas-replaces"), missing_migration)
         self.assertIn(("GET /nvts/{nvt_id}", "x-turbovas-replaces"), missing_migration)
+        self.assertIn(("GET /operating-systems", "x-turbovas-replaces"), missing_migration)
+        self.assertIn(("GET /hosts/{host_id}", "x-turbovas-inherited-still-owns"), missing_migration)
+        self.assertIn(("GET /tls-certificates/{certificate_id}", "x-turbovas-maturity"), missing_migration)
+        self.assertIn(("GET /scanners", "x-turbovas-replaces"), missing_migration)
+        self.assertIn(("GET /scan-configs/{scan_config_id}/families", "x-turbovas-inherited-still-owns"), missing_migration)
         self.assertIn(("GET /tags", "x-turbovas-replaces"), missing_migration)
         self.assertIn(("GET /tags/resource-names/{resource_type}", "x-turbovas-inherited-still-owns"), missing_migration)
         self.assertIn(("GET /tags/{tag_id}", "x-turbovas-maturity"), missing_migration)
@@ -1563,6 +1600,17 @@ class TurboVASCtlTests(unittest.TestCase):
         dfn_cert_detail = operations[("get", "/dfn-cert-advisories/{dfn_cert_advisory_id}")]
         nvts = operations[("get", "/nvts")]
         nvt_detail = operations[("get", "/nvts/{nvt_id}")]
+        operating_systems = operations[("get", "/operating-systems")]
+        operating_system_detail = operations[("get", "/operating-systems/{os_id}")]
+        hosts = operations[("get", "/hosts")]
+        host_detail = operations[("get", "/hosts/{host_id}")]
+        tls_certificates = operations[("get", "/tls-certificates")]
+        tls_certificate_detail = operations[("get", "/tls-certificates/{certificate_id}")]
+        scanners = operations[("get", "/scanners")]
+        scanner_detail = operations[("get", "/scanners/{scanner_id}")]
+        scan_configs = operations[("get", "/scan-configs")]
+        scan_config_detail = operations[("get", "/scan-configs/{scan_config_id}")]
+        scan_config_families = operations[("get", "/scan-configs/{scan_config_id}/families")]
         tag_resource_names = operations[("get", "/tags/resource-names/{resource_type}")]
         trashcan_summary = operations[("get", "/trashcan/summary")]
 
@@ -1579,6 +1627,27 @@ class TurboVASCtlTests(unittest.TestCase):
             (nvt_detail, "getNvtsByNvtId", "nvt-catalog-detail-read", "nvt-rich-detail"),
         ]
         for operation, operation_id, replaces, inherited_still_owns in expected_catalog_metadata:
+            self.assertEqual(operation["operation_id"], operation_id)
+            self.assertIn("x-turbovas-direct", operation["x_turbovas_fields"])
+            self.assertEqual(operation["x_turbovas_values"]["x-turbovas-exposure"], "direct-read")
+            self.assertEqual(operation["x_turbovas_values"]["x-turbovas-maturity"], "live-read")
+            self.assertEqual(operation["x_turbovas_values"]["x-turbovas-replaces"], replaces)
+            self.assertEqual(operation["x_turbovas_values"]["x-turbovas-inherited-still-owns"], inherited_still_owns)
+
+        expected_asset_metadata = [
+            (operating_systems, "getOperatingSystems", "operating-system-asset-list-read", "operating-system-writes-deletes-and-rich-history"),
+            (operating_system_detail, "getOperatingSystemsByOsId", "operating-system-asset-detail-info-read", "operating-system-writes-deletes-and-rich-history"),
+            (hosts, "getHosts", "host-asset-list-read", "host-target-creation-tags-writes-and-rich-history"),
+            (host_detail, "getHostsByHostId", "host-asset-detail-info-read", "host-target-creation-tags-writes-and-rich-history"),
+            (tls_certificates, "getTlsCertificates", "tls-certificate-asset-list-read", "tls-certificate-export-delete-and-rich-history"),
+            (tls_certificate_detail, "getTlsCertificatesByCertificateId", "tls-certificate-asset-detail-info-read", "tls-certificate-export-delete-and-rich-history"),
+            (scanners, "getScanners", "scanner-metadata-list-read", "scanner-control-credentials-writes-and-deletes"),
+            (scanner_detail, "getScannersByScannerId", "scanner-metadata-detail-info-read", "scanner-control-credentials-writes-and-deletes"),
+            (scan_configs, "getScanConfigs", "scan-config-metadata-list-read", "scan-config-preferences-export-import-writes-and-deletes"),
+            (scan_config_detail, "getScanConfigsByScanConfigId", "scan-config-metadata-detail-info-read", "scan-config-preferences-export-import-writes-and-deletes"),
+            (scan_config_families, "getScanConfigsByScanConfigIdFamilies", "scan-config-family-summary-read", "scan-config-preferences-export-import-writes-and-deletes"),
+        ]
+        for operation, operation_id, replaces, inherited_still_owns in expected_asset_metadata:
             self.assertEqual(operation["operation_id"], operation_id)
             self.assertIn("x-turbovas-direct", operation["x_turbovas_fields"])
             self.assertEqual(operation["x_turbovas_values"]["x-turbovas-exposure"], "direct-read")

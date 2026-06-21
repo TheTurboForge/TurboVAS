@@ -412,6 +412,10 @@ paths:
     get:
       operationId: getOperatingSystems
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: operating-system-asset-list-read
+      x-turbovas-inherited-still-owns: operating-system-writes-deletes-and-rich-history
       summary: List top-level operating-system assets
       description: Inherited asset view backed by gvmd/PostgreSQL operating-system evidence, distinct from report operating-system evidence tabs.
       parameters:
@@ -440,6 +444,10 @@ paths:
     get:
       operationId: getOperatingSystemsByOsId
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: operating-system-asset-detail-info-read
+      x-turbovas-inherited-still-owns: operating-system-writes-deletes-and-rich-history
       summary: Read one top-level operating-system asset
       description: Read-only asset metadata backed by gvmd/PostgreSQL `oss` records, associated host operating-system evidence, host details, and host severity state. This endpoint does not expose export, delete, scanner-control, feed-control, or write behavior.
       parameters:
@@ -467,6 +475,10 @@ paths:
     get:
       operationId: getHosts
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: host-asset-list-read
+      x-turbovas-inherited-still-owns: host-target-creation-tags-writes-and-rich-history
       summary: List top-level host assets
       description: Inherited host asset view backed by gvmd/PostgreSQL host identifiers, details, and severity state.
       parameters:
@@ -495,6 +507,10 @@ paths:
     get:
       operationId: getHostsByHostId
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: host-asset-detail-info-read
+      x-turbovas-inherited-still-owns: host-target-creation-tags-writes-and-rich-history
       summary: Read one top-level host asset
       description: Read-only host asset metadata backed by gvmd/PostgreSQL host, host identifier, host operating-system, severity, and whitelisted host detail state. This endpoint intentionally excludes host writes, delete-identifier behavior, XML export, target creation, user tags, raw report-host detail expansion, credential/privacy-sensitive identifiers, and report/result/port/application history.
       parameters:
@@ -522,6 +538,10 @@ paths:
     get:
       operationId: getTlsCertificates
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: tls-certificate-asset-list-read
+      x-turbovas-inherited-still-owns: tls-certificate-export-delete-and-rich-history
       summary: List top-level TLS certificate assets
       description: Inherited TLS certificate asset view backed by gvmd/PostgreSQL certificate, source, and location tables.
       parameters:
@@ -550,6 +570,10 @@ paths:
     get:
       operationId: getTlsCertificatesByCertificateId
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: tls-certificate-asset-detail-info-read
+      x-turbovas-inherited-still-owns: tls-certificate-export-delete-and-rich-history
       summary: Read one top-level TLS certificate asset
       description: Read-only TLS certificate asset metadata and source provenance backed by gvmd/PostgreSQL certificate, source, location, and origin tables. Certificate bytes, export, delete, scanner-control, feed-control, and write behavior are intentionally excluded.
       parameters:
@@ -577,6 +601,10 @@ paths:
     get:
       operationId: getScanners
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: scanner-metadata-list-read
+      x-turbovas-inherited-still-owns: scanner-control-credentials-writes-and-deletes
       summary: List scanner metadata
       description: Read-only scanner list metadata backed by gvmd/PostgreSQL. Credential secrets, scanner CA material, and control operations are intentionally excluded.
       parameters:
@@ -605,6 +633,10 @@ paths:
     get:
       operationId: getScannersByScannerId
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: scanner-metadata-detail-info-read
+      x-turbovas-inherited-still-owns: scanner-control-credentials-writes-and-deletes
       summary: Read one scanner metadata record
       description: Read-only scanner metadata backed by gvmd/PostgreSQL. Credential secrets, scanner CA material, live scanner status, verify/control operations, export/download behavior, and writes are intentionally excluded.
       parameters:
@@ -1045,6 +1077,10 @@ paths:
     get:
       operationId: getScanConfigs
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: scan-config-metadata-list-read
+      x-turbovas-inherited-still-owns: scan-config-preferences-export-import-writes-and-deletes
       summary: List scan configs
       description: Read-only scan-config metadata backed by gvmd/PostgreSQL. Preference values, NVT selector expansion, family edit payloads, import/export, scanner control, and create/modify/delete operations remain on inherited compatibility paths while native write/resource semantics are designed.
       parameters:
@@ -1080,6 +1116,10 @@ paths:
     get:
       operationId: getScanConfigsByScanConfigId
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: scan-config-metadata-detail-info-read
+      x-turbovas-inherited-still-owns: scan-config-preferences-export-import-writes-and-deletes
       summary: Read one scan config metadata record
       description: Metadata-only detail for automation and proof probes. Preferences, import/export, scanner control, and write operations remain on inherited compatibility paths while native contracts are designed.
       parameters:
@@ -1107,6 +1147,10 @@ paths:
     get:
       operationId: getScanConfigsByScanConfigIdFamilies
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: scan-config-family-summary-read
+      x-turbovas-inherited-still-owns: scan-config-preferences-export-import-writes-and-deletes
       summary: Read scan config NVT family selection summary
       description: Read-only expansion of the NVT Families detail tab. Scanner preferences, NVT preferences, selector edit payloads, import/export, and writes remain on inherited compatibility paths.
       parameters:
