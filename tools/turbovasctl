@@ -4571,6 +4571,181 @@ def native_api_direct_contract_summary(repo_root: Path | None, endpoints: list[d
     }
 
 
+def c_source_function_body(source: str, name: str) -> str:
+    match = re.search(rf"\b{re.escape(name)}\s*\([^)]*\)\s*{{", source)
+    if match is None:
+        return ""
+    start = source.find("{", match.start())
+    depth = 0
+    for index in range(start, len(source)):
+        char = source[index]
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return source[start + 1 : index]
+    return ""
+
+
+def c_string_constants(function_body: str) -> dict[str, str]:
+    return {
+        match.group(1): match.group(2)
+        for match in re.finditer(r'const\s+gchar\s+\*\s*(\w+)\s*=\s*"([^"]*)"\s*;', function_body)
+    }
+
+
+def c_string_array_values(function_body: str, name: str) -> list[str]:
+    match = re.search(rf"const\s+gchar\s+\*\s*{re.escape(name)}\s*\[\]\s*=\s*{{(?P<body>.*?)}};", function_body, re.DOTALL)
+    if match is None:
+        return []
+    return re.findall(r'"([^"]+)"', match.group("body"))
+
+
+def native_api_gsad_proxy_allowlist_templates(repo_root: Path | None) -> tuple[list[str], list[str]]:
+    if repo_root is None:
+        return [], []
+    relative_path = "components/gsad/src/gsad_native_api.c"
+    try:
+        source = (repo_root / relative_path).read_text(encoding="utf-8")
+    except OSError:
+        return [], [f"missing_source:{relative_path}"]
+
+    function_body = c_source_function_body(source, "native_api_path_is_allowed")
+    if not function_body:
+        return [], ["missing_function:native_api_path_is_allowed"]
+
+    constants = c_string_constants(function_body)
+    templates: set[str] = set()
+    errors: list[str] = []
+
+    for match in re.finditer(
+        r"if\s*\(\s*g_strcmp0\s*\(\s*path\s*,\s*(\w+)\s*\)\s*==\s*0\s*\)\s*return\s+TRUE\s*;",
+        function_body,
+        re.DOTALL,
+    ):
+        variable = match.group(1)
+        value = constants.get(variable)
+        if value and value.startswith("/api/v1"):
+            templates.add(value)
+        else:
+            errors.append(f"unresolved_exact_path:{variable}")
+
+    if "results_path" in constants and "g_str_has_prefix (path, results_path)" in function_body:
+        templates.add(f"{constants['results_path']}/{{}}")
+
+    single_segment_prefixes = (
+        "cpe_prefix",
+        "cve_prefix",
+        "cert_bund_advisory_prefix",
+        "dfn_cert_advisory_prefix",
+        "nvt_prefix",
+        "operating_system_prefix",
+        "host_prefix",
+        "tls_certificate_prefix",
+        "scanner_prefix",
+        "filter_prefix",
+        "tag_resource_names_prefix",
+        "override_prefix",
+        "port_list_prefix",
+        "schedule_prefix",
+        "report_config_prefix",
+        "report_format_prefix",
+        "scope_report_prefix",
+        "target_prefix",
+        "task_prefix",
+    )
+    for variable in single_segment_prefixes:
+        value = constants.get(variable)
+        if value and f"g_str_has_prefix (path, {variable})" in function_body:
+            templates.add(f"{value.rstrip('/')}/{{}}")
+
+    for prefix_variable, suffix_variable in (
+        ("scan_config_prefix", "scan_config_families_suffix"),
+        ("tag_prefix", "tag_resources_suffix"),
+    ):
+        prefix = constants.get(prefix_variable)
+        suffix = constants.get(suffix_variable)
+        if prefix and suffix and f"g_str_has_prefix (path, {prefix_variable})" in function_body:
+            templates.add(f"{prefix.rstrip('/')}/{{}}")
+            templates.add(f"{prefix.rstrip('/')}/{{}}{suffix}")
+
+    raw_report_prefix = constants.get("raw_report_prefix")
+    if raw_report_prefix and "g_str_has_prefix (path, raw_report_prefix)" in function_body:
+        templates.add(f"{raw_report_prefix.rstrip('/')}/{{}}")
+        for suffix_variable in (
+            "metrics_suffix",
+            "results_suffix",
+            "hosts_suffix",
+            "ports_suffix",
+            "applications_suffix",
+            "operating_systems_suffix",
+            "cves_suffix",
+            "tls_certificates_suffix",
+            "errors_suffix",
+        ):
+            suffix = constants.get(suffix_variable)
+            if suffix and f"g_str_has_suffix (path, {suffix_variable})" in function_body:
+                templates.add(f"{raw_report_prefix.rstrip('/')}/{{}}{suffix}")
+
+    scope_prefix = constants.get("scope_prefix")
+    if scope_prefix and "g_str_has_prefix (path, scope_prefix)" in function_body:
+        templates.add(f"{scope_prefix.rstrip('/')}/{{}}")
+        for suffix in c_string_array_values(function_body, "scope_collection_suffixes"):
+            if suffix.startswith("/"):
+                templates.add(f"{scope_prefix.rstrip('/')}/{{}}/reports/{{}}{suffix}")
+
+    return sorted(templates), errors
+
+
+def native_api_browser_proxy_contract_summary(repo_root: Path | None, endpoints: list[dict[str, Any]]) -> dict[str, Any]:
+    browser_proxied = sorted(
+        item["endpoint"]
+        for item in endpoints
+        if isinstance(item.get("endpoint"), str)
+        and native_api_browser_access_from_status(str(item.get("status", "unknown"))) == "browser_proxied"
+    )
+    internal_only = sorted(
+        item["endpoint"]
+        for item in endpoints
+        if isinstance(item.get("endpoint"), str)
+        and native_api_browser_access_from_status(str(item.get("status", "unknown"))) == "internal_only"
+    )
+    openapi_internal_only = sorted(
+        f"/api/v1{operation.get('path')}"
+        for operation in openapi_contract_operations(repo_root)
+        if isinstance(operation.get("path"), str)
+        and isinstance(operation.get("x_turbovas_values"), dict)
+        and operation["x_turbovas_values"].get("x-turbovas-exposure") == "internal-only"
+    )
+    gsad_allowed, parse_errors = native_api_gsad_proxy_allowlist_templates(repo_root)
+
+    browser_by_normalized = {normalize_native_api_endpoint_template(endpoint): endpoint for endpoint in browser_proxied}
+    internal_by_normalized = {normalize_native_api_endpoint_template(endpoint): endpoint for endpoint in openapi_internal_only}
+    internal_by_normalized.update({normalize_native_api_endpoint_template(endpoint): endpoint for endpoint in internal_only})
+    gsad_by_normalized = {normalize_native_api_endpoint_template(endpoint): endpoint for endpoint in gsad_allowed}
+
+    missing_gsad = [browser_by_normalized[key] for key in sorted(set(browser_by_normalized) - set(gsad_by_normalized))]
+    internal_only_in_gsad = [internal_by_normalized[key] for key in sorted(set(internal_by_normalized) & set(gsad_by_normalized))]
+    unexpected_gsad = [gsad_by_normalized[key] for key in sorted(set(gsad_by_normalized) - set(browser_by_normalized) - set(internal_by_normalized))]
+    drift = parse_errors or missing_gsad or unexpected_gsad or internal_only_in_gsad
+    return {
+        "alignment_status": "pass" if not drift else "warn",
+        "browser_proxied_count": len(browser_proxied),
+        "internal_only_count": len(internal_only),
+        "openapi_internal_only_count": len(openapi_internal_only),
+        "gsad_proxy_allowlist_count": len(gsad_allowed),
+        "browser_proxied_endpoints": browser_proxied,
+        "internal_only_endpoints": internal_only,
+        "openapi_internal_only_endpoints": openapi_internal_only,
+        "gsad_proxy_allowlist_endpoints": gsad_allowed,
+        "missing_gsad_proxy_allowlist": missing_gsad,
+        "unexpected_gsad_proxy_allowlist": unexpected_gsad,
+        "internal_only_gsad_proxy_allowlist": internal_only_in_gsad,
+        "parse_errors": parse_errors,
+    }
+
+
 def annotate_native_tooling_direct_api(summary: dict[str, Any], repo_root: Path | None) -> None:
     endpoints = summary.get("implemented_native_endpoints", [])
     if not isinstance(endpoints, list):
@@ -5035,6 +5210,18 @@ def compact_native_tooling_summary(summary: dict[str, Any]) -> dict[str, Any]:
         "missing_rust_direct_allowlist_count": len(direct_contract.get("missing_rust_direct_allowlist", [])) if isinstance(direct_contract, dict) else 0,
         "unexpected_rust_direct_allowlist_count": len(direct_contract.get("unexpected_rust_direct_allowlist", [])) if isinstance(direct_contract, dict) else 0,
     }
+    browser_proxy_contract = summary.get("browser_proxy_contract", {})
+    compact_browser_proxy_contract = {
+        "alignment_status": browser_proxy_contract.get("alignment_status", "unknown") if isinstance(browser_proxy_contract, dict) else "unknown",
+        "browser_proxied_count": browser_proxy_contract.get("browser_proxied_count", 0) if isinstance(browser_proxy_contract, dict) else 0,
+        "internal_only_count": browser_proxy_contract.get("internal_only_count", 0) if isinstance(browser_proxy_contract, dict) else 0,
+        "openapi_internal_only_count": browser_proxy_contract.get("openapi_internal_only_count", 0) if isinstance(browser_proxy_contract, dict) else 0,
+        "gsad_proxy_allowlist_count": browser_proxy_contract.get("gsad_proxy_allowlist_count", 0) if isinstance(browser_proxy_contract, dict) else 0,
+        "missing_gsad_proxy_allowlist_count": len(browser_proxy_contract.get("missing_gsad_proxy_allowlist", [])) if isinstance(browser_proxy_contract, dict) else 0,
+        "unexpected_gsad_proxy_allowlist_count": len(browser_proxy_contract.get("unexpected_gsad_proxy_allowlist", [])) if isinstance(browser_proxy_contract, dict) else 0,
+        "internal_only_gsad_proxy_allowlist_count": len(browser_proxy_contract.get("internal_only_gsad_proxy_allowlist", [])) if isinstance(browser_proxy_contract, dict) else 0,
+        "parse_error_count": len(browser_proxy_contract.get("parse_errors", [])) if isinstance(browser_proxy_contract, dict) else 0,
+    }
     openapi_contract = summary.get("openapi_contract", {})
     compact_openapi_contract = {
         "alignment_status": openapi_contract.get("alignment_status", "unknown") if isinstance(openapi_contract, dict) else "unknown",
@@ -5061,6 +5248,7 @@ def compact_native_tooling_summary(summary: dict[str, Any]) -> dict[str, Any]:
         "implemented_native_endpoint_count": len(summary.get("implemented_native_endpoints", [])),
         "implemented_native_endpoints_by_status": endpoint_statuses,
         "direct_api_contract": compact_direct_contract,
+        "browser_proxy_contract": compact_browser_proxy_contract,
         "openapi_contract": compact_openapi_contract,
         "next_replacement_candidates": summary.get("next_replacement_candidates", []),
     }
@@ -5074,6 +5262,7 @@ def compact_native_tooling_finding_details(summary: dict[str, Any]) -> dict[str,
         "implemented_native_endpoint_count": compact["implemented_native_endpoint_count"],
         "implemented_native_endpoints_by_status": compact["implemented_native_endpoints_by_status"],
         "direct_api_contract": compact["direct_api_contract"],
+        "browser_proxy_contract": compact["browser_proxy_contract"],
         "openapi_contract": compact["openapi_contract"],
     }
 
@@ -5203,9 +5392,13 @@ def command_native_tooling_state(repo_root: Path, compact: bool = False) -> dict
     summary = summarize_native_tooling(items, repo_root)
     annotate_native_tooling_direct_api(summary, repo_root)
     summary["openapi_contract"] = native_api_openapi_contract_summary(repo_root)
+    endpoints = summary.get("implemented_native_endpoints", [])
+    summary["browser_proxy_contract"] = native_api_browser_proxy_contract_summary(repo_root, [item for item in endpoints if isinstance(item, dict)])
     unknown_count = summary["by_category"]["unknown"]["count"]
     direct_contract = summary.get("direct_api_contract", {})
     direct_alignment_status = direct_contract.get("alignment_status", "warn") if isinstance(direct_contract, dict) else "warn"
+    browser_proxy_contract = summary.get("browser_proxy_contract", {})
+    browser_proxy_alignment_status = browser_proxy_contract.get("alignment_status", "warn") if isinstance(browser_proxy_contract, dict) else "warn"
     openapi_contract = summary.get("openapi_contract", {})
     openapi_alignment_status = openapi_contract.get("alignment_status", "warn") if isinstance(openapi_contract, dict) else "warn"
     finding_details = compact_native_tooling_finding_details(summary) if compact else summary
@@ -5218,6 +5411,14 @@ def command_native_tooling_state(repo_root: Path, compact: bool = False) -> dict
             if direct_alignment_status == "pass"
             else "Native API endpoint inventory, Rust routes, Rust direct allowlist, or OpenAPI direct markers differ.",
             details=direct_contract,
+        ),
+        finding(
+            "pass" if browser_proxy_alignment_status == "pass" else "warn",
+            "native-tooling.browser-proxy-contract",
+            "Native API browser-proxied endpoint inventory is aligned with the gsad same-origin proxy allowlist."
+            if browser_proxy_alignment_status == "pass"
+            else "Native API browser-proxied endpoint inventory or internal-only exposure metadata differs from the gsad proxy allowlist.",
+            details=browser_proxy_contract,
         ),
         finding(
             "pass" if openapi_alignment_status == "pass" else "warn",

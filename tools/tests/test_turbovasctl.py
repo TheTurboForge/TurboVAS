@@ -1006,6 +1006,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertNotIn("implemented_native_endpoints", details)
         self.assertIn("implemented_native_endpoint_count", details)
         self.assertIn("direct_api_contract", details)
+        self.assertIn("browser_proxy_contract", details)
         self.assertIn("candidate_for_removal_paths", details)
         inventory_details = compact["findings"][0]["details"]
         self.assertNotIn("candidate_for_removal_paths", inventory_details)
@@ -1151,6 +1152,86 @@ class TurboVASCtlTests(unittest.TestCase):
             "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/retention-plan",
             contract["rust_direct_allowlist_endpoints"],
         )
+
+    def test_native_tooling_state_tracks_browser_proxy_contract_alignment(self):
+        root = Path(__file__).resolve().parents[2]
+        result = turbovasctl.command_native_tooling_state(root)
+        details = result["details"]
+        contract = details["browser_proxy_contract"]
+        findings = {item["check"]: item for item in result["findings"]}
+
+        self.assertEqual(contract["alignment_status"], "pass")
+        self.assertEqual(findings["native-tooling.browser-proxy-contract"]["status"], "pass")
+        self.assertEqual(contract["missing_gsad_proxy_allowlist"], [])
+        self.assertEqual(contract["unexpected_gsad_proxy_allowlist"], [])
+        self.assertEqual(contract["internal_only_gsad_proxy_allowlist"], [])
+        self.assertEqual(contract["parse_errors"], [])
+        self.assertEqual(contract["browser_proxied_count"], contract["gsad_proxy_allowlist_count"])
+        self.assertIn("/api/v1/reports/{}", contract["gsad_proxy_allowlist_endpoints"])
+        self.assertIn("/api/v1/scopes/{}/reports/{}/metrics", contract["gsad_proxy_allowlist_endpoints"])
+        self.assertNotIn("/api/v1/scopes/{}/reports/{}/retention-plan", contract["gsad_proxy_allowlist_endpoints"])
+        self.assertIn(
+            "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/retention-plan",
+            contract["internal_only_endpoints"],
+        )
+        self.assertIn(
+            "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/retention-plan",
+            contract["openapi_internal_only_endpoints"],
+        )
+
+    def test_native_tooling_state_reports_browser_proxy_contract_drift(self):
+        endpoints = [
+            {"endpoint": "/api/v1/reports", "status": "implemented_internal_and_browser_proxied"},
+            {"endpoint": "/api/v1/targets", "status": "implemented_internal_and_browser_proxied"},
+            {"endpoint": "/api/v1/scopes/{scope_id}", "status": "implemented_internal_and_browser_proxied"},
+            {"endpoint": "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/results", "status": "implemented_internal_and_browser_proxied"},
+            {"endpoint": "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/retention-plan", "status": "implemented_internal"},
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            openapi = root / "api" / "openapi" / "turbovas-v1.yaml"
+            openapi.parent.mkdir(parents=True)
+            openapi.write_text(
+                "paths:\n"
+                "  /scopes/{scope_id}/reports/{scope_report_id}/retention-plan:\n"
+                "    get:\n"
+                "      operationId: getScopesByScopeIdReportsByScopeReportIdRetentionPlan\n"
+                "      x-turbovas-exposure: internal-only\n",
+                encoding="utf-8",
+            )
+            proxy_source = root / "components" / "gsad" / "src" / "gsad_native_api.c"
+            proxy_source.parent.mkdir(parents=True)
+            proxy_source.write_text(
+                "static gboolean\n"
+                "native_api_path_is_allowed (const gchar *path)\n"
+                "{\n"
+                "  const gchar *reports_path = \"/api/v1/reports\";\n"
+                "  const gchar *feeds_path = \"/api/v1/feeds\";\n"
+                "  const gchar *scope_prefix = \"/api/v1/scopes/\";\n"
+                "  const gchar *scope_collection_suffixes[] = { \"/results\", \"/retention-plan\", NULL };\n"
+                "\n"
+                "  if (g_strcmp0 (path, reports_path) == 0)\n"
+                "    return TRUE;\n"
+                "  if (g_strcmp0 (path, feeds_path) == 0)\n"
+                "    return TRUE;\n"
+                "  if (g_str_has_prefix (path, scope_prefix))\n"
+                "    return TRUE;\n"
+                "\n"
+                "  return FALSE;\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            summary = turbovasctl.native_api_browser_proxy_contract_summary(root, endpoints)
+
+        self.assertEqual(summary["alignment_status"], "warn")
+        self.assertEqual(summary["missing_gsad_proxy_allowlist"], ["/api/v1/targets"])
+        self.assertEqual(summary["unexpected_gsad_proxy_allowlist"], ["/api/v1/feeds"])
+        self.assertEqual(
+            summary["internal_only_gsad_proxy_allowlist"],
+            ["/api/v1/scopes/{scope_id}/reports/{scope_report_id}/retention-plan"],
+        )
+        self.assertEqual(summary["parse_errors"], [])
 
     def test_native_tooling_state_reports_direct_api_contract_drift(self):
         endpoints = [
