@@ -7050,6 +7050,32 @@ async fn scope_hosts(
     Ok(rows.iter().map(scope_entity_from_row).collect())
 }
 
+fn scope_candidate_hosts_sql() -> &'static str {
+    "WITH newest_reports AS (\n\
+         SELECT DISTINCT ON (t.id) t.id AS target, r.id AS report, r.uuid AS report_uuid\n\
+           FROM targets t\n\
+           JOIN scope_targets st ON st.target = t.id\n\
+           JOIN tasks task ON task.target = t.id\n\
+           JOIN reports r ON r.task = task.id\n\
+          WHERE st.scope = $1\n\
+            AND coalesce(task.usage_type, 'scan') = 'scan'\n\
+            AND run_status_name(coalesce(r.scan_run_status, 0)) = 'Done'\n\
+          ORDER BY t.id, coalesce(r.end_time, r.creation_time) DESC, r.id DESC\n\
+     )\n\
+     SELECT DISTINCT rh.host::text, st.target_uuid::text, coalesce(st.target_name, st.target_uuid)::text, nr.report_uuid::text\n\
+       FROM scope_targets st\n\
+       JOIN newest_reports nr ON nr.target = st.target\n\
+       JOIN report_hosts rh ON rh.report = nr.report\n\
+      WHERE st.scope = $1\n\
+        AND coalesce(rh.host, '') <> ''\n\
+        AND NOT EXISTS (\n\
+            SELECT 1 FROM scope_hosts sh\n\
+            JOIN hosts h ON h.id = sh.host\n\
+            WHERE sh.scope = $1 AND lower(h.name) = lower(rh.host)\n\
+        )\n\
+      ORDER BY rh.host, st.target_uuid;"
+}
+
 async fn scope_candidate_hosts(
     client: &tokio_postgres::Client,
     scope_pk: i32,
@@ -7059,32 +7085,7 @@ async fn scope_candidate_hosts(
         return Ok(Vec::new());
     }
     let rows = client
-        .query(
-            "WITH newest_reports AS (\n\
-                 SELECT DISTINCT ON (t.id) t.id AS target, r.id AS report, r.uuid AS report_uuid\n\
-                   FROM targets t\n\
-                   JOIN scope_targets st ON st.target = t.id\n\
-                   JOIN tasks task ON task.target = t.id\n\
-                   JOIN reports r ON r.task = task.id\n\
-                  WHERE st.scope = $1\n\
-                    AND coalesce(task.usage_type, 'scan') = 'scan'\n\
-                    AND run_status_name(coalesce(r.scan_run_status, 0)) = 'Done'\n\
-                  ORDER BY t.id, coalesce(r.end_time, r.creation_time) DESC, r.id DESC\n\
-             )\n\
-             SELECT DISTINCT rh.host::text, st.target_uuid::text, coalesce(st.target_name, st.target_uuid)::text, nr.report_uuid::text\n\
-               FROM scope_targets st\n\
-               JOIN newest_reports nr ON nr.target = st.target\n\
-               JOIN report_hosts rh ON rh.report = nr.report\n\
-              WHERE st.scope = $1\n\
-                AND coalesce(rh.host, '') <> ''\n\
-                AND NOT EXISTS (\n\
-                    SELECT 1 FROM scope_hosts sh\n\
-                    JOIN hosts h ON h.id = sh.host\n\
-                    WHERE sh.scope = $1 AND lower(h.name) = lower(rh.host)\n\
-                )\n\
-              ORDER BY rh.host, st.target_uuid;",
-            &[&scope_pk],
-        )
+        .query(scope_candidate_hosts_sql(), &[&scope_pk])
         .await
         .map_err(|error| {
             tracing::warn!(%error, "scope candidate hosts query failed");
@@ -11208,6 +11209,24 @@ mod tests {
         assert_eq!(normalize_protection_requirement("high"), "High");
         assert_eq!(normalize_protection_requirement("very_high"), "Very High");
         assert_eq!(normalize_protection_requirement("Very High"), "Very High");
+    }
+
+    #[test]
+    fn scope_candidate_hosts_sql_keeps_candidates_out_of_membership() {
+        let sql = scope_candidate_hosts_sql();
+        assert!(sql.contains("SELECT DISTINCT ON (t.id)"));
+        assert!(sql.contains("run_status_name(coalesce(r.scan_run_status, 0)) = 'Done'"));
+        assert!(
+            sql.contains("ORDER BY t.id, coalesce(r.end_time, r.creation_time) DESC, r.id DESC")
+        );
+        assert!(sql.contains("JOIN scope_targets st ON st.target = t.id"));
+        assert!(sql.contains("JOIN report_hosts rh ON rh.report = nr.report"));
+        assert!(sql.contains("AND NOT EXISTS"));
+        assert!(sql.contains("FROM scope_hosts sh"));
+        assert!(sql.contains("WHERE sh.scope = $1 AND lower(h.name) = lower(rh.host)"));
+        assert!(!sql.contains("INSERT"));
+        assert!(!sql.contains("UPDATE"));
+        assert!(!sql.contains("DELETE"));
     }
 
     #[test]
