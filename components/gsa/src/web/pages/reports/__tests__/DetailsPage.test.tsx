@@ -14,6 +14,10 @@ import {createSession} from 'gmp/testing';
 import {currentSettingsDefaultResponse} from 'web/pages/__fixtures__/current-settings';
 import {getMockReport} from 'web/pages/reports/__fixtures__/MockReport';
 import DetailsPage from 'web/pages/reports/DetailsPage';
+import {
+  DEFAULT_PORT_LIST_ID,
+  DEFAULT_PORT_LIST_NAME,
+} from 'web/pages/targets/TargetDialog';
 
 interface CollectionResponse {
   data: unknown[];
@@ -51,6 +55,39 @@ const nativeReportPayload = {
     false_positive: 0,
   },
   max_severity: 7.5,
+};
+
+const nativeEmptyReportPayload = {
+  ...nativeReportPayload,
+  result_count: 0,
+};
+
+const nativeTargetPayload = {
+  id: 'target-1',
+  name: 'target',
+  comment: 'native target',
+  hosts: ['192.168.178.50'],
+  exclude_hosts: [],
+  max_hosts: 1,
+  alive_tests: ['Scan Config Default'],
+  allow_simultaneous_ips: true,
+  reverse_lookup_only: false,
+  reverse_lookup_unify: false,
+  port_list: {id: DEFAULT_PORT_LIST_ID, name: DEFAULT_PORT_LIST_NAME},
+  credentials: {},
+  tasks: [],
+};
+
+const nativePortListsPayload = {
+  page: {page: 1, page_size: 1000, total: 1, sort: 'name', filter: ''},
+  items: [
+    {
+      id: DEFAULT_PORT_LIST_ID,
+      name: DEFAULT_PORT_LIST_NAME,
+      predefined: true,
+      port_count: {all: 7594, tcp: 7594, udp: 0},
+    },
+  ],
 };
 
 const nativeResultFiltersPayload = {
@@ -197,6 +234,9 @@ const createGmp = () => ({
   filters: {
     get: testing.fn().mockResolvedValue(emptyCollectionResponse),
   },
+  credentials: {
+    getAll: testing.fn().mockResolvedValue({data: []}),
+  },
   reportconfigs: {
     get: testing.fn().mockResolvedValue(emptyCollectionResponse),
   },
@@ -250,7 +290,7 @@ const createGmp = () => ({
   },
 });
 
-const createFetchMock = () =>
+const createFetchMock = (reportPayload = nativeReportPayload) =>
   testing.fn().mockImplementation((url: string) =>
     Promise.resolve({
       json: testing.fn().mockResolvedValue(
@@ -264,6 +304,12 @@ const createFetchMock = () =>
           if (url.includes('/api/v1/report-configs')) {
             return nativeReportConfigsPayload;
           }
+          if (url.includes('/api/v1/targets/')) {
+            return nativeTargetPayload;
+          }
+          if (url.includes('/api/v1/port-lists')) {
+            return nativePortListsPayload;
+          }
           if (url.includes('/api/v1/reports/') && url.includes('/cves')) {
             return nativeReportCvesPayload;
           }
@@ -273,7 +319,7 @@ const createFetchMock = () =>
           ) {
             return nativeReportTlsCertificatesPayload;
           }
-          return nativeReportPayload;
+          return reportPayload;
         })(),
       ),
       ok: true,
@@ -281,8 +327,11 @@ const createFetchMock = () =>
     }),
   );
 
-const setupRenderer = (gmp = createGmp()) => {
-  const fetchMock = createFetchMock();
+const setupRenderer = (
+  gmp = createGmp(),
+  reportPayload = nativeReportPayload,
+) => {
+  const fetchMock = createFetchMock(reportPayload);
   testing.stubGlobal('fetch', fetchMock);
   const {render, store} = rendererWith({
     gmp,
@@ -381,6 +430,44 @@ describe('DetailsPage', () => {
       await screen.findByRole('row', {name: /^Task Name/});
       expect(screen.getByRole('row', {name: /^Task Name/})).toHaveTextContent(
         'foo',
+      );
+    });
+
+    test('should load the report target through the native API when editing it', async () => {
+      const gmp = createGmp();
+      gmp.settings.reportResultsThreshold = 0;
+      const {render, fetchMock} = setupRenderer(gmp, nativeEmptyReportPayload);
+      renderPage(render);
+
+      await screen.findByRole('tab', {name: /^Results/});
+      fireEvent.click(screen.getByRole('tab', {name: /^Results/}));
+
+      await screen.findByText(
+        /You should change the Alive Test Method of the target for the next scan/i,
+      );
+      fireEvent.click(
+        screen.getByText(
+          /You should change the Alive Test Method of the target for the next scan/i,
+        ),
+      );
+
+      await screen.findByText('Edit Target target');
+      expect(gmp.target.get).not.toHaveBeenCalled();
+      expect(gmp.buildUrl).toHaveBeenCalledWith('api/v1/targets/target-1', {
+        token: 'test-token',
+      });
+      expect(gmp.buildUrl).toHaveBeenCalledWith('api/v1/port-lists', {
+        token: 'test-token',
+        page: 1,
+        page_size: 1000,
+        sort: 'name',
+        filter: '',
+      });
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://turbovas.example/api/v1/targets/target-1',
+        expect.objectContaining({
+          credentials: 'include',
+        }),
       );
     });
 

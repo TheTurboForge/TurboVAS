@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2025 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -13,7 +14,10 @@ import Target, {SCAN_CONFIG_DEFAULT} from 'gmp/models/target';
 import {createSession} from 'gmp/testing';
 import Button from 'web/components/form/Button';
 import TargetComponent from 'web/pages/targets/TargetComponent';
-import {DEFAULT_PORT_LIST_ID} from 'web/pages/targets/TargetDialog';
+import {
+  DEFAULT_PORT_LIST_ID,
+  DEFAULT_PORT_LIST_NAME,
+} from 'web/pages/targets/TargetDialog';
 
 const createGmp = ({
   credentials = [],
@@ -69,6 +73,59 @@ describe('TargetComponent tests', () => {
     );
 
     expect(screen.getByTestId('button')).toBeInTheDocument();
+  });
+
+  test('should load port lists through the native API when available', async () => {
+    const gmp = {
+      ...createGmp(),
+      buildUrl: testing.fn(
+        (path: string) => `https://turbovas.example/${path}`,
+      ),
+      session: createSession({token: 'test-token'}),
+    };
+    const fetchMock = testing.fn().mockResolvedValue({
+      json: testing.fn().mockResolvedValue({
+        page: {page: 1, page_size: 1000, total: 1, sort: 'name', filter: ''},
+        items: [
+          {
+            id: DEFAULT_PORT_LIST_ID,
+            name: DEFAULT_PORT_LIST_NAME,
+            predefined: true,
+            port_count: {all: 7594, tcp: 7594, udp: 0},
+          },
+        ],
+      }),
+      ok: true,
+      status: 200,
+    });
+    testing.stubGlobal('fetch', fetchMock);
+    const {render} = rendererWith({gmp, capabilities: true});
+
+    render(
+      <TargetComponent>
+        {({create}) => <Button data-testid="button" onClick={() => create()} />}
+      </TargetComponent>,
+    );
+
+    fireEvent.click(screen.getByTestId('button'));
+
+    await screen.findByText('New Target');
+
+    expect(gmp.portlists.getAll).not.toHaveBeenCalled();
+    expect(gmp.buildUrl).toHaveBeenCalledWith('api/v1/port-lists', {
+      token: 'test-token',
+      page: 1,
+      page_size: 1000,
+      sort: 'name',
+      filter: '',
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://turbovas.example/api/v1/port-lists',
+      expect.objectContaining({
+        credentials: 'include',
+      }),
+    );
+    expect(screen.getByName('portListId')).toHaveValue(DEFAULT_PORT_LIST_ID);
   });
 
   test('should allow to create a new target', async () => {

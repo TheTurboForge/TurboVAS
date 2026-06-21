@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -20,6 +21,7 @@ import {
   type AliveTest,
   SCAN_CONFIG_DEFAULT,
 } from 'gmp/models/target';
+import {fetchNativePortLists} from 'gmp/native-api/port-lists';
 import {first} from 'gmp/utils/array';
 import {isDefined} from 'gmp/utils/identity';
 import useEntityClone, {
@@ -86,6 +88,10 @@ export const TARGET_RESOURCE_PROPERTIES_NAMES = [
   'sshElevateCredential',
   'krb5Credential',
 ] as const;
+
+const canUseNativeApi = (gmp: {buildUrl?: unknown}) =>
+  typeof gmp?.buildUrl === 'function';
+const NATIVE_PORT_LIST_PAGE_SIZE = 1000;
 
 const TargetComponent = ({
   children,
@@ -169,8 +175,35 @@ const TargetComponent = ({
   };
 
   const loadPortLists = async () => {
-    const response = await gmp.portlists.getAll();
-    setPortLists(response.data);
+    if (!canUseNativeApi(gmp)) {
+      const response = await gmp.portlists.getAll();
+      setPortLists(response.data);
+      return;
+    }
+
+    const loadedPortLists: PortList[] = [];
+    let page = 1;
+    let total = Number.POSITIVE_INFINITY;
+
+    while (loadedPortLists.length < total) {
+      const response = await fetchNativePortLists(gmp, {
+        page,
+        pageSize: NATIVE_PORT_LIST_PAGE_SIZE,
+        sort: 'name',
+        filter: '',
+      });
+
+      loadedPortLists.push(...response.portLists);
+      total = response.counts.filtered;
+
+      if (response.portLists.length === 0) {
+        break;
+      }
+
+      page += 1;
+    }
+
+    setPortLists(loadedPortLists);
   };
 
   const loadAll = async () => {

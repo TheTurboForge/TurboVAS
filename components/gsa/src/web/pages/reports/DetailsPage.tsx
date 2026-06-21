@@ -12,6 +12,7 @@ import Filter, {RESET_FILTER} from 'gmp/models/filter';
 import type Report from 'gmp/models/report';
 import type ReportTLSCertificate from 'gmp/models/report/tls-certificate';
 import {isActive} from 'gmp/models/task';
+import {fetchNativeTarget} from 'gmp/native-api/targets';
 import {isDefined} from 'gmp/utils/identity';
 import Download from 'web/components/form/Download';
 import useDownload from 'web/components/form/useDownload';
@@ -72,6 +73,9 @@ interface ReportTargetRef {
 }
 
 const log = logger.getLogger('web.pages.reports.DetailsPage');
+
+const canUseNativeApi = (gmp: {buildUrl?: unknown}) =>
+  typeof gmp?.buildUrl === 'function';
 
 const DEFAULT_FILTER = Filter.fromString(
   'levels=chml rows=100 min_qod=70 first=1 sort-reverse=severity result_hosts_only=0',
@@ -334,12 +338,8 @@ const ReportDetailsPage = () => {
     async (values: Record<string, unknown>) => {
       const state = values as unknown as DownloadReportState;
       if (!entity || !reportFilter) return;
-      const {
-        includeOverrides,
-        reportConfigId,
-        reportFormatId,
-        storeAsDefault,
-      } = state;
+      const {includeOverrides, reportConfigId, reportFormatId, storeAsDefault} =
+        state;
 
       const newFilter = reportFilter.copy();
       newFilter.set('overrides', includeOverrides);
@@ -487,10 +487,16 @@ const ReportDetailsPage = () => {
     [showError],
   );
 
-  const loadTarget = useCallback(() => {
-    if (!entity) return Promise.resolve();
+  const loadTarget = useCallback(async () => {
+    if (!entity) return;
     const target = getTarget(entity);
-    if (!isDefined(target)) return Promise.resolve();
+    if (!isDefined(target?.id)) return;
+
+    if (canUseNativeApi(gmp)) {
+      const response = await fetchNativeTarget(gmp, target.id);
+      return {data: response.target};
+    }
+
     return gmp.target.get({id: target.id});
   }, [entity, gmp]);
 
