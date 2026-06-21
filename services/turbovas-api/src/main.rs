@@ -824,6 +824,42 @@ struct FilterAssetItem {
 }
 
 #[derive(Serialize)]
+struct AlertOwner {
+    name: String,
+}
+
+#[derive(Serialize)]
+struct AlertReference {
+    id: String,
+    name: String,
+}
+
+#[derive(Serialize)]
+struct AlertTypeLabel {
+    #[serde(rename = "type")]
+    type_name: String,
+}
+
+#[derive(Serialize)]
+struct AlertAssetItem {
+    id: String,
+    name: String,
+    comment: String,
+    owner: AlertOwner,
+    active: bool,
+    in_use: bool,
+    task_count: i64,
+    event: AlertTypeLabel,
+    condition: AlertTypeLabel,
+    method: AlertTypeLabel,
+    method_data_redacted: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    filter: Option<AlertReference>,
+    created_at: Option<String>,
+    modified_at: Option<String>,
+}
+
+#[derive(Serialize)]
 struct TagOwner {
     name: String,
 }
@@ -1250,6 +1286,7 @@ async fn main() -> Result<(), ApiError> {
         )
         .route("/api/v1/filters", get(filter_assets))
         .route("/api/v1/filters/:filter_id", get(filter_asset_detail))
+        .route("/api/v1/alerts", get(alert_assets))
         .route("/api/v1/tags", get(tag_assets))
         .route(
             "/api/v1/tags/resource-names/:resource_type",
@@ -2492,6 +2529,115 @@ async fn filter_asset_detail(
         .map(filter_alert_from_row)
         .collect();
     Ok(Json(filter_asset_from_row(&row, alerts)))
+}
+
+fn alert_assets_sql(sort_sql: &str) -> String {
+    format!(
+        r#"WITH alert_rows AS (
+             SELECT a.uuid AS id,
+                    coalesce(a.name, '') AS name,
+                    coalesce(a.comment, '') AS comment,
+                    coalesce(u.name, '') AS owner_name,
+                    coalesce(a.active, 0)::integer AS active_int,
+                    CASE coalesce(a.event, 0)::integer
+                      WHEN 1 THEN 'Task run status changed'
+                      WHEN 2 THEN 'New SecInfo arrived'
+                      WHEN 3 THEN 'Updated SecInfo arrived'
+                      ELSE 'Internal Error'
+                    END AS event_type,
+                    CASE coalesce(a.condition, 0)::integer
+                      WHEN 1 THEN 'Always'
+                      WHEN 2 THEN 'Severity at least'
+                      WHEN 3 THEN 'Severity changed'
+                      WHEN 4 THEN 'Filter count at least'
+                      WHEN 5 THEN 'Filter count changed'
+                      ELSE 'Internal Error'
+                    END AS condition_type,
+                    CASE coalesce(a.method, 0)::integer
+                      WHEN 1 THEN 'Email'
+                      WHEN 2 THEN 'HTTP Get'
+                      WHEN 3 THEN 'Sourcefire Connector'
+                      WHEN 4 THEN 'Start Task'
+                      WHEN 5 THEN 'Syslog'
+                      WHEN 6 THEN 'verinice Connector'
+                      WHEN 7 THEN 'Send'
+                      WHEN 8 THEN 'SCP'
+                      WHEN 9 THEN 'SNMP'
+                      WHEN 10 THEN 'SMB'
+                      WHEN 11 THEN 'TippingPoint SMS'
+                      WHEN 12 THEN 'Alemba vFire'
+                      ELSE 'Internal Error'
+                    END AS method_type,
+                    f.uuid AS filter_id,
+                    coalesce(f.name, '') AS filter_name,
+                    coalesce((
+                      SELECT count(*)::bigint
+                        FROM task_alerts ta
+                        JOIN tasks t ON t.id = ta.task
+                       WHERE ta.alert = a.id
+                         AND coalesce(t.hidden, 0) = 0
+                    ), 0)::bigint AS task_count,
+                    coalesce(a.creation_time, 0)::bigint AS created_at_unix,
+                    coalesce(a.modification_time, 0)::bigint AS modified_at_unix
+               FROM alerts a
+          LEFT JOIN users u ON u.id = a.owner
+          LEFT JOIN filters f ON f.id = a.filter
+         ),
+         filtered AS (
+             SELECT * FROM alert_rows
+              WHERE ($1 = ''
+                     OR lower(id) LIKE '%' || lower($1) || '%'
+                     OR lower(name) LIKE '%' || lower($1) || '%'
+                     OR lower(comment) LIKE '%' || lower($1) || '%'
+                     OR lower(owner_name) LIKE '%' || lower($1) || '%'
+                     OR lower(event_type) LIKE '%' || lower($1) || '%'
+                     OR lower(condition_type) LIKE '%' || lower($1) || '%'
+                     OR lower(method_type) LIKE '%' || lower($1) || '%'
+                     OR lower(filter_name) LIKE '%' || lower($1) || '%')
+         )
+         SELECT count(*) OVER()::bigint AS total, * FROM filtered
+          ORDER BY {sort_sql}, name ASC, id ASC LIMIT $2 OFFSET $3;"#,
+    )
+}
+
+async fn alert_assets(
+    State(state): State<AppState>,
+    Query(query): Query<CollectionQuery>,
+) -> Result<Json<Collection<AlertAssetItem>>, ApiError> {
+    let params = normalize_collection_query(query, "name")?;
+    let sort_sql = sort_clause(
+        &params.sort,
+        &[
+            ("id", "id"),
+            ("name", "name"),
+            ("event", "event_type"),
+            ("condition", "condition_type"),
+            ("method", "method_type"),
+            ("filter", "filter_name"),
+            ("active", "active_int"),
+            ("tasks", "task_count"),
+            ("task_count", "task_count"),
+            ("created", "created_at_unix"),
+            ("modified", "modified_at_unix"),
+        ],
+    )?;
+    let sql = alert_assets_sql(&sort_sql);
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let rows = client
+        .query(&sql, &[&params.filter, &params.page_size, &params.offset])
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "alert asset list query failed");
+            ApiError::Database
+        })?;
+    let total =
+        collection_total_with_empty_page_probe(&client, &rows, &sql, &params, "alert asset list")
+            .await?;
+    let items = rows.iter().map(alert_asset_from_row).collect();
+    Ok(Json(Collection {
+        page: params.page_info(total),
+        items,
+    }))
 }
 
 async fn tag_assets(
@@ -8624,6 +8770,43 @@ fn filter_asset_from_row(row: &Row, alerts: Vec<FilterAlertReference>) -> Filter
     }
 }
 
+fn alert_asset_from_row(row: &Row) -> AlertAssetItem {
+    let filter_id: Option<String> = row.get("filter_id");
+    let filter = filter_id.map(|id| AlertReference {
+        name: row
+            .get::<_, Option<String>>("filter_name")
+            .filter(|name| !name.is_empty())
+            .unwrap_or_else(|| id.clone()),
+        id,
+    });
+    let task_count: i64 = row.get("task_count");
+
+    AlertAssetItem {
+        id: row.get("id"),
+        name: row.get("name"),
+        comment: row.get("comment"),
+        owner: AlertOwner {
+            name: row.get("owner_name"),
+        },
+        active: row.get::<_, i32>("active_int") != 0,
+        in_use: task_count > 0,
+        task_count,
+        event: AlertTypeLabel {
+            type_name: row.get("event_type"),
+        },
+        condition: AlertTypeLabel {
+            type_name: row.get("condition_type"),
+        },
+        method: AlertTypeLabel {
+            type_name: row.get("method_type"),
+        },
+        method_data_redacted: true,
+        filter,
+        created_at: unix_ts_to_rfc3339(row.get("created_at_unix")),
+        modified_at: unix_ts_to_rfc3339(row.get("modified_at_unix")),
+    }
+}
+
 fn tag_asset_from_row(row: &Row) -> TagAssetItem {
     let resource_type: String = row.get("resource_type");
     let resource_count: i64 = row.get("resource_count");
@@ -9332,6 +9515,19 @@ mod tests {
             "result_count DESC"
         );
         assert!(sort_clause(";drop", &[("host", "host")]).is_err());
+    }
+
+    #[test]
+    fn alert_assets_sql_redacts_payload_tables() {
+        let sort_sql = sort_clause("name", &[("id", "id"), ("name", "name")]).unwrap();
+        let sql = alert_assets_sql(&sort_sql);
+        assert!(sql.contains("FROM alerts a"));
+        assert!(sql.contains("LEFT JOIN users u ON u.id = a.owner"));
+        assert!(sql.contains("LEFT JOIN filters f ON f.id = a.filter"));
+        assert!(sql.contains("FROM task_alerts ta"));
+        assert!(!sql.contains("alert_method_data"));
+        assert!(!sql.contains("alert_event_data"));
+        assert!(!sql.contains("alert_condition_data"));
     }
 
     #[test]

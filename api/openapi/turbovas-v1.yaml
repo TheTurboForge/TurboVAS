@@ -341,6 +341,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/FilterAsset'
+  /alerts:
+    get:
+      summary: List redacted alert metadata
+      description: Read-only alert metadata backed by gvmd/PostgreSQL. This list intentionally excludes alert condition data, event data, method delivery payloads, credentials, destinations, message bodies, certificates, export/test actions, and all alert mutations.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Filter'
+      responses:
+        '200':
+          description: Redacted alert metadata collection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertAssetCollection'
   /tags:
     get:
       summary: List tags
@@ -1536,6 +1552,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/FilterAsset'
+    AlertAssetCollection:
+      type: object
+      required: [page, items]
+      properties:
+        page:
+          $ref: '#/components/schemas/PageInfo'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlertAsset'
     TagAssetCollection:
       type: object
       required: [page, items]
@@ -2639,6 +2665,64 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/FilterAlertReference'
+        created_at:
+          type: string
+          format: date-time
+        modified_at:
+          type: string
+          format: date-time
+    AlertOwner:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+    AlertReference:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+    AlertTypeLabel:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          description: Human-readable inherited alert enum label. Associated data values are intentionally omitted from the redacted native contract.
+    AlertAsset:
+      type: object
+      required: [id, name, owner, active, in_use, task_count, event, condition, method, method_data_redacted]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        comment:
+          type: string
+        owner:
+          $ref: '#/components/schemas/AlertOwner'
+        active:
+          type: boolean
+        in_use:
+          type: boolean
+        task_count:
+          type: integer
+        event:
+          $ref: '#/components/schemas/AlertTypeLabel'
+        condition:
+          $ref: '#/components/schemas/AlertTypeLabel'
+        method:
+          $ref: '#/components/schemas/AlertTypeLabel'
+        method_data_redacted:
+          type: boolean
+          description: Always true for this metadata list; alert method delivery payloads remain on inherited operator-only paths until a safe redacted detail contract exists.
+        filter:
+          $ref: '#/components/schemas/AlertReference'
         created_at:
           type: string
           format: date-time

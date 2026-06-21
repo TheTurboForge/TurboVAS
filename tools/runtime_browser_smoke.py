@@ -339,6 +339,37 @@ async function assertTagResourceNameProxy(page) {
   );
 }
 
+async function assertAlertMetadataProxy(page) {
+  const alerts = await fetchNativeJsonWithBrowserToken(page, '/api/v1/alerts?page_size=1&sort=name');
+  const alertItems = Array.isArray(alerts.body?.items) ? alerts.body.items : null;
+  const allowedKeys = new Set(['id', 'name', 'comment', 'owner', 'active', 'in_use', 'task_count', 'event', 'condition', 'method', 'method_data_redacted', 'filter', 'created_at', 'modified_at']);
+  const forbiddenKeys = new Set(['alert_method_data', 'method_data', 'event_data', 'condition_data', 'credential', 'credentials', 'password', 'secret', 'token', 'url', 'host', 'hosts', 'path', 'email', 'message', 'certificate', 'cert']);
+  const unexpected = [];
+  const forbidden = [];
+  for (const item of alertItems || []) {
+    for (const key of Object.keys(item || {})) {
+      if (!allowedKeys.has(key)) unexpected.push(key);
+      if (forbiddenKeys.has(key)) forbidden.push(key);
+    }
+    if (item?.method_data_redacted !== true) forbidden.push('method_data_redacted_false');
+  }
+  const ok = alerts.status === 200 && alertItems !== null && unexpected.length === 0 && forbidden.length === 0;
+  add(
+    ok ? 'pass' : 'fail',
+    'alert.metadata-native-api',
+    ok ? 'Redacted Alerts metadata list loaded through same-origin native API.' : 'Alerts metadata native proxy returned unexpected or unredacted data.',
+    { status: alerts.status, total: alerts.body?.page?.total ?? null, item_count: alertItems?.length ?? null, unexpected, forbidden, sample: alertItems?.[0] ?? alerts.textSample },
+  );
+
+  const detail = await fetchNativeJsonWithBrowserToken(page, '/api/v1/alerts/00000000-0000-0000-0000-000000000000');
+  add(
+    [400, 404].includes(detail.status) ? 'pass' : 'fail',
+    'alert.detail-blocked-native-api',
+    [400, 404].includes(detail.status) ? 'Alert detail remains unavailable through the same-origin native proxy.' : 'Alert detail unexpectedly returned through the same-origin native proxy.',
+    { status: detail.status, message: detail.body?.error?.message || detail.textSample },
+  );
+}
+
 function focusedRouteCatalog() {
   const specs = [
     { label: 'reports', path: '/reports', nativePath: '/api/v1/reports', nativeCheck: 'raw-report.list-native-api', nativePass: 'Raw-report list loaded through same-origin native API.', nativeFail: 'Raw-report list did not produce a successful same-origin native API response.', forbidden: [/Delta Report/i, /Import Report/i], aliases: ['raw-reports'] },
@@ -353,6 +384,7 @@ function focusedRouteCatalog() {
     { label: 'scanners', path: '/scanners', nativePath: '/api/v1/scanners', nativeCheck: 'scanner.list-native-api', nativePass: 'Top-level Scanners list loaded through same-origin native API.', nativeFail: 'Top-level Scanners list did not produce a successful same-origin native API response.' },
     { label: 'scan-configs', path: '/scan-configs', nativePath: '/api/v1/scan-configs', nativeCheck: 'scan-config.list-native-api', nativePass: 'Top-level Scan Configs list loaded through same-origin native API.', nativeFail: 'Top-level Scan Configs list did not produce a successful same-origin native API response.', aliases: ['scanconfigs'] },
     { label: 'filters', path: '/filters', nativePath: '/api/v1/filters', nativeCheck: 'filter.list-native-api', nativePass: 'Top-level Filters list loaded through same-origin native API.', nativeFail: 'Top-level Filters list did not produce a successful same-origin native API response.' },
+    { label: 'alerts', path: '/alerts', nativePath: null, aliases: ['alert'] },
     { label: 'tags', path: '/tags', nativePath: '/api/v1/tags', nativeCheck: 'tag.list-native-api', nativePass: 'Top-level Tags list loaded through same-origin native API.', nativeFail: 'Top-level Tags list did not produce a successful same-origin native API response.' },
     { label: 'overrides', path: '/overrides', nativePath: '/api/v1/overrides', nativeCheck: 'override.list-native-api', nativePass: 'Top-level Overrides list loaded through same-origin native API.', nativeFail: 'Top-level Overrides list did not produce a successful same-origin native API response.' },
     { label: 'port-lists', path: '/port-lists', nativePath: '/api/v1/port-lists', nativeCheck: 'port-list.list-native-api', nativePass: 'Top-level Port Lists loaded through same-origin native API.', nativeFail: 'Top-level Port Lists did not produce a successful same-origin native API response.' },
@@ -425,6 +457,9 @@ async function validateFocusedRoute(page, nativeApiResponses, spec) {
   const observed = nativeApiResponses.slice(startIndex).filter(item => item.path.startsWith('/api/v1/'));
   if (!spec.nativePath) {
     add('pass', `focused-route.${spec.label}`, 'Focused browser route loaded without a GSA application error.', { path: spec.path, observed_native_api_responses: observed });
+    if (spec.label === 'alerts') {
+      await assertAlertMetadataProxy(page);
+    }
     return;
   }
   const nativeResponse = await waitForNativeApiResponse(page, nativeApiResponses, new RegExp(`^${escapeRegExp(spec.nativePath)}$`));

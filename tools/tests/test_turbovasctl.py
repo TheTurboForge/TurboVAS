@@ -725,11 +725,14 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("native-api.tags", source)
         self.assertIn("native-api.overrides", source)
         self.assertIn("native-api.trashcan-summary", source)
+        self.assertIn("native-api.alerts", source)
         self.assertIn("/api/v1/report-configs", source)
         self.assertIn("/api/v1/report-configs/{report_config_id}", source)
         self.assertIn("/api/v1/scan-configs", source)
         self.assertIn("/api/v1/scan-configs/{scan_config_id}", source)
         self.assertIn("/api/v1/trashcan/summary", source)
+        self.assertIn("/api/v1/alerts", source)
+        self.assertNotIn("/api/v1/alerts/{alert_id}", source)
         self.assertIn("/api/v1/tags", source)
         self.assertIn("/api/v1/tags/resource-names/{resource_type}", source)
         self.assertIn("native-api.tag-resource-names", source)
@@ -776,6 +779,68 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(len(summary["vulnerabilities_sample"]), 3)
         self.assertNotIn("systems", summary)
         self.assertNotIn("vulnerabilities", summary)
+
+    def test_native_api_alert_summary_omits_delivery_payload_values(self):
+        payload = {
+            "page": {"total": 1},
+            "items": [
+                {
+                    "id": "alert-1",
+                    "name": "Daily report",
+                    "comment": "operator note",
+                    "owner": {"name": "admin"},
+                    "active": True,
+                    "event_type": "Task run status changed",
+                    "condition_type": "Always",
+                    "method_type": "Email",
+                    "filter": {"id": "filter-1", "name": "High"},
+                    "task_count": 2,
+                    "method_data_redacted": True,
+                    "created_at": "2026-06-21T00:00:00Z",
+                }
+            ],
+        }
+        summary = turbovasctl.summarize_native_alerts_response(payload)
+        self.assertEqual(summary["item_count_in_response"], 1)
+        self.assertEqual(
+            summary["items_sample"],
+            [
+                {
+                    "id": "alert-1",
+                    "name": "Daily report",
+                    "event_type": "Task run status changed",
+                    "condition_type": "Always",
+                    "method_type": "Email",
+                }
+            ],
+        )
+        sample = summary["items_sample"][0]
+        self.assertNotIn("comment", sample)
+        self.assertNotIn("owner", sample)
+        self.assertNotIn("filter", sample)
+        self.assertNotIn("method_data_redacted", sample)
+
+    def test_native_api_alert_metadata_validation_rejects_delivery_values(self):
+        safe = {
+            "id": "alert-1",
+            "name": "Daily report",
+            "comment": "operator note",
+            "owner": {"name": "admin"},
+            "active": True,
+            "event_type": "Task run status changed",
+            "condition_type": "Always",
+            "method_type": "Email",
+            "filter": {"id": "filter-1", "name": "High"},
+            "task_count": 2,
+            "method_data_redacted": True,
+            "created_at": "2026-06-21T00:00:00Z",
+            "modified_at": "2026-06-21T00:00:00Z",
+        }
+        self.assertTrue(turbovasctl.alert_metadata_item_ok(safe))
+        leaked_method = dict(safe, alert_method_data={"email": "operator@example.invalid"})
+        self.assertFalse(turbovasctl.alert_metadata_item_ok(leaked_method))
+        unredacted = dict(safe, method_data_redacted=False)
+        self.assertFalse(turbovasctl.alert_metadata_item_ok(unredacted))
 
     def test_native_api_probe_finding_uses_response_summary(self):
         result = turbovasctl.subprocess.CompletedProcess(
@@ -868,6 +933,8 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("/api/v1/scan-configs", endpoints)
         self.assertIn("/api/v1/scan-configs/{scan_config_id}", endpoints)
         self.assertIn("/api/v1/scan-configs/{scan_config_id}/families", endpoints)
+        self.assertIn("/api/v1/alerts", endpoints)
+        self.assertNotIn("/api/v1/alerts/{alert_id}", endpoints)
         self.assertIn("/api/v1/tags", endpoints)
         self.assertIn("/api/v1/tags/resource-names/{resource_type}", endpoints)
         self.assertIn("/api/v1/tags/{tag_id}", endpoints)
@@ -920,9 +987,19 @@ class TurboVASCtlTests(unittest.TestCase):
         dfn_cert_detail = next(item for item in details["implemented_native_endpoints"] if item["endpoint"] == "/api/v1/dfn-cert-advisories/{advisory_id}")
         self.assertEqual(dfn_cert_detail["status"], "implemented_internal_and_browser_proxied")
         self.assertIn("GSA Security Information DFN-CERT advisory detail metadata overlay (migrated through gsad same-origin proxy)", dfn_cert_detail["replacement_candidates"])
-        trashcan_summary = next(item for item in details["implemented_native_endpoints"] if item["endpoint"] == "/api/v1/trashcan/summary")
+        alerts = next(item for item in details["implemented_native_endpoints"] if item["endpoint"] == "/api/v1/alerts")
         api_source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
         proxy_source = (root / "components" / "gsad" / "src" / "gsad_native_api.c").read_text(encoding="utf-8")
+        alerts_api_declared = '.route("/api/v1/alerts"' in api_source
+        alerts_proxy_declared = "/api/v1/alerts" in proxy_source
+        if alerts_api_declared and alerts_proxy_declared:
+            self.assertEqual(alerts["status"], "implemented_internal_and_browser_proxied")
+        elif alerts_api_declared or alerts_proxy_declared:
+            self.assertEqual(alerts["status"], "partial_internal_browser_proxy_mismatch")
+        else:
+            self.assertEqual(alerts["status"], "planned_internal_and_browser_proxied")
+        self.assertIn("Metadata list only; no alert detail endpoint in this tooling slice.", alerts["notes"])
+        trashcan_summary = next(item for item in details["implemented_native_endpoints"] if item["endpoint"] == "/api/v1/trashcan/summary")
         self.assertIn('/api/v1/tags/resource-names/', proxy_source)
         self.assertIn('is_tag_resource_type_segment', proxy_source)
         if "/api/v1/trashcan/summary" in api_source or "/api/v1/trashcan/summary" in proxy_source:

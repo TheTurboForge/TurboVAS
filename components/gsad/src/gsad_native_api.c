@@ -269,6 +269,7 @@ native_api_path_is_allowed (const gchar *path)
   const gchar *scan_config_families_suffix = "/families";
   const gchar *filters_path = "/api/v1/filters";
   const gchar *filter_prefix = "/api/v1/filters/";
+  const gchar *alerts_path = "/api/v1/alerts";
   const gchar *tags_path = "/api/v1/tags";
   const gchar *tag_resource_names_prefix = "/api/v1/tags/resource-names/";
   const gchar *tag_prefix = "/api/v1/tags/";
@@ -432,6 +433,9 @@ native_api_path_is_allowed (const gchar *path)
       const gchar *id = path + strlen (filter_prefix);
       return is_uuid_segment (id, strlen (id));
     }
+
+  if (g_strcmp0 (path, alerts_path) == 0)
+    return TRUE;
 
   if (g_strcmp0 (path, tags_path) == 0)
     return TRUE;
