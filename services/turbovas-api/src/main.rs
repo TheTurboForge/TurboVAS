@@ -30,11 +30,13 @@ mod auth;
 mod collections;
 mod errors;
 mod request_ids;
+mod request_shapes;
 
 use auth::*;
 use collections::*;
 use errors::ApiError;
 use request_ids::*;
+use request_shapes::*;
 
 #[derive(Clone)]
 struct AppState {
@@ -48,7 +50,6 @@ struct DirectApiAuth {
 
 const DIRECT_API_BIND_ENV: &str = "TURBOVAS_API_DIRECT_BIND";
 const DIRECT_API_BEARER_TOKEN_ENV: &str = "TURBOVAS_API_BEARER_TOKEN";
-const MAX_DIRECT_API_QUERY_BYTES: usize = 8 * 1024;
 const FEED_METADATA_ROOT_ENV: &str = "TURBOVAS_FEED_METADATA_DIR";
 const FEED_LOCK_ROOT_ENV: &str = "TURBOVAS_FEED_LOCK_DIR";
 const DEFAULT_FEED_METADATA_ROOT: &str = "/runtime/feeds";
@@ -1572,27 +1573,6 @@ async fn require_direct_api_auth(
     }
     attach_request_id_header(&mut response, &request_id);
     response
-}
-
-fn direct_api_request_shape_is_allowed(request: &Request) -> bool {
-    if request
-        .uri()
-        .query()
-        .is_some_and(|query| query.len() > MAX_DIRECT_API_QUERY_BYTES)
-    {
-        return false;
-    }
-    if request.headers().get(header::TRANSFER_ENCODING).is_some() {
-        return false;
-    }
-    match request.headers().get(header::CONTENT_LENGTH) {
-        Some(value) => value
-            .to_str()
-            .ok()
-            .and_then(|text| text.parse::<u64>().ok())
-            .is_some_and(|length| length == 0),
-        None => true,
-    }
 }
 
 fn direct_api_v1_path_is_allowed(path: &str) -> bool {
