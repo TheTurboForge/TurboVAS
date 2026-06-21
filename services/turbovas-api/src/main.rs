@@ -2,12 +2,16 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use std::{env, net::SocketAddr};
+use std::{
+    env,
+    net::SocketAddr,
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 use axum::{
     Json, Router,
     extract::{Path, Query, Request, State},
-    http::{HeaderMap, StatusCode, header},
+    http::{HeaderMap, HeaderName, HeaderValue, StatusCode, header},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::get,
@@ -31,6 +35,9 @@ struct DirectApiAuth {
 
 const DIRECT_API_BIND_ENV: &str = "TURBOVAS_API_DIRECT_BIND";
 const DIRECT_API_BEARER_TOKEN_ENV: &str = "TURBOVAS_API_BEARER_TOKEN";
+const DIRECT_API_REQUEST_ID_HEADER: &str = "x-request-id";
+const MAX_REQUEST_ID_LENGTH: usize = 128;
+static REQUEST_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Debug, Deserialize)]
 struct CollectionQuery {
@@ -1413,7 +1420,7 @@ async fn main() -> Result<(), ApiError> {
             .map_err(|_| ApiError::Config)?;
         let direct_addr: SocketAddr = direct_listener.local_addr().map_err(|_| ApiError::Config)?;
         tracing::info!(addr = %direct_addr, "starting turbovas-api direct authenticated listener");
-        let direct_app = app.clone().route_layer(middleware::from_fn_with_state(
+        let direct_app = app.clone().layer(middleware::from_fn_with_state(
             auth,
             require_direct_api_auth,
         ));
@@ -1451,13 +1458,26 @@ async fn require_direct_api_auth(
     request: Request,
     next: Next,
 ) -> Response {
-    if !request.uri().path().starts_with("/api/v1/") && request.uri().path() != "/api/v1" {
-        return next.run(request).await;
+    let request_id = request_id_from_headers(request.headers());
+    let method = request.method().clone();
+    let path = request.uri().path().to_string();
+    let api_path = path.starts_with("/api/v1/") || path == "/api/v1";
+
+    let mut response = if !api_path {
+        next.run(request).await
+    } else if bearer_token_matches(request.headers(), &auth.token) {
+        next.run(request).await
+    } else {
+        tracing::warn!(request_id = %request_id, %method, path = %path, "direct native API bearer authentication failed");
+        ApiError::Unauthorized.into_response()
+    };
+
+    let status = response.status();
+    if status.is_server_error() {
+        tracing::warn!(request_id = %request_id, %method, path = %path, status = status.as_u16(), "direct native API request completed with server error");
     }
-    if bearer_token_matches(request.headers(), &auth.token) {
-        return next.run(request).await;
-    }
-    ApiError::Unauthorized.into_response()
+    attach_request_id_header(&mut response, &request_id);
+    response
 }
 
 fn bearer_token_matches(headers: &HeaderMap, expected: &str) -> bool {
@@ -1475,6 +1495,41 @@ fn bearer_token_matches(headers: &HeaderMap, expected: &str) -> bool {
         return false;
     };
     scheme.eq_ignore_ascii_case("Bearer") && token == expected
+}
+
+fn request_id_header_name() -> HeaderName {
+    HeaderName::from_static(DIRECT_API_REQUEST_ID_HEADER)
+}
+
+fn request_id_from_headers(headers: &HeaderMap) -> String {
+    headers
+        .get(request_id_header_name())
+        .and_then(|value| value.to_str().ok())
+        .filter(|value| request_id_is_valid(value))
+        .map(str::to_string)
+        .unwrap_or_else(new_request_id)
+}
+
+fn request_id_is_valid(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= MAX_REQUEST_ID_LENGTH
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b':'))
+}
+
+fn new_request_id() -> String {
+    let counter = REQUEST_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let timestamp = OffsetDateTime::now_utc().unix_timestamp_nanos();
+    format!("tv-{timestamp:x}-{counter:x}")
+}
+
+fn attach_request_id_header(response: &mut Response, request_id: &str) {
+    if let Ok(value) = HeaderValue::from_str(request_id) {
+        response
+            .headers_mut()
+            .insert(request_id_header_name(), value);
+    }
 }
 
 async fn shutdown_signal() {
@@ -9771,6 +9826,54 @@ mod tests {
             "bearer secret-token".parse().unwrap(),
         );
         assert!(bearer_token_matches(&headers, "secret-token"));
+    }
+
+    #[test]
+    fn request_id_accepts_bounded_safe_client_header() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            request_id_header_name(),
+            "client-123_abc.4:5".parse().unwrap(),
+        );
+        assert_eq!(request_id_from_headers(&headers), "client-123_abc.4:5");
+    }
+
+    #[test]
+    fn request_id_rejects_unsafe_or_unbounded_client_header() {
+        let mut headers = HeaderMap::new();
+
+        headers.insert(request_id_header_name(), "contains space".parse().unwrap());
+        assert!(request_id_from_headers(&headers).starts_with("tv-"));
+
+        headers.insert(request_id_header_name(), "../bad".parse().unwrap());
+        assert!(request_id_from_headers(&headers).starts_with("tv-"));
+
+        let too_long = "a".repeat(MAX_REQUEST_ID_LENGTH + 1);
+        headers.insert(
+            request_id_header_name(),
+            HeaderValue::from_str(&too_long).unwrap(),
+        );
+        assert!(request_id_from_headers(&headers).starts_with("tv-"));
+    }
+
+    #[test]
+    fn generated_request_id_is_safe_for_header_contract() {
+        let request_id = new_request_id();
+        assert!(request_id.starts_with("tv-"));
+        assert!(request_id_is_valid(&request_id));
+    }
+
+    #[test]
+    fn request_id_header_is_attached_to_responses() {
+        let mut response = ApiError::Unauthorized.into_response();
+        attach_request_id_header(&mut response, "req-123");
+        assert_eq!(
+            response
+                .headers()
+                .get(request_id_header_name())
+                .and_then(|value| value.to_str().ok()),
+            Some("req-123")
+        );
     }
 
     #[test]

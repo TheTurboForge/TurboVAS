@@ -25,6 +25,10 @@ script/curl -> opt-in direct bearer listener -> turbovas-api -> PostgreSQL
 - `/healthz` is unauthenticated for readiness. `/api/v1/...` on the direct
   listener requires `Authorization: Bearer <token>` and returns JSON `401`
   errors for missing or wrong tokens.
+- Direct listener responses include `X-Request-Id`. A client may provide a
+  bounded ASCII request ID for correlation; unsafe, empty, or oversized values
+  are replaced with a generated `tv-...` ID. Auth failures and direct-listener
+  server-error responses log the request ID for diagnostics.
 - The browser may keep using same-origin `gsad` paths while GSA migrations are
   in progress. That bridge is not the final scriptable API boundary.
 - Direct development access currently uses HTTP on an explicit development host
@@ -40,6 +44,8 @@ script/curl -> opt-in direct bearer listener -> turbovas-api -> PostgreSQL
   management, target/task writes, alert delivery, and destructive mutations stay
   inherited until native write/control designs are separately reviewed.
 - Do not expose arbitrary GMP command forwarding through `/api/v1`.
+- Treat `X-Request-Id` as correlation metadata only. It is not authentication,
+  authorization, operator identity, or a trusted audit principal.
 - Treat CORS as out of scope for this first direct helper. Command-line clients
   do not need CORS; any future separately hosted browser app must receive a
   dedicated CORS/security design.
@@ -61,7 +67,8 @@ rejection, valid-token JSON access, and continued internal native API smoke.
 
 - whether the internal `gsad` -> `turbovas-api` hop should gain mTLS, a private
   proxy token, or a Unix socket;
-- how request IDs and operator identity should be forwarded for audit;
+- how operator identity should be forwarded for audit once direct access moves
+  beyond a single development bearer token;
 - rate limits and payload limits for heavyweight report queries;
 - TLS/certificate strategy and host-binding defaults for production;
 - CSRF/origin handling for future non-GET browser-accessible native APIs;

@@ -72,6 +72,10 @@ separate TLS/bootstrap/host-binding posture tracked outside this v1 read API.
 - Timestamps: RFC 3339 UTC strings.
 - Pagination: `page`, `page_size`, `total`, `sort`, and `filter` fields are
   explicit in collection responses.
+- Request correlation: the direct bearer listener returns `X-Request-Id` on
+  responses. Clients may send a bounded safe `X-Request-Id`; invalid or missing
+  values are replaced with a generated ID. The header is correlation metadata,
+  not identity or authorization.
 - Errors: return an object with `error.code`, `error.message`, and optional
   `error.details`; do not leak secrets or raw stack traces.
 - Provenance: report-like rows include raw evidence links or source report IDs

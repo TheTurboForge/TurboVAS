@@ -51,6 +51,9 @@ Checks to consider:
 opt-in boundary: a separate bearer-auth listener can expose read-only `/api/v1`
 paths, defaulting to loopback. `/healthz` is intentionally unauthenticated for
 service checks; `/api/v1/...` must reject missing or wrong bearer tokens.
+Direct listener responses include `X-Request-Id`; client-supplied values are
+accepted only when bounded and safe for logs/headers, otherwise a generated ID
+is returned.
 
 This direct path is a product direction, not a production security claim. Do not
 add scanner control, credentials, feed operations, account writes, destructive
@@ -61,6 +64,8 @@ Checks to consider:
 
 - `runtime-native-api-direct-smoke --json` for missing/wrong/valid bearer-token
   behavior and internal-smoke compatibility;
+- header-level probes for `X-Request-Id` on both unauthorized and successful
+  direct `/api/v1` responses;
 - OpenAPI and API contract review for new direct endpoints;
 - production posture review before any non-development exposure.
 

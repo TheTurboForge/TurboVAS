@@ -5,7 +5,7 @@ openapi: 3.1.0
 info:
   title: TurboVAS Native API
   version: 0.1.0-contract
-  description: Read-only contract baseline for DB-backed TurboVAS product workflows.
+  description: Read-only contract baseline for DB-backed TurboVAS product workflows. Direct listener responses include X-Request-Id for correlation.
 servers:
   - url: /api/v1
   - url: http://127.0.0.1:19080/api/v1
@@ -1103,6 +1103,15 @@ components:
       in: query
       schema:
         type: string
+    RequestId:
+      name: X-Request-Id
+      in: header
+      required: false
+      description: Optional client correlation ID for the direct bearer listener. Invalid, empty, or oversized values are replaced by a generated ID.
+      schema:
+        type: string
+        maxLength: 128
+        pattern: '^[A-Za-z0-9_.:-]+$'
     ReportId:
       name: report_id
       in: path
@@ -1269,6 +1278,13 @@ components:
         type: string
         maxLength: 256
         pattern: '^[A-Za-z0-9._:/-]+$'
+  headers:
+    RequestId:
+      description: Request correlation ID returned by the direct bearer listener.
+      schema:
+        type: string
+        maxLength: 128
+        pattern: '^[A-Za-z0-9_.:-]+$'
   schemas:
     Error:
       type: object
