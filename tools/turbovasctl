@@ -718,6 +718,7 @@ OPENAPI_ERROR_SCHEMA_EXPECTED_FIELDS = {
     "properties.error.properties.details.type": "object",
     "properties.error.properties.details.additionalProperties": "true",
 }
+OPENAPI_COLLECTION_PARAMETER_REFS = ("Page", "PageSize", "Sort", "Filter")
 OPENAPI_COMMON_ERROR_RESPONSE_REFS = {
     "400": "BadRequest",
     "401": "Unauthorized",
@@ -4106,14 +4107,16 @@ def openapi_contract_operations(repo_root: Path | None) -> list[dict[str, Any]]:
     current_path: str | None = None
     current: dict[str, Any] | None = None
     in_responses = False
+    in_parameters = False
     current_status: str | None = None
 
     def finish_current() -> None:
-        nonlocal current, in_responses, current_status
+        nonlocal current, in_responses, in_parameters, current_status
         if current is not None:
             operations.append(current)
         current = None
         in_responses = False
+        in_parameters = False
         current_status = None
 
     for line in lines:
@@ -4135,6 +4138,7 @@ def openapi_contract_operations(repo_root: Path | None) -> list[dict[str, Any]]:
                 "operation_id": None,
                 "x_turbovas_fields": [],
                 "x_turbovas_values": {},
+                "parameters": [],
                 "responses": {},
             }
             continue
@@ -4153,8 +4157,21 @@ def openapi_contract_operations(repo_root: Path | None) -> list[dict[str, Any]]:
             if isinstance(current.get("x_turbovas_values"), dict):
                 current["x_turbovas_values"][field] = openapi_scalar_value(value)
             continue
+        if line == "      parameters:":
+            in_parameters = True
+            in_responses = False
+            current_status = None
+            continue
+        if in_parameters and line.startswith("      ") and not line.startswith("        "):
+            in_parameters = False
+        if in_parameters:
+            parameter_ref_match = re.match(r"^        - \$ref: ['\"]#/components/parameters/([^'\"]+)['\"]$", line)
+            if parameter_ref_match:
+                current["parameters"].append(parameter_ref_match.group(1))
+            continue
         if line == "      responses:":
             in_responses = True
+            in_parameters = False
             current_status = None
             continue
         if in_responses and line.startswith("      ") and not line.startswith("        "):
@@ -4408,6 +4425,101 @@ def openapi_error_schema_contract_drift(repo_root: Path | None) -> dict[str, Any
     }
 
 
+def rust_collection_contract_constants(repo_root: Path | None) -> dict[str, int | None]:
+    if repo_root is None:
+        return {"default_page_size": None, "max_page_size": None, "max_filter_length": None}
+    path = repo_root / "services" / "turbovas-api" / "src" / "collections.rs"
+    try:
+        source = path.read_text(encoding="utf-8")
+    except OSError:
+        source = ""
+
+    def const_int(name: str) -> int | None:
+        match = re.search(rf"pub\(crate\)\s+const\s+{re.escape(name)}\s*:\s*(?:i64|usize)\s*=\s*([0-9]+)\s*;", source)
+        return int(match.group(1)) if match else None
+
+    return {
+        "default_page_size": const_int("DEFAULT_COLLECTION_PAGE_SIZE"),
+        "max_page_size": const_int("MAX_COLLECTION_PAGE_SIZE"),
+        "max_filter_length": const_int("MAX_COLLECTION_FILTER_LENGTH"),
+    }
+
+
+def openapi_component_parameter_block(repo_root: Path | None, parameter_name: str) -> list[str]:
+    lines = openapi_contract_lines(repo_root)
+    in_components = False
+    in_parameters = False
+    in_parameter = False
+    block: list[str] = []
+    for line in lines:
+        if line == "components:":
+            in_components = True
+            in_parameters = False
+            in_parameter = False
+            continue
+        if in_components and line and not line.startswith(" "):
+            break
+        if not in_components:
+            continue
+        top_key_match = re.match(r"^  ([A-Za-z][A-Za-z0-9_-]*):$", line)
+        if top_key_match:
+            in_parameters = top_key_match.group(1) == "parameters"
+            in_parameter = False
+            continue
+        if not in_parameters:
+            continue
+        parameter_match = re.match(r"^    ([A-Za-z][A-Za-z0-9_-]*):$", line)
+        if parameter_match:
+            if in_parameter:
+                break
+            in_parameter = parameter_match.group(1) == parameter_name
+            continue
+        if in_parameter:
+            block.append(line)
+    return block
+
+
+def openapi_collection_query_contract_summary(repo_root: Path | None, operations: list[dict[str, Any]]) -> dict[str, Any]:
+    rust_constants = rust_collection_contract_constants(repo_root)
+    page_size_fields = openapi_indented_scalar_fields(openapi_component_parameter_block(repo_root, "PageSize"))
+    filter_fields = openapi_indented_scalar_fields(openapi_component_parameter_block(repo_root, "Filter"))
+
+    def int_value(value: str | None) -> int | None:
+        return int(value) if isinstance(value, str) and re.fullmatch(r"[0-9]+", value) else None
+
+    openapi_values = {
+        "default_page_size": int_value(page_size_fields.get("schema.default")),
+        "max_page_size": int_value(page_size_fields.get("schema.maximum")),
+        "max_filter_length": int_value(filter_fields.get("schema.maxLength")),
+    }
+    mismatches = [
+        {"field": field, "openapi": openapi_values.get(field), "rust": rust_constants.get(field)}
+        for field in sorted(openapi_values)
+        if openapi_values.get(field) != rust_constants.get(field)
+    ]
+
+    required = set(OPENAPI_COLLECTION_PARAMETER_REFS)
+    incomplete_collection_parameters = []
+    for operation in operations:
+        parameters = set(operation.get("parameters", [])) if isinstance(operation.get("parameters"), list) else set()
+        present = parameters & required
+        if present and present != required:
+            incomplete_collection_parameters.append(
+                {
+                    "operation": openapi_operation_label(operation),
+                    "present": sorted(present),
+                    "missing": sorted(required - present),
+                }
+            )
+    return {
+        "alignment_status": "pass" if not mismatches and not incomplete_collection_parameters else "warn",
+        "rust_collection_constants": rust_constants,
+        "openapi_collection_values": openapi_values,
+        "collection_limit_mismatches": mismatches,
+        "incomplete_collection_parameters": incomplete_collection_parameters,
+    }
+
+
 def openapi_required_error_response_refs(path: str) -> dict[str, str]:
     required = dict(OPENAPI_COMMON_ERROR_RESPONSE_REFS)
     if "{" in path:
@@ -4437,6 +4549,7 @@ def native_api_openapi_contract_summary(repo_root: Path | None) -> dict[str, Any
     exposure_drift = openapi_exposure_contract_drift(operations)
     migration_metadata_drift = openapi_migration_metadata_contract_drift(operations)
     error_schema_drift = openapi_error_schema_contract_drift(repo_root)
+    collection_query_contract = openapi_collection_query_contract_summary(repo_root, operations)
 
     shared_response_refs = openapi_components_response_refs(repo_root)
     missing_shared_responses = sorted(set(OPENAPI_SHARED_ERROR_RESPONSES) - set(shared_response_refs))
@@ -4476,6 +4589,7 @@ def native_api_openapi_contract_summary(repo_root: Path | None) -> dict[str, Any
         or operations_missing_error_responses
         or error_schema_drift["missing_error_schema_fields"]
         or error_schema_drift["invalid_error_schema_fields"]
+        or collection_query_contract["alignment_status"] != "pass"
     )
     return {
         "alignment_status": "pass" if not drift else "warn",
@@ -4497,6 +4611,7 @@ def native_api_openapi_contract_summary(repo_root: Path | None) -> dict[str, Any
         "invalid_shared_error_responses": invalid_shared_responses,
         "operations_missing_error_responses": operations_missing_error_responses,
         **error_schema_drift,
+        "collection_query_contract": collection_query_contract,
     }
 
 
@@ -5332,6 +5447,9 @@ def compact_native_tooling_summary(summary: dict[str, Any]) -> dict[str, Any]:
         "operations_missing_error_response_count": len(openapi_contract.get("operations_missing_error_responses", [])) if isinstance(openapi_contract, dict) else 0,
         "missing_error_schema_field_count": len(openapi_contract.get("missing_error_schema_fields", [])) if isinstance(openapi_contract, dict) else 0,
         "invalid_error_schema_field_count": len(openapi_contract.get("invalid_error_schema_fields", [])) if isinstance(openapi_contract, dict) else 0,
+        "collection_query_alignment_status": openapi_contract.get("collection_query_contract", {}).get("alignment_status", "unknown") if isinstance(openapi_contract.get("collection_query_contract", {}), dict) else "unknown",
+        "collection_limit_mismatch_count": len(openapi_contract.get("collection_query_contract", {}).get("collection_limit_mismatches", [])) if isinstance(openapi_contract.get("collection_query_contract", {}), dict) else 0,
+        "incomplete_collection_parameter_count": len(openapi_contract.get("collection_query_contract", {}).get("incomplete_collection_parameters", [])) if isinstance(openapi_contract.get("collection_query_contract", {}), dict) else 0,
     }
     return {
         "total_items": summary.get("total_items", 0),
@@ -5516,9 +5634,9 @@ def command_native_tooling_state(repo_root: Path, compact: bool = False) -> dict
         finding(
             "pass" if openapi_alignment_status == "pass" else "warn",
             "native-tooling.openapi-contract",
-            "Native API OpenAPI operations have deterministic operation IDs, exposure/migration metadata, and shared Error responses."
+            "Native API OpenAPI operations have deterministic operation IDs, exposure/migration metadata, shared Error responses, and collection query contracts."
             if openapi_alignment_status == "pass"
-            else "Native API OpenAPI operation IDs, x-turbovas exposure/migration fields, or shared Error responses need attention.",
+            else "Native API OpenAPI operation IDs, x-turbovas exposure/migration fields, shared Error responses, or collection query contracts need attention.",
             details=openapi_contract,
         ),
         finding("warn" if unknown_count else "pass", "native-tooling.unknown", f"{unknown_count} inherited tooling surface(s) are outside the current classification map." if unknown_count else "No inherited tooling surfaces were left unclassified.", details={"paths": summary["by_category"]["unknown"]["paths"]}),

@@ -1314,6 +1314,22 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(contract["invalid_error_schema_fields"], [])
         self.assertEqual(contract["error_schema_fields"]["type"], "object")
         self.assertEqual(contract["error_schema_fields"]["properties.error.required"], "[code, message]")
+        collection_contract = contract["collection_query_contract"]
+        self.assertEqual(collection_contract["alignment_status"], "pass")
+        self.assertEqual(
+            collection_contract["rust_collection_constants"],
+            {"default_page_size": 50, "max_page_size": 500, "max_filter_length": 4096},
+        )
+        self.assertEqual(
+            collection_contract["openapi_collection_values"],
+            {"default_page_size": 50, "max_page_size": 500, "max_filter_length": 4096},
+        )
+        self.assertEqual(collection_contract["collection_limit_mismatches"], [])
+        self.assertEqual(collection_contract["incomplete_collection_parameters"], [])
+        compact = turbovasctl.compact_native_tooling_summary(details)
+        self.assertEqual(compact["openapi_contract"]["collection_query_alignment_status"], "pass")
+        self.assertEqual(compact["openapi_contract"]["collection_limit_mismatch_count"], 0)
+        self.assertEqual(compact["openapi_contract"]["incomplete_collection_parameter_count"], 0)
         self.assertIn("getResultsByResultId", contract["operation_ids"])
         self.assertIn("getScopesByScopeIdReportsByScopeReportIdRetentionPlan", contract["operation_ids"])
 
@@ -1702,6 +1718,77 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("properties.error.required", missing_error_schema)
         self.assertIn("properties.error.properties.code.type", missing_error_schema)
         self.assertEqual(summary["invalid_error_schema_fields"], [])
+
+    def test_native_tooling_state_reports_openapi_collection_query_contract_drift(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            openapi = root / "api" / "openapi" / "turbovas-v1.yaml"
+            collections = root / "services" / "turbovas-api" / "src" / "collections.rs"
+            openapi.parent.mkdir(parents=True)
+            collections.parent.mkdir(parents=True)
+            collections.write_text(
+                "pub(crate) const DEFAULT_COLLECTION_PAGE_SIZE: i64 = 50;\n"
+                "pub(crate) const MAX_COLLECTION_PAGE_SIZE: i64 = 500;\n"
+                "pub(crate) const MAX_COLLECTION_FILTER_LENGTH: usize = 4096;\n",
+                encoding="utf-8",
+            )
+            openapi.write_text(
+                "openapi: 3.1.0\n"
+                "paths:\n"
+                "  /reports:\n"
+                "    get:\n"
+                "      operationId: getReports\n"
+                "      parameters:\n"
+                "        - $ref: '#/components/parameters/Page'\n"
+                "        - $ref: '#/components/parameters/PageSize'\n"
+                "      responses:\n"
+                "        '200':\n"
+                "          description: Reports\n"
+                "components:\n"
+                "  parameters:\n"
+                "    Page:\n"
+                "      name: page\n"
+                "      in: query\n"
+                "      schema:\n"
+                "        type: integer\n"
+                "        minimum: 1\n"
+                "        default: 1\n"
+                "    PageSize:\n"
+                "      name: page_size\n"
+                "      in: query\n"
+                "      schema:\n"
+                "        type: integer\n"
+                "        minimum: 1\n"
+                "        maximum: 499\n"
+                "        default: 25\n"
+                "    Sort:\n"
+                "      name: sort\n"
+                "      in: query\n"
+                "      schema:\n"
+                "        type: string\n"
+                "    Filter:\n"
+                "      name: filter\n"
+                "      in: query\n"
+                "      schema:\n"
+                "        type: string\n"
+                "        maxLength: 2048\n",
+                encoding="utf-8",
+            )
+            operations = turbovasctl.openapi_contract_operations(root)
+            summary = turbovasctl.openapi_collection_query_contract_summary(root, operations)
+
+        self.assertEqual(summary["alignment_status"], "warn")
+        mismatches = {item["field"]: item for item in summary["collection_limit_mismatches"]}
+        self.assertEqual(mismatches["default_page_size"]["openapi"], 25)
+        self.assertEqual(mismatches["default_page_size"]["rust"], 50)
+        self.assertEqual(mismatches["max_page_size"]["openapi"], 499)
+        self.assertEqual(mismatches["max_page_size"]["rust"], 500)
+        self.assertEqual(mismatches["max_filter_length"]["openapi"], 2048)
+        self.assertEqual(mismatches["max_filter_length"]["rust"], 4096)
+        self.assertEqual(
+            summary["incomplete_collection_parameters"],
+            [{"operation": "GET /reports", "present": ["Page", "PageSize"], "missing": ["Filter", "Sort"]}],
+        )
 
     def test_native_tooling_state_reports_invalid_openapi_error_schema_shape(self):
         with tempfile.TemporaryDirectory() as tmp:
