@@ -1,15 +1,57 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
 import React, {useState} from 'react';
+import {
+  fetchNativeReportFormat,
+  fetchNativeReportFormats,
+} from 'gmp/native-api/report-formats';
 import {isDefined} from 'gmp/utils/identity';
 import EntityComponent from 'web/entity/EntityComponent';
 import useGmp from 'web/hooks/useGmp';
 import useTranslation from 'web/hooks/useTranslation';
 import ReportFormatDialog from 'web/pages/reportformats/Dialog';
 import PropTypes from 'web/utils/PropTypes';
+
+const canUseNativeApi = gmp => typeof gmp?.buildUrl === 'function';
+
+const reportFormatId = reportFormatData =>
+  typeof reportFormatData === 'string' ? reportFormatData : reportFormatData.id;
+
+const fetchReportFormat = async (gmp, reportFormatData) => {
+  if (canUseNativeApi(gmp)) {
+    return fetchNativeReportFormat(gmp, reportFormatId(reportFormatData));
+  }
+  const response = await gmp.reportformat.get(reportFormatData);
+  return response.data;
+};
+
+const fetchAllReportFormats = async gmp => {
+  if (!canUseNativeApi(gmp)) {
+    const response = await gmp.reportformats.getAll();
+    return response.data;
+  }
+
+  const pageSize = 200;
+  const formats = [];
+  let page = 1;
+  let total = 0;
+  do {
+    const response = await fetchNativeReportFormats(gmp, {
+      page,
+      pageSize,
+      sort: 'name',
+      filter: '',
+    });
+    formats.push(...response.reportFormats);
+    total = response.page.total;
+    page += 1;
+  } while (formats.length < total);
+  return formats;
+};
 
 const ReportFormatComponent = ({
   children,
@@ -26,6 +68,7 @@ const ReportFormatComponent = ({
   const [dialogVisible, setDialogVisible] = useState(false);
   const [preferences, setPreferences] = useState({});
   const [reportFormat, setReportFormat] = useState(undefined);
+  const [formats, setFormats] = useState([]);
   const [title, setTitle] = useState('');
   const [idLists, setIdLists] = useState({});
 
@@ -41,8 +84,7 @@ const ReportFormatComponent = ({
     if (isDefined(reportFormatParam)) {
       try {
         // (re-)load report format to get params
-        const response = await gmp.reportformat.get(reportFormatParam);
-        const format = response.data;
+        const format = await fetchReportFormat(gmp, reportFormatParam);
         const newPreferences = {};
         let loadFormats = false;
         const idLists = {};
@@ -58,11 +100,13 @@ const ReportFormatComponent = ({
 
         // only load formats if they are required for the report format list
         // type param
+        let loadedFormats = [];
         if (loadFormats) {
-          await gmp.reportformats.getAll();
+          loadedFormats = await fetchAllReportFormats(gmp);
         }
 
         setDialogVisible(true);
+        setFormats(loadedFormats);
         setPreferences(newPreferences);
         setIdLists(idLists);
         setReportFormat(format);
@@ -109,6 +153,7 @@ const ReportFormatComponent = ({
           })}
           {dialogVisible && (
             <ReportFormatDialog
+              formats={formats}
               id_lists={idLists}
               preferences={preferences}
               reportformat={reportFormat}
