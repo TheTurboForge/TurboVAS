@@ -6133,10 +6133,9 @@ async fn results(
             tracing::warn!(%error, "result list query failed");
             ApiError::Database
         })?;
-    let total = rows
-        .first()
-        .map(|row| row.get::<_, i64>("total"))
-        .unwrap_or(0);
+    let total =
+        collection_total_with_empty_page_probe(&client, &rows, &sql, &params, "result list")
+            .await?;
     let items = rows.iter().map(result_from_row).collect();
     Ok(Json(Collection {
         page: params.page_info(total),
