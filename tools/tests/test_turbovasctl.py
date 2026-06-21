@@ -1310,6 +1310,10 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(contract["missing_shared_error_responses"], [])
         self.assertEqual(contract["invalid_shared_error_responses"], [])
         self.assertEqual(contract["operations_missing_error_responses"], [])
+        self.assertEqual(contract["missing_error_schema_fields"], [])
+        self.assertEqual(contract["invalid_error_schema_fields"], [])
+        self.assertEqual(contract["error_schema_fields"]["type"], "object")
+        self.assertEqual(contract["error_schema_fields"]["properties.error.required"], "[code, message]")
         self.assertIn("getResultsByResultId", contract["operation_ids"])
         self.assertIn("getScopesByScopeIdReportsByScopeReportIdRetentionPlan", contract["operation_ids"])
 
@@ -1694,6 +1698,48 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(summary["invalid_shared_error_responses"], [{"response": "BadRequest", "actual": "#/components/schemas/Other", "expected": "#/components/schemas/Error"}])
         missing_statuses = {item["status"] for item in summary["operations_missing_error_responses"]}
         self.assertEqual(missing_statuses, {"401", "405", "413", "500"})
+        missing_error_schema = {item["field"] for item in summary["missing_error_schema_fields"]}
+        self.assertIn("properties.error.required", missing_error_schema)
+        self.assertIn("properties.error.properties.code.type", missing_error_schema)
+        self.assertEqual(summary["invalid_error_schema_fields"], [])
+
+    def test_native_tooling_state_reports_invalid_openapi_error_schema_shape(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            openapi = root / "api" / "openapi" / "turbovas-v1.yaml"
+            openapi.parent.mkdir(parents=True)
+            openapi.write_text(
+                "openapi: 3.1.0\n"
+                "paths: {}\n"
+                "components:\n"
+                "  schemas:\n"
+                "    Error:\n"
+                "      type: array\n"
+                "      required: [message]\n"
+                "      properties:\n"
+                "        error:\n"
+                "          type: string\n"
+                "          required: [code]\n"
+                "          properties:\n"
+                "            code:\n"
+                "              type: integer\n"
+                "            message:\n"
+                "              type: object\n"
+                "            details:\n"
+                "              type: string\n"
+                "              additionalProperties: false\n",
+                encoding="utf-8",
+            )
+            summary = turbovasctl.native_api_openapi_contract_summary(root)
+
+        self.assertEqual(summary["alignment_status"], "warn")
+        self.assertEqual(summary["missing_error_schema_fields"], [])
+        invalid = {item["field"]: item for item in summary["invalid_error_schema_fields"]}
+        self.assertEqual(invalid["type"]["actual"], "array")
+        self.assertEqual(invalid["required"]["expected"], "[error]")
+        self.assertEqual(invalid["properties.error.type"]["actual"], "string")
+        self.assertEqual(invalid["properties.error.properties.code.type"]["actual"], "integer")
+        self.assertEqual(invalid["properties.error.properties.details.additionalProperties"]["actual"], "false")
 
     def test_security_policy_marks_native_api_contract_surfaces_sensitive(self):
         root = Path(__file__).resolve().parents[2]
