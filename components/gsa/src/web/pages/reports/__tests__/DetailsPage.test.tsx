@@ -35,6 +35,7 @@ const reportId = entity.report?.id ?? '';
 const nativeReportPayload = {
   id: reportId,
   name: entity.name,
+  owner: {name: 'native-owner'},
   status: 'Done',
   task: {id: '314', name: 'foo'},
   target: {id: 'target-1', name: 'target'},
@@ -55,6 +56,14 @@ const nativeReportPayload = {
     false_positive: 0,
   },
   max_severity: 7.5,
+  user_tags: [
+    {
+      id: 'tag-1',
+      name: 'Native Tag',
+      value: 'native-value',
+      comment: 'native comment',
+    },
+  ],
 };
 
 const nativeEmptyReportPayload = {
@@ -354,10 +363,11 @@ const renderPage = (render: ReturnType<typeof setupRenderer>['render']) =>
 describe('DetailsPage', () => {
   describe('Loading state', () => {
     test('should render Loading spinner while report is being fetched', () => {
-      const gmp = createGmp();
-      gmp.report.get = testing.fn().mockReturnValue(new Promise(() => {}));
-
-      const {render} = setupRenderer(gmp);
+      const {render} = setupRenderer();
+      testing.stubGlobal(
+        'fetch',
+        testing.fn().mockReturnValue(new Promise(() => {})),
+      );
       renderPage(render);
 
       screen.getByTestId('loading');
@@ -365,10 +375,11 @@ describe('DetailsPage', () => {
     });
 
     test('should show Loading text in header while report is being fetched', async () => {
-      const gmp = createGmp();
-      gmp.report.get = testing.fn().mockReturnValue(new Promise(() => {}));
-
-      const {render} = setupRenderer(gmp);
+      const {render} = setupRenderer();
+      testing.stubGlobal(
+        'fetch',
+        testing.fn().mockReturnValue(new Promise(() => {})),
+      );
       renderPage(render);
 
       await screen.findByText('Loading');
@@ -431,6 +442,24 @@ describe('DetailsPage', () => {
       expect(screen.getByRole('row', {name: /^Task Name/})).toHaveTextContent(
         'foo',
       );
+    });
+
+    test('should use native report detail for small reports with owner and user tags', async () => {
+      const gmp = createGmp();
+      const {render} = setupRenderer(gmp);
+      renderPage(render);
+
+      await screen.findByRole('row', {name: /^Task Name/});
+      expect(gmp.report.get).not.toHaveBeenCalled();
+      expect(screen.getByRole('row', {name: /^Owner:/})).toHaveTextContent(
+        'native-owner',
+      );
+
+      fireEvent.click(screen.getByRole('tab', {name: /^User Tags/}));
+
+      await screen.findByText('Native Tag');
+      screen.getByText('native-value');
+      screen.getByText('native comment');
     });
 
     test('should load the report target through the native API when editing it', async () => {
@@ -630,11 +659,15 @@ describe('DetailsPage', () => {
 
   describe('Error state', () => {
     test('should render error panel when report load fails', async () => {
-      const gmp = createGmp();
-      const loadError = new Error('Connection refused');
-      gmp.report.get = testing.fn().mockRejectedValue(loadError);
-
-      const {render} = setupRenderer(gmp);
+      const {render} = setupRenderer();
+      testing.stubGlobal(
+        'fetch',
+        testing.fn().mockResolvedValue({
+          json: testing.fn().mockResolvedValue({}),
+          ok: false,
+          status: 503,
+        }),
+      );
       renderPage(render);
 
       await screen.findByText(/Error while loading Report/);

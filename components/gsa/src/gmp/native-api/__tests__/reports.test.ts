@@ -6,6 +6,7 @@
 import {describe, expect, test} from '@gsa/testing';
 import Filter from 'gmp/models/filter';
 import {
+  nativeReportToModel,
   nativeReportErrorsQueryFromFilter,
   nativeReportTlsCertificatesQueryFromFilter,
 } from 'gmp/native-api/reports';
@@ -39,6 +40,49 @@ describe('report native API query builders', () => {
     );
     expect(nativeReportTlsCertificatesQueryFromFilter(tlsFilter).sort).toBe(
       'subject',
+    );
+  });
+
+  test('should map report detail owner, user tags, and active filter', () => {
+    const filter = Filter.fromString(
+      'levels=h rows=10 first=1 sort-reverse=severity',
+    );
+    const report = nativeReportToModel(
+      {
+        id: 'report-1',
+        name: 'Report 1',
+        owner: {name: 'native-owner'},
+        status: 'Done',
+        result_count: 1,
+        vulnerability_count: 1,
+        host_count: 1,
+        cve_count: 1,
+        severity: {
+          critical: 0,
+          high: 1,
+          medium: 0,
+          low: 0,
+          log: 0,
+          false_positive: 0,
+        },
+        max_severity: 7.5,
+        user_tags: [
+          {
+            id: 'tag-1',
+            name: 'Native Tag',
+            value: 'native-value',
+            comment: 'native comment',
+          },
+        ],
+      },
+      filter,
+    );
+
+    expect(report.owner?.name).toBe('native-owner');
+    expect(report.report?.owner?.name).toBe('native-owner');
+    expect(report.report?.userTags[0]?.name).toBe('Native Tag');
+    expect(report.report?.filter?.toFilterString()).toBe(
+      filter.toFilterString(),
     );
   });
 });

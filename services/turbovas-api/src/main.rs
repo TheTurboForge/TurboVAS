@@ -194,9 +194,23 @@ struct ReportSeverityCounts {
 }
 
 #[derive(Debug, Serialize)]
+struct ReportOwner {
+    name: String,
+}
+
+#[derive(Debug, Serialize)]
+struct ReportUserTag {
+    id: String,
+    name: String,
+    value: String,
+    comment: String,
+}
+
+#[derive(Debug, Serialize)]
 struct ReportItem {
     id: String,
     name: String,
+    owner: ReportOwner,
     status: String,
     task: Option<ReportReference>,
     target: Option<ReportReference>,
@@ -210,6 +224,8 @@ struct ReportItem {
     cve_count: i64,
     severity: ReportSeverityCounts,
     max_severity: f64,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    user_tags: Vec<ReportUserTag>,
 }
 
 #[derive(Debug, Serialize)]
@@ -6004,7 +6020,9 @@ async fn report_detail(
             ApiError::Database
         })?
         .ok_or(ApiError::NotFound)?;
-    Ok(Json(report_from_row(&row)))
+    let mut report = report_from_row(&row);
+    report.user_tags = report_user_tags(&client, &report_id).await?;
+    Ok(Json(report))
 }
 
 async fn results(
@@ -7062,6 +7080,7 @@ fn raw_report_sql(filtered_predicate: &str, sort_sql: &str, limit_clause: &str) 
              SELECT r.id AS report_pk,
                     r.uuid,
                     coalesce(nullif(t.name, ''), r.uuid) AS name,
+                    coalesce(u.name, '') AS owner_name,
                     t.uuid AS task_uuid,
                     t.name AS task_name,
                     tg.uuid AS target_uuid,
@@ -7073,6 +7092,7 @@ fn raw_report_sql(filtered_predicate: &str, sort_sql: &str, limit_clause: &str) 
                     coalesce(r.modification_time, 0)::bigint AS modification_time
                FROM reports r
                LEFT JOIN tasks t ON t.id = r.task
+               LEFT JOIN users u ON u.id = r.owner
                LEFT JOIN targets tg ON tg.id = t.target
               WHERE (t.id IS NULL OR coalesce(t.usage_type, 'scan') = 'scan')
          ),
@@ -7107,7 +7127,7 @@ fn raw_report_sql(filtered_predicate: &str, sort_sql: &str, limit_clause: &str) 
               GROUP BY b.report_pk
          ),
          joined AS (
-             SELECT b.uuid, b.name, b.task_uuid, b.task_name, b.target_uuid, b.target_name,
+             SELECT b.uuid, b.name, b.owner_name, b.task_uuid, b.task_name, b.target_uuid, b.target_name,
                     b.status, b.creation_time, b.scan_start, b.scan_end, b.modification_time,
                     coalesce(ra.result_count, 0)::bigint AS result_count,
                     coalesce(ra.vulnerability_count, 0)::bigint AS vulnerability_count,
@@ -7129,7 +7149,7 @@ fn raw_report_sql(filtered_predicate: &str, sort_sql: &str, limit_clause: &str) 
              SELECT * FROM joined WHERE {filtered_predicate}
          )
          SELECT count(*) OVER()::bigint AS total,
-                uuid, name, task_uuid, task_name, target_uuid, target_name, status,
+                uuid, name, owner_name, task_uuid, task_name, target_uuid, target_name, status,
                 creation_time, scan_start, scan_end, modification_time,
                 result_count, vulnerability_count, host_count, cve_count, max_severity,
                 severity_critical, severity_high, severity_medium, severity_low,
@@ -7137,6 +7157,42 @@ fn raw_report_sql(filtered_predicate: &str, sort_sql: &str, limit_clause: &str) 
            FROM filtered
           ORDER BY {sort_sql}, creation_time DESC, uuid DESC {limit_clause};"#,
     )
+}
+
+async fn report_user_tags(
+    client: &tokio_postgres::Client,
+    report_id: &str,
+) -> Result<Vec<ReportUserTag>, ApiError> {
+    let rows = client
+        .query(
+            r#"SELECT t.uuid AS id,
+                      coalesce(t.name, '') AS name,
+                      coalesce(t.value, '') AS value,
+                      coalesce(t.comment, '') AS comment
+                 FROM tags t
+                 JOIN tag_resources tr ON tr.tag = t.id
+                 JOIN reports r ON r.id = tr.resource
+                WHERE lower(r.uuid) = lower($1)
+                  AND tr.resource_type = 'report'
+                  AND tr.resource_location = 0
+                  AND coalesce(t.active, 0) = 1
+                ORDER BY t.name ASC, t.uuid ASC;"#,
+            &[&report_id],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "raw report user-tag query failed");
+            ApiError::Database
+        })?;
+    Ok(rows
+        .iter()
+        .map(|row| ReportUserTag {
+            id: row.get("id"),
+            name: row.get("name"),
+            value: row.get("value"),
+            comment: row.get("comment"),
+        })
+        .collect())
 }
 
 async fn scope_report_results(
@@ -9201,26 +9257,28 @@ fn report_from_row(row: &Row) -> ReportItem {
     ReportItem {
         id: row.get(1),
         name: row.get(2),
-        task: report_reference(row.get(3), row.get(4)),
-        target: report_reference(row.get(5), row.get(6)),
-        status: row.get(7),
-        creation_time: unix_ts_to_rfc3339(row.get(8)),
-        scan_start: unix_ts_to_rfc3339(row.get(9)),
-        scan_end: unix_ts_to_rfc3339(row.get(10)),
-        modification_time: unix_ts_to_rfc3339(row.get(11)),
-        result_count: row.get(12),
-        vulnerability_count: row.get(13),
-        host_count: row.get(14),
-        cve_count: row.get(15),
-        max_severity: row.get(16),
+        owner: ReportOwner { name: row.get(3) },
+        task: report_reference(row.get(4), row.get(5)),
+        target: report_reference(row.get(6), row.get(7)),
+        status: row.get(8),
+        creation_time: unix_ts_to_rfc3339(row.get(9)),
+        scan_start: unix_ts_to_rfc3339(row.get(10)),
+        scan_end: unix_ts_to_rfc3339(row.get(11)),
+        modification_time: unix_ts_to_rfc3339(row.get(12)),
+        result_count: row.get(13),
+        vulnerability_count: row.get(14),
+        host_count: row.get(15),
+        cve_count: row.get(16),
+        max_severity: row.get(17),
         severity: ReportSeverityCounts {
-            critical: row.get(17),
-            high: row.get(18),
-            medium: row.get(19),
-            low: row.get(20),
-            log: row.get(21),
-            false_positive: row.get(22),
+            critical: row.get(18),
+            high: row.get(19),
+            medium: row.get(20),
+            low: row.get(21),
+            log: row.get(22),
+            false_positive: row.get(23),
         },
+        user_tags: Vec::new(),
     }
 }
 

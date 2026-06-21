@@ -1866,13 +1866,15 @@ components:
             $ref: '#/components/schemas/ErrorMessage'
     Report:
       type: object
-      required: [id, name, status, result_count, vulnerability_count, host_count, cve_count, severity, max_severity]
+      required: [id, name, owner, status, result_count, vulnerability_count, host_count, cve_count, severity, max_severity]
       properties:
         id:
           type: string
           format: uuid
         name:
           type: string
+        owner:
+          $ref: '#/components/schemas/ReportOwner'
         status:
           type: string
         task:
@@ -1903,6 +1905,17 @@ components:
           type: integer
         cve_count:
           type: integer
+        user_tags:
+          type: array
+          description: Active user tags attached directly to this report. Generic report/result tag-resource enumeration remains outside the native tag-resource API allowlist.
+          items:
+            $ref: '#/components/schemas/ReportUserTag'
+    ReportOwner:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
     ReportReference:
       type: object
       required: [id, name]
@@ -1928,6 +1941,19 @@ components:
           type: integer
         false_positive:
           type: integer
+    ReportUserTag:
+      type: object
+      required: [id, name, value, comment]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        value:
+          type: string
+        comment:
+          type: string
     Scope:
       type: object
       required: [id, name, protection_requirement, protection_requirement_label, predefined, global, target_count, host_count, scope_report_count]

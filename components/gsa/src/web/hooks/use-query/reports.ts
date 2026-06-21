@@ -114,23 +114,12 @@ export const useGetReport = ({
   refetchInterval,
 }: UseGetReportParams) => {
   const gmp = useGmp();
-  const threshold = gmp.settings.reportResultsThreshold;
   const filterString = filter?.toFilterString();
 
   return useGetEntity<Report>({
     gmpMethod: async ({id}) => {
-      const nativeResponse = await fetchNativeReport(gmp, id);
-      const lightReport = nativeResponse.report;
-
-      const needsFullReport =
-        isDefined(lightReport?.report?.results) &&
-        lightReport.report.results.counts.filtered < threshold;
-
-      if (needsFullReport) {
-        return gmp.report.get({id}, {filter: filterString, details: true});
-      }
-
-      return {data: lightReport} as Response<Report, XmlMeta>;
+      const nativeResponse = await fetchNativeReport(gmp, id, filter);
+      return {data: nativeResponse.report} as Response<Report, XmlMeta>;
     },
     queryId: 'get_report',
     queryKeyParts: [filterString],

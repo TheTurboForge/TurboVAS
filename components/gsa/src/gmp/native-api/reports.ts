@@ -74,6 +74,17 @@ interface NativeReportReference {
   name: string;
 }
 
+interface NativeReportOwner {
+  name?: string;
+}
+
+interface NativeReportUserTag {
+  id: string;
+  name: string;
+  value?: string | number;
+  comment?: string;
+}
+
 interface NativeReportSeverityCounts {
   critical: number;
   high: number;
@@ -86,6 +97,7 @@ interface NativeReportSeverityCounts {
 interface NativeReportItem {
   id: string;
   name: string;
+  owner?: NativeReportOwner;
   status: string;
   task?: NativeReportReference;
   target?: NativeReportReference;
@@ -99,6 +111,7 @@ interface NativeReportItem {
   cve_count: number;
   severity: NativeReportSeverityCounts;
   max_severity: number;
+  user_tags?: NativeReportUserTag[];
 }
 
 interface NativeReportPage {
@@ -954,7 +967,13 @@ const nativeCounts = (page: NativeReportPage, length: number) =>
 
 const resultCountElement = (count: number) => ({filtered: count, full: count});
 
-export const nativeReportToModel = (item: NativeReportItem): Report => {
+const nativeFilterElement = (filter?: Filter) =>
+  filter === undefined ? undefined : {term: filter.toFilterString()};
+
+export const nativeReportToModel = (
+  item: NativeReportItem,
+  reportFilter?: Filter,
+): Report => {
   const task = item.task
     ? {
         _id: item.task.id,
@@ -971,6 +990,16 @@ export const nativeReportToModel = (item: NativeReportItem): Report => {
 
   const timestamp = item.creation_time ?? item.scan_end ?? item.scan_start;
   const severity = resultCountElement(item.max_severity);
+  const owner = {name: stringValue(item.owner?.name)};
+  const userTags = {
+    tag: (item.user_tags ?? []).map(tag => ({
+      _id: stringValue(tag.id),
+      name: stringValue(tag.name),
+      value: stringValue(tag.value),
+      comment: stringValue(tag.comment),
+    })),
+  };
+  const filters = nativeFilterElement(reportFilter);
   return Report.fromElement({
     _id: item.id,
     name: item.name,
@@ -991,6 +1020,9 @@ export const nativeReportToModel = (item: NativeReportItem): Report => {
       scan_run_status: item.status,
       severity,
       task,
+      owner,
+      user_tags: userTags,
+      filters,
       hosts: {count: item.host_count},
       vulns: {count: item.vulnerability_count},
       result_count: {
@@ -1006,6 +1038,8 @@ export const nativeReportToModel = (item: NativeReportItem): Report => {
       timezone: 'UTC',
       timezone_abbrev: 'UTC',
     },
+    owner,
+    user_tags: userTags,
   });
 };
 
@@ -1035,13 +1069,14 @@ const fetchNativeJson = async <T>(
 export const fetchNativeReport = async (
   gmp: NativeApiGmp,
   id: string,
+  filter?: Filter,
 ): Promise<NativeReportResponse> => {
   const payload = await fetchNativeJson<NativeReportDetailPayload>(
     gmp,
     `api/v1/reports/${encodeURIComponent(id)}`,
     {token: gmp.session.token},
   );
-  return {report: nativeReportToModel(payload)};
+  return {report: nativeReportToModel(payload, filter)};
 };
 
 export const fetchNativeReports = async (
@@ -1066,7 +1101,7 @@ export const fetchNativeReports = async (
     sort: stringValue(payload.page?.sort),
     filter: stringValue(payload.page?.filter),
   };
-  const reports = (payload.items ?? []).map(nativeReportToModel);
+  const reports = (payload.items ?? []).map(item => nativeReportToModel(item));
   return {
     reports,
     counts: nativeCounts(page, reports.length),
