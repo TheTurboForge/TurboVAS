@@ -6006,7 +6006,7 @@ def command_native_api_migration_matrix(repo_root: Path) -> dict[str, Any]:
     return result
 
 
-def command_native_tooling_state(repo_root: Path, compact: bool = False) -> dict[str, Any]:
+def command_native_tooling_state(repo_root: Path, compact: bool = False, summary_only: bool = False) -> dict[str, Any]:
     items = native_tooling_inventory(repo_root)
     summary = summarize_native_tooling(items, repo_root)
     annotate_native_tooling_direct_api(summary, repo_root)
@@ -6020,7 +6020,12 @@ def command_native_tooling_state(repo_root: Path, compact: bool = False) -> dict
     browser_proxy_alignment_status = browser_proxy_contract.get("alignment_status", "warn") if isinstance(browser_proxy_contract, dict) else "warn"
     openapi_contract = summary.get("openapi_contract", {})
     openapi_alignment_status = openapi_contract.get("alignment_status", "warn") if isinstance(openapi_contract, dict) else "warn"
-    finding_details = compact_native_tooling_finding_details(summary) if compact else summary
+    summary_details = compact_native_tooling_finding_details(summary)
+    finding_details = summary_details if compact or summary_only else summary
+    direct_finding_details = summary_details["direct_api_contract"] if summary_only else direct_contract
+    browser_proxy_finding_details = summary_details["browser_proxy_contract"] if summary_only else browser_proxy_contract
+    openapi_finding_details = summary_details["openapi_contract"] if summary_only else openapi_contract
+    unknown_finding_details = {"count": unknown_count} if summary_only else {"paths": summary["by_category"]["unknown"]["paths"]}
     findings = [
         finding("pass", "native-tooling.inventory", f"Classified {len(items)} inherited tooling dependency surface(s).", details=finding_details),
         finding(
@@ -6029,7 +6034,7 @@ def command_native_tooling_state(repo_root: Path, compact: bool = False) -> dict
             "Native API endpoint inventory is aligned with Rust routes, Rust direct allowlist, and OpenAPI direct markers."
             if direct_alignment_status == "pass"
             else "Native API endpoint inventory, Rust routes, Rust direct allowlist, or OpenAPI direct markers differ.",
-            details=direct_contract,
+            details=direct_finding_details,
         ),
         finding(
             "pass" if browser_proxy_alignment_status == "pass" else "warn",
@@ -6037,7 +6042,7 @@ def command_native_tooling_state(repo_root: Path, compact: bool = False) -> dict
             "Native API browser-proxied endpoint inventory is aligned with the gsad same-origin proxy allowlist."
             if browser_proxy_alignment_status == "pass"
             else "Native API browser-proxied endpoint inventory or internal-only exposure metadata differs from the gsad proxy allowlist.",
-            details=browser_proxy_contract,
+            details=browser_proxy_finding_details,
         ),
         finding(
             "pass" if openapi_alignment_status == "pass" else "warn",
@@ -6045,13 +6050,18 @@ def command_native_tooling_state(repo_root: Path, compact: bool = False) -> dict
             "Native API OpenAPI operations have deterministic operation IDs, exposure/migration metadata, shared Error responses, and collection query contracts."
             if openapi_alignment_status == "pass"
             else "Native API OpenAPI operation IDs, x-turbovas exposure/migration fields, shared Error responses, or collection query contracts need attention.",
-            details=openapi_contract,
+            details=openapi_finding_details,
         ),
-        finding("warn" if unknown_count else "pass", "native-tooling.unknown", f"{unknown_count} inherited tooling surface(s) are outside the current classification map." if unknown_count else "No inherited tooling surfaces were left unclassified.", details={"paths": summary["by_category"]["unknown"]["paths"]}),
+        finding("warn" if unknown_count else "pass", "native-tooling.unknown", f"{unknown_count} inherited tooling surface(s) are outside the current classification map." if unknown_count else "No inherited tooling surfaces were left unclassified.", details=unknown_finding_details),
         finding("pass", "native-tooling.end-state", "End-state remains full removal of required python-gvm and gvm-tools dependence after native API replacements land."),
     ]
     result = make_result("native-tooling-state", repo_root, "Inherited GMP/python-gvm/gvm-tools dependency state collected.", findings)
-    result["details"] = compact_native_tooling_summary(summary) if compact else {"items": items, **summary}
+    if summary_only:
+        result["details"] = summary_details
+    elif compact:
+        result["details"] = compact_native_tooling_summary(summary)
+    else:
+        result["details"] = {"items": items, **summary}
     return result
 
 
@@ -11919,6 +11929,7 @@ def build_parser() -> argparse.ArgumentParser:
     native_api_request.add_argument("--request-id", help="optional safe X-Request-Id correlation value")
     native_tooling_state = subparsers.add_parser("native-tooling-state", parents=[common], help="inventory inherited GMP/python-gvm/gvm-tools dependency surfaces")
     native_tooling_state.add_argument("--compact", action="store_true", help="omit full item and endpoint inventories from JSON output")
+    native_tooling_state.add_argument("--summary", action="store_true", help="emit only status/count contract summaries for low-noise closeout checks")
     subparsers.add_parser("native-api-migration-matrix", parents=[common], help="show native API migration metadata by endpoint")
     subparsers.add_parser("rust-migration-state", parents=[common], help="inspect Rust migration tooling and first C-to-Rust dry-run candidate")
     subparsers.add_parser("doctor", parents=[common], help="run structural and environment health checks")
@@ -12031,7 +12042,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "native-api-request":
         result = command_native_api_request(repo_root, args.path, direct=args.direct, request_id=args.request_id)
     elif args.command == "native-tooling-state":
-        result = command_native_tooling_state(repo_root, compact=args.compact)
+        result = command_native_tooling_state(repo_root, compact=args.compact, summary_only=args.summary)
     elif args.command == "native-api-migration-matrix":
         result = command_native_api_migration_matrix(repo_root)
     elif args.command == "rust-migration-state":

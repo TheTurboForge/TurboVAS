@@ -6,7 +6,7 @@ use std::{env, fs};
 
 use axum::{
     extract::{Request, State},
-    http::Method,
+    http::{Method, Uri},
     middleware::Next,
     response::{IntoResponse, Response},
 };
@@ -73,12 +73,13 @@ pub(crate) async fn require_direct_api_auth(
 ) -> Response {
     let request_id = request_id_from_headers(request.headers());
     let method = request.method().clone();
-    let path = request.uri().path().to_string();
+    let path = direct_api_audit_path(request.uri()).to_string();
     let api_path = path.starts_with("/api/v1/") || path == "/api/v1";
+    let authenticated_api_path = api_path && bearer_token_matches(request.headers(), &auth.token);
 
     let mut response = if !api_path {
         next.run(request).await
-    } else if bearer_token_matches(request.headers(), &auth.token) {
+    } else if authenticated_api_path {
         if !direct_api_v1_path_is_allowed(&path) {
             ApiError::NotFound.into_response()
         } else if request.method() == Method::GET {
@@ -96,11 +97,17 @@ pub(crate) async fn require_direct_api_auth(
     };
 
     let status = response.status();
-    if status.is_server_error() {
+    if authenticated_api_path && status.is_server_error() {
         tracing::warn!(request_id = %request_id, %method, path = %path, status = status.as_u16(), "direct native API request completed with server error");
+    } else if authenticated_api_path {
+        tracing::info!(request_id = %request_id, %method, path = %path, status = status.as_u16(), "direct native API request completed");
     }
     attach_request_id_header(&mut response, &request_id);
     response
+}
+
+fn direct_api_audit_path(uri: &Uri) -> &str {
+    uri.path()
 }
 
 pub(crate) fn direct_api_v1_path_is_allowed(path: &str) -> bool {
@@ -228,6 +235,14 @@ mod tests {
         let path = env::temp_dir().join(format!("turbovas-direct-token-{name}-{nonce}"));
         fs::write(&path, value).expect("write direct token fixture");
         path.to_string_lossy().into_owned()
+    }
+
+    #[test]
+    fn direct_api_audit_path_omits_query_string() {
+        let uri: Uri = "/api/v1/reports?page_size=1&token=secret-like"
+            .parse()
+            .unwrap();
+        assert_eq!(direct_api_audit_path(&uri), "/api/v1/reports");
     }
 
     #[test]

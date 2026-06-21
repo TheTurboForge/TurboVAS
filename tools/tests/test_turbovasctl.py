@@ -1159,6 +1159,25 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertGreater(contract["scriptable_read_count"], 0)
         self.assertGreater(contract["internal_only_count"], 0)
 
+    def test_native_tooling_state_summary_is_low_noise(self):
+        root = Path(__file__).resolve().parents[2]
+        compact = turbovasctl.command_native_tooling_state(root, compact=True)
+        summary = turbovasctl.command_native_tooling_state(root, summary_only=True)
+        details = summary["details"]
+
+        self.assertEqual(summary["status"], "pass")
+        self.assertEqual(details["total_items"], compact["details"]["total_items"])
+        self.assertIn("direct_api_contract", details)
+        self.assertIn("browser_proxy_contract", details)
+        self.assertIn("openapi_contract", details)
+        self.assertNotIn("items", details)
+        self.assertNotIn("implemented_native_endpoints", details)
+        self.assertNotIn("candidate_for_removal_paths", details)
+        self.assertNotIn("next_replacement_candidates", details)
+        self.assertNotIn("paths", summary["findings"][4]["details"])
+        self.assertEqual(summary["findings"][4]["details"], {"count": 0})
+        self.assertLess(len(json.dumps(summary)), len(json.dumps(compact)))
+
     def test_native_tooling_state_tracks_direct_api_contract_alignment(self):
         root = Path(__file__).resolve().parents[2]
         result = turbovasctl.command_native_tooling_state(root)
