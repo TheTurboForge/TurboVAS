@@ -1064,14 +1064,20 @@ def direct_native_api_curl(
     method: str = "GET",
     request_id: str | None = None,
     body: str | None = None,
+    extra_headers: Iterable[tuple[str, str]] | None = None,
+    include_response_headers: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     command = ["curl", "-sS", "--max-time", "10", "-w", "\n%{http_code}"]
+    if include_response_headers:
+        command.extend(["-D", "-"])
     if method != "GET" or body is not None:
         command.extend(["-X", method])
     if token is not None:
         command.extend(["-H", f"Authorization: Bearer {token}"])
     if request_id is not None:
         command.extend(["-H", f"{DIRECT_API_REQUEST_ID_HEADER}: {request_id}"])
+    for name, value in extra_headers or ():
+        command.extend(["-H", f"{name}: {value}"])
     if body is not None:
         command.extend(["--data-binary", body])
     command.append(f"{native_api_direct_base_url(env)}{path}")
@@ -1086,14 +1092,20 @@ def direct_native_api_display_command(
     method: str = "GET",
     request_id: str | None = None,
     body: str | None = None,
+    extra_headers: Iterable[tuple[str, str]] | None = None,
+    include_response_headers: bool = False,
 ) -> list[str]:
     command = ["curl", "-sS", "--max-time", "10", "-w", "\\n%{http_code}"]
+    if include_response_headers:
+        command.extend(["-D", "-"])
     if method != "GET" or body is not None:
         command.extend(["-X", method])
     if token is not None:
         command.extend(["-H", "Authorization: Bearer <redacted>"])
     if request_id is not None:
         command.extend(["-H", f"{DIRECT_API_REQUEST_ID_HEADER}: {request_id}"])
+    for name, value in extra_headers or ():
+        command.extend(["-H", f"{name}: {value}"])
     if body is not None:
         command.extend(["--data-binary", "<redacted-body>"])
     command.append(f"{native_api_direct_base_url(env)}{path}")
@@ -1113,6 +1125,41 @@ def parse_json_output_with_http_status(result: subprocess.CompletedProcess[str])
     except json.JSONDecodeError:
         return None, status_code
     return (parsed if isinstance(parsed, dict) else None), status_code
+
+
+def parse_json_output_with_headers_and_http_status(result: subprocess.CompletedProcess[str]) -> tuple[dict[str, Any] | None, int | None, dict[str, str]]:
+    payload, separator, status_text = result.stdout.rstrip().rpartition("\n")
+    if not separator:
+        parsed, status = parse_json_output_with_http_status(result)
+        return parsed, status, {}
+    try:
+        status_code = int(status_text)
+    except ValueError:
+        parsed, status = parse_json_output_with_http_status(result)
+        return parsed, status, {}
+    blocks = payload.replace("\r\n", "\n").split("\n\n")
+    if len(blocks) < 2:
+        try:
+            parsed = json.loads(payload)
+        except json.JSONDecodeError:
+            parsed = None
+        return (parsed if isinstance(parsed, dict) else None), status_code, {}
+    header_block = blocks[-2]
+    body = "\n\n".join(blocks[-1:])
+    headers: dict[str, str] = {}
+    for line in header_block.splitlines()[1:]:
+        name, sep, value = line.partition(":")
+        if sep:
+            headers[name.strip().lower()] = value.strip()
+    try:
+        parsed = json.loads(body)
+    except json.JSONDecodeError:
+        parsed = None
+    return (parsed if isinstance(parsed, dict) else None), status_code, headers
+
+
+def direct_api_response_request_id(headers: dict[str, str]) -> str:
+    return headers.get(DIRECT_API_REQUEST_ID_HEADER.lower(), "")
 
 
 def feed_cache_root(repo_root: Path) -> Path:
@@ -6843,20 +6890,26 @@ def command_runtime_native_api_direct_smoke(repo_root: Path) -> dict[str, Any]:
     health_ok = health.returncode == 0 and health_status == 200 and isinstance(health_json, dict) and health_json.get("status") == "ok"
     findings.append(native_api_probe_finding("pass" if health_ok else "fail", "native-api-direct.healthz", "Direct native API health endpoint is reachable without bearer auth." if health_ok else "Direct native API health endpoint failed.", health, direct_native_api_display_command("/healthz", token=None, env=env), health_json, {"http_status": health_status, **summarize_native_api_response(health_json)}))
 
-    missing = direct_native_api_curl(repo_root, "/api/v1/reports?page_size=1", token=None, env=env)
-    missing_json, missing_status = parse_json_output_with_http_status(missing)
+    missing = direct_native_api_curl(repo_root, "/api/v1/reports?page_size=1", token=None, env=env, include_response_headers=True)
+    missing_json, missing_status, missing_headers = parse_json_output_with_headers_and_http_status(missing)
     missing_ok = missing.returncode == 0 and missing_status == 401 and isinstance(missing_json, dict) and missing_json.get("error", {}).get("code") == "unauthorized"
-    findings.append(native_api_probe_finding("pass" if missing_ok else "fail", "native-api-direct.missing-token", "Direct native API rejects missing bearer token with JSON 401." if missing_ok else "Direct native API did not reject a missing bearer token correctly.", missing, direct_native_api_display_command("/api/v1/reports?page_size=1", token=None, env=env), missing_json, {"http_status": missing_status, **summarize_native_api_response(missing_json)}))
+    missing_request_id = direct_api_response_request_id(missing_headers)
+    findings.append(native_api_probe_finding("pass" if missing_ok else "fail", "native-api-direct.missing-token", "Direct native API rejects missing bearer token with JSON 401." if missing_ok else "Direct native API did not reject a missing bearer token correctly.", missing, direct_native_api_display_command("/api/v1/reports?page_size=1", token=None, env=env, include_response_headers=True), missing_json, {"http_status": missing_status, "request_id": missing_request_id, **summarize_native_api_response(missing_json)}))
+    missing_request_id_ok = missing_ok and missing_request_id.startswith("tv-") and len(missing_request_id) <= MAX_DIRECT_API_REQUEST_ID_LENGTH
+    findings.append(finding("pass" if missing_request_id_ok else "fail", "native-api-direct.request-id-unauthorized", "Direct native API attaches a generated safe X-Request-Id to missing-token JSON 401 responses." if missing_request_id_ok else "Direct native API missing-token response did not include a generated safe X-Request-Id.", details={"http_status": missing_status, "request_id": missing_request_id}))
 
     wrong = direct_native_api_curl(repo_root, "/api/v1/reports?page_size=1", token="wrong-token", env=env)
     wrong_json, wrong_status = parse_json_output_with_http_status(wrong)
     wrong_ok = wrong.returncode == 0 and wrong_status == 401 and isinstance(wrong_json, dict) and wrong_json.get("error", {}).get("code") == "unauthorized"
     findings.append(native_api_probe_finding("pass" if wrong_ok else "fail", "native-api-direct.wrong-token", "Direct native API rejects wrong bearer token with JSON 401." if wrong_ok else "Direct native API did not reject a wrong bearer token correctly.", wrong, direct_native_api_display_command("/api/v1/reports?page_size=1", token="wrong-token", env=env), wrong_json, {"http_status": wrong_status, **summarize_native_api_response(wrong_json)}))
 
-    valid = direct_native_api_curl(repo_root, "/api/v1/reports?page_size=1", token=env[TURBOVAS_API_BEARER_TOKEN_ENV], env=env)
-    valid_json, valid_status = parse_json_output_with_http_status(valid)
+    client_request_id = "direct-smoke-1"
+    valid = direct_native_api_curl(repo_root, "/api/v1/reports?page_size=1", token=env[TURBOVAS_API_BEARER_TOKEN_ENV], env=env, request_id=client_request_id, include_response_headers=True)
+    valid_json, valid_status, valid_headers = parse_json_output_with_headers_and_http_status(valid)
     valid_ok = valid.returncode == 0 and valid_status == 200 and isinstance(valid_json, dict) and isinstance(valid_json.get("items"), list)
-    findings.append(native_api_probe_finding("pass" if valid_ok else "fail", "native-api-direct.valid-token", "Direct native API accepts the configured bearer token and returns JSON." if valid_ok else "Direct native API did not return JSON for the configured bearer token.", valid, direct_native_api_display_command("/api/v1/reports?page_size=1", token=env[TURBOVAS_API_BEARER_TOKEN_ENV], env=env), valid_json, {"http_status": valid_status, **summarize_native_api_response(valid_json)}))
+    valid_request_id = direct_api_response_request_id(valid_headers)
+    findings.append(native_api_probe_finding("pass" if valid_ok else "fail", "native-api-direct.valid-token", "Direct native API accepts the configured bearer token and returns JSON." if valid_ok else "Direct native API did not return JSON for the configured bearer token.", valid, direct_native_api_display_command("/api/v1/reports?page_size=1", token=env[TURBOVAS_API_BEARER_TOKEN_ENV], env=env, request_id=client_request_id, include_response_headers=True), valid_json, {"http_status": valid_status, "request_id": valid_request_id, **summarize_native_api_response(valid_json)}))
+    findings.append(finding("pass" if valid_ok and valid_request_id == client_request_id else "fail", "native-api-direct.request-id-client", "Direct native API echoes a bounded safe client X-Request-Id on valid-token JSON responses." if valid_ok and valid_request_id == client_request_id else "Direct native API did not echo the safe client X-Request-Id on a valid-token response.", details={"http_status": valid_status, "request_id": valid_request_id}))
 
     non_get = direct_native_api_curl(
         repo_root,
@@ -6880,6 +6933,46 @@ def command_runtime_native_api_direct_smoke(repo_root: Path) -> dict[str, Any]:
     request_body_json, request_body_status = parse_json_output_with_http_status(request_body)
     request_body_ok = request_body.returncode == 0 and request_body_status == 413 and isinstance(request_body_json, dict) and request_body_json.get("error", {}).get("code") == "request_too_large"
     findings.append(native_api_probe_finding("pass" if request_body_ok else "fail", "native-api-direct.request-shape-guard", "Direct native API rejects valid-token GET /api/v1 requests with a request body using JSON 413." if request_body_ok else "Direct native API did not reject a valid-token GET /api/v1 request body correctly.", request_body, direct_native_api_display_command("/api/v1/reports?page_size=1", token=env[TURBOVAS_API_BEARER_TOKEN_ENV], env=env, method="GET", body="probe-body"), request_body_json, {"http_status": request_body_status, **summarize_native_api_response(request_body_json)}))
+
+    transfer_encoding = direct_native_api_curl(
+        repo_root,
+        "/api/v1/reports?page_size=1",
+        token=env[TURBOVAS_API_BEARER_TOKEN_ENV],
+        env=env,
+        extra_headers=(("Transfer-Encoding", "chunked"),),
+    )
+    transfer_encoding_json, transfer_encoding_status = parse_json_output_with_http_status(transfer_encoding)
+    transfer_encoding_ok = transfer_encoding.returncode == 0 and transfer_encoding_status == 413 and isinstance(transfer_encoding_json, dict) and transfer_encoding_json.get("error", {}).get("code") == "request_too_large"
+    findings.append(native_api_probe_finding("pass" if transfer_encoding_ok else "fail", "native-api-direct.request-shape-transfer-encoding", "Direct native API rejects valid-token GET /api/v1 requests with Transfer-Encoding using JSON 413." if transfer_encoding_ok else "Direct native API did not reject a valid-token GET /api/v1 Transfer-Encoding request correctly.", transfer_encoding, direct_native_api_display_command("/api/v1/reports?page_size=1", token=env[TURBOVAS_API_BEARER_TOKEN_ENV], env=env, extra_headers=(("Transfer-Encoding", "chunked"),)), transfer_encoding_json, {"http_status": transfer_encoding_status, **summarize_native_api_response(transfer_encoding_json)}))
+
+    malformed_length = direct_native_api_curl(
+        repo_root,
+        "/api/v1/reports?page_size=1",
+        token=env[TURBOVAS_API_BEARER_TOKEN_ENV],
+        env=env,
+        extra_headers=(("Content-Length", "not-a-number"),),
+    )
+    malformed_length_json, malformed_length_status = parse_json_output_with_http_status(malformed_length)
+    malformed_length_middleware_ok = malformed_length.returncode == 0 and malformed_length_status == 413 and isinstance(malformed_length_json, dict) and malformed_length_json.get("error", {}).get("code") == "request_too_large"
+    malformed_length_parser_ok = malformed_length.returncode == 0 and malformed_length_status == 400 and malformed_length_json is None
+    malformed_length_ok = malformed_length_middleware_ok or malformed_length_parser_ok
+    malformed_length_message = "Direct native API rejects valid-token GET /api/v1 requests with malformed Content-Length."
+    if malformed_length_middleware_ok:
+        malformed_length_message = "Direct native API rejects valid-token GET /api/v1 requests with malformed Content-Length using JSON 413."
+    elif malformed_length_parser_ok:
+        malformed_length_message = "HTTP parsing rejects malformed Content-Length with 400 before direct API middleware."
+    findings.append(native_api_probe_finding("pass" if malformed_length_ok else "fail", "native-api-direct.request-shape-malformed-content-length", malformed_length_message if malformed_length_ok else "Direct native API did not reject a valid-token GET /api/v1 malformed Content-Length request correctly.", malformed_length, direct_native_api_display_command("/api/v1/reports?page_size=1", token=env[TURBOVAS_API_BEARER_TOKEN_ENV], env=env, extra_headers=(("Content-Length", "not-a-number"),)), malformed_length_json, {"http_status": malformed_length_status, "rejection_layer": "middleware" if malformed_length_middleware_ok else "http-parser" if malformed_length_parser_ok else "unknown", **summarize_native_api_response(malformed_length_json)}))
+
+    oversized_query_path = f"/api/v1/reports?filter={'a' * 9000}"
+    oversized_query = direct_native_api_curl(
+        repo_root,
+        oversized_query_path,
+        token=env[TURBOVAS_API_BEARER_TOKEN_ENV],
+        env=env,
+    )
+    oversized_query_json, oversized_query_status = parse_json_output_with_http_status(oversized_query)
+    oversized_query_ok = oversized_query.returncode == 0 and oversized_query_status == 413 and isinstance(oversized_query_json, dict) and oversized_query_json.get("error", {}).get("code") == "request_too_large"
+    findings.append(native_api_probe_finding("pass" if oversized_query_ok else "fail", "native-api-direct.request-shape-oversized-query", "Direct native API rejects oversized valid-token GET /api/v1 query strings using JSON 413." if oversized_query_ok else "Direct native API did not reject an oversized valid-token GET /api/v1 query correctly.", oversized_query, direct_native_api_display_command("/api/v1/reports?filter=<oversized>", token=env[TURBOVAS_API_BEARER_TOKEN_ENV], env=env), oversized_query_json, {"http_status": oversized_query_status, **summarize_native_api_response(oversized_query_json), "query_length": len(oversized_query_path.partition('?')[2])}))
 
     unclassified = direct_native_api_curl(
         repo_root,

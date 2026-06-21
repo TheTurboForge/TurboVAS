@@ -125,8 +125,9 @@ GMP/XML for the tested read path.
 `runtime-native-api-direct-smoke` enables the opt-in direct development listener
 for `turbovas-api`, defaulting to `127.0.0.1:19080`, verifies that `/healthz`
 is reachable without a token, verifies that `/api/v1/...` rejects missing or
-wrong bearer tokens, verifies a valid bearer token, and reruns the internal
-native API smoke. The helper creates or reuses the ignored runtime secret
+wrong bearer tokens, verifies a valid bearer token, checks request-ID headers
+and bounded direct request-shape denials, and reruns the internal native API
+smoke. The helper creates or reuses the ignored runtime secret
 `native-api-bearer-token`; it does not make direct API exposure the default.
 
 `runtime-scope-report-metrics` now uses this internal native API path for scope

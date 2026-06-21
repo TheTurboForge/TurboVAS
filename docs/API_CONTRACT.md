@@ -77,8 +77,10 @@ separate TLS/bootstrap/host-binding posture tracked outside this v1 read API.
   valid-token non-GET requests until native write/control APIs are separately
   designed.
 - Direct v1 request-shape boundary: bearer-authenticated direct `GET` requests
-  reject request bodies, transfer-encoded bodies, malformed `Content-Length`,
-  and oversized query strings with JSON `413 request_too_large`. This first
+  reject request bodies, transfer-encoded bodies, and oversized query strings
+  with JSON `413 request_too_large`. Malformed `Content-Length` is rejected as
+  malformed HTTP before middleware in the live stack, currently with HTTP 400.
+  This first
   bound is listener-level hardening; endpoint-specific cost limits and rate
   limits remain separate B-130/B-134 work.
 - Direct v1 endpoint boundary: bearer-authenticated direct access exposes only

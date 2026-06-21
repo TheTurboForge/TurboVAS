@@ -2349,11 +2349,28 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertEqual(status, 401)
         self.assertEqual(parsed["error"]["code"], "unauthorized")
 
+    def test_direct_native_api_header_status_parser_keeps_request_id(self):
+        completed = turbovasctl.subprocess.CompletedProcess(
+            [],
+            0,
+            "HTTP/1.1 401 Unauthorized\r\nx-request-id: tv-123\r\ncontent-type: application/json\r\n\r\n{\"error\":{\"code\":\"unauthorized\"}}\n401",
+            "",
+        )
+        parsed, status, headers = turbovasctl.parse_json_output_with_headers_and_http_status(completed)
+        self.assertEqual(status, 401)
+        self.assertEqual(parsed["error"]["code"], "unauthorized")
+        self.assertEqual(headers["x-request-id"], "tv-123")
+
     def test_direct_native_api_direct_smoke_tracks_internal_only_denial(self):
         root = Path(__file__).resolve().parents[2]
         native_tooling = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
         self.assertIn("native-api-direct.internal-only-retention-plan", native_tooling)
         self.assertIn("native-api-direct.request-shape-guard", native_tooling)
+        self.assertIn("native-api-direct.request-id-unauthorized", native_tooling)
+        self.assertIn("native-api-direct.request-id-client", native_tooling)
+        self.assertIn("native-api-direct.request-shape-transfer-encoding", native_tooling)
+        self.assertIn("native-api-direct.request-shape-malformed-content-length", native_tooling)
+        self.assertIn("native-api-direct.request-shape-oversized-query", native_tooling)
         self.assertIn("/retention-plan", native_tooling)
 
     def test_scanner_redis_paths_live_under_runtime_dir(self):
