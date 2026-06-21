@@ -22,6 +22,10 @@ script/curl -> opt-in direct bearer listener -> turbovas-api -> PostgreSQL
 - Direct host exposure is opt-in. The development helper publishes
   `127.0.0.1:19080` only when direct mode is requested and configures a bearer
   token from `TURBOVAS_API_BEARER_TOKEN` or an ignored runtime secret.
+- Direct bearer tokens must satisfy the local strength contract enforced by the
+  service and helper: at least 32 printable non-whitespace ASCII characters.
+  Generated runtime secrets use this stronger shape by default; weak configured
+  environment tokens are rejected before use.
 - `/healthz` is unauthenticated for readiness. `/api/v1/...` on the direct
   listener requires `Authorization: Bearer <token>` and returns JSON `401`
   errors for missing or wrong tokens.

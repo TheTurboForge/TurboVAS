@@ -1980,6 +1980,7 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertEqual(turbovasctl.TURBOVAS_API_DIRECT_CONTAINER_PORT, "9081")
         self.assertEqual(turbovasctl.TURBOVAS_API_DIRECT_DEFAULT_HOST, "127.0.0.1")
         self.assertEqual(turbovasctl.TURBOVAS_API_DIRECT_DEFAULT_PORT, "19080")
+        self.assertEqual(turbovasctl.TURBOVAS_API_BEARER_TOKEN_MIN_LENGTH, 32)
         self.assertEqual(turbovasctl.DEV_ADMIN_USER, "admin")
         self.assertEqual(turbovasctl.DEV_ADMIN_PASSWORD, "admin")
 
@@ -2163,6 +2164,12 @@ db2:keys=5,expires=0,avg_ttl=0
             text = override.read_text(encoding="utf-8")
             self.assertIn('"127.0.0.1:19080:9081"', text)
 
+    def test_direct_api_bearer_token_strength_contract(self):
+        self.assertTrue(turbovasctl.direct_api_bearer_token_is_acceptable("0123456789abcdef0123456789abcdef"))
+        for token in ("short-token", "0123456789abcdef 123456789abcdef", "0123456789abcdef0123456789abcde\n"):
+            with self.subTest(token=token):
+                self.assertFalse(turbovasctl.direct_api_bearer_token_is_acceptable(token))
+
     def test_env_values_have_nonempty_key_rejects_empty_compose_values(self):
         self.assertFalse(turbovasctl.env_values_have_nonempty_key([], "TOKEN"))
         self.assertFalse(turbovasctl.env_values_have_nonempty_key(["TOKEN"], "TOKEN"))
@@ -2199,6 +2206,24 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertEqual(by_check["production.native-api-direct.auth-boundary"]["status"], "fail")
         self.assertIn("B-130 auth boundary", by_check["production.native-api-direct.auth-boundary"]["message"])
 
+    def test_direct_native_api_posture_fails_weak_configured_token_without_leaking_value(self):
+        env = {
+            turbovasctl.TURBOVAS_API_DIRECT_ENV: "1",
+            turbovasctl.TURBOVAS_API_BEARER_TOKEN_ENV: "short-token",
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            root.mkdir()
+            with unittest.mock.patch.object(turbovasctl, "current_native_api_direct_published_bindings", return_value=()), unittest.mock.patch.object(turbovasctl, "running_service_env_has_key", return_value=False):
+                findings = turbovasctl.direct_native_api_posture_findings(root, env)
+
+        auth = {item["check"]: item for item in findings}["production.native-api-direct.auth-boundary"]
+        rendered = json.dumps(findings, sort_keys=True)
+        self.assertEqual(auth["status"], "fail")
+        self.assertFalse(auth["details"]["configured_environment_token_ok"])
+        self.assertEqual(auth["details"]["minimum_token_length"], 32)
+        self.assertNotIn("short-token", rendered)
+
     def test_direct_native_api_posture_does_not_treat_secret_file_as_live_auth_boundary(self):
         env = {turbovasctl.TURBOVAS_API_DIRECT_ENV: "1"}
         with tempfile.TemporaryDirectory() as tmp:
@@ -2231,7 +2256,7 @@ db2:keys=5,expires=0,avg_ttl=0
     def test_direct_native_api_posture_never_reports_bearer_token_value(self):
         env = {
             turbovasctl.TURBOVAS_API_DIRECT_ENV: "1",
-            turbovasctl.TURBOVAS_API_BEARER_TOKEN_ENV: "super-secret-token",
+            turbovasctl.TURBOVAS_API_BEARER_TOKEN_ENV: "super-secret-token-0123456789abcdef",
         }
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "TurboVAS"
@@ -2242,7 +2267,7 @@ db2:keys=5,expires=0,avg_ttl=0
         rendered = json.dumps(findings, sort_keys=True)
         self.assertEqual({item["check"]: item for item in findings}["production.native-api-direct.auth-boundary"]["status"], "pass")
         self.assertIn("environment", rendered)
-        self.assertNotIn("super-secret-token", rendered)
+        self.assertNotIn("super-secret-token-0123456789abcdef", rendered)
 
     def test_direct_native_api_display_command_redacts_token(self):
         env = {

@@ -206,6 +206,7 @@ TURBOVAS_API_DIRECT_PORT_ENV = "TURBOVAS_API_DIRECT_PORT"
 TURBOVAS_API_DIRECT_BIND_ENV = "TURBOVAS_API_DIRECT_BIND"
 TURBOVAS_API_BEARER_TOKEN_ENV = "TURBOVAS_API_BEARER_TOKEN"
 TURBOVAS_API_BEARER_TOKEN_SECRET = "native-api-bearer-token"
+TURBOVAS_API_BEARER_TOKEN_MIN_LENGTH = 32
 DIRECT_API_REQUEST_ID_HEADER = "X-Request-Id"
 MAX_DIRECT_API_REQUEST_ID_LENGTH = 128
 POSTGRES_DEFAULTS = {
@@ -1268,6 +1269,12 @@ def native_api_direct_port_binding(env: dict[str, str]) -> str:
     return f"{native_api_direct_host(env)}:{native_api_direct_port(env)}:{TURBOVAS_API_DIRECT_CONTAINER_PORT}"
 
 
+def direct_api_bearer_token_is_acceptable(token: str) -> bool:
+    return len(token) >= TURBOVAS_API_BEARER_TOKEN_MIN_LENGTH and all(
+        char.isascii() and not char.isspace() and 33 <= ord(char) <= 126 for char in token
+    )
+
+
 def native_api_direct_base_url(env: dict[str, str]) -> str:
     return f"http://{native_api_direct_host(env)}:{native_api_direct_port(env)}"
 
@@ -1475,11 +1482,15 @@ def direct_native_api_posture_findings(repo_root: Path, env: dict[str, str] | No
     )
 
     token_sources, secret_path, secret_present = native_api_direct_token_sources(repo_root, env)
+    configured_token = env.get(TURBOVAS_API_BEARER_TOKEN_ENV, "")
+    configured_token_ok = direct_api_bearer_token_is_acceptable(configured_token) if configured_token else None
     exposure_enabled = configured or bool(running_bindings)
     auth_details = {
         "exposure_enabled": exposure_enabled,
         "token_sources": list(token_sources),
         "bearer_token_env": TURBOVAS_API_BEARER_TOKEN_ENV,
+        "minimum_token_length": TURBOVAS_API_BEARER_TOKEN_MIN_LENGTH,
+        "configured_environment_token_ok": configured_token_ok,
         "runtime_secret": str(secret_path),
         "runtime_secret_present": secret_present,
     }
@@ -1489,6 +1500,15 @@ def direct_native_api_posture_findings(repo_root: Path, env: dict[str, str] | No
                 "pass",
                 "production.native-api-direct.auth-boundary",
                 "Direct native API host exposure is disabled; no direct bearer boundary is needed for the internal-only default.",
+                details=auth_details,
+            )
+        )
+    elif configured_token_ok is False:
+        findings.append(
+            finding(
+                "fail",
+                "production.native-api-direct.auth-boundary",
+                "Direct native API exposure is configured with a bearer token that is too short or contains unsafe characters.",
                 details=auth_details,
             )
         )
@@ -6687,6 +6707,20 @@ def command_runtime_native_api_direct_smoke(repo_root: Path) -> dict[str, Any]:
             },
         )
     )
+    token_ok = direct_api_bearer_token_is_acceptable(env.get(TURBOVAS_API_BEARER_TOKEN_ENV, ""))
+    findings.append(
+        finding(
+            "pass" if token_ok else "fail",
+            "native-api-direct.bearer-token-strength",
+            "Direct native API bearer token satisfies the minimum local strength contract."
+            if token_ok
+            else "Direct native API bearer token is too short or contains unsafe characters.",
+            details={
+                "minimum_token_length": TURBOVAS_API_BEARER_TOKEN_MIN_LENGTH,
+                "token_source": "environment" if token_from_env else "runtime-secret",
+            },
+        )
+    )
     config = run_command(compose_command(repo_root, "config", "--quiet", env=env), repo_root, env=env)
     findings.append(finding("pass" if config.returncode == 0 else "fail", "compose.config", f"Compose direct native API config validation exit code {config.returncode}.", str(compose_file(repo_root).relative_to(repo_root)), {"output_tail": output_tail(config.stdout, 40)}))
     if aggregate_status(findings) == "fail":
@@ -6998,6 +7032,16 @@ def command_native_api_request(repo_root: Path, path: str, *, direct: bool = Fal
     if direct:
         env = native_api_direct_runtime_env(repo_root)
         token = env[TURBOVAS_API_BEARER_TOKEN_ENV]
+        if not direct_api_bearer_token_is_acceptable(token):
+            findings.append(
+                finding(
+                    "fail",
+                    "native-api-request.direct-token-strength",
+                    "Direct native API bearer token is too short or contains unsafe characters.",
+                    details={"minimum_token_length": TURBOVAS_API_BEARER_TOKEN_MIN_LENGTH},
+                )
+            )
+            return make_result("native-api-request", repo_root, "Direct native API request rejected before runtime access.", findings)
         response = direct_native_api_curl(repo_root, request_path, token=token, env=env, request_id=request_id)
         parsed, http_status = parse_json_output_with_http_status(response)
         ok = response.returncode == 0 and http_status == 200 and isinstance(parsed, dict)

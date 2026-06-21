@@ -40,6 +40,7 @@ struct DirectApiAuth {
 const DIRECT_API_BIND_ENV: &str = "TURBOVAS_API_DIRECT_BIND";
 const DIRECT_API_BEARER_TOKEN_ENV: &str = "TURBOVAS_API_BEARER_TOKEN";
 const DIRECT_API_REQUEST_ID_HEADER: &str = "x-request-id";
+const MIN_DIRECT_API_BEARER_TOKEN_LENGTH: usize = 32;
 const FEED_METADATA_ROOT_ENV: &str = "TURBOVAS_FEED_METADATA_DIR";
 const FEED_LOCK_ROOT_ENV: &str = "TURBOVAS_FEED_LOCK_DIR";
 const DEFAULT_FEED_METADATA_ROOT: &str = "/runtime/feeds";
@@ -1549,7 +1550,15 @@ fn direct_api_config() -> Result<Option<(String, DirectApiAuth)>, ApiError> {
         return Ok(None);
     };
     let token = env_string(DIRECT_API_BEARER_TOKEN_ENV).ok_or(ApiError::Config)?;
+    if !direct_api_bearer_token_is_acceptable(&token) {
+        return Err(ApiError::Config);
+    }
     Ok(Some((bind, DirectApiAuth { token })))
+}
+
+fn direct_api_bearer_token_is_acceptable(token: &str) -> bool {
+    token.len() >= MIN_DIRECT_API_BEARER_TOKEN_LENGTH
+        && token.bytes().all(|byte| (0x21..=0x7e).contains(&byte))
 }
 
 async fn require_direct_api_auth(
@@ -10410,6 +10419,20 @@ FEED_COMMIT = "not part of the public contract";
         assert_eq!(error.status_code(), StatusCode::METHOD_NOT_ALLOWED);
         assert_eq!(error.code(), "method_not_allowed");
         assert!(error.public_message().contains("GET"));
+    }
+
+    #[test]
+    fn direct_api_bearer_token_requires_bounded_printable_secret() {
+        assert!(direct_api_bearer_token_is_acceptable(
+            "0123456789abcdef0123456789abcdef"
+        ));
+        assert!(!direct_api_bearer_token_is_acceptable("short-token"));
+        assert!(!direct_api_bearer_token_is_acceptable(
+            "0123456789abcdef 123456789abcdef"
+        ));
+        assert!(!direct_api_bearer_token_is_acceptable(
+            "0123456789abcdef0123456789abcde\n"
+        ));
     }
 
     #[test]
