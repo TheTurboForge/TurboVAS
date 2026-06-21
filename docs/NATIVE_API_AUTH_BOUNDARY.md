@@ -85,8 +85,9 @@ tools/turbovasctl native-api-request --direct --json --request-id 'operator-chec
 ```
 
 The direct smoke proves health access, missing-token rejection, wrong-token
-rejection, generated and client-supplied `X-Request-Id` response headers,
-valid-token JSON access, valid-token non-GET rejection, request-body,
+rejection, generated, safe client-supplied, and unsafe client-replaced
+`X-Request-Id` response headers, valid-token JSON access without browser CORS
+access headers, valid-token non-GET rejection, request-body,
 `Transfer-Encoding`, malformed `Content-Length`, and oversized-query rejection,
 direct feed inventory access, tag-dialog alert resource-name lookup, and
 internal-only endpoint denial for the retention preview when a scope report is

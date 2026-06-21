@@ -6915,6 +6915,55 @@ def command_runtime_native_api_direct_smoke(repo_root: Path) -> dict[str, Any]:
     valid_request_id = direct_api_response_request_id(valid_headers)
     findings.append(native_api_probe_finding("pass" if valid_ok else "fail", "native-api-direct.valid-token", "Direct native API accepts the configured bearer token and returns JSON." if valid_ok else "Direct native API did not return JSON for the configured bearer token.", valid, direct_native_api_display_command("/api/v1/reports?page_size=1", token=env[TURBOVAS_API_BEARER_TOKEN_ENV], env=env, request_id=client_request_id, include_response_headers=True), valid_json, {"http_status": valid_status, "request_id": valid_request_id, **summarize_native_api_response(valid_json)}))
     findings.append(finding("pass" if valid_ok and valid_request_id == client_request_id else "fail", "native-api-direct.request-id-client", "Direct native API echoes a bounded safe client X-Request-Id on valid-token JSON responses." if valid_ok and valid_request_id == client_request_id else "Direct native API did not echo the safe client X-Request-Id on a valid-token response.", details={"http_status": valid_status, "request_id": valid_request_id}))
+    cors_header_names = ("access-control-allow-origin", "access-control-allow-credentials")
+    present_cors_headers = {name: valid_headers[name] for name in cors_header_names if name in valid_headers}
+    cors_headers_ok = valid_ok and not present_cors_headers
+    findings.append(
+        finding(
+            "pass" if cors_headers_ok else "fail",
+            "native-api-direct.cors-disabled",
+            "Direct native API valid-token responses do not advertise browser CORS access."
+            if cors_headers_ok
+            else "Direct native API valid-token response unexpectedly included browser CORS headers.",
+            details={"http_status": valid_status, "present_cors_headers": present_cors_headers},
+        )
+    )
+    unsafe_request_id = "../bad"
+    unsafe_request_id_probe = direct_native_api_curl(
+        repo_root,
+        "/api/v1/reports?page_size=1",
+        token=env[TURBOVAS_API_BEARER_TOKEN_ENV],
+        env=env,
+        extra_headers=((DIRECT_API_REQUEST_ID_HEADER, unsafe_request_id),),
+        include_response_headers=True,
+    )
+    unsafe_request_id_json, unsafe_request_id_status, unsafe_request_id_headers = (
+        parse_json_output_with_headers_and_http_status(unsafe_request_id_probe)
+    )
+    unsafe_response_request_id = direct_api_response_request_id(unsafe_request_id_headers)
+    unsafe_request_id_ok = (
+        unsafe_request_id_probe.returncode == 0
+        and unsafe_request_id_status == 200
+        and isinstance(unsafe_request_id_json, dict)
+        and isinstance(unsafe_request_id_json.get("items"), list)
+        and unsafe_response_request_id.startswith("tv-")
+        and unsafe_response_request_id != unsafe_request_id
+        and len(unsafe_response_request_id) <= MAX_DIRECT_API_REQUEST_ID_LENGTH
+    )
+    findings.append(
+        finding(
+            "pass" if unsafe_request_id_ok else "fail",
+            "native-api-direct.request-id-unsafe-client",
+            "Direct native API replaces unsafe client X-Request-Id values with a generated safe request ID."
+            if unsafe_request_id_ok
+            else "Direct native API did not replace an unsafe client X-Request-Id value correctly.",
+            details={
+                "http_status": unsafe_request_id_status,
+                "request_id": unsafe_response_request_id,
+                "unsafe_request_id": unsafe_request_id,
+            },
+        )
+    )
 
     non_get = direct_native_api_curl(
         repo_root,

@@ -76,6 +76,9 @@ separate TLS/bootstrap/host-binding posture tracked outside this v1 read API.
   `GET` requests under `/api/v1` and returns JSON `405 method_not_allowed` for
   valid-token non-GET requests until native write/control APIs are separately
   designed.
+- Direct v1 browser boundary: direct responses do not emit browser CORS access
+  headers. Browser product reads continue through the same-origin `gsad` path
+  while direct access remains script/operator oriented.
 - Direct v1 request-shape boundary: bearer-authenticated direct `GET` requests
   reject request bodies, transfer-encoded bodies, and oversized query strings
   with JSON `413 request_too_large`. Malformed `Content-Length` is rejected as

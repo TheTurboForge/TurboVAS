@@ -2370,6 +2370,8 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertIn("native-api-direct.request-shape-guard", native_tooling)
         self.assertIn("native-api-direct.request-id-unauthorized", native_tooling)
         self.assertIn("native-api-direct.request-id-client", native_tooling)
+        self.assertIn("native-api-direct.cors-disabled", native_tooling)
+        self.assertIn("native-api-direct.request-id-unsafe-client", native_tooling)
         self.assertIn("native-api-direct.request-shape-transfer-encoding", native_tooling)
         self.assertIn("native-api-direct.request-shape-malformed-content-length", native_tooling)
         self.assertIn("native-api-direct.request-shape-oversized-query", native_tooling)
