@@ -1137,6 +1137,21 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(endpoints["/api/v1/scope-reports/{scope_report_id}"]["direct_access"], "scriptable_read")
         self.assertEqual(endpoints["/api/v1/tags/resource-names/{resource_type}"]["direct_access"], "scriptable_read")
         self.assertEqual(endpoints["/api/v1/scopes/{scope_id}/reports/{scope_report_id}/retention-plan"]["direct_access"], "internal_only")
+        expected_scriptable = {
+            f"/api/v1{path}"
+            for (method, path), exposure in turbovasctl.OPENAPI_REQUIRED_EXPOSURE.items()
+            if method == "get" and exposure == "direct-read"
+        }
+        expected_scriptable = {
+            turbovasctl.normalize_native_api_endpoint_template(endpoint)
+            for endpoint in expected_scriptable
+        }
+        openapi_scriptable = {
+            turbovasctl.normalize_native_api_endpoint_template(endpoint)
+            for endpoint in turbovasctl.openapi_direct_endpoint_templates(root)
+        }
+        self.assertEqual(turbovasctl.DIRECT_API_SCRIPTABLE_ENDPOINTS, openapi_scriptable)
+        self.assertLessEqual(expected_scriptable, openapi_scriptable)
         self.assertEqual(
             set(contract["scriptable_read_endpoints"]),
             {item["endpoint"] for item in details["implemented_native_endpoints"] if item["direct_access"] == "scriptable_read"},
