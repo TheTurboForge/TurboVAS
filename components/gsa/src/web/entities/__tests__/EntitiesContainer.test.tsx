@@ -1,9 +1,10 @@
 /* SPDX-FileCopyrightText: 2025 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import {describe, test, expect, testing} from '@gsa/testing';
+import {afterEach, describe, test, expect, testing} from '@gsa/testing';
 import {
   rendererWith,
   screen,
@@ -27,6 +28,34 @@ const currentSettingsResponse = {
   },
 };
 
+const setupTagBulk = gmp => {
+  const {render} = rendererWith({gmp, store: true, router: true});
+  const initialFilter = new Filter();
+  render(
+    <EntitiesContainer
+      entities={[new PortList()]}
+      filter={initialFilter}
+      gmp={gmp}
+      gmpName="portlist"
+      isLoading={false}
+      notify={notify}
+      reload={reload}
+      showError={showError}
+      showErrorMessage={showErrorMessage}
+      showSuccessMessage={showSuccessMessage}
+      updateFilter={updateFilter}
+      onDownload={onDownload}
+    >
+      {({onTagsBulk}) => (
+        <button data-testid="tag-button" onClick={() => onTagsBulk()}>
+          Tag Bulk
+        </button>
+      )}
+    </EntitiesContainer>,
+  );
+  return screen.getByRole('button', {name: /Tag Bulk/i});
+};
+
 const onDownloaded = testing.fn();
 const notify = testing.fn();
 const updateFilter = testing.fn();
@@ -35,6 +64,14 @@ const showError = testing.fn();
 const showErrorMessage = testing.fn();
 const showSuccessMessage = testing.fn();
 const onDownload = testing.fn();
+
+interface CreateGmpOptions {
+  exportByFilter?: ReturnType<typeof testing.fn>;
+  currentSettings?: ReturnType<typeof testing.fn>;
+  getAllTags?: ReturnType<typeof testing.fn>;
+  buildUrl?: ReturnType<typeof testing.fn>;
+  session?: ReturnType<typeof createSession> & {token?: string};
+}
 
 const setup = gmp => {
   const {render} = rendererWith({gmp, store: true, router: true});
@@ -67,12 +104,21 @@ const setup = gmp => {
 const createGmp = ({
   exportByFilter = testing.fn().mockResolvedValue({data: {id: '123'}}),
   currentSettings = testing.fn().mockResolvedValue(currentSettingsResponse),
-} = {}) => ({
+  getAllTags = testing.fn().mockResolvedValue({data: []}),
+  buildUrl,
+  session = createSession(),
+}: CreateGmpOptions = {}) => ({
+  buildUrl,
   portlists: {
     exportByFilter,
   },
+  tags: {getAll: getAllTags},
   user: {currentSettings},
-  session: createSession(),
+  session,
+});
+
+afterEach(() => {
+  testing.unstubAllGlobals();
 });
 
 describe('EntitiesContainer', () => {
@@ -106,5 +152,44 @@ describe('EntitiesContainer', () => {
     expect(onDownloaded).not.toHaveBeenCalled();
 
     console.error = originalConsoleError;
+  });
+
+  test('should load tag-bulk choices through the native API when available', async () => {
+    const getAllTags = testing.fn();
+    const buildUrl = testing.fn((path: string) => `https://turbovas.example/${path}`);
+    const fetchMock = testing.fn().mockResolvedValue({
+      json: testing.fn().mockResolvedValue({
+        page: {page: 1, page_size: 25, total: 1, sort: 'name', filter: ''},
+        items: [{id: '1', name: 'Native tag', resource_type: 'port_list'}],
+      }),
+      ok: true,
+      status: 200,
+    });
+    testing.stubGlobal('fetch', fetchMock);
+    const gmp = createGmp({
+      buildUrl,
+      getAllTags,
+      session: {...createSession(), token: 'test-token'},
+    });
+    const tagButton = setupTagBulk(gmp);
+
+    fireEvent.click(tagButton);
+    await wait();
+
+    expect(getAllTags).not.toHaveBeenCalled();
+    expect(buildUrl).toHaveBeenCalledWith('api/v1/tags', {
+      token: 'test-token',
+      page: 1,
+      page_size: 25,
+      sort: 'name',
+      filter: '',
+      active: '',
+      resource_type: 'port_list',
+      value: '',
+    });
+    expect(fetchMock).toHaveBeenCalledWith('https://turbovas.example/api/v1/tags', {
+      credentials: 'include',
+      headers: {Accept: 'application/json'},
+    });
   });
 });

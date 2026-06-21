@@ -1,13 +1,18 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
 import {useCallback, useEffect, useState} from 'react';
 import type CollectionCounts from 'gmp/collection/collection-counts';
-import type Filter from 'gmp/models/filter';
+import Filter from 'gmp/models/filter';
 import type Model from 'gmp/models/model';
 import Tag from 'gmp/models/tag';
+import {
+  fetchNativeTags,
+  nativeTagsQueryFromFilter,
+} from 'gmp/native-api/tags';
 import {apiType, type EntityType, getEntityType} from 'gmp/utils/entity-type';
 import {isDefined} from 'gmp/utils/identity';
 import TagsDialog, {type TagsDialogData} from 'web/entities/TagsDialog';
@@ -27,6 +32,9 @@ interface BulkTagsProps<TEntity extends Model> {
 
 const getEntityIds = <TEntity extends Model>(entityArray: TEntity[] = []) =>
   entityArray.map(entity => entity.id as string);
+
+const canUseNativeApi = (gmp: {buildUrl?: unknown}) =>
+  typeof gmp?.buildUrl === 'function';
 
 const getMultiTagEntitiesCount = <TEntity extends Model>(
   pageEntities: TEntity[],
@@ -68,13 +76,21 @@ const BulkTags = <TEntity extends Model>({
 
   const fetchTagsByType = useCallback(() => {
     const tagFilter = `resource_type=${apiType(entitiesType)}`;
+    if (canUseNativeApi(gmp)) {
+      const filter = Filter.fromString(tagFilter);
+      return fetchNativeTags(gmp, nativeTagsQueryFromFilter(filter))
+        .then(({tags}) => {
+          setTags(tags);
+        })
+        .catch(setError);
+    }
     return gmp.tags
       .getAll({filter: tagFilter})
       .then(resp => {
         setTags(resp.data);
       })
       .catch(setError);
-  }, [gmp.tags, entitiesType]);
+  }, [gmp, entitiesType]);
 
   useEffect(() => {
     void fetchTagsByType();

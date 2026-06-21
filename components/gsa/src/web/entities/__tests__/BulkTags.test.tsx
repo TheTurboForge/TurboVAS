@@ -1,9 +1,10 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import {describe, test, expect, testing} from '@gsa/testing';
+import {afterEach, describe, test, expect, testing} from '@gsa/testing';
 import {screen, within, rendererWith, fireEvent, wait} from 'web/testing';
 import CollectionCounts from 'gmp/collection/collection-counts';
 import Filter from 'gmp/models/filter';
@@ -11,6 +12,10 @@ import Tag from 'gmp/models/tag';
 import Task from 'gmp/models/task';
 import BulkTags from 'web/entities/BulkTags';
 import SelectionType from 'web/utils/SelectionType';
+
+afterEach(() => {
+  testing.unstubAllGlobals();
+});
 
 describe('BulkTags tests', () => {
   test('should render the BulkTags component', () => {
@@ -65,6 +70,60 @@ describe('BulkTags tests', () => {
     );
     const title = screen.getDialogTitle();
     expect(title).toHaveTextContent('Add Tag to All Filtered');
+  });
+
+  test('should load selectable tags through the native API when available', async () => {
+    const entities = [new Task({id: '1'}), new Task({id: '2'})];
+    const entitiesCounts = new CollectionCounts({filtered: 2, all: 2});
+    const filter = Filter.fromString('');
+    const selectedEntities = [];
+    const onClose = testing.fn();
+    const getAllTags = testing.fn();
+    const buildUrl = testing.fn((path: string) => `https://turbovas.example/${path}`);
+    const fetchMock = testing.fn().mockResolvedValue({
+      json: testing.fn().mockResolvedValue({
+        page: {page: 1, page_size: 25, total: 1, sort: 'name', filter: ''},
+        items: [{id: '1', name: 'Native tag', resource_type: 'task'}],
+      }),
+      ok: true,
+      status: 200,
+    });
+    testing.stubGlobal('fetch', fetchMock);
+    const gmp = {
+      buildUrl,
+      session: {token: 'test-token'},
+      tags: {getAll: getAllTags},
+    };
+    const {render} = rendererWith({gmp, store: true});
+
+    render(
+      <BulkTags
+        entities={entities}
+        entitiesCounts={entitiesCounts}
+        filter={filter}
+        selectedEntities={selectedEntities}
+        selectionType={SelectionType.SELECTION_PAGE_CONTENTS}
+        onClose={onClose}
+      />,
+    );
+
+    await wait();
+
+    expect(getAllTags).not.toHaveBeenCalled();
+    expect(buildUrl).toHaveBeenCalledWith('api/v1/tags', {
+      token: 'test-token',
+      page: 1,
+      page_size: 25,
+      sort: 'name',
+      filter: '',
+      active: '',
+      resource_type: 'task',
+      value: '',
+    });
+    expect(fetchMock).toHaveBeenCalledWith('https://turbovas.example/api/v1/tags', {
+      credentials: 'include',
+      headers: {Accept: 'application/json'},
+    });
   });
 
   test('should allow to tag tasks with a new tag', async () => {

@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -15,9 +16,13 @@ import type Response from 'gmp/http/response';
 import {type XmlMeta} from 'gmp/http/transform/fast-xml';
 import {type TranslateOptions} from 'gmp/locale/lang';
 import logger from 'gmp/log';
-import {type default as Filter, RESET_FILTER} from 'gmp/models/filter';
+import Filter, {RESET_FILTER} from 'gmp/models/filter';
 import type Model from 'gmp/models/model';
 import type Tag from 'gmp/models/tag';
+import {
+  fetchNativeTags,
+  nativeTagsQueryFromFilter,
+} from 'gmp/native-api/tags';
 import {map} from 'gmp/utils/array';
 import {
   getEntityType,
@@ -46,6 +51,9 @@ import withTranslation from 'web/utils/withTranslation';
 import withUserName from 'web/utils/withUserName';
 
 type NavigateFunction = (args: {pathname: string; search?: string}) => void;
+
+const canUseNativeApi = (gmp: {buildUrl?: unknown}) =>
+  typeof gmp?.buildUrl === 'function';
 
 export interface EntitiesContainerRenderProps<TModel extends Model = Model> {
   createFilterType: EntityType;
@@ -523,6 +531,15 @@ class EntitiesContainer<TModel extends Model> extends React.Component<
 
     if (entities.length > 0) {
       const filter = 'resource_type=' + apiType(getEntityType(entities[0]));
+      if (canUseNativeApi(gmp)) {
+        void fetchNativeTags(
+          gmp,
+          nativeTagsQueryFromFilter(Filter.fromString(filter)),
+        ).then(({tags}) => {
+          this.setState({tags});
+        });
+        return;
+      }
       void gmp.tags.getAll({filter}).then(response => {
         const {data: tags} = response;
         this.setState({tags});
