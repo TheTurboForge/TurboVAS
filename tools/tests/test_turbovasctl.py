@@ -1282,7 +1282,7 @@ class TurboVASCtlTests(unittest.TestCase):
 
         self.assertEqual(contract["alignment_status"], "pass")
         self.assertEqual(findings["native-tooling.openapi-contract"]["status"], "pass")
-        self.assertEqual(contract["operation_count"], 73)
+        self.assertEqual(contract["operation_count"], 72)
         self.assertEqual(contract["missing_operation_ids"], [])
         self.assertEqual(contract["duplicate_operation_ids"], [])
         self.assertEqual(contract["nondeterministic_operation_ids"], [])
@@ -1442,8 +1442,8 @@ class TurboVASCtlTests(unittest.TestCase):
         source = (Path(__file__).resolve().parents[1] / "turbovasctl").read_text(encoding="utf-8")
 
         self.assertEqual(result["status"], "pass")
-        self.assertEqual(details["summary"]["total_rows"], 73)
-        self.assertEqual(details["summary"]["openapi_operation_rows"], 73)
+        self.assertEqual(details["summary"]["total_rows"], 72)
+        self.assertEqual(details["summary"]["openapi_operation_rows"], 72)
         self.assertEqual(details["summary"]["inventory_rows"], 72)
         self.assertEqual(details["summary"]["rows_with_checked_migration_metadata"], 72)
         self.assertEqual(details["summary"]["checked_migration_field_counts"]["x_turbovas_exposure"], 72)
@@ -1604,11 +1604,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(cert_bund_detail["inventory_endpoint"], "/api/v1/cert-bund-advisories/{advisory_id}")
         self.assertIn("GSA Security Information CERT-Bund advisory detail metadata overlay (migrated through gsad same-origin proxy)", cert_bund_detail["replacement_candidates"])
 
-        scope_bound_detail = rows["/api/v1/scopes/{scope_id}/reports/{scope_report_id}"]
-        self.assertEqual(scope_bound_detail["status"], "unknown")
-        self.assertEqual(scope_bound_detail["browser_access"], "unknown")
-        self.assertEqual(scope_bound_detail["replacement_candidates"], [])
-        self.assertIsNone(scope_bound_detail["x_turbovas_exposure"])
+        self.assertNotIn("/api/v1/scopes/{scope_id}/reports/{scope_report_id}", rows)
 
     def test_openapi_operation_id_generator_is_stable_and_collision_free(self):
         root = Path(__file__).resolve().parents[2]
@@ -1618,7 +1614,7 @@ class TurboVASCtlTests(unittest.TestCase):
             for item in operations
         ]
 
-        self.assertEqual(len(operation_ids), 73)
+        self.assertEqual(len(operation_ids), 72)
         self.assertEqual(len(operation_ids), len(set(operation_ids)))
         self.assertEqual(turbovasctl.openapi_contract_operation_id("get", "/reports/{report_id}/results"), "getReportsByReportIdResults")
         self.assertEqual(
