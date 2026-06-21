@@ -184,22 +184,6 @@ def write_artifact(artifact_dir: Path, name: str, payload: dict[str, Any]) -> st
     return str(path)
 
 
-def command_summary(gmp: Any, artifact_dir: Path) -> dict[str, Any]:
-    scope = organization_scope(gmp)
-    if not scope or not scope.get("id"):
-        payload = result("fail", "Organization scope is missing.")
-        payload["artifacts"] = [write_artifact(artifact_dir, "summary-failed.json", payload)]
-        return payload
-    reports = scope_reports(gmp, scope["id"])
-    if not reports:
-        payload = result("fail", "No Organization scope report exists yet.", scope=scope)
-        payload["artifacts"] = [write_artifact(artifact_dir, "summary-failed.json", payload)]
-        return payload
-    payload = result("pass", "Latest Organization scope report read.", scope=scope, scope_report=reports[0])
-    payload["artifacts"] = [write_artifact(artifact_dir, "summary.json", payload)]
-    return payload
-
-
 def command_smoke(gmp: Any, artifact_dir: Path) -> dict[str, Any]:
     targets = entity_rows(gmp, "get_targets", "target")
     hosts = entity_rows(gmp, "get_hosts", "host")
@@ -303,7 +287,7 @@ def command_smoke(gmp: Any, artifact_dir: Path) -> dict[str, Any]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Exercise TurboVAS scope reporting over GMP")
-    parser.add_argument("command", choices=("smoke", "summary"))
+    parser.add_argument("command", choices=("smoke",))
     parser.add_argument("--socket", required=True, help="gvmd Unix socket path")
     parser.add_argument("--username", required=True, help="GMP username")
     parser.add_argument("--password-file", required=True, help="file containing the GMP password")
@@ -318,10 +302,7 @@ def main(argv: list[str] | None = None) -> int:
     gmp = None
     try:
         gmp, password = runtime_full_test_scan.connect_gmp(Path(args.socket), args.username, Path(args.password_file), args.timeout)
-        if args.command == "smoke":
-            payload = command_smoke(gmp, Path(args.artifact_dir))
-        else:
-            payload = command_summary(gmp, Path(args.artifact_dir))
+        payload = command_smoke(gmp, Path(args.artifact_dir))
     except Exception as error:  # pylint: disable=broad-except
         payload = result("fail", "Runtime scope helper failed.", error_type=type(error).__name__, error=str(error).replace(password, "[redacted]"))
     finally:

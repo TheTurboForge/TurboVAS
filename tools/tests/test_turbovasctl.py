@@ -508,9 +508,13 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_runtime_metrics_commands_use_native_api_not_legacy_xml_helper(self):
         root = Path(__file__).resolve().parents[2]
         source = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
+        runtime_scope_source = (root / "tools" / "runtime_scope.py").read_text(encoding="utf-8")
         browser_smoke_command = source.split("def command_runtime_browser_smoke", 1)[1].split("def command_runtime_browser_regression", 1)[0]
         browser_regression_command = source.split("def command_runtime_browser_regression", 1)[1].split("def command_runtime_credential_smoke", 1)[0]
+        scope_command_action = next(action for action in runtime_scope.build_parser()._actions if action.dest == "command")
         self.assertFalse((root / "tools" / "runtime_metrics.py").exists())
+        self.assertEqual(scope_command_action.choices, ("smoke",))
+        self.assertNotIn("def command_summary", runtime_scope_source)
         self.assertNotIn("runtime_metrics_probe_path", source)
         self.assertIn("def command_runtime_scope_report_summary_native", source)
         self.assertIn("def native_scope_report_browser_target", source)
@@ -577,6 +581,36 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("scopeReportPath(scopeId, scopeReportId, 'cves')", native_client)
         self.assertIn("scopeReportPath(scopeId, scopeReportId, 'tls-certificates')", native_client)
         self.assertIn("scopeReportPath(scopeId, scopeReportId, 'errors')", native_client)
+
+    def test_scope_report_evidence_api_handlers_remain_scope_source_scoped(self):
+        root = Path(__file__).resolve().parents[2]
+        source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
+
+        def section(start, end):
+            self.assertIn(start, source)
+            self.assertIn(end, source)
+            return source.split(start, 1)[1].split(end, 1)[0]
+
+        handlers = [
+            ("async fn scope_report_results", "async fn scope_report_metrics", "srs.source_report_uuid AS source_report_id"),
+            ("async fn scope_report_errors", "async fn scope_reports", "srs.source_report_uuid AS source_report_id"),
+            ("async fn scope_report_hosts", "async fn scope_report_ports", "source_report_ids"),
+            ("async fn scope_report_ports", "async fn scope_report_applications", "source_report_ids"),
+            ("async fn scope_report_applications", "async fn scope_report_operating_systems", "source_report_ids"),
+            ("async fn scope_report_operating_systems", "async fn scope_report_tls_certificates", "source_report_ids"),
+            ("async fn scope_report_tls_certificates", "async fn scope_report_cves", "source_report_ids"),
+            ("async fn scope_report_cves", "async fn scope_report_exists", "source_report_ids"),
+        ]
+        for start, end, source_identity in handlers:
+            with self.subTest(handler=start):
+                body = section(start, end)
+                self.assertIn("Path((scope_id, scope_report_id)): Path<(String, String)>", body)
+                self.assertIn("parse_uuid(&scope_id)?", body)
+                self.assertIn("parse_uuid(&scope_report_id)?", body)
+                self.assertIn("WHERE sr.uuid = $1 AND sr.scope_uuid = $2", body)
+                self.assertIn("JOIN scope_report_sources srs ON srs.scope_report = sr.id", body)
+                self.assertIn(source_identity, body)
+                self.assertIn("scope_report_exists(&client, &scope_report_id, &scope_id)", body)
 
     def test_gsad_native_api_proxy_is_authenticated_and_allowlisted(self):
         root = Path(__file__).resolve().parents[2]
@@ -2190,6 +2224,31 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("/api/v1/scopes/:scope_id/reports/:scope_report_id/retention-plan", source)
         self.assertIn("native-api.scope-report-retention-plan", smoke)
 
+    def test_scope_report_retention_source_sql_preserves_source_identity_contract(self):
+        root = Path(__file__).resolve().parents[2]
+        source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
+        start = "fn scope_report_retention_sources_sql() -> &'static str {"
+        end = "\n}\n\nasync fn report_metrics"
+        self.assertIn(start, source)
+        self.assertIn(end, source)
+        body = source.split(start, 1)[1].split(end, 1)[0]
+        upper_body = body.upper()
+
+        self.assertIn("SELECT DISTINCT ON (task.target)", body)
+        self.assertIn("ORDER BY task.target, coalesce(reports.end_time, reports.creation_time) DESC, reports.id DESC", body)
+        self.assertIn("SELECT srs.source_report, srs.source_report_uuid, srs.target,", body)
+        self.assertIn("LEFT JOIN latest_completed lc ON lc.target = srs.target", body)
+        self.assertIn("(lc.source_report = srs.source_report) AS kept_as_latest", body)
+        self.assertIn("WHERE srs.scope_report = $1", body)
+        self.assertIn("SELECT sr.source_report_uuid::text", body)
+        self.assertIn("LEFT JOIN results res ON res.report = sr.source_report", body)
+        self.assertIn("GROUP BY sr.source_report_uuid", body)
+        self.assertIn("coalesce(sr.kept_as_latest, false) AS kept_as_latest", body)
+        self.assertIn("ORDER BY target_name ASC, sr.target_uuid ASC, scan_end DESC, sr.source_report_uuid ASC", body)
+        self.assertLess(body.index("SELECT srs.source_report, srs.source_report_uuid, srs.target,"), body.index("SELECT sr.source_report_uuid::text"))
+        for forbidden in ("INSERT", "UPDATE", "DELETE", "TRUNCATE"):
+            self.assertNotIn(forbidden, upper_body)
+
     def test_openapi_tracks_scope_read_contracts(self):
         root = Path(__file__).resolve().parents[2]
         openapi = (root / "api" / "openapi" / "turbovas-v1.yaml").read_text(encoding="utf-8")
@@ -3314,7 +3373,7 @@ db2:keys=5,expires=0,avg_ttl=0
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "TurboVAS"
             root.mkdir()
-            with unittest.mock.patch.object(turbovasctl, "current_native_api_direct_published_bindings", return_value=()), unittest.mock.patch.object(turbovasctl, "running_service_env_has_key", return_value=False):
+            with unittest.mock.patch.object(turbovasctl, "current_native_api_direct_published_bindings", return_value=()), unittest.mock.patch.object(turbovasctl, "running_service_env_has_key", return_value=False), unittest.mock.patch.object(turbovasctl, "running_service_env_value", return_value=None):
                 findings = turbovasctl.direct_native_api_posture_findings(root, env)
 
         by_check = {item["check"]: item for item in findings}
@@ -3348,7 +3407,7 @@ db2:keys=5,expires=0,avg_ttl=0
             secret_path = turbovasctl.runtime_secret_path(root, turbovasctl.TURBOVAS_API_BEARER_TOKEN_SECRET)
             secret_path.parent.mkdir(parents=True)
             secret_path.write_text("stored-secret\n", encoding="utf-8")
-            with unittest.mock.patch.object(turbovasctl, "current_native_api_direct_published_bindings", return_value=()), unittest.mock.patch.object(turbovasctl, "running_service_env_has_key", return_value=False):
+            with unittest.mock.patch.object(turbovasctl, "current_native_api_direct_published_bindings", return_value=()), unittest.mock.patch.object(turbovasctl, "running_service_env_has_key", return_value=False), unittest.mock.patch.object(turbovasctl, "running_service_env_value", return_value=None):
                 findings = turbovasctl.direct_native_api_posture_findings(root, env)
 
         auth = {item["check"]: item for item in findings}["production.native-api-direct.auth-boundary"]
