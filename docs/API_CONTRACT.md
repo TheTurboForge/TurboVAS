@@ -97,6 +97,8 @@ Read-only automation can use `tools/turbovasctl native-api-request --json --path
 opt-in direct bearer listener. This replaces covered read-only GMP scripts for
 report, scope, target, task, scan-config metadata, override metadata, tag
 metadata, and selected asset listing/detail workflows.
+Direct probes may add `--request-id 'operator-check-1'` to send a bounded safe
+`X-Request-Id` correlation value.
 
 The first runtime implementation proof is scoped in
 `docs/NATIVE_API_PROOF_PLAN.md`. It started with an internal Rust sidecar and now

@@ -205,6 +205,8 @@ TURBOVAS_API_DIRECT_PORT_ENV = "TURBOVAS_API_DIRECT_PORT"
 TURBOVAS_API_DIRECT_BIND_ENV = "TURBOVAS_API_DIRECT_BIND"
 TURBOVAS_API_BEARER_TOKEN_ENV = "TURBOVAS_API_BEARER_TOKEN"
 TURBOVAS_API_BEARER_TOKEN_SECRET = "native-api-bearer-token"
+DIRECT_API_REQUEST_ID_HEADER = "X-Request-Id"
+MAX_DIRECT_API_REQUEST_ID_LENGTH = 128
 POSTGRES_DEFAULTS = {
     "user": "turbovas",
     "password": "turbovas-dev",
@@ -977,12 +979,15 @@ def direct_native_api_curl(
     token: str | None,
     env: dict[str, str],
     method: str = "GET",
+    request_id: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     command = ["curl", "-sS", "--max-time", "10", "-w", "\n%{http_code}"]
     if method != "GET":
         command.extend(["-X", method])
     if token is not None:
         command.extend(["-H", f"Authorization: Bearer {token}"])
+    if request_id is not None:
+        command.extend(["-H", f"{DIRECT_API_REQUEST_ID_HEADER}: {request_id}"])
     command.append(f"{native_api_direct_base_url(env)}{path}")
     return run_command(command, repo_root, env=env, timeout=30)
 
@@ -993,12 +998,15 @@ def direct_native_api_display_command(
     token: str | None,
     env: dict[str, str],
     method: str = "GET",
+    request_id: str | None = None,
 ) -> list[str]:
     command = ["curl", "-sS", "--max-time", "10", "-w", "\\n%{http_code}"]
     if method != "GET":
         command.extend(["-X", method])
     if token is not None:
         command.extend(["-H", "Authorization: Bearer <redacted>"])
+    if request_id is not None:
+        command.extend(["-H", f"{DIRECT_API_REQUEST_ID_HEADER}: {request_id}"])
     command.append(f"{native_api_direct_base_url(env)}{path}")
     return command
 
@@ -6401,19 +6409,22 @@ def command_runtime_app_smoke(repo_root: Path) -> dict[str, Any]:
     return make_result("runtime-app-smoke", repo_root, "Application runtime smoke checks completed.", findings, [str(runtime_dir(repo_root))])
 
 
-def native_api_curl(repo_root: Path, path: str) -> subprocess.CompletedProcess[str]:
+def native_api_curl(repo_root: Path, path: str, *, request_id: str | None = None) -> subprocess.CompletedProcess[str]:
+    command = compose_command(
+        repo_root,
+        "exec",
+        "-T",
+        "turbovas-api",
+        "curl",
+        "-fsS",
+        "--max-time",
+        "10",
+    )
+    if request_id is not None:
+        command.extend(["-H", f"{DIRECT_API_REQUEST_ID_HEADER}: {request_id}"])
+    command.append(f"http://127.0.0.1:{TURBOVAS_API_CONTAINER_PORT}{path}")
     return run_command(
-        compose_command(
-            repo_root,
-            "exec",
-            "-T",
-            "turbovas-api",
-            "curl",
-            "-fsS",
-            "--max-time",
-            "10",
-            f"http://127.0.0.1:{TURBOVAS_API_CONTAINER_PORT}{path}",
-        ),
+        command,
         repo_root,
         env=runtime_env(repo_root),
         timeout=30,
@@ -6431,18 +6442,50 @@ def validate_native_api_request_path(path: str) -> str:
     return urllib.parse.urlunsplit(("", "", parsed.path, parsed.query, ""))
 
 
-def command_native_api_request(repo_root: Path, path: str, *, direct: bool = False) -> dict[str, Any]:
+def validate_direct_api_request_id(request_id: str) -> str:
+    if request_id == "":
+        raise ValueError("request ID must not be empty")
+    if len(request_id) > MAX_DIRECT_API_REQUEST_ID_LENGTH:
+        raise ValueError(f"request ID must be at most {MAX_DIRECT_API_REQUEST_ID_LENGTH} characters")
+    if not all(char.isascii() and (char.isalnum() or char in "-_.:") for char in request_id):
+        raise ValueError("request ID may contain only ASCII letters, digits, '-', '_', '.', and ':'")
+    return request_id
+
+
+def native_api_request_display_command(repo_root: Path, request_path: str, *, request_id: str | None = None) -> list[str]:
+    command = compose_command(
+        repo_root,
+        "exec",
+        "-T",
+        "turbovas-api",
+        "curl",
+        "-fsS",
+        "--max-time",
+        "10",
+    )
+    if request_id is not None:
+        command.extend(["-H", f"{DIRECT_API_REQUEST_ID_HEADER}: {request_id}"])
+    command.append(f"http://127.0.0.1:{TURBOVAS_API_CONTAINER_PORT}{request_path}")
+    return command
+
+
+def command_native_api_request(repo_root: Path, path: str, *, direct: bool = False, request_id: str | None = None) -> dict[str, Any]:
     findings: list[dict[str, Any]] = []
     try:
         request_path = validate_native_api_request_path(path)
     except ValueError as exc:
         findings.append(finding("fail", "native-api-request.path", str(exc), details={"path": path}))
         return make_result("native-api-request", repo_root, "Native API request rejected before runtime access.", findings)
+    try:
+        request_id = validate_direct_api_request_id(request_id) if request_id is not None else None
+    except ValueError as exc:
+        findings.append(finding("fail", "native-api-request.request-id", str(exc), details={"request_id": request_id}))
+        return make_result("native-api-request", repo_root, "Native API request rejected before runtime access.", findings)
 
     if direct:
         env = native_api_direct_runtime_env(repo_root)
         token = env[TURBOVAS_API_BEARER_TOKEN_ENV]
-        response = direct_native_api_curl(repo_root, request_path, token=token, env=env)
+        response = direct_native_api_curl(repo_root, request_path, token=token, env=env, request_id=request_id)
         parsed, http_status = parse_json_output_with_http_status(response)
         ok = response.returncode == 0 and http_status == 200 and isinstance(parsed, dict)
         findings.append(
@@ -6453,16 +6496,16 @@ def command_native_api_request(repo_root: Path, path: str, *, direct: bool = Fal
                 if ok
                 else f"Direct native API GET {request_path} failed or returned non-JSON output.",
                 response,
-                direct_native_api_display_command(request_path, token=token, env=env),
+                direct_native_api_display_command(request_path, token=token, env=env, request_id=request_id),
                 parsed,
-                {"http_status": http_status, **summarize_native_api_response(parsed)},
+                {"http_status": http_status, "request_id": request_id, **summarize_native_api_response(parsed)},
             )
         )
         result = make_result("native-api-request", repo_root, "Direct native API request completed." if ok else "Direct native API request failed.", findings)
-        result["details"] = {"path": request_path, "direct": True, "http_status": http_status, "response": parsed if isinstance(parsed, dict) else None}
+        result["details"] = {"path": request_path, "direct": True, "http_status": http_status, "request_id": request_id, "response": parsed if isinstance(parsed, dict) else None}
         return result
 
-    response = native_api_curl(repo_root, request_path)
+    response = native_api_curl(repo_root, request_path, request_id=request_id)
     parsed = parse_json_output(response)
     ok = response.returncode == 0 and isinstance(parsed, dict)
     findings.append(
@@ -6471,12 +6514,13 @@ def command_native_api_request(repo_root: Path, path: str, *, direct: bool = Fal
             "native-api-request.get",
             f"Native API GET {request_path} returned JSON." if ok else f"Native API GET {request_path} failed or returned non-JSON output.",
             response,
-            compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", f"http://127.0.0.1:9080{request_path}"),
+            native_api_request_display_command(repo_root, request_path, request_id=request_id),
             parsed,
+            {"request_id": request_id},
         )
     )
     result = make_result("native-api-request", repo_root, "Native API request completed." if ok else "Native API request failed.", findings)
-    result["details"] = {"path": request_path, "response": parsed if isinstance(parsed, dict) else None}
+    result["details"] = {"path": request_path, "request_id": request_id, "response": parsed if isinstance(parsed, dict) else None}
     return result
 
 
@@ -8754,6 +8798,7 @@ def build_parser() -> argparse.ArgumentParser:
     native_api_request = subparsers.add_parser("native-api-request", parents=[common], help="perform a read-only TurboVAS native API request")
     native_api_request.add_argument("--path", required=True, help="validated /api/v1/... path plus optional query string")
     native_api_request.add_argument("--direct", action="store_true", help="call the opt-in direct native API listener with bearer auth")
+    native_api_request.add_argument("--request-id", help="optional safe X-Request-Id correlation value")
     native_tooling_state = subparsers.add_parser("native-tooling-state", parents=[common], help="inventory inherited GMP/python-gvm/gvm-tools dependency surfaces")
     native_tooling_state.add_argument("--compact", action="store_true", help="omit full item and endpoint inventories from JSON output")
     subparsers.add_parser("rust-migration-state", parents=[common], help="inspect Rust migration tooling and first C-to-Rust dry-run candidate")
@@ -8854,7 +8899,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "inventory":
         result = command_inventory(repo_root, args.scope)
     elif args.command == "native-api-request":
-        result = command_native_api_request(repo_root, args.path, direct=args.direct)
+        result = command_native_api_request(repo_root, args.path, direct=args.direct, request_id=args.request_id)
     elif args.command == "native-tooling-state":
         result = command_native_tooling_state(repo_root, compact=args.compact)
     elif args.command == "rust-migration-state":

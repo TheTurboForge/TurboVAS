@@ -743,7 +743,8 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("/api/v1/tags/{tag_id}/resources", source)
         self.assertIn("/api/v1/overrides", source)
         self.assertIn("/api/v1/overrides/{override_id}", source)
-        self.assertIn('compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", f"http://127.0.0.1:9080{request_path}"),\n            parsed,', source)
+        self.assertIn("def native_api_request_display_command", source)
+        self.assertIn("native_api_request_display_command(repo_root, request_path, request_id=request_id)", source)
         self.assertIn("def command_security_policy_check", source)
         self.assertIn("def command_path_coupling_state", source)
         self.assertIn("def command_production_posture_check", source)
@@ -2102,6 +2103,31 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertIn("-X", command)
         self.assertIn("POST", command)
         self.assertIn("Authorization: Bearer <redacted>", " ".join(command))
+
+    def test_direct_native_api_display_command_includes_request_id(self):
+        env = {
+            turbovasctl.TURBOVAS_API_DIRECT_HOST_ENV: "127.0.0.1",
+            turbovasctl.TURBOVAS_API_DIRECT_PORT_ENV: "19080",
+        }
+        command = turbovasctl.direct_native_api_display_command(
+            "/api/v1/reports?page_size=1",
+            token="secret-token",
+            env=env,
+            request_id="client-123_abc.4:5",
+        )
+        rendered = " ".join(command)
+        self.assertIn("X-Request-Id: client-123_abc.4:5", rendered)
+        self.assertNotIn("secret-token", rendered)
+
+    def test_validate_direct_api_request_id_rejects_unsafe_values(self):
+        self.assertEqual(
+            turbovasctl.validate_direct_api_request_id("client-123_abc.4:5"),
+            "client-123_abc.4:5",
+        )
+        for value in ("", "contains space", "../bad", "a" * 129):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    turbovasctl.validate_direct_api_request_id(value)
 
     def test_direct_native_api_http_status_parser_keeps_json_error_body(self):
         completed = turbovasctl.subprocess.CompletedProcess([], 0, '{"error":{"code":"unauthorized"}}\n401', "")

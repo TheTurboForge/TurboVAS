@@ -84,6 +84,12 @@ enables and validates an opt-in bearer-auth direct listener, defaulting to
 loopback. That direct mode is for read-only `/api/v1` development proof work;
 it is not production deployment guidance and does not authorize scanner control,
 credential, feed, account, or destructive write endpoints.
+Use a request ID when a direct probe needs a visible correlation ID in
+responses/logs:
+
+```sh
+tools/turbovasctl native-api-request --direct --json --request-id 'operator-check-1' --path '/api/v1/reports?page_size=1'
+```
 
 ## Targets, Tasks, And Raw Evidence
 

@@ -115,6 +115,8 @@ target, task, scan-config metadata, host asset metadata, tag metadata, override
 metadata, and report-config reads. This removes the need for covered inherited
 read-only GMP scripts while keeping write/control operations on inherited paths
 until a separate native write design exists.
+Direct probes may add `--request-id 'operator-check-1'`; the value is sent as
+`X-Request-Id` and must use the bounded safe request-ID character set.
 
 ## Not In The First Proof
 

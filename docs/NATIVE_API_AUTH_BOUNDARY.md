@@ -61,10 +61,14 @@ Use these command surfaces:
 just runtime-native-api-smoke --json
 just runtime-native-api-direct-smoke --json
 tools/turbovasctl native-api-request --direct --json --path '/api/v1/reports?page_size=1'
+tools/turbovasctl native-api-request --direct --json --request-id 'operator-check-1' --path '/api/v1/reports?page_size=1'
 ```
 
 The direct smoke proves health access, missing-token rejection, wrong-token
-rejection, valid-token JSON access, and continued internal native API smoke.
+rejection, valid-token JSON access, valid-token non-GET rejection, and
+continued internal native API smoke. `native-api-request --request-id` sends a
+safe `X-Request-Id` value for correlation; it is not an authentication or audit
+identity.
 
 ## Remaining Hardening Questions
 
