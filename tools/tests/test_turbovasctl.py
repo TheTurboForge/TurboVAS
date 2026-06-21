@@ -1983,6 +1983,52 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(invalid["properties.error.properties.code.type"]["actual"], "integer")
         self.assertEqual(invalid["properties.error.properties.details.additionalProperties"]["actual"], "false")
 
+    def test_openapi_contract_tracks_auth_and_server_boundary(self):
+        root = Path(__file__).resolve().parents[2]
+        summary = turbovasctl.native_api_openapi_contract_summary(root)
+        auth = summary["auth_contract"]
+
+        self.assertEqual(auth["alignment_status"], "pass")
+        self.assertEqual(set(auth["servers"]), {"/api/v1", "http://127.0.0.1:19080/api/v1"})
+        self.assertEqual(set(auth["security_requirements"]), {"operatorSession", "bearerAuth"})
+        self.assertEqual(auth["security_schemes"]["operatorSession"]["name"], "turbovas_session")
+        self.assertEqual(auth["security_schemes"]["bearerAuth"]["scheme"], "bearer")
+        compact = turbovasctl.compact_native_tooling_summary({"openapi_contract": summary})["openapi_contract"]
+        self.assertEqual(compact["auth_contract_alignment_status"], "pass")
+        self.assertEqual(compact["missing_security_scheme_count"], 0)
+
+    def test_openapi_contract_warns_on_auth_boundary_drift(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            openapi = root / "api" / "openapi" / "turbovas-v1.yaml"
+            openapi.parent.mkdir(parents=True)
+            openapi.write_text(
+                "openapi: 3.1.0\n"
+                "info:\n"
+                "  title: Drift\n"
+                "  version: test\n"
+                "servers:\n"
+                "  - url: /wrong\n"
+                "security:\n"
+                "  - bearerAuth: []\n"
+                "paths: {}\n"
+                "components:\n"
+                "  securitySchemes:\n"
+                "    bearerAuth:\n"
+                "      type: apiKey\n"
+                "      in: header\n",
+                encoding="utf-8",
+            )
+            auth = turbovasctl.openapi_auth_contract_summary(root)
+
+        self.assertEqual(auth["alignment_status"], "warn")
+        self.assertIn("/api/v1", auth["missing_servers"])
+        self.assertIn("operatorSession", auth["missing_security_requirements"])
+        self.assertIn("operatorSession", auth["missing_security_schemes"])
+        mismatches = {(item["scheme"], item["field"]): item for item in auth["security_scheme_mismatches"]}
+        self.assertEqual(mismatches[("bearerAuth", "type")]["actual"], "apiKey")
+        self.assertIsNone(mismatches[("bearerAuth", "scheme")]["actual"])
+
     def test_security_policy_marks_native_api_contract_surfaces_sensitive(self):
         root = Path(__file__).resolve().parents[2]
         result = turbovasctl.command_security_policy_check(root)

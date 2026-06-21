@@ -332,6 +332,12 @@ OPENAPI_ALLOWED_TURBOVAS_OPERATION_FIELDS = frozenset(
     }
 )
 OPENAPI_ALLOWED_EXPOSURE_VALUES = frozenset({"direct-read", "internal-only"})
+OPENAPI_EXPECTED_SERVER_URLS = frozenset({"/api/v1", "http://127.0.0.1:19080/api/v1"})
+OPENAPI_EXPECTED_SECURITY_REQUIREMENTS = frozenset({"operatorSession", "bearerAuth"})
+OPENAPI_EXPECTED_SECURITY_SCHEMES = {
+    "operatorSession": {"type": "apiKey", "in": "cookie", "name": "turbovas_session"},
+    "bearerAuth": {"type": "http", "scheme": "bearer"},
+}
 OPENAPI_ALLOWED_MATURITY_VALUES = frozenset({"live-read", "preview-read"})
 OPENAPI_ALLOWED_REPLACES_VALUES = frozenset(
     {
@@ -4352,6 +4358,106 @@ def openapi_contract_lines(repo_root: Path | None) -> list[str]:
         return []
 
 
+def openapi_server_urls(repo_root: Path | None) -> list[str]:
+    lines = openapi_contract_lines(repo_root)
+    urls: list[str] = []
+    in_servers = False
+    for line in lines:
+        if line == "servers:":
+            in_servers = True
+            continue
+        if in_servers and line and not line.startswith(" "):
+            break
+        if in_servers:
+            match = re.match(r"^  - url:\s*([^#]+?)\s*(?:#.*)?$", line)
+            if match:
+                urls.append(match.group(1).strip().strip("'\""))
+    return urls
+
+
+def openapi_top_level_security_requirements(repo_root: Path | None) -> list[str]:
+    lines = openapi_contract_lines(repo_root)
+    requirements: list[str] = []
+    in_security = False
+    for line in lines:
+        if line == "security:":
+            in_security = True
+            continue
+        if in_security and line and not line.startswith(" "):
+            break
+        if in_security:
+            match = re.match(r"^  - ([A-Za-z0-9_]+):\s*\[\]\s*(?:#.*)?$", line)
+            if match:
+                requirements.append(match.group(1))
+    return requirements
+
+
+def openapi_security_schemes(repo_root: Path | None) -> dict[str, dict[str, str]]:
+    lines = openapi_contract_lines(repo_root)
+    schemes: dict[str, dict[str, str]] = {}
+    in_components = False
+    in_security_schemes = False
+    current: str | None = None
+    for line in lines:
+        if line == "components:":
+            in_components = True
+            continue
+        if in_components and line and not line.startswith(" "):
+            break
+        if not in_components:
+            continue
+        if line == "  securitySchemes:":
+            in_security_schemes = True
+            current = None
+            continue
+        if in_security_schemes and line.startswith("  ") and not line.startswith("    "):
+            break
+        if not in_security_schemes:
+            continue
+        scheme_match = re.match(r"^    ([A-Za-z0-9_]+):\s*$", line)
+        if scheme_match:
+            current = scheme_match.group(1)
+            schemes[current] = {}
+            continue
+        field_match = re.match(r"^      (type|in|name|scheme):\s*([^#]+?)\s*(?:#.*)?$", line)
+        if current and field_match:
+            schemes[current][field_match.group(1)] = field_match.group(2).strip().strip("'\"")
+    return schemes
+
+
+def openapi_auth_contract_summary(repo_root: Path | None) -> dict[str, Any]:
+    servers = openapi_server_urls(repo_root)
+    security_requirements = openapi_top_level_security_requirements(repo_root)
+    security_schemes = openapi_security_schemes(repo_root)
+    missing_servers = sorted(OPENAPI_EXPECTED_SERVER_URLS - set(servers))
+    unexpected_servers = sorted(set(servers) - OPENAPI_EXPECTED_SERVER_URLS)
+    missing_security_requirements = sorted(OPENAPI_EXPECTED_SECURITY_REQUIREMENTS - set(security_requirements))
+    unexpected_security_requirements = sorted(set(security_requirements) - OPENAPI_EXPECTED_SECURITY_REQUIREMENTS)
+    missing_security_schemes = sorted(set(OPENAPI_EXPECTED_SECURITY_SCHEMES) - set(security_schemes))
+    unexpected_security_schemes = sorted(set(security_schemes) - set(OPENAPI_EXPECTED_SECURITY_SCHEMES))
+    security_scheme_mismatches: list[dict[str, str | None]] = []
+    for name, expected_fields in sorted(OPENAPI_EXPECTED_SECURITY_SCHEMES.items()):
+        actual_fields = security_schemes.get(name, {})
+        for field, expected in sorted(expected_fields.items()):
+            actual = actual_fields.get(field)
+            if actual != expected:
+                security_scheme_mismatches.append({"scheme": name, "field": field, "actual": actual, "expected": expected})
+    drift = missing_servers or unexpected_servers or missing_security_requirements or unexpected_security_requirements or missing_security_schemes or unexpected_security_schemes or security_scheme_mismatches
+    return {
+        "alignment_status": "pass" if not drift else "warn",
+        "servers": servers,
+        "security_requirements": security_requirements,
+        "security_schemes": security_schemes,
+        "missing_servers": missing_servers,
+        "unexpected_servers": unexpected_servers,
+        "missing_security_requirements": missing_security_requirements,
+        "unexpected_security_requirements": unexpected_security_requirements,
+        "missing_security_schemes": missing_security_schemes,
+        "unexpected_security_schemes": unexpected_security_schemes,
+        "security_scheme_mismatches": security_scheme_mismatches,
+    }
+
+
 def openapi_identifier_words(value: str) -> list[str]:
     return [part.lower() for part in re.split(r"[^A-Za-z0-9]+", value) if part]
 
@@ -4824,6 +4930,7 @@ def native_api_openapi_contract_summary(repo_root: Path | None) -> dict[str, Any
     migration_metadata_drift = openapi_migration_metadata_contract_drift(operations)
     error_schema_drift = openapi_error_schema_contract_drift(repo_root)
     collection_query_contract = openapi_collection_query_contract_summary(repo_root, operations)
+    auth_contract = openapi_auth_contract_summary(repo_root)
 
     shared_response_refs = openapi_components_response_refs(repo_root)
     missing_shared_responses = sorted(set(OPENAPI_SHARED_ERROR_RESPONSES) - set(shared_response_refs))
@@ -4864,6 +4971,7 @@ def native_api_openapi_contract_summary(repo_root: Path | None) -> dict[str, Any
         or error_schema_drift["missing_error_schema_fields"]
         or error_schema_drift["invalid_error_schema_fields"]
         or collection_query_contract["alignment_status"] != "pass"
+        or auth_contract["alignment_status"] != "pass"
     )
     return {
         "alignment_status": "pass" if not drift else "warn",
@@ -4886,6 +4994,7 @@ def native_api_openapi_contract_summary(repo_root: Path | None) -> dict[str, Any
         "operations_missing_error_responses": operations_missing_error_responses,
         **error_schema_drift,
         "collection_query_contract": collection_query_contract,
+        "auth_contract": auth_contract,
     }
 
 
@@ -5739,6 +5848,14 @@ def compact_native_tooling_summary(summary: dict[str, Any]) -> dict[str, Any]:
         "collection_query_alignment_status": openapi_contract.get("collection_query_contract", {}).get("alignment_status", "unknown") if isinstance(openapi_contract.get("collection_query_contract", {}), dict) else "unknown",
         "collection_limit_mismatch_count": len(openapi_contract.get("collection_query_contract", {}).get("collection_limit_mismatches", [])) if isinstance(openapi_contract.get("collection_query_contract", {}), dict) else 0,
         "incomplete_collection_parameter_count": len(openapi_contract.get("collection_query_contract", {}).get("incomplete_collection_parameters", [])) if isinstance(openapi_contract.get("collection_query_contract", {}), dict) else 0,
+        "auth_contract_alignment_status": openapi_contract.get("auth_contract", {}).get("alignment_status", "unknown") if isinstance(openapi_contract.get("auth_contract", {}), dict) else "unknown",
+        "missing_server_count": len(openapi_contract.get("auth_contract", {}).get("missing_servers", [])) if isinstance(openapi_contract.get("auth_contract", {}), dict) else 0,
+        "unexpected_server_count": len(openapi_contract.get("auth_contract", {}).get("unexpected_servers", [])) if isinstance(openapi_contract.get("auth_contract", {}), dict) else 0,
+        "missing_security_requirement_count": len(openapi_contract.get("auth_contract", {}).get("missing_security_requirements", [])) if isinstance(openapi_contract.get("auth_contract", {}), dict) else 0,
+        "unexpected_security_requirement_count": len(openapi_contract.get("auth_contract", {}).get("unexpected_security_requirements", [])) if isinstance(openapi_contract.get("auth_contract", {}), dict) else 0,
+        "missing_security_scheme_count": len(openapi_contract.get("auth_contract", {}).get("missing_security_schemes", [])) if isinstance(openapi_contract.get("auth_contract", {}), dict) else 0,
+        "unexpected_security_scheme_count": len(openapi_contract.get("auth_contract", {}).get("unexpected_security_schemes", [])) if isinstance(openapi_contract.get("auth_contract", {}), dict) else 0,
+        "security_scheme_mismatch_count": len(openapi_contract.get("auth_contract", {}).get("security_scheme_mismatches", [])) if isinstance(openapi_contract.get("auth_contract", {}), dict) else 0,
     }
     return {
         "total_items": summary.get("total_items", 0),
