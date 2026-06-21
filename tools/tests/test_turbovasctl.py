@@ -1038,6 +1038,65 @@ class TurboVASCtlTests(unittest.TestCase):
             self.assertEqual(trashcan_summary["status"], "planned_internal_and_browser_proxied")
         self.assertIn("row-level Trashcan data remains inherited/deferred", trashcan_summary["replacement_candidates"])
 
+    def test_certbund_report_rows_expand_one_result_per_cert_ref(self):
+        rows = turbovasctl.certbund_report_rows(
+            [
+                {
+                    "host": "192.0.2.10",
+                    "port": "443/tcp",
+                    "name": "Example vulnerability",
+                    "severity": 7.5,
+                    "cves": ["CVE-2026-0001"],
+                    "cert_refs": ["cert-bund:CB-K14/1304", "cert-bund:CB-K14/1305"],
+                }
+            ],
+            [{"host": "192.0.2.10", "best_os_txt": "ExampleOS"}],
+            {
+                "CB-K14/1304": {"severity": 6.8, "title": "First advisory"},
+                "CB-K14/1305": {"severity": 8.1, "title": "Second advisory"},
+            },
+        )
+        self.assertEqual([row["CertBUND-ID"] for row in rows], ["CB-K14/1304", "CB-K14/1305"])
+        self.assertEqual(rows[0]["CVEs"], "CVE-2026-0001")
+        self.assertEqual(rows[0]["OS"], "ExampleOS")
+
+    def test_certbund_report_rows_ignore_results_without_cert_refs(self):
+        rows = turbovasctl.certbund_report_rows(
+            [{"host": "192.0.2.10", "name": "No advisory", "cert_refs": []}, {"host": "192.0.2.11", "name": "Missing refs"}],
+            [],
+            {},
+        )
+        self.assertEqual(rows, [])
+
+    def test_certbund_report_rows_missing_advisory_uses_legacy_na(self):
+        rows = turbovasctl.certbund_report_rows(
+            [
+                {
+                    "host": "192.0.2.10",
+                    "hostname": "fixture-host",
+                    "port": "80/tcp",
+                    "name": "Example vulnerability",
+                    "severity": 5.0,
+                    "cert_refs": ["cert-bund:CB-K14/1304"],
+                }
+            ],
+            [{"host": "192.0.2.10", "best_os_cpe": "cpe:/o:example:os"}],
+            {},
+        )
+        self.assertEqual(rows[0]["Hostname"], "fixture-host")
+        self.assertEqual(rows[0]["OS"], "cpe:/o:example:os")
+        self.assertEqual(rows[0]["CertBUND-Severity"], "N/A")
+        self.assertEqual(rows[0]["CertBUND-Title"], "N/A (could not be retrieved)")
+
+    def test_runtime_certbund_report_command_is_registered(self):
+        root = Path(__file__).resolve().parents[2]
+        source = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
+        justfile = (root / "justfile").read_text(encoding="utf-8")
+        self.assertIn("def command_runtime_certbund_report", source)
+        self.assertIn("runtime-certbund-report", source)
+        self.assertIn("runtime-certbund-report *args:", justfile)
+        self.assertIn('tools/turbovasctl runtime-certbund-report "$@"', justfile)
+
     def test_native_api_request_validates_relative_api_paths(self):
         self.assertEqual(turbovasctl.validate_native_api_request_path("/api/v1/reports?page_size=1"), "/api/v1/reports?page_size=1")
         self.assertEqual(turbovasctl.validate_native_api_request_path("/api/v1"), "/api/v1")
