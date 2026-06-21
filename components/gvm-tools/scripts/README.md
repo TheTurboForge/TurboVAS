@@ -4,20 +4,6 @@
 
 # GVM Example Scripts
 
-## `application-detection.gmp.py`
-
-This script will search the reports and display all hosts with the requested applications!
-
-### Arguments
-
-* `<application>`: Name of the application
-
-### Example
-
-  `$ gvm-script --gmp-username name --gmp-password pass ssh --hostname <gsm> scripts/application-detection.gmp.py <application>`
-
----
-
 ## `cfg-gen-for-certs.gmp.py`
 
 This script creates a new scan config with nvts from a given CERT-Bund!
