@@ -23,40 +23,6 @@ const {
 
 const canUseNativeApi = gmp => typeof gmp?.buildUrl === 'function';
 
-const mergeNativeInformation = (inheritedInformation, nativeInformation) => {
-  if (nativeInformation === undefined) {
-    return inheritedInformation;
-  }
-
-  if (inheritedInformation === undefined) {
-    return nativeInformation;
-  }
-
-  return Object.assign(
-    Object.create(Object.getPrototypeOf(inheritedInformation)),
-    inheritedInformation,
-    {
-      id: nativeInformation.id || inheritedInformation.id,
-      name: nativeInformation.name || inheritedInformation.name,
-      family: nativeInformation.family || inheritedInformation.family,
-      solution: inheritedInformation.solution || nativeInformation.solution,
-    },
-  );
-};
-
-const mergeNativeMetadata = (inherited, native) =>
-  Object.assign(Object.create(Object.getPrototypeOf(inherited)), inherited, {
-    creationTime: native.creationTime || inherited.creationTime,
-    host: native.host || inherited.host,
-    port: native.port || inherited.port,
-    qod: native.qod || inherited.qod,
-    report: native.report || inherited.report,
-    scan_nvt_version: native.scan_nvt_version || inherited.scan_nvt_version,
-    severity: native.severity ?? inherited.severity,
-    task: native.task || inherited.task,
-    information: mergeNativeInformation(inherited.information, native.information),
-  });
-
 const nativeLoadEntities = gmp => filter => (dispatch, getState) => {
   if (!canUseNativeApi(gmp)) {
     return loadEntities(gmp)(filter)(dispatch, getState);
@@ -99,21 +65,18 @@ const nativeLoadEntity = gmp => id => (dispatch, getState) => {
 
   dispatch(entityLoadingActions.request(id));
 
-  return gmp.result
-    .get({id})
-    .then(inheritedResponse =>
-      fetchNativeResult(gmp, id).then(
-        nativeResponse =>
-          dispatch(
-            entityLoadingActions.success(
-              id,
-              mergeNativeMetadata(inheritedResponse.data, nativeResponse.result),
-            ),
-          ),
-        () => dispatch(entityLoadingActions.success(id, inheritedResponse.data)),
-      ),
-    )
-    .catch(error => dispatch(entityLoadingActions.error(id, error)));
+  const loadInheritedResult = () =>
+    gmp.result.get({id}).then(
+      inheritedResponse =>
+        dispatch(entityLoadingActions.success(id, inheritedResponse.data)),
+      error => dispatch(entityLoadingActions.error(id, error)),
+    );
+
+  return fetchNativeResult(gmp, id).then(
+    nativeResponse =>
+      dispatch(entityLoadingActions.success(id, nativeResponse.result)),
+    () => loadInheritedResult(),
+  );
 };
 
 export {

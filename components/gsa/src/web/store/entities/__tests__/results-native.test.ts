@@ -63,6 +63,7 @@ describe('native API result list', () => {
     expect(response.counts.filtered).toEqual(1);
     expect(result.id).toEqual('result-1');
     expect(result.name).toEqual('Example vulnerability');
+    expect(result.description).toEqual('Example detection text');
     expect(result.severity).toEqual(7.5);
     expect(result.qod?.value).toEqual(80);
     expect(result.host?.name).toEqual('192.168.178.42');
@@ -107,6 +108,12 @@ describe('native API result list', () => {
         name: 'Example vulnerability',
         nvt_family: 'General',
         description_excerpt: 'Example detection text',
+        description: 'Full native result description',
+        summary: 'Native summary',
+        insight: 'Native insight',
+        affected: 'Native affected software',
+        impact: 'Native impact',
+        detection: 'Native detection method',
         solution_type: 'VendorFix',
         solution: 'Install the vendor fix.',
         severity: 7.5,
@@ -129,9 +136,29 @@ describe('native API result list', () => {
     expect(response.result).toBeInstanceOf(Result);
     expect(response.result.id).toEqual(id);
     expect(response.result.name).toEqual('Example vulnerability');
+    expect(response.result.description).toEqual('Full native result description');
     expect(response.result.host?.id).toEqual(
       '77777777-7777-4777-8777-777777777777',
     );
+    expect(
+      (response.result.information as {tags?: {summary?: string}})?.tags
+        ?.summary,
+    ).toEqual('Native summary');
+    expect(
+      (response.result.information as {tags?: {vuldetect?: string}})?.tags
+        ?.vuldetect,
+    ).toEqual('Native detection method');
+    expect(
+      (response.result.information as {tags?: {affected?: string}})?.tags
+        ?.affected,
+    ).toEqual('Native affected software');
+    expect(
+      (response.result.information as {tags?: {impact?: string}})?.tags?.impact,
+    ).toEqual('Native impact');
+    expect(
+      (response.result.information as {tags?: {insight?: string}})?.tags
+        ?.insight,
+    ).toEqual('Native insight');
     expect(response.result.report?.id).toEqual('report-1');
     expect(response.result.task?.name).toEqual('LAN scan');
     expect(gmp.buildUrl).toHaveBeenCalledWith(`api/v1/results/${id}`, {
@@ -139,29 +166,9 @@ describe('native API result list', () => {
     });
   });
 
-  test('loads inherited detail before overlaying native metadata', async () => {
+  test('loads native detail without calling inherited GMP result detail', async () => {
     const id = '9d77c6b6-dcb2-4a38-87f7-3bb77cf60cf1';
     const calls: string[] = [];
-    const inherited = Result.fromElement({
-      _id: id,
-      name: 'Inherited result',
-      host: {__text: '192.168.178.42'},
-      port: '80/tcp',
-      nvt: {
-        _oid: '1.3.6.1.4.1.25623.1.0.900001',
-        type: 'nvt',
-        name: 'Inherited NVT',
-        tags: 'summary=Inherited summary|vuldetect=Inherited detection',
-      },
-      description: 'Full inherited result description',
-      severity: 5.0,
-      qod: {value: 70},
-      report: {_id: 'report-inherited'},
-      task: {_id: 'task-inherited', name: 'Inherited task'},
-      overrides: {
-        override: [{_id: 'override-1', text: 'Retained override', active: 1}],
-      },
-    });
     const fetchMock = testing.fn().mockImplementation(() => {
       calls.push('native');
       return Promise.resolve({
@@ -175,6 +182,12 @@ describe('native API result list', () => {
           name: 'Native result metadata',
           nvt_family: 'Native family',
           description_excerpt: 'Native excerpt only',
+          description: 'Full native result description',
+          summary: 'Native summary',
+          insight: 'Native insight',
+          affected: 'Native affected software',
+          impact: 'Native impact',
+          detection: 'Native detection method',
           solution_type: 'VendorFix',
           solution: 'Native solution',
           severity: 7.5,
@@ -191,6 +204,84 @@ describe('native API result list', () => {
       });
     });
     testing.stubGlobal('fetch', fetchMock);
+    const gmp = {
+      ...createGmp({jwt: 'jwt-token'}),
+      result: {
+        get: testing.fn().mockRejectedValue(new Error('unexpected GMP call')),
+      },
+    };
+    const actions: Array<{type: string; data?: Result}> = [];
+    const dispatch = testing.fn(action => {
+      actions.push(action);
+      return action;
+    });
+    const getState = () => ({
+      entities: {
+        result: {
+          byId: {},
+          errors: {},
+          isLoading: {},
+        },
+      },
+    });
+
+    await loadEntity(gmp)(id)(dispatch, getState);
+
+    const success = actions.find(
+      action => action.type === 'ENTITY_LOADING_SUCCESS',
+    );
+    const result = success?.data;
+    expect(calls).toEqual(['native']);
+    expect(gmp.result.get).not.toHaveBeenCalled();
+    expect(result).toBeInstanceOf(Result);
+    expect(result?.description).toEqual('Full native result description');
+    expect(
+      (result?.information as {tags?: {summary?: string}} | undefined)?.tags
+        ?.summary,
+    ).toEqual('Native summary');
+    expect(
+      (result?.information as {tags?: {vuldetect?: string}} | undefined)?.tags
+        ?.vuldetect,
+    ).toEqual('Native detection method');
+    expect(
+      (result?.information as {tags?: {affected?: string}} | undefined)?.tags
+        ?.affected,
+    ).toEqual('Native affected software');
+    expect(
+      (result?.information as {tags?: {impact?: string}} | undefined)?.tags
+        ?.impact,
+    ).toEqual('Native impact');
+    expect(
+      (result?.information as {tags?: {insight?: string}} | undefined)?.tags
+        ?.insight,
+    ).toEqual('Native insight');
+    expect(result?.host?.name).toEqual('192.168.178.43');
+    expect(result?.host?.id).toEqual('77777777-7777-4777-8777-777777777777');
+    expect(result?.port).toEqual('443/tcp');
+    expect(result?.severity).toEqual(7.5);
+    expect(result?.qod?.value).toEqual(80);
+    expect(result?.report?.id).toEqual('report-native');
+    expect(result?.task?.name).toEqual('Native task');
+    expect(result?.scan_nvt_version).toEqual('20260618T1200');
+  });
+
+  test('falls back to inherited result detail when native detail fails', async () => {
+    const id = '9d77c6b6-dcb2-4a38-87f7-3bb77cf60cf1';
+    const calls: string[] = [];
+    const inherited = Result.fromElement({
+      _id: id,
+      name: 'Inherited result',
+      description: 'Full inherited result description',
+      severity: 5.0,
+      qod: {value: 70},
+    });
+    testing.stubGlobal(
+      'fetch',
+      testing.fn().mockImplementation(() => {
+        calls.push('native');
+        return Promise.reject(new Error('404'));
+      }),
+    );
     const gmp = {
       ...createGmp({jwt: 'jwt-token'}),
       result: {
@@ -220,62 +311,8 @@ describe('native API result list', () => {
     const success = actions.find(
       action => action.type === 'ENTITY_LOADING_SUCCESS',
     );
-    const result = success?.data;
-    expect(calls).toEqual(['gmp', 'native']);
+    expect(calls).toEqual(['native', 'gmp']);
     expect(gmp.result.get).toHaveBeenCalledWith({id});
-    expect(result).toBeInstanceOf(Result);
-    expect(result?.description).toEqual('Full inherited result description');
-    expect(result?.overrides[0].text).toEqual('Retained override');
-    expect(
-      (result?.information as {tags?: {summary?: string}} | undefined)?.tags
-        ?.summary,
-    ).toEqual('Inherited summary');
-    expect(result?.host?.name).toEqual('192.168.178.43');
-    expect(result?.host?.id).toEqual('77777777-7777-4777-8777-777777777777');
-    expect(result?.port).toEqual('443/tcp');
-    expect(result?.severity).toEqual(7.5);
-    expect(result?.qod?.value).toEqual(80);
-    expect(result?.report?.id).toEqual('report-native');
-    expect(result?.task?.name).toEqual('Native task');
-    expect(result?.scan_nvt_version).toEqual('20260618T1200');
-  });
-
-  test('keeps inherited result detail when the native overlay fails', async () => {
-    const id = '9d77c6b6-dcb2-4a38-87f7-3bb77cf60cf1';
-    const inherited = Result.fromElement({
-      _id: id,
-      name: 'Inherited result',
-      description: 'Full inherited result description',
-      severity: 5.0,
-      qod: {value: 70},
-    });
-    testing.stubGlobal('fetch', testing.fn().mockRejectedValue(new Error('404')));
-    const gmp = {
-      ...createGmp({jwt: 'jwt-token'}),
-      result: {
-        get: testing.fn().mockResolvedValue({data: inherited}),
-      },
-    };
-    const actions: Array<{type: string; data?: Result}> = [];
-    const dispatch = testing.fn(action => {
-      actions.push(action);
-      return action;
-    });
-    const getState = () => ({
-      entities: {
-        result: {
-          byId: {},
-          errors: {},
-          isLoading: {},
-        },
-      },
-    });
-
-    await loadEntity(gmp)(id)(dispatch, getState);
-
-    const success = actions.find(
-      action => action.type === 'ENTITY_LOADING_SUCCESS',
-    );
     expect(success?.data).toBe(inherited);
   });
 });

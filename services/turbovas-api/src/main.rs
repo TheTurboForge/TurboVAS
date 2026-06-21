@@ -704,7 +704,19 @@ struct ResultItem {
     cert_refs: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     xrefs: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<String>,
     description_excerpt: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    summary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    insight: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    affected: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    impact: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    detection: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     solution_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -6116,7 +6128,13 @@ async fn result_detail(
                          END AS cves,
                          coalesce(refs.cert_refs, ARRAY[]::text[]) AS cert_refs,
                          coalesce(refs.xrefs, ARRAY[]::text[]) AS xrefs,
+                         nullif(r.description, '') AS description,
                          nullif(left(coalesce(r.description, ''), 240), '') AS description_excerpt,
+                         nullif(n.summary, '') AS summary,
+                         nullif(n.insight, '') AS insight,
+                         nullif(n.affected, '') AS affected,
+                         nullif(n.impact, '') AS impact,
+                         nullif(n.detection, '') AS detection,
                          nullif(n.solution_type, '') AS solution_type,
                          nullif(n.solution, '') AS solution,
                          coalesce(r.severity, 0)::double precision AS severity,
@@ -10186,7 +10204,13 @@ fn result_from_row(row: &Row) -> ResultItem {
         cves: optional_row_strings(row, "cves"),
         cert_refs: optional_row_strings(row, "cert_refs"),
         xrefs: optional_row_strings(row, "xrefs"),
+        description: optional_row_string(row, "description"),
         description_excerpt: row.get("description_excerpt"),
+        summary: optional_row_string(row, "summary"),
+        insight: optional_row_string(row, "insight"),
+        affected: optional_row_string(row, "affected"),
+        impact: optional_row_string(row, "impact"),
+        detection: optional_row_string(row, "detection"),
         solution_type: optional_row_string(row, "solution_type"),
         solution: optional_row_string(row, "solution"),
         severity: row.get("severity"),

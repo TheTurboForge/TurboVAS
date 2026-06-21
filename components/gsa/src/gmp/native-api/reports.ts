@@ -127,6 +127,12 @@ interface NativeReportResultPayload {
   cert_refs?: string[];
   xrefs?: string[];
   description_excerpt?: string;
+  description?: string;
+  summary?: string;
+  insight?: string;
+  affected?: string;
+  impact?: string;
+  detection?: string;
   solution_type?: string;
   solution?: string;
   severity: number;
@@ -750,9 +756,33 @@ const nativeReportResultFromPayload = (
   rawEvidenceHref: stringValue(item.raw_evidence_href),
 });
 
+const nativeResultNvtTagsFromPayload = (
+  item: NativeReportResultPayload,
+): string => {
+  const parts: string[] = [];
+  const detailTags: Array<[string, unknown]> = [
+    ['summary', item.summary],
+    ['insight', item.insight],
+    ['affected', item.affected],
+    ['impact', item.impact],
+    ['vuldetect', item.detection],
+  ];
+
+  for (const [key, value] of detailTags) {
+    const stringified = stringValue(value);
+    if (stringified !== '') {
+      parts.push(`${key}=${stringified}`);
+    }
+  }
+
+  return parts.join('|');
+};
+
 const nativeResultToModel = (item: NativeReportResultPayload): Result => {
   const solutionType = stringValue(item.solution_type);
   const solutionText = stringValue(item.solution);
+  const description =
+    stringValue(item.description) || stringValue(item.description_excerpt);
   const element = {
     _id: stringValue(item.id),
     name: stringValue(item.name),
@@ -770,6 +800,7 @@ const nativeResultToModel = (item: NativeReportResultPayload): Result => {
       type: 'nvt',
       name: stringValue(item.name),
       family: stringValue(item.nvt_family),
+      tags: nativeResultNvtTagsFromPayload(item),
       solution:
         solutionType || solutionText
           ? {
@@ -795,7 +826,7 @@ const nativeResultToModel = (item: NativeReportResultPayload): Result => {
     severity: numberValue(item.severity),
     qod: {value: integerValue(item.qod)},
     scan_nvt_version: stringValue(item.scan_nvt_version),
-    description: stringValue(item.description_excerpt),
+    description,
   };
   return Result.fromElement(
     element as unknown as Parameters<typeof Result.fromElement>[0],
