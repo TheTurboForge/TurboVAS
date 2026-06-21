@@ -24,7 +24,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 
 STATUSES = ("pass", "warn", "fail")
@@ -849,6 +849,45 @@ def git_name_status(repo_root: Path, base: str, pathspecs: tuple[str, ...] = ())
             continue
         rows.append((parts[0], parts[-1]))
     return rows
+
+
+def git_name_status_for_diff_scope(repo_root: Path, diff_scope: str, pathspecs: tuple[str, ...] = ()) -> list[tuple[str, str]] | None:
+    if diff_scope == "baseline":
+        return git_name_status(repo_root, IMPORT_BASELINE_COMMIT, pathspecs)
+    if diff_scope == "staged":
+        args = ["diff", "--cached", "--name-status"]
+    elif diff_scope == "worktree":
+        args = ["diff", "--name-status"]
+    else:
+        return None
+    if pathspecs:
+        args.append("--")
+        args.extend(pathspecs)
+    output = run_git(repo_root, args)
+    if output is None:
+        return None
+    rows: list[tuple[str, str]] = []
+    for line in output.splitlines():
+        parts = line.split("\t")
+        if len(parts) < 2:
+            continue
+        rows.append((parts[0], parts[-1]))
+    return rows
+
+
+def git_staged_file_head(repo_root: Path, relative_path: str, limit: int = 5000) -> str | None:
+    try:
+        result = subprocess.run(
+            ["git", "show", f":{relative_path}"],
+            cwd=repo_root,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return result.stdout[:limit]
 
 
 def git_tracked_files(repo_root: Path) -> list[str] | None:
@@ -4842,24 +4881,38 @@ def has_spdx_header(path: Path) -> bool:
     return "SPDX-FileCopyrightText:" in head and "SPDX-License-Identifier:" in head
 
 
+def text_has_turbovas_modification_notice(text: str) -> bool:
+    return TURBOVAS_MODIFICATION_NOTICE in text[:5000]
+
+
 def has_turbovas_modification_notice(path: Path) -> bool:
-    return TURBOVAS_MODIFICATION_NOTICE in file_head(path)
+    return text_has_turbovas_modification_notice(file_head(path))
 
 
 def imported_added_path(relative_path: str) -> bool:
     return any(relative_path.startswith(prefix) for prefix in IMPORTED_ADDED_PREFIXES)
 
 
-def modified_imported_notice_gaps(repo_root: Path, rows: list[tuple[str, str]]) -> tuple[list[str], list[str]]:
+def modified_imported_notice_gaps(
+    repo_root: Path,
+    rows: list[tuple[str, str]],
+    content_provider: Callable[[str], str | None] | None = None,
+) -> tuple[list[str], list[str]]:
     missing: list[str] = []
     review: list[str] = []
     for status, relative_path in rows:
         if status != "M":
             continue
-        path = repo_root / relative_path
-        if not path.is_file():
-            continue
-        if has_turbovas_modification_notice(path):
+        if content_provider is None:
+            path = repo_root / relative_path
+            if not path.is_file():
+                continue
+            text = file_head(path)
+        else:
+            text = content_provider(relative_path)
+            if text is None:
+                continue
+        if text_has_turbovas_modification_notice(text):
             continue
         if comment_notice_supported(relative_path):
             missing.append(relative_path)
@@ -4875,6 +4928,57 @@ def modified_imported_no_comment_manifest_gaps(review_notices: list[str], manife
     undocumented = sorted(review_paths - manifest_paths)
     stale = sorted(manifest_paths - review_paths)
     return documented, undocumented, stale
+
+
+def modified_imported_content_provider(repo_root: Path, diff_scope: str) -> Callable[[str], str | None] | None:
+    if diff_scope == "staged":
+        return lambda relative_path: git_staged_file_head(repo_root, relative_path)
+    return None
+
+
+def modified_imported_license_findings(
+    repo_root: Path,
+    rows: list[tuple[str, str]] | None,
+    *,
+    diff_scope: str,
+    check_manifest_stale: bool = True,
+) -> list[dict[str, Any]]:
+    if rows is None:
+        return [finding("fail", "license.git-history", f"Could not collect modified imported files for diff scope {diff_scope}.")]
+    missing_notices, review_notices = modified_imported_notice_gaps(
+        repo_root,
+        rows,
+        content_provider=modified_imported_content_provider(repo_root, diff_scope),
+    )
+    notice_details: dict[str, Any] = {"diff_scope": diff_scope, "missing": missing_notices}
+    if diff_scope == "baseline":
+        notice_details["baseline"] = IMPORT_BASELINE_COMMIT
+    findings = [
+        finding(
+            "pass" if not missing_notices else "fail",
+            "license.modified-imported-notices",
+            "Modified imported files have TurboVAS modification notices." if not missing_notices else "Modified imported files are missing TurboVAS modification notices.",
+            details=notice_details,
+        )
+    ]
+    documented_review, undocumented_review, stale_review = modified_imported_no_comment_manifest_gaps(review_notices)
+    stale_failures = stale_review if check_manifest_stale else []
+    findings.append(
+        finding(
+            "pass" if not undocumented_review and not stale_failures else "fail",
+            "license.modified-imported-no-comment-manifest",
+            "Modified imported no-comment files are explicitly recorded in the license manifest." if not undocumented_review and not stale_failures else "Modified imported no-comment manifest is incomplete or stale.",
+            details={
+                "diff_scope": diff_scope,
+                "documented": documented_review,
+                "undocumented": undocumented_review,
+                "stale": stale_review if check_manifest_stale else [],
+                "stale_checked": check_manifest_stale,
+                "manifest": MODIFIED_IMPORTED_NO_COMMENT_FILES,
+            },
+        )
+    )
+    return findings
 
 
 def added_turbovas_spdx_gaps(repo_root: Path, rows: list[tuple[str, str]]) -> list[str]:
@@ -5069,8 +5173,40 @@ def enterprise_feed_key_support_finding(repo_root: Path) -> dict[str, Any]:
     )
 
 
-def command_license_report(repo_root: Path, public_release: bool = False, mode: str = "source-public") -> dict[str, Any]:
+def command_license_report(
+    repo_root: Path,
+    public_release: bool = False,
+    mode: str = "source-public",
+    *,
+    diff_scope: str = "baseline",
+    modified_imported_only: bool = False,
+) -> dict[str, Any]:
     findings: list[dict[str, Any]] = []
+    if modified_imported_only:
+        rows = git_name_status_for_diff_scope(repo_root, diff_scope, ("components",))
+        findings.extend(
+            modified_imported_license_findings(
+                repo_root,
+                rows,
+                diff_scope=diff_scope,
+                check_manifest_stale=diff_scope == "baseline",
+            )
+        )
+        result = make_result("license-report", repo_root, "Modified imported file license/provenance checks completed.", findings)
+        result["details"] = {"diff_scope": diff_scope, "modified_imported_only": True}
+        return result
+
+    if diff_scope != "baseline":
+        findings.append(
+            finding(
+                "fail",
+                "license.diff-scope",
+                "Non-baseline diff scopes are only supported with --modified-imported-only.",
+                details={"diff_scope": diff_scope},
+            )
+        )
+        return make_result("license-report", repo_root, "License/provenance checks completed.", findings)
+
     for component in COMPONENTS:
         component_path = repo_root / component.path
         for license_file in component.licenses:
@@ -5082,24 +5218,7 @@ def command_license_report(repo_root: Path, public_release: bool = False, mode: 
     if rows is None:
         findings.append(finding("fail", "license.git-history", f"Could not compare against import baseline {IMPORT_BASELINE_COMMIT}."))
     else:
-        missing_notices, review_notices = modified_imported_notice_gaps(repo_root, rows)
-        findings.append(
-            finding(
-                "pass" if not missing_notices else "fail",
-                "license.modified-imported-notices",
-                "Modified imported files have TurboVAS modification notices." if not missing_notices else "Modified imported files are missing TurboVAS modification notices.",
-                details={"baseline": IMPORT_BASELINE_COMMIT, "missing": missing_notices},
-            )
-        )
-        documented_review, undocumented_review, stale_review = modified_imported_no_comment_manifest_gaps(review_notices)
-        findings.append(
-            finding(
-                "pass" if not undocumented_review and not stale_review else "fail",
-                "license.modified-imported-no-comment-manifest",
-                "Modified imported no-comment files are explicitly recorded in the license manifest." if not undocumented_review and not stale_review else "Modified imported no-comment manifest is incomplete or stale.",
-                details={"documented": documented_review, "undocumented": undocumented_review, "stale": stale_review, "manifest": MODIFIED_IMPORTED_NO_COMMENT_FILES},
-            )
-        )
+        findings.extend(modified_imported_license_findings(repo_root, rows, diff_scope="baseline"))
 
     if all_rows is None:
         findings.append(finding("fail", "license.new-file-spdx", f"Could not compare new files against import baseline {IMPORT_BASELINE_COMMIT}."))
@@ -10235,6 +10354,8 @@ def build_parser() -> argparse.ArgumentParser:
     license_report = subparsers.add_parser("license-report", parents=[common], help="check preserved license/provenance files")
     license_report.add_argument("--public-release", action="store_true", help="fail while public-release license review items remain open")
     license_report.add_argument("--mode", choices=PUBLICATION_MODES, default="source-public", help="publication mode for --public-release gating")
+    license_report.add_argument("--diff-scope", choices=("baseline", "staged", "worktree"), default="baseline", help="diff scope for focused modified-imported-file checks")
+    license_report.add_argument("--modified-imported-only", action="store_true", help="run only the fast modified-imported-file notice checks")
     subparsers.add_parser("production-posture-check", parents=[common], help="run the non-destructive production posture checklist")
     deps = subparsers.add_parser("deps", parents=[common], help="check dependency readiness")
     deps.add_argument("component", nargs="?", help="component name")
@@ -10344,7 +10465,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "branding-state":
         result = command_branding_state(repo_root)
     elif args.command == "license-report":
-        result = command_license_report(repo_root, public_release=args.public_release, mode=args.mode)
+        result = command_license_report(repo_root, public_release=args.public_release, mode=args.mode, diff_scope=args.diff_scope, modified_imported_only=args.modified_imported_only)
     elif args.command == "production-posture-check":
         result = command_production_posture_check(repo_root)
     elif args.command == "deps":

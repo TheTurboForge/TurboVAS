@@ -1994,6 +1994,74 @@ db2:keys=5,expires=0,avg_ttl=0
             self.assertEqual(missing, [])
             self.assertEqual(review, ["components/gsa/package.json"])
 
+    def test_modified_imported_notice_gaps_can_use_staged_content(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "components" / "gvmd" / "src" / "example.c"
+            source.parent.mkdir(parents=True)
+            source.write_text("/* Modified by TurboVAS contributors, 2026. */\n", encoding="utf-8")
+            rows = [("M", "components/gvmd/src/example.c")]
+
+            missing, review = turbovasctl.modified_imported_notice_gaps(
+                root,
+                rows,
+                content_provider=lambda _relative_path: "/* upstream staged blob */\n",
+            )
+
+        self.assertEqual(missing, ["components/gvmd/src/example.c"])
+        self.assertEqual(review, [])
+
+    def test_git_name_status_for_staged_scope_uses_cached_diff(self):
+        calls = []
+
+        def fake_run_git(_repo_root, args):
+            calls.append(args)
+            return "M\tcomponents/gvmd/src/example.c\n"
+
+        with unittest.mock.patch.object(turbovasctl, "run_git", side_effect=fake_run_git):
+            rows = turbovasctl.git_name_status_for_diff_scope(
+                Path("/tmp/repo"),
+                "staged",
+                ("components",),
+            )
+
+        self.assertEqual(rows, [("M", "components/gvmd/src/example.c")])
+        self.assertEqual(calls, [["diff", "--cached", "--name-status", "--", "components"]])
+
+    def test_license_report_modified_imported_only_uses_diff_scope(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "components" / "gvmd" / "src" / "example.c"
+            source.parent.mkdir(parents=True)
+            source.write_text("/* Modified by TurboVAS contributors, 2026. */\n", encoding="utf-8")
+
+            with unittest.mock.patch.object(
+                turbovasctl,
+                "git_name_status_for_diff_scope",
+                return_value=[("M", "components/gvmd/src/example.c")],
+            ) as name_status:
+                result = turbovasctl.command_license_report(
+                    root,
+                    diff_scope="worktree",
+                    modified_imported_only=True,
+                )
+
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(result["details"], {"diff_scope": "worktree", "modified_imported_only": True})
+        name_status.assert_called_once_with(root, "worktree", ("components",))
+
+    def test_license_report_rejects_non_baseline_full_scope(self):
+        result = turbovasctl.command_license_report(Path("/tmp/repo"), diff_scope="staged")
+
+        self.assertEqual(result["status"], "fail")
+        self.assertEqual(result["findings"][0]["check"], "license.diff-scope")
+
+    def test_license_precommit_recipe_is_registered(self):
+        justfile = (Path(__file__).resolve().parents[2] / "justfile").read_text(encoding="utf-8")
+
+        self.assertIn("license-precommit *args:", justfile)
+        self.assertIn("tools/turbovasctl license-report --diff-scope staged --modified-imported-only", justfile)
+
     def test_no_comment_manifest_requires_current_documented_paths(self):
         review = ["components/gsa/package.json", "components/gsa/public/locales/gsa-en.json", "components/gsa/new-data.json"]
         manifest = {

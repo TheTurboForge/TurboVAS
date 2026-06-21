@@ -30,6 +30,9 @@ branding-state *args:
 license-report *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl license-report "$@"
 
+license-precommit *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl license-report --diff-scope staged --modified-imported-only "$@"
+
 license-public-release-gate *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl license-report --public-release "$@"
 
