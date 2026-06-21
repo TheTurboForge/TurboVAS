@@ -17,12 +17,12 @@ use serde::Serialize;
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use tokio_postgres::{Config as PgConfig, NoTls, Row};
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
-use uuid::Uuid;
 
 mod auth;
 mod collections;
 mod errors;
 mod feeds;
+mod path_ids;
 mod query;
 mod request_ids;
 mod request_shapes;
@@ -31,6 +31,7 @@ use auth::*;
 use collections::*;
 use errors::ApiError;
 use feeds::feeds;
+use path_ids::*;
 use query::*;
 use request_ids::*;
 use request_shapes::*;
@@ -7847,65 +7848,6 @@ fn operating_system_asset_from_row(row: &Row) -> OperatingSystemAssetItem {
     }
 }
 
-fn parse_uuid(value: &str) -> Result<Uuid, ApiError> {
-    Uuid::parse_str(value).map_err(|_| ApiError::BadRequest("path id must be a UUID".to_string()))
-}
-
-fn validate_cve_id(value: &str) -> Result<(), ApiError> {
-    let upper = value.to_ascii_uppercase();
-    let parts: Vec<&str> = upper.split('-').collect();
-    if parts.len() != 3
-        || parts[0] != "CVE"
-        || parts[1].len() != 4
-        || parts[2].len() < 4
-        || !parts[1].chars().all(|ch| ch.is_ascii_digit())
-        || !parts[2].chars().all(|ch| ch.is_ascii_digit())
-    {
-        return Err(ApiError::BadRequest(
-            "path id must be a CVE identifier".to_string(),
-        ));
-    }
-    Ok(())
-}
-
-fn validate_cpe_id(value: &str) -> Result<(), ApiError> {
-    if value.is_empty() || value.len() > 2048 || !value.starts_with("cpe:") {
-        return Err(ApiError::BadRequest(
-            "path id must be a CPE identifier".to_string(),
-        ));
-    }
-    Ok(())
-}
-
-fn validate_advisory_id(value: &str) -> Result<(), ApiError> {
-    if value.is_empty()
-        || value.len() > 256
-        || !value
-            .chars()
-            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.' | ':' | '/'))
-    {
-        return Err(ApiError::BadRequest(
-            "path id must be an advisory identifier".to_string(),
-        ));
-    }
-    Ok(())
-}
-
-fn validate_nvt_oid(value: &str) -> Result<(), ApiError> {
-    if value.is_empty()
-        || value.len() > 128
-        || value.split('.').count() < 2
-        || !value
-            .split('.')
-            .all(|part| !part.is_empty() && part.chars().all(|ch| ch.is_ascii_digit()))
-    {
-        return Err(ApiError::BadRequest(
-            "path id must be a numeric dotted NVT OID".to_string(),
-        ));
-    }
-    Ok(())
-}
-
 fn report_reference(id: Option<String>, name: Option<String>) -> Option<ReportReference> {
     let id = id?;
     let name = name.unwrap_or_else(|| id.clone());
@@ -10032,30 +9974,6 @@ mod tests {
         assert!(nvt_sql.contains("r.oid = tr.resource_uuid"));
         let cert_sql = tag_resource_collection_sql("cert_bund_adv", &sort_sql).unwrap();
         assert!(cert_sql.contains("JOIN cert.cert_bund_advs r ON"));
-    }
-
-    #[test]
-    fn advisory_id_validator_allows_feed_ids_but_rejects_unsafe_text() {
-        assert!(validate_advisory_id("DFN-CERT-2026-2178").is_ok());
-        assert!(validate_advisory_id("WID-SEC-2022-1384").is_ok());
-        assert!(validate_advisory_id("CB-K14/0001").is_ok());
-        assert!(validate_advisory_id("").is_err());
-        assert!(validate_advisory_id("CB-K14/0001?download=true").is_err());
-        assert!(validate_advisory_id("CB-K14/0001;drop").is_err());
-    }
-
-    #[test]
-    fn nvt_oid_validator_requires_bounded_numeric_dotted_oid() {
-        assert!(validate_nvt_oid("1.3.6.1.4.1.25623.1.0.100001").is_ok());
-        assert!(validate_nvt_oid("").is_err());
-        assert!(validate_nvt_oid("1").is_err());
-        assert!(validate_nvt_oid("1.3.6.").is_err());
-        assert!(validate_nvt_oid("1.3..6").is_err());
-        assert!(validate_nvt_oid("1.3.6.a").is_err());
-        assert!(validate_nvt_oid("1.3.6/1").is_err());
-        assert!(validate_nvt_oid("1.3.6?download=true").is_err());
-        assert!(validate_nvt_oid("1.3.6;drop").is_err());
-        assert!(validate_nvt_oid(&format!("1.{}", "2".repeat(128))).is_err());
     }
 
     #[test]
