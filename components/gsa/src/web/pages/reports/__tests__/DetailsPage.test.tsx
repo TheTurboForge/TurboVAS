@@ -65,6 +65,55 @@ const nativeResultFiltersPayload = {
   ],
 };
 
+const validReportFormatId = 'a994b278-1f62-11e1-96ac-406186ea4fc5';
+
+const nativeReportFormatsPayload = {
+  page: {page: 1, page_size: 500, total: 3, sort: 'name', filter: ''},
+  items: [
+    {
+      id: 'inactive-report-format',
+      name: 'Inactive XML',
+      extension: 'xml',
+      report_type: 'scan',
+      trust: 'yes',
+      active: false,
+    },
+    {
+      id: 'untrusted-report-format',
+      name: 'Untrusted XML',
+      extension: 'xml',
+      report_type: 'scan',
+      trust: 'no',
+      active: true,
+    },
+    {
+      id: validReportFormatId,
+      name: 'XML',
+      extension: 'xml',
+      report_type: 'scan',
+      trust: 'yes',
+      active: true,
+    },
+  ],
+};
+
+const nativeReportConfigsPayload = {
+  page: {page: 1, page_size: 500, total: 1, sort: 'name', filter: ''},
+  items: [
+    {
+      id: 'afde48df-7f26-4b2b-9c1e-03b0e1bfb3a6',
+      name: 'Default config',
+      report_format: {
+        id: validReportFormatId,
+        name: 'XML',
+      },
+      writable: true,
+      in_use: false,
+      orphan: false,
+    },
+  ],
+};
+
 const nativeReportCvesPayload = {
   page: {page: 1, page_size: 1, total: 7, sort: '-max_severity', filter: ''},
   items: [
@@ -208,6 +257,12 @@ const createFetchMock = () =>
         (() => {
           if (url.includes('/api/v1/filters')) {
             return nativeResultFiltersPayload;
+          }
+          if (url.includes('/api/v1/report-formats')) {
+            return nativeReportFormatsPayload;
+          }
+          if (url.includes('/api/v1/report-configs')) {
+            return nativeReportConfigsPayload;
           }
           if (url.includes('/api/v1/reports/') && url.includes('/cves')) {
             return nativeReportCvesPayload;
@@ -380,6 +435,47 @@ describe('DetailsPage', () => {
       });
       expect(gmp.reportcves.get).not.toHaveBeenCalled();
       expect(gmp.reporttlscertificates.get).not.toHaveBeenCalled();
+    });
+
+    test('should load report dropdown choices through the native API', async () => {
+      const gmp = createGmp();
+      const {render} = setupRenderer(gmp);
+      renderPage(render);
+
+      await screen.findByRole('heading', {name: /Report:/});
+
+      await waitFor(() => {
+        expect(gmp.buildUrl).toHaveBeenCalledWith('api/v1/report-formats', {
+          token: 'test-token',
+          page: 1,
+          page_size: 500,
+          sort: 'name',
+          filter: '',
+        });
+        expect(gmp.buildUrl).toHaveBeenCalledWith('api/v1/report-configs', {
+          token: 'test-token',
+          page: 1,
+          page_size: 500,
+          sort: 'name',
+          filter: '',
+        });
+      });
+      expect(gmp.reportformats.get).not.toHaveBeenCalled();
+      expect(gmp.reportconfigs.get).not.toHaveBeenCalled();
+
+      await screen.findByTitle(/^Download filtered Report/);
+      fireEvent.click(screen.getByTitle(/^Download filtered Report/));
+
+      await screen.findByRole('heading', {
+        name: /Compose Content for Scan Report/,
+      });
+      expect(screen.getByDisplayValue('XML')).toBeInTheDocument();
+      expect(
+        screen.queryByDisplayValue('Inactive XML'),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByDisplayValue('Untrusted XML'),
+      ).not.toBeInTheDocument();
     });
   });
 
