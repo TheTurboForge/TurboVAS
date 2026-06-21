@@ -6643,7 +6643,37 @@ async fn scope_report_results(
     parse_uuid(&scope_report_id)?;
     let params = normalize_collection_query(query, REPORT_RESULT_DEFAULT_SORT)?;
     let sort_sql = sort_clause(&params.sort, REPORT_RESULT_SORT_FIELDS)?;
-    let sql = format!(
+    let sql = scope_report_results_sql(&sort_sql);
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let rows = client
+        .query(
+            &sql,
+            &[
+                &scope_report_id,
+                &scope_id,
+                &params.filter,
+                &params.page_size,
+                &params.offset,
+            ],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "scope report result query failed");
+            ApiError::Database
+        })?;
+    if rows.is_empty() && !scope_report_exists(&client, &scope_report_id, &scope_id).await? {
+        return Err(ApiError::NotFound);
+    }
+    let total = rows.first().map(|row| row.get::<_, i64>(0)).unwrap_or(0);
+    let items = rows.iter().map(result_from_row).collect();
+    Ok(Json(Collection {
+        page: params.page_info(total),
+        items,
+    }))
+}
+
+fn scope_report_results_sql(sort_sql: &str) -> String {
+    format!(
         "WITH selected_scope_report AS (\n\
              SELECT sr.id, sr.scope, coalesce(s.is_global, 0)::int AS is_global\n\
                FROM scope_reports sr\n\
@@ -6736,33 +6766,7 @@ async fn scope_report_results(
                ) refs ON true\n\
          )\n\
          SELECT * FROM page_with_refs;"
-    );
-    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
-    let rows = client
-        .query(
-            &sql,
-            &[
-                &scope_report_id,
-                &scope_id,
-                &params.filter,
-                &params.page_size,
-                &params.offset,
-            ],
-        )
-        .await
-        .map_err(|error| {
-            tracing::warn!(%error, "scope report result query failed");
-            ApiError::Database
-        })?;
-    if rows.is_empty() && !scope_report_exists(&client, &scope_report_id, &scope_id).await? {
-        return Err(ApiError::NotFound);
-    }
-    let total = rows.first().map(|row| row.get::<_, i64>(0)).unwrap_or(0);
-    let items = rows.iter().map(result_from_row).collect();
-    Ok(Json(Collection {
-        page: params.page_info(total),
-        items,
-    }))
+    )
 }
 
 async fn scope_report_metrics(
@@ -10431,6 +10435,22 @@ mod tests {
         assert!(sort_field_names(SCOPE_REPORT_TLS_CERTIFICATE_SORT_FIELDS).contains(&"not_after"));
         assert!(!sort_field_names(SCOPE_REPORT_TLS_CERTIFICATE_SORT_FIELDS).contains(&"dn"));
         assert!(sort_clause("severity", SCOPE_REPORT_CVE_SORT_FIELDS).is_err());
+    }
+
+    #[test]
+    fn scope_report_results_sql_is_source_scoped_and_deduplicated() {
+        let sort_sql = sort_clause(REPORT_RESULT_DEFAULT_SORT, REPORT_RESULT_SORT_FIELDS).unwrap();
+        let sql = scope_report_results_sql(&sort_sql);
+
+        assert!(sql.contains("WHERE sr.uuid = $1 AND sr.scope_uuid = $2"));
+        assert!(sql.contains("JOIN scope_report_sources srs ON srs.scope_report = sr.id"));
+        assert!(sql.contains("JOIN selected_hosts sh"));
+        assert!(sql.contains("WHERE coalesce(r.severity, 0) != -3.0"));
+        assert!(sql.contains("row_number () OVER"));
+        assert!(sql.contains("PARTITION BY lower(coalesce(nullif(r.host, ''), r.hostname, ''))"));
+        assert!(sql.contains("FROM ranked WHERE rn = 1"));
+        assert!(sql.contains("srs.source_report_uuid AS source_report_id"));
+        assert!(sql.contains("JOIN results r ON r.report = srs.source_report"));
     }
 
     #[test]
