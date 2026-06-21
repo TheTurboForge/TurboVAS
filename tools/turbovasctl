@@ -4728,6 +4728,126 @@ def compact_native_tooling_finding_details(summary: dict[str, Any]) -> dict[str,
     }
 
 
+def native_api_browser_access_from_status(status: str | None) -> str:
+    if status == "planned_internal_and_browser_proxied":
+        return "planned_browser_proxied"
+    if status == "partial_internal_browser_proxy_mismatch":
+        return "partial_browser_proxy_mismatch"
+    if status in {"implemented_internal_and_browser_proxied", "implemented_internal_browser_proxied_and_scriptable_read"}:
+        return "browser_proxied"
+    if status == "implemented_internal":
+        return "internal_only"
+    return "unknown"
+
+
+def native_api_migration_matrix_rows(repo_root: Path) -> list[dict[str, Any]]:
+    items = native_tooling_inventory(repo_root)
+    summary = summarize_native_tooling(items, repo_root)
+    annotate_native_tooling_direct_api(summary, repo_root)
+
+    inventory_by_key: dict[tuple[str, str], dict[str, Any]] = {}
+    for item in summary.get("implemented_native_endpoints", []):
+        if not isinstance(item, dict) or not isinstance(item.get("endpoint"), str):
+            continue
+        key = ("get", normalize_native_api_endpoint_template(item["endpoint"]))
+        inventory_by_key.setdefault(key, item)
+
+    openapi_by_key: dict[tuple[str, str], dict[str, Any]] = {}
+    for operation in openapi_contract_operations(repo_root):
+        method = str(operation.get("method", ""))
+        path = operation.get("path")
+        if not method or not isinstance(path, str):
+            continue
+        endpoint = f"/api/v1{path}"
+        key = (method, normalize_native_api_endpoint_template(endpoint))
+        openapi_by_key.setdefault(key, operation)
+
+    def row_endpoint(key: tuple[str, str]) -> str:
+        operation = openapi_by_key.get(key)
+        if operation and isinstance(operation.get("path"), str):
+            return f"/api/v1{operation['path']}"
+        inventory = inventory_by_key.get(key, {})
+        endpoint = inventory.get("endpoint")
+        return endpoint if isinstance(endpoint, str) else key[1]
+
+    rows: list[dict[str, Any]] = []
+    for key in sorted(set(inventory_by_key) | set(openapi_by_key), key=row_endpoint):
+        method, _normalized = key
+        inventory = inventory_by_key.get(key)
+        operation = openapi_by_key.get(key)
+        endpoint = row_endpoint(key)
+        fields = set(operation.get("x_turbovas_fields", [])) if isinstance(operation, dict) else set()
+        values = operation.get("x_turbovas_values", {}) if isinstance(operation, dict) and isinstance(operation.get("x_turbovas_values"), dict) else {}
+        status = inventory.get("status") if isinstance(inventory, dict) and isinstance(inventory.get("status"), str) else "unknown"
+        direct_access = inventory.get("direct_access") if isinstance(inventory, dict) and isinstance(inventory.get("direct_access"), str) else native_api_direct_access(endpoint)
+        replacement_candidates = inventory.get("replacement_candidates", []) if isinstance(inventory, dict) else []
+        if not isinstance(replacement_candidates, list):
+            replacement_candidates = []
+        rows.append(
+            {
+                "endpoint": endpoint,
+                "method": method,
+                "status": status,
+                "browser_access": native_api_browser_access_from_status(status),
+                "direct_access": direct_access,
+                "operation_id": operation.get("operation_id") if isinstance(operation, dict) else None,
+                "openapi_path": operation.get("path") if isinstance(operation, dict) else None,
+                "inventory_endpoint": inventory.get("endpoint") if isinstance(inventory, dict) else None,
+                "openapi_direct_marker": "x-turbovas-direct" in fields if isinstance(operation, dict) else None,
+                "x_turbovas_exposure": values.get("x-turbovas-exposure"),
+                "x_turbovas_maturity": values.get("x-turbovas-maturity"),
+                "x_turbovas_replaces": values.get("x-turbovas-replaces"),
+                "x_turbovas_inherited_still_owns": values.get("x-turbovas-inherited-still-owns"),
+                "replacement_candidates": replacement_candidates,
+            }
+        )
+    return rows
+
+
+def native_api_migration_matrix_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    def counts(field: str) -> dict[str, int]:
+        result: dict[str, int] = {}
+        for row in rows:
+            value = row.get(field)
+            key = str(value) if value is not None else "null"
+            result[key] = result.get(key, 0) + 1
+        return dict(sorted(result.items()))
+
+    migration_fields = (
+        "x_turbovas_exposure",
+        "x_turbovas_maturity",
+        "x_turbovas_replaces",
+        "x_turbovas_inherited_still_owns",
+    )
+    return {
+        "total_rows": len(rows),
+        "openapi_operation_rows": sum(1 for row in rows if row.get("openapi_path") is not None),
+        "inventory_rows": sum(1 for row in rows if row.get("inventory_endpoint") is not None),
+        "rows_with_replacement_candidates": sum(1 for row in rows if row.get("replacement_candidates")),
+        "rows_with_checked_migration_metadata": sum(1 for row in rows if any(row.get(field) is not None for field in migration_fields)),
+        "checked_migration_field_counts": {field: sum(1 for row in rows if row.get(field) is not None) for field in migration_fields},
+        "by_status": counts("status"),
+        "by_browser_access": counts("browser_access"),
+        "by_direct_access": counts("direct_access"),
+    }
+
+
+def command_native_api_migration_matrix(repo_root: Path) -> dict[str, Any]:
+    rows = native_api_migration_matrix_rows(repo_root)
+    details = {"summary": native_api_migration_matrix_summary(rows), "items": rows}
+    findings = [
+        finding(
+            "pass" if rows else "warn",
+            "native-api-migration-matrix.rows",
+            f"Collected {len(rows)} native API migration matrix row(s) from endpoint inventory and OpenAPI metadata.",
+            details=details["summary"],
+        )
+    ]
+    result = make_result("native-api-migration-matrix", repo_root, "Native API migration matrix collected.", findings)
+    result["details"] = details
+    return result
+
+
 def command_native_tooling_state(repo_root: Path, compact: bool = False) -> dict[str, Any]:
     items = native_tooling_inventory(repo_root)
     summary = summarize_native_tooling(items, repo_root)
@@ -10580,6 +10700,7 @@ def build_parser() -> argparse.ArgumentParser:
     native_api_request.add_argument("--request-id", help="optional safe X-Request-Id correlation value")
     native_tooling_state = subparsers.add_parser("native-tooling-state", parents=[common], help="inventory inherited GMP/python-gvm/gvm-tools dependency surfaces")
     native_tooling_state.add_argument("--compact", action="store_true", help="omit full item and endpoint inventories from JSON output")
+    subparsers.add_parser("native-api-migration-matrix", parents=[common], help="show native API migration metadata by endpoint")
     subparsers.add_parser("rust-migration-state", parents=[common], help="inspect Rust migration tooling and first C-to-Rust dry-run candidate")
     subparsers.add_parser("doctor", parents=[common], help="run structural and environment health checks")
     subparsers.add_parser("branding-state", parents=[common], help="inventory visible branding and upstream-identity surfaces")
@@ -10690,6 +10811,8 @@ def main(argv: list[str] | None = None) -> int:
         result = command_native_api_request(repo_root, args.path, direct=args.direct, request_id=args.request_id)
     elif args.command == "native-tooling-state":
         result = command_native_tooling_state(repo_root, compact=args.compact)
+    elif args.command == "native-api-migration-matrix":
+        result = command_native_api_migration_matrix(repo_root)
     elif args.command == "rust-migration-state":
         result = command_rust_migration_state(repo_root)
     elif args.command == "doctor":

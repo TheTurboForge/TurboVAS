@@ -1225,6 +1225,59 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("getResultsByResultId", contract["operation_ids"])
         self.assertIn("getScopesByScopeIdReportsByScopeReportIdRetentionPlan", contract["operation_ids"])
 
+    def test_native_api_migration_matrix_combines_inventory_and_openapi_metadata(self):
+        root = Path(__file__).resolve().parents[2]
+        result = turbovasctl.command_native_api_migration_matrix(root)
+        details = result["details"]
+        rows = {item["endpoint"]: item for item in details["items"]}
+        source = (Path(__file__).resolve().parents[1] / "turbovasctl").read_text(encoding="utf-8")
+
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(details["summary"]["total_rows"], 73)
+        self.assertEqual(details["summary"]["openapi_operation_rows"], 73)
+        self.assertEqual(details["summary"]["inventory_rows"], 72)
+        self.assertEqual(details["summary"]["rows_with_checked_migration_metadata"], 6)
+        self.assertEqual(details["summary"]["checked_migration_field_counts"]["x_turbovas_exposure"], 6)
+        self.assertIn("native-api-migration-matrix", source)
+        self.assertIn("def command_native_api_migration_matrix", source)
+
+        reports = rows["/api/v1/reports"]
+        self.assertEqual(reports["status"], "implemented_internal_and_browser_proxied")
+        self.assertEqual(reports["browser_access"], "browser_proxied")
+        self.assertEqual(reports["direct_access"], "scriptable_read")
+        self.assertEqual(reports["operation_id"], "getReports")
+        self.assertTrue(reports["openapi_direct_marker"])
+        self.assertIsNone(reports["x_turbovas_exposure"])
+        self.assertIsNone(reports["x_turbovas_maturity"])
+        self.assertIn("GSA raw report list (migrated through gsad same-origin proxy)", reports["replacement_candidates"])
+
+        feeds = rows["/api/v1/feeds"]
+        self.assertEqual(feeds["operation_id"], "getFeeds")
+        self.assertEqual(feeds["x_turbovas_exposure"], "direct-read")
+        self.assertEqual(feeds["x_turbovas_maturity"], "live-read")
+        self.assertEqual(feeds["x_turbovas_replaces"], "feed-status-read")
+        self.assertEqual(feeds["x_turbovas_inherited_still_owns"], "feed-sync-import-control")
+
+        retention = rows["/api/v1/scopes/{scope_id}/reports/{scope_report_id}/retention-plan"]
+        self.assertEqual(retention["status"], "implemented_internal")
+        self.assertEqual(retention["browser_access"], "internal_only")
+        self.assertEqual(retention["direct_access"], "internal_only")
+        self.assertFalse(retention["openapi_direct_marker"])
+        self.assertEqual(retention["x_turbovas_exposure"], "internal-only")
+        self.assertEqual(retention["x_turbovas_maturity"], "preview-read")
+        self.assertEqual(retention["x_turbovas_replaces"], "none")
+        self.assertEqual(retention["x_turbovas_inherited_still_owns"], "retention-mutations")
+
+        cert_bund_detail = rows["/api/v1/cert-bund-advisories/{cert_bund_advisory_id}"]
+        self.assertEqual(cert_bund_detail["inventory_endpoint"], "/api/v1/cert-bund-advisories/{advisory_id}")
+        self.assertIn("GSA Security Information CERT-Bund advisory detail metadata overlay (migrated through gsad same-origin proxy)", cert_bund_detail["replacement_candidates"])
+
+        scope_bound_detail = rows["/api/v1/scopes/{scope_id}/reports/{scope_report_id}"]
+        self.assertEqual(scope_bound_detail["status"], "unknown")
+        self.assertEqual(scope_bound_detail["browser_access"], "unknown")
+        self.assertEqual(scope_bound_detail["replacement_candidates"], [])
+        self.assertIsNone(scope_bound_detail["x_turbovas_exposure"])
+
     def test_openapi_operation_id_generator_is_stable_and_collision_free(self):
         root = Path(__file__).resolve().parents[2]
         operations = turbovasctl.openapi_contract_operations(root)
