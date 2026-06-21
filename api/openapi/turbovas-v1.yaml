@@ -2290,6 +2290,18 @@ components:
           type: string
         nvt_family:
           type: string
+        cves:
+          type: array
+          items:
+            type: string
+        cert_refs:
+          type: array
+          items:
+            type: string
+        xrefs:
+          type: array
+          items:
+            type: string
         description_excerpt:
           type: string
         solution_type:

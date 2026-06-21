@@ -123,6 +123,9 @@ interface NativeReportResultPayload {
   nvt_oid: string;
   name: string;
   nvt_family?: string;
+  cves?: string[];
+  cert_refs?: string[];
+  xrefs?: string[];
   description_excerpt?: string;
   solution_type?: string;
   solution?: string;
@@ -234,6 +237,9 @@ export interface NativeReportResultItem {
   nvtOid: string;
   name: string;
   nvtFamily?: string;
+  cves: string[];
+  certRefs: string[];
+  xrefs: string[];
   descriptionExcerpt?: string;
   severity: number;
   qod: number;
@@ -733,6 +739,9 @@ const nativeReportResultFromPayload = (
   nvtOid: stringValue(item.nvt_oid),
   name: stringValue(item.name),
   nvtFamily: stringValue(item.nvt_family) || undefined,
+  cves: stringArrayValue(item.cves),
+  certRefs: stringArrayValue(item.cert_refs),
+  xrefs: stringArrayValue(item.xrefs),
   descriptionExcerpt: stringValue(item.description_excerpt) || undefined,
   severity: numberValue(item.severity),
   qod: integerValue(item.qod),

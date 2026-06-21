@@ -677,6 +677,12 @@ struct ResultItem {
     nvt_oid: String,
     name: String,
     nvt_family: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    cves: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    cert_refs: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    xrefs: Vec<String>,
     description_excerpt: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     solution_type: Option<String>,
@@ -5937,6 +5943,7 @@ async fn results(
                     coalesce(r.nvt, '') AS nvt_oid,
                     coalesce(n.name, r.nvt, '') AS name,
                     nullif(n.family, '') AS nvt_family,
+                    n.cve AS cve_text,
                     nullif(left(coalesce(r.description, ''), 240), '') AS description_excerpt,
                     nullif(n.solution_type, '') AS solution_type,
                     nullif(n.solution, '') AS solution,
@@ -5968,9 +5975,38 @@ async fn results(
                      OR lower(name) LIKE '%' || lower($1) || '%'
                      OR lower(coalesce(task_name, '')) LIKE '%' || lower($1) || '%'
                      OR lower(source_report_name) LIKE '%' || lower($1) || '%')
+         ),
+         page_rows AS (
+             SELECT count(*) OVER()::bigint AS total, * FROM filtered
+              ORDER BY {sort_sql}, created_at_unix DESC, id ASC LIMIT $2 OFFSET $3
+         ),
+         page_with_refs AS (
+             SELECT p.*,
+                    CASE
+                      WHEN cardinality(coalesce(refs.cves, ARRAY[]::text[])) > 0
+                      THEN refs.cves
+                      WHEN coalesce(p.cve_text, '') <> ''
+                      THEN regexp_split_to_array(p.cve_text, '\\s*,\\s*')
+                      ELSE ARRAY[]::text[]
+                    END AS cves,
+                    coalesce(refs.cert_refs, ARRAY[]::text[]) AS cert_refs,
+                    coalesce(refs.xrefs, ARRAY[]::text[]) AS xrefs
+               FROM page_rows p
+               LEFT JOIN LATERAL (
+                   SELECT array_agg(vr.ref_id::text ORDER BY vr.ref_id)
+                            FILTER (WHERE vr.ref_id IS NOT NULL
+                                    AND lower(vr.type) IN ('cve', 'cve_id')) AS cves,
+                          array_agg(lower(vr.type) || ':' || vr.ref_id::text ORDER BY lower(vr.type), vr.ref_id)
+                            FILTER (WHERE vr.ref_id IS NOT NULL
+                                    AND lower(vr.type) IN ('dfn-cert', 'cert-bund')) AS cert_refs,
+                          array_agg(lower(vr.type) || ':' || vr.ref_id::text ORDER BY lower(vr.type), vr.ref_id)
+                            FILTER (WHERE vr.ref_id IS NOT NULL
+                                    AND lower(vr.type) NOT IN ('cve', 'cve_id', 'dfn-cert', 'cert-bund')) AS xrefs
+                     FROM vt_refs vr
+                    WHERE vr.vt_oid = p.nvt_oid
+               ) refs ON true
          )
-         SELECT count(*) OVER()::bigint AS total, * FROM filtered
-          ORDER BY {sort_sql}, created_at_unix DESC, id ASC LIMIT $2 OFFSET $3;"#,
+         SELECT * FROM page_with_refs;"#,
     );
     let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
     let rows = client
@@ -6004,6 +6040,15 @@ async fn result_detail(
                          coalesce(r.nvt, '') AS nvt_oid,
                          coalesce(n.name, r.nvt, '') AS name,
                          nullif(n.family, '') AS nvt_family,
+                         CASE
+                           WHEN cardinality(coalesce(refs.cves, ARRAY[]::text[])) > 0
+                           THEN refs.cves
+                           WHEN coalesce(n.cve, '') <> ''
+                           THEN regexp_split_to_array(n.cve, '\\s*,\\s*')
+                           ELSE ARRAY[]::text[]
+                         END AS cves,
+                         coalesce(refs.cert_refs, ARRAY[]::text[]) AS cert_refs,
+                         coalesce(refs.xrefs, ARRAY[]::text[]) AS xrefs,
                          nullif(left(coalesce(r.description, ''), 240), '') AS description_excerpt,
                          nullif(n.solution_type, '') AS solution_type,
                          nullif(n.solution, '') AS solution,
@@ -6020,6 +6065,19 @@ async fn result_detail(
                     LEFT JOIN tasks t ON t.id = coalesce(r.task, rep.task)
                     LEFT JOIN hosts h ON lower(h.name) = lower(coalesce(nullif(r.host, ''), r.hostname, ''))
                     LEFT JOIN nvts n ON n.oid = r.nvt
+                    LEFT JOIN LATERAL (
+                        SELECT array_agg(vr.ref_id::text ORDER BY vr.ref_id)
+                                 FILTER (WHERE vr.ref_id IS NOT NULL
+                                         AND lower(vr.type) IN ('cve', 'cve_id')) AS cves,
+                               array_agg(lower(vr.type) || ':' || vr.ref_id::text ORDER BY lower(vr.type), vr.ref_id)
+                                 FILTER (WHERE vr.ref_id IS NOT NULL
+                                         AND lower(vr.type) IN ('dfn-cert', 'cert-bund')) AS cert_refs,
+                               array_agg(lower(vr.type) || ':' || vr.ref_id::text ORDER BY lower(vr.type), vr.ref_id)
+                                 FILTER (WHERE vr.ref_id IS NOT NULL
+                                         AND lower(vr.type) NOT IN ('cve', 'cve_id', 'dfn-cert', 'cert-bund')) AS xrefs
+                          FROM vt_refs vr
+                         WHERE vr.vt_oid = r.nvt
+                    ) refs ON true
                    WHERE lower(r.uuid) = lower($1)
                      AND coalesce(r.severity, 0) != -3.0
                      AND coalesce(nullif(r.host, ''), r.hostname, '') <> ''
@@ -6069,6 +6127,7 @@ async fn report_results(
                     coalesce(r.nvt, '') AS nvt_oid,\n\
                     coalesce(n.name, r.nvt, '') AS name,\n\
                     nullif(n.family, '') AS nvt_family,\n\
+                    n.cve AS cve_text,\n\
                     nullif(left(coalesce(r.description, ''), 240), '') AS description_excerpt,\n\
                     coalesce(r.severity, 0)::double precision AS severity,\n\
                     coalesce(r.qod, 0)::bigint AS qod,\n\
@@ -6088,9 +6147,38 @@ async fn report_results(
                      OR lower(port) LIKE '%' || lower($2) || '%'\n\
                      OR lower(nvt_oid) LIKE '%' || lower($2) || '%'\n\
                      OR lower(name) LIKE '%' || lower($2) || '%')\n\
+         ),\n\
+         page_rows AS (\n\
+             SELECT count(*) OVER()::bigint AS total, * FROM filtered\n\
+              ORDER BY {sort_sql}, created_at_unix DESC, id ASC LIMIT $3 OFFSET $4\n\
+         ),\n\
+         page_with_refs AS (\n\
+             SELECT p.*,\n\
+                    CASE\n\
+                      WHEN cardinality(coalesce(refs.cves, ARRAY[]::text[])) > 0\n\
+                      THEN refs.cves\n\
+                      WHEN coalesce(p.cve_text, '') <> ''\n\
+                      THEN regexp_split_to_array(p.cve_text, '\\s*,\\s*')\n\
+                      ELSE ARRAY[]::text[]\n\
+                    END AS cves,\n\
+                    coalesce(refs.cert_refs, ARRAY[]::text[]) AS cert_refs,\n\
+                    coalesce(refs.xrefs, ARRAY[]::text[]) AS xrefs\n\
+               FROM page_rows p\n\
+               LEFT JOIN LATERAL (\n\
+                   SELECT array_agg(vr.ref_id::text ORDER BY vr.ref_id)\n\
+                            FILTER (WHERE vr.ref_id IS NOT NULL\n\
+                                    AND lower(vr.type) IN ('cve', 'cve_id')) AS cves,\n\
+                          array_agg(lower(vr.type) || ':' || vr.ref_id::text ORDER BY lower(vr.type), vr.ref_id)\n\
+                            FILTER (WHERE vr.ref_id IS NOT NULL\n\
+                                    AND lower(vr.type) IN ('dfn-cert', 'cert-bund')) AS cert_refs,\n\
+                          array_agg(lower(vr.type) || ':' || vr.ref_id::text ORDER BY lower(vr.type), vr.ref_id)\n\
+                            FILTER (WHERE vr.ref_id IS NOT NULL\n\
+                                    AND lower(vr.type) NOT IN ('cve', 'cve_id', 'dfn-cert', 'cert-bund')) AS xrefs\n\
+                     FROM vt_refs vr\n\
+                    WHERE vr.vt_oid = p.nvt_oid\n\
+               ) refs ON true\n\
          )\n\
-         SELECT count(*) OVER()::bigint AS total, * FROM filtered\n\
-          ORDER BY {sort_sql}, created_at_unix DESC, id ASC LIMIT $3 OFFSET $4;"
+         SELECT * FROM page_with_refs;"
     );
     let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
     let rows = client
@@ -6997,6 +7085,7 @@ async fn scope_report_results(
                     coalesce(r.nvt, '') AS nvt_oid,\n\
                     coalesce(n.name, r.nvt, '') AS name,\n\
                     nullif(n.family, '') AS nvt_family,\n\
+                    n.cve AS cve_text,\n\
                     nullif(left(coalesce(r.description, ''), 240), '') AS description_excerpt,\n\
                     coalesce(r.severity, 0)::double precision AS severity,\n\
                     coalesce(r.qod, 0)::bigint AS qod,\n\
@@ -7016,7 +7105,7 @@ async fn scope_report_results(
                 AND coalesce(nullif(r.host, ''), r.hostname, '') <> ''\n\
          ),\n\
          result_rows AS (\n\
-             SELECT id, host, hostname, port, nvt_oid, name, nvt_family, description_excerpt, severity, qod, created_at_unix, source_report_id\n\
+             SELECT id, host, hostname, port, nvt_oid, name, nvt_family, cve_text, description_excerpt, severity, qod, created_at_unix, source_report_id\n\
                FROM ranked WHERE rn = 1\n\
          ),\n\
          filtered AS (\n\
@@ -7027,9 +7116,38 @@ async fn scope_report_results(
                      OR lower(port) LIKE '%' || lower($3) || '%'\n\
                      OR lower(nvt_oid) LIKE '%' || lower($3) || '%'\n\
                      OR lower(name) LIKE '%' || lower($3) || '%')\n\
+         ),\n\
+         page_rows AS (\n\
+             SELECT count(*) OVER()::bigint AS total, * FROM filtered\n\
+              ORDER BY {sort_sql}, created_at_unix DESC, id ASC LIMIT $4 OFFSET $5\n\
+         ),\n\
+         page_with_refs AS (\n\
+             SELECT p.*,\n\
+                    CASE\n\
+                      WHEN cardinality(coalesce(refs.cves, ARRAY[]::text[])) > 0\n\
+                      THEN refs.cves\n\
+                      WHEN coalesce(p.cve_text, '') <> ''\n\
+                      THEN regexp_split_to_array(p.cve_text, '\\s*,\\s*')\n\
+                      ELSE ARRAY[]::text[]\n\
+                    END AS cves,\n\
+                    coalesce(refs.cert_refs, ARRAY[]::text[]) AS cert_refs,\n\
+                    coalesce(refs.xrefs, ARRAY[]::text[]) AS xrefs\n\
+               FROM page_rows p\n\
+               LEFT JOIN LATERAL (\n\
+                   SELECT array_agg(vr.ref_id::text ORDER BY vr.ref_id)\n\
+                            FILTER (WHERE vr.ref_id IS NOT NULL\n\
+                                    AND lower(vr.type) IN ('cve', 'cve_id')) AS cves,\n\
+                          array_agg(lower(vr.type) || ':' || vr.ref_id::text ORDER BY lower(vr.type), vr.ref_id)\n\
+                            FILTER (WHERE vr.ref_id IS NOT NULL\n\
+                                    AND lower(vr.type) IN ('dfn-cert', 'cert-bund')) AS cert_refs,\n\
+                          array_agg(lower(vr.type) || ':' || vr.ref_id::text ORDER BY lower(vr.type), vr.ref_id)\n\
+                            FILTER (WHERE vr.ref_id IS NOT NULL\n\
+                                    AND lower(vr.type) NOT IN ('cve', 'cve_id', 'dfn-cert', 'cert-bund')) AS xrefs\n\
+                     FROM vt_refs vr\n\
+                    WHERE vr.vt_oid = p.nvt_oid\n\
+               ) refs ON true\n\
          )\n\
-         SELECT count(*) OVER()::bigint AS total, * FROM filtered\n\
-          ORDER BY {sort_sql}, created_at_unix DESC, id ASC LIMIT $4 OFFSET $5;"
+         SELECT * FROM page_with_refs;"
     );
     let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
     let rows = client
@@ -8646,6 +8764,10 @@ fn optional_row_string(row: &Row, name: &str) -> Option<String> {
     row.try_get::<_, Option<String>>(name).ok().flatten()
 }
 
+fn optional_row_strings(row: &Row, name: &str) -> Vec<String> {
+    row.try_get::<_, Vec<String>>(name).unwrap_or_default()
+}
+
 fn target_reference(id: Option<String>, name: Option<String>) -> Option<TargetReference> {
     let id = id?;
     let name = name.unwrap_or_else(|| id.clone());
@@ -9852,6 +9974,9 @@ fn result_from_row(row: &Row) -> ResultItem {
         nvt_oid: row.get("nvt_oid"),
         name: row.get("name"),
         nvt_family: row.get("nvt_family"),
+        cves: optional_row_strings(row, "cves"),
+        cert_refs: optional_row_strings(row, "cert_refs"),
+        xrefs: optional_row_strings(row, "xrefs"),
         description_excerpt: row.get("description_excerpt"),
         solution_type: optional_row_string(row, "solution_type"),
         solution: optional_row_string(row, "solution"),

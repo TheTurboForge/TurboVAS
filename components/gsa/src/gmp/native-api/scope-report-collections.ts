@@ -90,6 +90,9 @@ export interface ScopeReportResultItem {
   port: string;
   nvtOid: string;
   name: string;
+  cves: string[];
+  certRefs: string[];
+  xrefs: string[];
   severity: number;
   qod: number;
   createdAt?: string;
@@ -295,6 +298,9 @@ export const fetchNativeScopeReportResults = (
       port: stringValue(item.port),
       nvtOid: stringValue(item.nvt_oid),
       name: stringValue(item.name),
+      cves: stringArrayValue(item.cves),
+      certRefs: stringArrayValue(item.cert_refs),
+      xrefs: stringArrayValue(item.xrefs),
       severity: numberValue(item.severity),
       qod: integerValue(item.qod),
       createdAt: optionalStringValue(item.created_at),
