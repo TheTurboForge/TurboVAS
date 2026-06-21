@@ -286,6 +286,25 @@ NATIVE_TOOLING_CATEGORIES = (
     "candidate_for_removal",
     "unknown",
 )
+NATIVE_TOOLING_RESIDUE_KINDS = (
+    "alert-delivery-and-credentials",
+    "asset-action-or-rich-context",
+    "compatibility-parser-model-or-test",
+    "feed-control-or-status-compatibility",
+    "gsa-session-http-transport",
+    "report-export-delete-or-rich-context",
+    "report-format-config-write-or-export",
+    "saved-filter-write-or-alert-linkage",
+    "scan-config-preference-write-or-export",
+    "scanner-control-or-credential",
+    "scope-report-generation",
+    "schedule-write-or-export",
+    "tag-write-or-resource-actions",
+    "task-target-scan-control-or-credential",
+    "trashcan-row-or-mutation",
+    "user-account-or-session",
+    "retained-gmp-product-residue",
+)
 NATIVE_TOOLING_MARKERS = (
     "python-gvm",
     "gvm-tools",
@@ -2175,6 +2194,49 @@ def running_service_env_value(repo_root: Path, service: str, key: str) -> str | 
         if isinstance(value, str) and value.startswith(prefix) and value[len(prefix) :].strip():
             return value[len(prefix) :]
     return None
+
+
+def native_tooling_residue(relative_path: str, category: str) -> tuple[str, str] | None:
+    if category != "product_workflow":
+        return None
+    name = Path(relative_path).name
+    if relative_path == "components/gvm-tools/scripts/generate-scope-report.gmp.py":
+        return "scope-report-generation", "Retained GMP helper generates scope reports; native read APIs do not replace report generation."
+    if "/__tests__/" in relative_path or relative_path.startswith("components/gsa/src/gmp/__tests__/"):
+        return "compatibility-parser-model-or-test", "Inherited GSA/GMP tests characterize retained compatibility behavior."
+    if relative_path.startswith(("components/gsa/src/gmp/collection/", "components/gsa/src/gmp/http/transform/", "components/gsa/src/gmp/locale/", "components/gsa/src/gmp/models/")):
+        return "compatibility-parser-model-or-test", "Inherited GSA parser/model/locale code remains while retained GMP workflows exist."
+    if relative_path == "components/gsa/src/gmp/http/http.ts":
+        return "gsa-session-http-transport", "GSA still needs inherited session/transport plumbing for retained GMP workflows."
+    if name == "alert.ts":
+        return "alert-delivery-and-credentials", "Alert detail, delivery payloads, tests, credentials, and writes remain inherited."
+    if name in {"credential-store.ts", "scanner.ts"}:
+        return "scanner-control-or-credential", "Scanner and credential surfaces remain inherited until control/secret handling is designed."
+    if name == "task.ts":
+        return "task-target-scan-control-or-credential", "Task start/stop/write and credential-linked behavior remains inherited."
+    if name == "hosts.js":
+        return "asset-action-or-rich-context", "Host actions and richer inherited context remain outside the current native read contract."
+    if name == "overrides.js":
+        return "asset-action-or-rich-context", "Override writes and result-expansion behavior remain inherited."
+    if name == "port-lists.ts":
+        return "asset-action-or-rich-context", "Port-list writes, imports, exports, and range mutation remain inherited."
+    if name == "report.ts":
+        return "report-export-delete-or-rich-context", "Report export/delete/upload and rich inherited report context remain inherited."
+    if name in {"report-config.ts", "report-format.ts"}:
+        return "report-format-config-write-or-export", "Report config/format writes, imports, exports, and dialog side effects remain inherited."
+    if name == "scan-configs.js":
+        return "scan-config-preference-write-or-export", "Scan-config preferences, imports, exports, writes, and deletes remain inherited."
+    if name == "schedules.js":
+        return "schedule-write-or-export", "Schedule writes, exports, and deletes remain inherited."
+    if name == "filter.ts":
+        return "saved-filter-write-or-alert-linkage", "Saved-filter writes and alert linkage remain inherited."
+    if name == "tag.ts":
+        return "tag-write-or-resource-actions", "Tag writes and unsupported resource actions remain inherited."
+    if name == "user.ts":
+        return "user-account-or-session", "User/account/session behavior remains inherited."
+    if name in {"feed-status.ts", "dashboards.ts", "entity.ts"}:
+        return "feed-control-or-status-compatibility", "Retained inherited command compatibility remains after removed or native-covered UI reads."
+    return "retained-gmp-product-residue", "Remaining inherited GSA/GMP product residue needs a narrower owner before replacement."
 
 
 def native_api_direct_token_sources(repo_root: Path, env: dict[str, str]) -> tuple[tuple[str, ...], Path, bool]:
@@ -4220,7 +4282,13 @@ def native_tooling_inventory(repo_root: Path) -> list[dict[str, Any]]:
             continue
         classified = native_tooling_category(relative_path)
         category, reason = classified if classified else ("unknown", "Inherited tooling marker appears outside the current retirement map classification.")
-        items.append({"category": category, "path": relative_path, "markers": markers, "reason": reason})
+        item = {"category": category, "path": relative_path, "markers": markers, "reason": reason}
+        residue = native_tooling_residue(relative_path, category)
+        if residue is not None:
+            residue_kind, residue_reason = residue
+            item["residue_kind"] = residue_kind
+            item["residue_reason"] = residue_reason
+        items.append(item)
     return sorted(items, key=lambda item: (NATIVE_TOOLING_CATEGORIES.index(item["category"]), item["path"]))
 
 
@@ -5198,9 +5266,19 @@ def summarize_native_tooling(items: list[dict[str, Any]], repo_root: Path | None
     for category in NATIVE_TOOLING_CATEGORIES:
         category_items = [item for item in items if item["category"] == category]
         by_category[category] = {"count": len(category_items), "paths": [item["path"] for item in category_items]}
+    product_residue: dict[str, dict[str, Any]] = {}
+    for kind in NATIVE_TOOLING_RESIDUE_KINDS:
+        residue_items = [item for item in items if item.get("residue_kind") == kind]
+        if residue_items:
+            product_residue[kind] = {
+                "count": len(residue_items),
+                "paths": [item["path"] for item in residue_items],
+                "reason": residue_items[0].get("residue_reason"),
+            }
     return {
         "total_items": len(items),
         "by_category": by_category,
+        "product_workflow_residue": product_residue,
         "implemented_native_endpoints": [
             {
                 "endpoint": "/api/v1/results",
@@ -5607,6 +5685,11 @@ def compact_native_tooling_summary(summary: dict[str, Any]) -> dict[str, Any]:
         for category, category_summary in summary.get("by_category", {}).items()
         if isinstance(category_summary, dict)
     }
+    product_residue = {
+        kind: {"count": residue_summary.get("count", 0)}
+        for kind, residue_summary in summary.get("product_workflow_residue", {}).items()
+        if isinstance(residue_summary, dict)
+    }
     direct_contract = summary.get("direct_api_contract", {})
     compact_direct_contract = {
         "alignment_status": direct_contract.get("alignment_status", "unknown") if isinstance(direct_contract, dict) else "unknown",
@@ -5660,6 +5743,7 @@ def compact_native_tooling_summary(summary: dict[str, Any]) -> dict[str, Any]:
     return {
         "total_items": summary.get("total_items", 0),
         "by_category": by_category,
+        "product_workflow_residue": product_residue,
         "candidate_for_removal_paths": summary.get("by_category", {}).get("candidate_for_removal", {}).get("paths", []),
         "unknown_paths": summary.get("by_category", {}).get("unknown", {}).get("paths", []),
         "implemented_native_endpoint_count": len(summary.get("implemented_native_endpoints", [])),
@@ -5676,6 +5760,7 @@ def compact_native_tooling_finding_details(summary: dict[str, Any]) -> dict[str,
     return {
         "total_items": compact["total_items"],
         "by_category": compact["by_category"],
+        "product_workflow_residue": compact["product_workflow_residue"],
         "implemented_native_endpoint_count": compact["implemented_native_endpoint_count"],
         "implemented_native_endpoints_by_status": compact["implemented_native_endpoints_by_status"],
         "direct_api_contract": compact["direct_api_contract"],

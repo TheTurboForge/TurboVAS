@@ -1041,12 +1041,21 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("implemented_native_endpoint_count", details)
         self.assertIn("direct_api_contract", details)
         self.assertIn("browser_proxy_contract", details)
+        self.assertIn("product_workflow_residue", details)
         self.assertIn("candidate_for_removal_paths", details)
         inventory_details = compact["findings"][0]["details"]
         self.assertNotIn("candidate_for_removal_paths", inventory_details)
         self.assertNotIn("next_replacement_candidates", inventory_details)
+        self.assertIn("product_workflow_residue", inventory_details)
         self.assertLess(len(json.dumps(compact)), len(json.dumps(full)))
         details = full["details"]
+        product_residue = details["product_workflow_residue"]
+        residue_count = sum(item["count"] for item in product_residue.values())
+        self.assertEqual(residue_count, details["by_category"]["product_workflow"]["count"])
+        self.assertGreater(product_residue["compatibility-parser-model-or-test"]["count"], 0)
+        self.assertGreater(product_residue["alert-delivery-and-credentials"]["count"], 0)
+        self.assertGreater(product_residue["task-target-scan-control-or-credential"]["count"], 0)
+        self.assertGreater(product_residue["scope-report-generation"]["count"], 0)
         endpoints = {item["endpoint"] for item in details["implemented_native_endpoints"]}
         self.assertIn("/api/v1/cert-bund-advisories", endpoints)
         self.assertIn("/api/v1/cert-bund-advisories/{advisory_id}", endpoints)
@@ -2299,6 +2308,13 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(turbovasctl.native_tooling_category("components/gvm-tools/scripts/generate-scope-report.gmp.py")[0], "product_workflow")
         self.assertEqual(turbovasctl.native_tooling_category("components/gvm-tools/scripts/empty-trash.gmp.py")[0], "candidate_for_removal")
         self.assertEqual(turbovasctl.native_tooling_category("docs/GMP_XML_STRANGLER.md")[0], "compatibility_bridge")
+
+    def test_native_tooling_residue_classifies_remaining_product_workflow(self):
+        self.assertEqual(turbovasctl.native_tooling_residue("components/gsa/src/gmp/commands/alert.ts", "product_workflow")[0], "alert-delivery-and-credentials")
+        self.assertEqual(turbovasctl.native_tooling_residue("components/gsa/src/gmp/commands/task.ts", "product_workflow")[0], "task-target-scan-control-or-credential")
+        self.assertEqual(turbovasctl.native_tooling_residue("components/gsa/src/gmp/collection/parser.ts", "product_workflow")[0], "compatibility-parser-model-or-test")
+        self.assertEqual(turbovasctl.native_tooling_residue("components/gvm-tools/scripts/generate-scope-report.gmp.py", "product_workflow")[0], "scope-report-generation")
+        self.assertIsNone(turbovasctl.native_tooling_residue("components/python-gvm/gvm/__init__.py", "compatibility_bridge"))
 
     def test_trashcan_summary_contract_is_counts_only_and_row_details_deferred(self):
         root = Path(__file__).resolve().parents[2]
