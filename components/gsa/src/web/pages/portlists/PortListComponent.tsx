@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2025 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -17,6 +18,7 @@ import {
   type default as PortList,
   type ProtocolType,
 } from 'gmp/models/port-list';
+import {fetchNativePortList} from 'gmp/native-api/port-lists';
 import {isDefined} from 'gmp/utils/identity';
 import {shorten} from 'gmp/utils/string';
 import useEntityClone, {
@@ -77,6 +79,21 @@ interface PortListComponentProps {
   onSaveError?: (error: Error) => void;
   onSaved?: (response: EntitySaveResponse) => void;
 }
+
+const canUseNativeApi = (gmp: {buildUrl?: unknown}) =>
+  typeof gmp?.buildUrl === 'function';
+
+const loadPortList = async (
+  gmp: ReturnType<typeof useGmp>,
+  entity: PortList,
+) => {
+  if (canUseNativeApi(gmp)) {
+    return fetchNativePortList(gmp, entity.id as string);
+  }
+
+  const response = await gmp.portlist.get(entity as EntityCommandParams);
+  return response.data;
+};
 
 const PortListComponent = ({
   children,
@@ -145,8 +162,7 @@ const PortListComponent = ({
   const openPortListDialog = async (entity?: PortList) => {
     if (entity) {
       // edit
-      const response = await gmp.portlist.get(entity as EntityCommandParams);
-      const portList = response.data;
+      const portList = await loadPortList(gmp, entity);
       setCreatedPortRanges([]);
       setDeletedPortRanges([]);
       setPortListDialogTitle(

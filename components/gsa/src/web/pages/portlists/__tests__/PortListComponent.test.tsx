@@ -1,9 +1,10 @@
 /* SPDX-FileCopyrightText: 2025 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import {describe, test, expect, testing} from '@gsa/testing';
+import {afterEach, describe, test, expect, testing} from '@gsa/testing';
 import {
   changeInputValue,
   screen,
@@ -52,6 +53,10 @@ const createGmp = ({
   },
   user: {currentSettings},
   session: createSession(),
+});
+
+afterEach(() => {
+  testing.unstubAllGlobals();
 });
 
 describe('PortListComponent tests', () => {
@@ -236,6 +241,63 @@ describe('PortListComponent tests', () => {
     expect(screen.queryByText('Edit Port List foo')).not.toBeInTheDocument();
     expect(onSaveError).not.toHaveBeenCalled();
     expect(onSaved).toHaveBeenCalledWith({id: '123'});
+  });
+
+  test('should load edit dialog prefill through native API when available', async () => {
+    const gmp = {
+      ...createGmp(),
+      buildUrl: testing.fn(
+        (path: string) => `https://turbovas.example/${path}`,
+      ),
+      session: createSession({token: 'test-token'}),
+    };
+    const fetchMock = testing.fn().mockResolvedValue({
+      json: testing.fn().mockResolvedValue({
+        id: '123',
+        name: 'Native Port List',
+        comment: 'native prefill',
+        port_count: {all: 1, tcp: 1, udp: 0},
+        port_ranges: [
+          {
+            id: 'range-1',
+            protocol: 'tcp',
+            start: 22,
+            end: 22,
+          },
+        ],
+      }),
+      ok: true,
+      status: 200,
+    });
+    testing.stubGlobal('fetch', fetchMock);
+
+    const {render} = rendererWith({gmp});
+    render(
+      <PortListComponent>
+        {({edit}) => (
+          <Button
+            data-testid="open"
+            onClick={() => edit(new PortList({id: '123'}))}
+          />
+        )}
+      </PortListComponent>,
+    );
+
+    fireEvent.click(screen.getByTestId('open'));
+    await wait();
+
+    expect(gmp.portlist.get).not.toHaveBeenCalled();
+    expect(gmp.buildUrl).toHaveBeenCalledWith('api/v1/port-lists/123', {
+      token: 'test-token',
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://turbovas.example/api/v1/port-lists/123',
+      expect.objectContaining({credentials: 'include'}),
+    );
+    expect(
+      screen.getByText('Edit Port List Native Port List'),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('22')).toHaveLength(2);
   });
 
   test('should allow editing a port list to add a port range', async () => {
