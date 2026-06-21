@@ -13,7 +13,7 @@ use axum::{
     routing::get,
 };
 use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use tokio_postgres::{Config as PgConfig, NoTls, Row};
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
@@ -23,6 +23,7 @@ mod auth;
 mod collections;
 mod errors;
 mod feeds;
+mod query;
 mod request_ids;
 mod request_shapes;
 
@@ -30,6 +31,7 @@ use auth::*;
 use collections::*;
 use errors::ApiError;
 use feeds::feeds;
+use query::*;
 use request_ids::*;
 use request_shapes::*;
 
@@ -40,40 +42,10 @@ struct AppState {
 
 const DIRECT_API_BIND_ENV: &str = "TURBOVAS_API_DIRECT_BIND";
 const DIRECT_API_BEARER_TOKEN_ENV: &str = "TURBOVAS_API_BEARER_TOKEN";
-#[derive(Debug, Deserialize)]
-struct CollectionQuery {
-    page: Option<i64>,
-    page_size: Option<i64>,
-    sort: Option<String>,
-    filter: Option<String>,
-    filter_type: Option<String>,
-    active: Option<String>,
-    predefined: Option<String>,
-    resource_type: Option<String>,
-    text: Option<String>,
-    task_name: Option<String>,
-    value: Option<String>,
-}
-
 #[derive(Debug, Serialize)]
 struct HealthResponse {
     status: &'static str,
     database: &'static str,
-}
-
-#[derive(Debug, Serialize)]
-struct PageInfo {
-    page: i64,
-    page_size: i64,
-    total: i64,
-    sort: String,
-    filter: String,
-}
-
-#[derive(Debug, Serialize)]
-struct Collection<T> {
-    page: PageInfo,
-    items: Vec<T>,
 }
 
 #[derive(Debug, Serialize)]
@@ -7733,60 +7705,6 @@ async fn raw_report_exists(
     Ok(row.get::<_, bool>(0))
 }
 
-#[derive(Debug)]
-struct NormalizedQuery {
-    page: i64,
-    page_size: i64,
-    offset: i64,
-    sort: String,
-    filter: String,
-}
-
-impl NormalizedQuery {
-    fn page_info(&self, total: i64) -> PageInfo {
-        PageInfo {
-            page: self.page,
-            page_size: self.page_size,
-            total,
-            sort: self.sort.clone(),
-            filter: self.filter.clone(),
-        }
-    }
-}
-
-fn needs_first_page_total_probe(row_count: usize, offset: i64) -> bool {
-    row_count == 0 && offset > 0
-}
-
-async fn collection_total_with_empty_page_probe(
-    client: &tokio_postgres::Client,
-    rows: &[Row],
-    sql: &str,
-    params: &NormalizedQuery,
-    log_context: &'static str,
-) -> Result<i64, ApiError> {
-    if let Some(row) = rows.first() {
-        return Ok(row.get::<_, i64>("total"));
-    }
-    if !needs_first_page_total_probe(rows.len(), params.offset) {
-        return Ok(0);
-    }
-
-    let probe_page_size = 1_i64;
-    let probe_offset = 0_i64;
-    let probe_rows = client
-        .query(sql, &[&params.filter, &probe_page_size, &probe_offset])
-        .await
-        .map_err(|error| {
-            tracing::warn!(%error, %log_context, "collection first-page total probe failed");
-            ApiError::Database
-        })?;
-    Ok(probe_rows
-        .first()
-        .map(|row| row.get::<_, i64>("total"))
-        .unwrap_or(0))
-}
-
 fn host_identifier_from_row(
     row: &Row,
     id_field: &str,
@@ -7927,54 +7845,6 @@ fn operating_system_asset_from_row(row: &Row) -> OperatingSystemAssetItem {
         created_at: unix_ts_to_rfc3339(row.get("created_at_unix")),
         modified_at: unix_ts_to_rfc3339(row.get("modified_at_unix")),
     }
-}
-
-fn normalize_collection_query(
-    query: CollectionQuery,
-    default_sort: &str,
-) -> Result<NormalizedQuery, ApiError> {
-    let page = query.page.unwrap_or(1);
-    let page_size = query.page_size.unwrap_or(DEFAULT_COLLECTION_PAGE_SIZE);
-    if page < 1 {
-        return Err(ApiError::BadRequest(
-            "page must be greater than or equal to 1".to_string(),
-        ));
-    }
-    if !(1..=MAX_COLLECTION_PAGE_SIZE).contains(&page_size) {
-        return Err(ApiError::BadRequest(format!(
-            "page_size must be between 1 and {MAX_COLLECTION_PAGE_SIZE}"
-        )));
-    }
-    let sort = query
-        .sort
-        .filter(|value| !value.trim().is_empty())
-        .unwrap_or_else(|| default_sort.to_string());
-    let filter = query.filter.unwrap_or_default();
-    if filter.len() > MAX_COLLECTION_FILTER_LENGTH {
-        return Err(ApiError::BadRequest(format!(
-            "filter must be at most {MAX_COLLECTION_FILTER_LENGTH} bytes"
-        )));
-    }
-    Ok(NormalizedQuery {
-        page,
-        page_size,
-        offset: (page - 1) * page_size,
-        sort,
-        filter,
-    })
-}
-
-fn sort_clause(sort: &str, allowed: &[(&str, &str)]) -> Result<String, ApiError> {
-    let (direction, field) = if let Some(field) = sort.strip_prefix('-') {
-        ("DESC", field)
-    } else {
-        ("ASC", sort)
-    };
-    allowed
-        .iter()
-        .find(|(name, _)| *name == field)
-        .map(|(_, column)| format!("{column} {direction}"))
-        .ok_or_else(|| ApiError::BadRequest(format!("unsupported sort field: {field}")))
 }
 
 fn parse_uuid(value: &str) -> Result<Uuid, ApiError> {
@@ -9858,98 +9728,6 @@ mod tests {
         );
         assert!(sort_clause(contract.default_sort, contract.allowed_sort_fields).is_ok());
         assert!(sort_clause("unsupported_field", contract.allowed_sort_fields).is_err());
-    }
-
-    #[test]
-    fn normalize_collection_defaults_and_offset() {
-        let query = normalize_collection_query(
-            CollectionQuery {
-                page: Some(3),
-                page_size: Some(25),
-                sort: None,
-                filter: Some("router".to_string()),
-                filter_type: None,
-                active: None,
-                predefined: None,
-                resource_type: None,
-                text: None,
-                task_name: None,
-                value: None,
-            },
-            "host",
-        )
-        .unwrap();
-        assert_eq!(query.page, 3);
-        assert_eq!(query.page_size, 25);
-        assert_eq!(query.offset, 50);
-        assert_eq!(query.sort, "host");
-        assert_eq!(query.filter, "router");
-    }
-
-    #[test]
-    fn normalize_collection_rejects_bad_page_size() {
-        let err = normalize_collection_query(
-            CollectionQuery {
-                page: Some(1),
-                page_size: Some(501),
-                sort: None,
-                filter: None,
-                filter_type: None,
-                active: None,
-                predefined: None,
-                resource_type: None,
-                text: None,
-                task_name: None,
-                value: None,
-            },
-            "host",
-        )
-        .unwrap_err();
-        assert!(matches!(err, ApiError::BadRequest(_)));
-    }
-
-    #[test]
-    fn normalize_collection_rejects_oversized_filter() {
-        let err = normalize_collection_query(
-            CollectionQuery {
-                page: Some(1),
-                page_size: Some(25),
-                sort: None,
-                filter: Some("x".repeat(MAX_COLLECTION_FILTER_LENGTH + 1)),
-                filter_type: None,
-                active: None,
-                predefined: None,
-                resource_type: None,
-                text: None,
-                task_name: None,
-                value: None,
-            },
-            "host",
-        )
-        .unwrap_err();
-        assert!(
-            matches!(err, ApiError::BadRequest(message) if message.contains("filter must be at most"))
-        );
-    }
-
-    #[test]
-    fn empty_page_total_probe_only_runs_for_out_of_range_pages() {
-        assert!(!needs_first_page_total_probe(1, 50));
-        assert!(!needs_first_page_total_probe(0, 0));
-        assert!(needs_first_page_total_probe(0, 50));
-    }
-
-    #[test]
-    fn sort_clause_supports_descending_whitelist_only() {
-        assert_eq!(
-            sort_clause(
-                "-result_count",
-                &[("host", "host"), ("result_count", "result_count")]
-            )
-            .unwrap(),
-            "result_count DESC"
-        );
-        assert!(sort_clause(";drop", &[("host", "host")]).is_err());
     }
 
     #[test]
