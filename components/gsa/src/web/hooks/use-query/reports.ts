@@ -6,11 +6,16 @@
 
 import {useQuery} from '@tanstack/react-query';
 import Filter, {ALL_FILTER, RESULTS_FILTER_FILTER} from 'gmp/models/filter';
-import type Response from 'gmp/http/response';
+import type {EntitiesMeta} from 'gmp/commands/entities';
+import Response from 'gmp/http/response';
 import type {XmlMeta} from 'gmp/http/transform/fast-xml';
 import type Report from 'gmp/models/report';
 import type ReportConfig from 'gmp/models/report-config';
 import type ReportFormat from 'gmp/models/report-format';
+import {
+  fetchNativeFilters,
+  nativeFiltersQueryFromFilter,
+} from 'gmp/native-api/filters';
 import {fetchNativeReport} from 'gmp/native-api/reports';
 import {isDefined} from 'gmp/utils/identity';
 import useGmp from 'web/hooks/useGmp';
@@ -60,9 +65,25 @@ export const useGetReport = ({
 
 export const useGetResultsFilters = () => {
   const gmp = useGmp();
+  const canUseNativeApi = typeof gmp?.buildUrl === 'function';
 
   return useGetEntities<Filter>({
-    gmpMethod: gmp.filters.get.bind(gmp.filters),
+    gmpMethod: async ({filter}) => {
+      const queryFilter = filter instanceof Filter ? filter : undefined;
+
+      if (!canUseNativeApi) {
+        return gmp.filters.get({filter: queryFilter});
+      }
+
+      const response = await fetchNativeFilters(
+        gmp,
+        nativeFiltersQueryFromFilter(queryFilter),
+      );
+      return new Response<Filter[], EntitiesMeta>(response.filters, {
+        counts: response.counts,
+        filter: queryFilter ?? RESULTS_FILTER_FILTER,
+      });
+    },
     queryId: 'get_filters',
     filter: RESULTS_FILTER_FILTER,
     refetchInterval: false,

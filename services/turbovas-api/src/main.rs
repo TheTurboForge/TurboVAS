@@ -45,6 +45,7 @@ struct CollectionQuery {
     page_size: Option<i64>,
     sort: Option<String>,
     filter: Option<String>,
+    filter_type: Option<String>,
     active: Option<String>,
     predefined: Option<String>,
     resource_type: Option<String>,
@@ -2528,6 +2529,12 @@ async fn filter_assets(
     State(state): State<AppState>,
     Query(query): Query<CollectionQuery>,
 ) -> Result<Json<Collection<FilterAssetItem>>, ApiError> {
+    let filter_type = query
+        .filter_type
+        .as_deref()
+        .unwrap_or("")
+        .trim()
+        .to_string();
     let params = normalize_collection_query(query, "name")?;
     let sort_sql = sort_clause(
         &params.sort,
@@ -2575,13 +2582,22 @@ async fn filter_assets(
                      OR lower(comment) LIKE '%' || lower($1) || '%'
                      OR lower(filter_type) LIKE '%' || lower($1) || '%'
                      OR lower(term) LIKE '%' || lower($1) || '%')
+                AND ($2 = '' OR lower(filter_type) = lower($2))
          )
          SELECT count(*) OVER()::bigint AS total, * FROM filtered
-          ORDER BY {sort_sql}, name ASC, id ASC LIMIT $2 OFFSET $3;"#,
+          ORDER BY {sort_sql}, name ASC, id ASC LIMIT $3 OFFSET $4;"#,
     );
     let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
     let rows = client
-        .query(&sql, &[&params.filter, &params.page_size, &params.offset])
+        .query(
+            &sql,
+            &[
+                &params.filter,
+                &filter_type,
+                &params.page_size,
+                &params.offset,
+            ],
+        )
         .await
         .map_err(|error| {
             tracing::warn!(%error, "filter asset list query failed");
@@ -9603,6 +9619,7 @@ mod tests {
                 page_size: Some(25),
                 sort: None,
                 filter: Some("router".to_string()),
+                filter_type: None,
                 active: None,
                 predefined: None,
                 resource_type: None,
@@ -9628,6 +9645,7 @@ mod tests {
                 page_size: Some(501),
                 sort: None,
                 filter: None,
+                filter_type: None,
                 active: None,
                 predefined: None,
                 resource_type: None,

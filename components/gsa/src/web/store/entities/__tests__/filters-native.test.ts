@@ -4,7 +4,12 @@
  */
 
 import {afterEach, describe, expect, test, testing} from '@gsa/testing';
-import {fetchNativeFilter, fetchNativeFilters} from 'gmp/native-api/filters';
+import Filter from 'gmp/models/filter';
+import {
+  fetchNativeFilter,
+  fetchNativeFilters,
+  nativeFiltersQueryFromFilter,
+} from 'gmp/native-api/filters';
 
 const createGmp = ({jwt, token = 'test-token'}: {jwt?: string; token?: string} = {}) => ({
   buildUrl: testing.fn((path: string) => `https://turbovas.example/${path}`),
@@ -45,6 +50,7 @@ describe('native API filters', () => {
       pageSize: 25,
       sort: 'name',
       filter: '',
+      filterType: 'result',
     });
 
     const filter = response.filters[0];
@@ -62,6 +68,7 @@ describe('native API filters', () => {
       page_size: 25,
       sort: 'name',
       filter: '',
+      filter_type: 'result',
     });
     expect(fetchMock).toHaveBeenCalledWith(
       'https://turbovas.example/api/v1/filters',
@@ -104,5 +111,17 @@ describe('native API filters', () => {
     expect(filter.alerts).toHaveLength(1);
     expect(filter.alerts[0].id).toEqual('a9483e36-b9e4-43df-9ddc-d28ec1df9c23');
     expect(filter.alerts[0].name).toEqual('Notify SecOps');
+  });
+
+  test('maps inherited filter type criteria to the native filter_type query', () => {
+    expect(
+      nativeFiltersQueryFromFilter(Filter.fromString('type=result rows=10')),
+    ).toEqual({
+      page: 1,
+      pageSize: 10,
+      sort: 'name',
+      filter: '',
+      filterType: 'result',
+    });
   });
 });

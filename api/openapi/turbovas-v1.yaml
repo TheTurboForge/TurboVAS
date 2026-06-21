@@ -325,6 +325,7 @@ paths:
         - $ref: '#/components/parameters/PageSize'
         - $ref: '#/components/parameters/Sort'
         - $ref: '#/components/parameters/Filter'
+        - $ref: '#/components/parameters/FilterType'
       responses:
         '200':
           description: Saved filter collection
@@ -1101,6 +1102,12 @@ components:
     Filter:
       name: filter
       in: query
+      schema:
+        type: string
+    FilterType:
+      name: filter_type
+      in: query
+      description: Exact saved-filter resource type, for example result, report, target, or task.
       schema:
         type: string
     RequestId:

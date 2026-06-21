@@ -53,6 +53,7 @@ export interface NativeFiltersQuery {
   pageSize: number;
   sort: string;
   filter: string;
+  filterType?: string;
 }
 
 export interface NativeFiltersResponse {
@@ -99,11 +100,15 @@ export const nativeFiltersQueryFromFilter = (
 ): NativeFiltersQuery => {
   const pageSize = Math.max(1, integerValue(filter?.get('rows'), 25));
   const first = Math.max(1, integerValue(filter?.get('first'), 1));
+  const filterType = stringValue(
+    filter?.get('type') ?? filter?.get('filter_type'),
+  );
   return {
     page: Math.floor((first - 1) / pageSize) + 1,
     pageSize,
     sort: nativeSortFromFilter(filter),
     filter: nativeSearchFromFilter(filter),
+    ...(filterType !== '' ? {filterType} : {}),
   };
 };
 
@@ -168,6 +173,7 @@ export const fetchNativeFilters = async (
       page_size: query.pageSize,
       sort: query.sort,
       filter: query.filter,
+      ...(query.filterType ? {filter_type: query.filterType} : {}),
     },
   );
   const page = {

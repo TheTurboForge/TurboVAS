@@ -53,6 +53,18 @@ const nativeReportPayload = {
   max_severity: 7.5,
 };
 
+const nativeResultFiltersPayload = {
+  page: {page: 1, page_size: 25, total: 1, sort: 'name', filter: ''},
+  items: [
+    {
+      id: 'f8df35ce-e8a2-4c27-90a6-76b29a1e1b41',
+      name: 'High Severity Results',
+      filter_type: 'result',
+      term: 'severity>7.0',
+    },
+  ],
+};
+
 const emptyCollectionResponse: CollectionResponse = {
   data: [],
   meta: {
@@ -127,6 +139,21 @@ const createGmp = () => ({
       },
     }),
   },
+  reportcves: {
+    get: testing.fn().mockResolvedValue({
+      data: [],
+      meta: {
+        filter: Filter.fromString(''),
+        counts: new CollectionCounts({
+          first: 1,
+          all: 1,
+          filtered: 1,
+          length: 1,
+          rows: 1,
+        }),
+      },
+    }),
+  },
   reporttlscertificates: {
     get: testing.fn().mockResolvedValue({
       data: [],
@@ -144,15 +171,24 @@ const createGmp = () => ({
   },
 });
 
-const setupRenderer = (gmp = createGmp()) => {
-  testing.stubGlobal(
-    'fetch',
-    testing.fn().mockResolvedValue({
-      json: testing.fn().mockResolvedValue(nativeReportPayload),
+const createFetchMock = () =>
+  testing.fn().mockImplementation((url: string) =>
+    Promise.resolve({
+      json: testing
+        .fn()
+        .mockResolvedValue(
+          url.includes('/api/v1/filters')
+            ? nativeResultFiltersPayload
+            : nativeReportPayload,
+        ),
       ok: true,
       status: 200,
     }),
   );
+
+const setupRenderer = (gmp = createGmp()) => {
+  const fetchMock = createFetchMock();
+  testing.stubGlobal('fetch', fetchMock);
   const {render, store} = rendererWith({
     gmp,
     capabilities: true,
@@ -161,7 +197,7 @@ const setupRenderer = (gmp = createGmp()) => {
     route: `/report/${reportId}`,
   });
 
-  return {render, store};
+  return {render, store, fetchMock};
 };
 
 const renderPage = (render: ReturnType<typeof setupRenderer>['render']) =>
@@ -209,12 +245,12 @@ describe('DetailsPage', () => {
       );
     });
 
-    test('should render all 12 tabs once entity is loaded', async () => {
+    test('should render all report tabs once entity is loaded', async () => {
       const {render} = setupRenderer();
       renderPage(render);
 
       const tablist = await screen.findByRole('tablist');
-      expect(within(tablist).getAllByRole('tab')).toHaveLength(12);
+      expect(within(tablist).getAllByRole('tab')).toHaveLength(11);
       within(tablist).getByRole('tab', {name: /^metrics/i});
     });
 
@@ -250,6 +286,30 @@ describe('DetailsPage', () => {
       await screen.findByRole('row', {name: /^Task Name/});
       expect(screen.getByRole('row', {name: /^Task Name/})).toHaveTextContent(
         'foo',
+      );
+    });
+
+    test('should load result filter choices through the native API', async () => {
+      const gmp = createGmp();
+      const {render, fetchMock} = setupRenderer(gmp);
+      renderPage(render);
+
+      await screen.findByRole('heading', {name: /Report:/});
+
+      await waitFor(() => {
+        expect(gmp.buildUrl).toHaveBeenCalledWith('api/v1/filters', {
+          token: 'test-token',
+          page: 1,
+          page_size: 25,
+          sort: 'name',
+          filter: '',
+          filter_type: 'result',
+        });
+      });
+      expect(gmp.filters.get).not.toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://turbovas.example/api/v1/filters',
+        expect.objectContaining({credentials: 'include'}),
       );
     });
   });
