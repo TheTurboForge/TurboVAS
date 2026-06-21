@@ -119,6 +119,12 @@ read-only GMP scripts while keeping write/control operations on inherited paths
 until a separate native write design exists.
 Direct probes may add `--request-id 'operator-check-1'`; the value is sent as
 `X-Request-Id` and must use the bounded safe request-ID character set.
+Direct host/port env overrides are intentionally single-value settings:
+`TURBOVAS_API_DIRECT_HOST` accepts a host name, IPv4 address, or bracketed IPv6
+address; `TURBOVAS_API_DIRECT_PORT` accepts one TCP port; and
+`TURBOVAS_API_DIRECT_BIND` accepts `host:port` or `[ipv6]:port`. The helper
+rejects URLs, host lists, whitespace, and invalid ports before executing direct
+requests.
 Direct scriptable access is narrower than the internal listener: endpoints must
 be explicitly classified for direct use. Internal-only scaffolds such as the
 scope-report retention preview stay available to internal validation but return

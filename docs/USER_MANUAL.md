@@ -84,6 +84,12 @@ enables and validates an opt-in bearer-auth direct listener, defaulting to
 loopback. That direct mode is for read-only `/api/v1` development proof work;
 it is not production deployment guidance and does not authorize scanner control,
 credential, feed, account, or destructive write endpoints.
+Direct host and port overrides are intentionally narrow: use
+`TURBOVAS_API_DIRECT_HOST` for one host name, IPv4 address, or bracketed IPv6
+address such as `[::1]`, `TURBOVAS_API_DIRECT_PORT` for one TCP port, and
+`TURBOVAS_API_DIRECT_BIND` for `host:port` or `[ipv6]:port`. Do not put URLs,
+paths, comma-separated host lists, or whitespace in these values; the helper
+rejects malformed direct settings before sending a direct request.
 Use a request ID when a direct probe needs a visible correlation ID in
 responses/logs:
 

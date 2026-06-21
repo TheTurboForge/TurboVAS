@@ -96,6 +96,11 @@ be rejected by the HTTP parser before native middleware; the smoke records that
 layer explicitly.
 `native-api-request --request-id` sends a safe `X-Request-Id` value for
 correlation; it is not an authentication or audit identity.
+Direct listener host/port env is locally shape-checked as part of the direct
+smoke and `native-api-request --direct`: host is one host name, IPv4 address, or
+bracketed IPv6 address, port is one TCP port, and bind is `host:port` or
+`[ipv6]:port`. Malformed URLs, host lists, whitespace, and invalid ports are
+reported as local configuration failures before direct request execution.
 
 ## Remaining Hardening Questions
 

@@ -124,6 +124,12 @@ metadata and tag-dialog resource-name lookups, runtime feed inventory metadata
 (`/api/v1/feeds`), and selected asset listing/detail workflows.
 Direct probes may add `--request-id 'operator-check-1'` to send a bounded safe
 `X-Request-Id` correlation value.
+The direct helper validates direct listener env shape locally before access:
+`TURBOVAS_API_DIRECT_HOST` is a single host name, IPv4 address, or bracketed
+IPv6 address, `TURBOVAS_API_DIRECT_PORT` is a decimal TCP port, and
+`TURBOVAS_API_DIRECT_BIND` is `host:port` or `[ipv6]:port`. URLs, paths,
+comma-separated hosts, whitespace, and out-of-range ports are rejected before a
+direct request is sent.
 
 The first runtime implementation proof is scoped in
 `docs/NATIVE_API_PROOF_PLAN.md`. It started with an internal Rust sidecar and now
