@@ -5,11 +5,13 @@ import importlib.util
 import json
 import os
 import socket
+import subprocess
 import sys
 import tempfile
 import unittest
 import unittest.mock
 import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
 
@@ -627,6 +629,7 @@ class TurboVASCtlTests(unittest.TestCase):
         browser_smoke = (Path(__file__).resolve().parents[1] / "runtime_browser_smoke.py").read_text(encoding="utf-8")
         justfile = (Path(__file__).resolve().parents[2] / "justfile").read_text(encoding="utf-8")
         self.assertIn("def command_runtime_browser_smoke", source)
+        self.assertIn("browser_smoke_run_artifact_dir(repo_root, routes)", source)
         self.assertIn("browser_gmp_readiness_finding(repo_root, check=\"browser-smoke.gmp-ready\")", source)
         self.assertIn("runtime_browser_smoke_probe_path", source)
         self.assertIn("runtime-browser-smoke", source)
@@ -643,6 +646,61 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn('args.extend(["--route", route])', source)
         self.assertIn("runtime-browser-smoke *args:", justfile)
         self.assertIn('tools/turbovasctl runtime-browser-smoke "$@"', justfile)
+
+    def test_browser_smoke_run_artifact_dir_isolates_route_focused_runs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            root.mkdir()
+            run_dir = turbovasctl.browser_smoke_run_artifact_dir(
+                root,
+                ["reports", "/scopes/reports?filter=rows=10"],
+                now=datetime(2026, 6, 21, 19, 45, 1, 123456, tzinfo=timezone.utc),
+                pid=4242,
+            )
+
+            parent = Path(tmp) / "TurboVAS-runtime" / "artifacts" / "browser-smoke"
+            self.assertEqual(run_dir.parent, parent)
+            self.assertEqual(run_dir.name, "20260621T194501123456Z-pid4242-routes-reports-scopes-reports-filter-rows-10")
+
+    def test_runtime_browser_smoke_passes_isolated_artifact_dir_to_helper(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            probe = root / "tools" / "runtime_browser_smoke.py"
+            secret = root.parent / "TurboVAS-runtime" / "secrets" / "admin-password"
+            probe.parent.mkdir(parents=True)
+            secret.parent.mkdir(parents=True)
+            probe.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+            secret.write_text("admin\n", encoding="utf-8")
+            captured: dict[str, list[str]] = {}
+            original_run_dir = turbovasctl.browser_smoke_run_artifact_dir
+
+            def fake_run_command(command, *_args, **_kwargs):
+                captured["command"] = command
+                payload = {"status": "pass", "summary": "Browser smoke passed.", "artifacts": ["helper-artifact.json"]}
+                return subprocess.CompletedProcess(command, 0, json.dumps(payload) + "\n")
+
+            with unittest.mock.patch.object(turbovasctl, "runtime_secret_path", return_value=secret), \
+                unittest.mock.patch.object(turbovasctl, "runtime_browser_smoke_probe_path", return_value=probe), \
+                unittest.mock.patch.object(turbovasctl.shutil, "which", return_value="/usr/bin/node"), \
+                unittest.mock.patch.object(turbovasctl, "gsad_base_urls", return_value=("https://127.0.0.1:19392",)), \
+                unittest.mock.patch.object(turbovasctl, "runtime_gsa_freshness_findings", return_value=[]), \
+                unittest.mock.patch.object(turbovasctl, "browser_gmp_readiness_finding", return_value=turbovasctl.finding("pass", "browser-smoke.gmp-ready", "ready")), \
+                unittest.mock.patch.object(turbovasctl, "native_scope_report_browser_target", return_value=(None, False, turbovasctl.finding("pass", "browser-smoke.scope-report-target", "target"))), \
+                unittest.mock.patch.object(turbovasctl, "runtime_env", return_value={}), \
+                unittest.mock.patch.object(turbovasctl, "run_command", side_effect=fake_run_command), \
+                unittest.mock.patch.object(
+                    turbovasctl,
+                    "browser_smoke_run_artifact_dir",
+                    side_effect=lambda repo_root, routes: original_run_dir(repo_root, routes, now=datetime(2026, 6, 21, 19, 45, 1, tzinfo=timezone.utc), pid=4242),
+                ):
+                result = turbovasctl.command_runtime_browser_smoke(root, ["reports"])
+
+            artifact_arg = captured["command"][captured["command"].index("--artifact-dir") + 1]
+            parent = str(root.parent / "TurboVAS-runtime" / "artifacts" / "browser-smoke")
+            self.assertEqual(result["status"], "pass")
+            self.assertTrue(artifact_arg.startswith(parent + os.sep), artifact_arg)
+            self.assertTrue(artifact_arg.endswith("20260621T194501000000Z-pid4242-routes-reports"), artifact_arg)
+            self.assertNotEqual(artifact_arg, parent)
 
     def test_runtime_browser_regression_is_registered(self):
         source = (Path(__file__).resolve().parents[1] / "turbovasctl").read_text(encoding="utf-8")
