@@ -1764,8 +1764,15 @@ fn direct_api_wildcard_detail_path_is_allowed(path: &str) -> bool {
     .iter()
     .any(|prefix| {
         path.strip_prefix(prefix)
-            .is_some_and(|tail| tail.chars().any(|ch| ch != '/'))
+            .is_some_and(direct_api_wildcard_tail_is_allowed)
     })
+}
+
+fn direct_api_wildcard_tail_is_allowed(tail: &str) -> bool {
+    !tail.is_empty()
+        && tail
+            .split('/')
+            .all(|segment| !segment.is_empty() && segment != "." && segment != "..")
 }
 
 fn bearer_token_matches(headers: &HeaderMap, expected: &str) -> bool {
@@ -10708,6 +10715,12 @@ FEED_COMMIT = "not part of the public contract";
             "/api/v1/cpes/cpe:/a:example:thing/1.0"
         ));
         assert!(!direct_api_v1_path_is_allowed("/api/v1/cpes///"));
+        assert!(!direct_api_v1_path_is_allowed("/api/v1/cpes/."));
+        assert!(!direct_api_v1_path_is_allowed("/api/v1/cpes/.."));
+        assert!(!direct_api_v1_path_is_allowed("/api/v1/cpes/foo/../bar"));
+        assert!(!direct_api_v1_path_is_allowed(
+            "/api/v1/cert-bund-advisories/.."
+        ));
         assert!(direct_api_v1_path_is_allowed(
             "/api/v1/scopes/scope-id/reports/report-id/metrics"
         ));
