@@ -9,6 +9,10 @@ import {
   fetchNativeTagResources,
   fetchNativeTags,
 } from 'gmp/native-api/tags';
+import Filter from 'gmp/models/filter';
+import {loadEntities, loadEntity} from 'web/store/entities/tags';
+import {createState} from 'web/store/entities/utils/testing';
+import {filterIdentifier} from 'web/store/utils';
 
 const createGmp = ({jwt, token = 'test-token'}: {jwt?: string; token?: string} = {}) => ({
   buildUrl: testing.fn((path: string) => `https://turbovas.example/${path}`),
@@ -150,5 +154,92 @@ describe('native API tags', () => {
         sort: 'name',
       },
     );
+  });
+
+  test('loads the tag store through same-origin native API', async () => {
+    const filter = Filter.fromString(
+      'first=1 rows=10 sort=name resource_type=task',
+    );
+    const rootState = createState('tag', {
+      isLoading: {
+        [filterIdentifier(filter)]: false,
+      },
+    });
+    const getState = testing.fn().mockReturnValue(rootState);
+    const dispatch = testing.fn();
+    const fetchMock = testing.fn().mockResolvedValue({
+      json: testing.fn().mockResolvedValue({
+        page: {page: 1, page_size: 10, total: 1, sort: 'name', filter: ''},
+        items: [
+          {
+            id: '6d4dddf0-92a4-427f-b65d-bb9f9627aa01',
+            name: 'Task label',
+            resource_type: 'task',
+            resource_count: 2,
+            active: true,
+            value: 'prod',
+          },
+        ],
+      }),
+      ok: true,
+      status: 200,
+    });
+    testing.stubGlobal('fetch', fetchMock);
+    const gmp = createGmp();
+
+    await loadEntities(gmp)(filter)(dispatch, getState);
+
+    expect(gmp.buildUrl).toHaveBeenCalledWith('api/v1/tags', {
+      token: 'test-token',
+      page: 1,
+      page_size: 10,
+      sort: 'name',
+      filter: '',
+      active: '',
+      resource_type: 'task',
+      value: '',
+    });
+    expect(dispatch).toHaveBeenCalledTimes(2);
+    const successAction = dispatch.mock.calls[1][0];
+    expect(successAction.type).toEqual('ENTITIES_LOADING_SUCCESS');
+    expect(successAction.counts.filtered).toEqual(1);
+    expect(successAction.data[0].name).toEqual('Task label');
+    expect(successAction.data[0].resourceType).toEqual('task');
+  });
+
+  test('loads tag detail store entries through same-origin native API', async () => {
+    const id = '6d4dddf0-92a4-427f-b65d-bb9f9627aa01';
+    const rootState = createState('tag', {
+      isLoading: {
+        [id]: false,
+      },
+    });
+    const getState = testing.fn().mockReturnValue(rootState);
+    const dispatch = testing.fn();
+    const fetchMock = testing.fn().mockResolvedValue({
+      json: testing.fn().mockResolvedValue({
+        id,
+        name: 'Environment',
+        resources: {type: 'task', count: {total: 3}},
+        active: true,
+        value: 'production',
+      }),
+      ok: true,
+      status: 200,
+    });
+    testing.stubGlobal('fetch', fetchMock);
+    const gmp = createGmp();
+
+    await loadEntity(gmp)(id)(dispatch, getState);
+
+    expect(gmp.buildUrl).toHaveBeenCalledWith(
+      'api/v1/tags/6d4dddf0-92a4-427f-b65d-bb9f9627aa01',
+      {token: 'test-token'},
+    );
+    expect(dispatch).toHaveBeenCalledTimes(2);
+    const successAction = dispatch.mock.calls[1][0];
+    expect(successAction.type).toEqual('ENTITY_LOADING_SUCCESS');
+    expect(successAction.data.name).toEqual('Environment');
+    expect(successAction.data.resourceCount).toEqual(3);
   });
 });
