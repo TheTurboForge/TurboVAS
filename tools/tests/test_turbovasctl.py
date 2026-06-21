@@ -791,13 +791,14 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_technical_foundation_commands_are_registered(self):
         source = (Path(__file__).resolve().parents[1] / "turbovasctl").read_text(encoding="utf-8")
         justfile = (Path(__file__).resolve().parents[2] / "justfile").read_text(encoding="utf-8")
-        for command in ("native-tooling-state", "native-api-request", "rust-migration-state", "branding-state", "production-posture-check", "runtime-log-review", "runtime-data-state", "runtime-db-introspect", "runtime-performance-snapshot", "runtime-redis-state", "security-policy-check", "path-coupling-state", "runtime-native-api-smoke", "runtime-native-api-direct-smoke", "runtime-native-api-rebuild", "quality-gate", "quality-gate-state", "quality-gate-schedule"):
+        for command in ("native-tooling-state", "native-api-request", "native-api-client-contract", "rust-migration-state", "branding-state", "production-posture-check", "runtime-log-review", "runtime-data-state", "runtime-db-introspect", "runtime-performance-snapshot", "runtime-redis-state", "security-policy-check", "path-coupling-state", "runtime-native-api-smoke", "runtime-native-api-direct-smoke", "runtime-native-api-rebuild", "quality-gate", "quality-gate-state", "quality-gate-schedule"):
             with self.subTest(command=command):
                 self.assertIn(command, source)
                 self.assertIn(f"{command} *args:", justfile)
                 self.assertIn(f'tools/turbovasctl {command} "$@"', justfile)
         self.assertIn("def command_native_tooling_state", source)
         self.assertIn("def command_native_api_request", source)
+        self.assertIn("def command_native_api_client_contract", source)
         self.assertIn("def command_rust_migration_state", source)
         self.assertIn("def command_branding_state", source)
         self.assertIn("def command_runtime_log_review", source)
@@ -1363,6 +1364,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(contract["missing_operation_ids"], [])
         self.assertEqual(contract["duplicate_operation_ids"], [])
         self.assertEqual(contract["nondeterministic_operation_ids"], [])
+
         self.assertEqual(
             contract["allowed_turbovas_operation_fields"],
             [
@@ -1510,6 +1512,26 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(compact["openapi_contract"]["incomplete_collection_parameter_count"], 0)
         self.assertIn("getResultsByResultId", contract["operation_ids"])
         self.assertIn("getScopesByScopeIdReportsByScopeReportIdRetentionPlan", contract["operation_ids"])
+
+    def test_native_api_client_contract_is_generated_client_ready(self):
+        root = Path(__file__).resolve().parents[2]
+        result = turbovasctl.command_native_api_client_contract(root)
+        details = result["details"]
+        findings = {item["check"]: item for item in result["findings"]}
+
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(details["openapi_version"], "0.1.0-contract")
+        self.assertEqual(details["operation_count"], 72)
+        self.assertGreater(details["direct_read_operation_count"], 0)
+        self.assertEqual(details["non_get_direct_operations"], [])
+        self.assertIn("/api/v1", details["servers"])
+        self.assertIn("http://127.0.0.1:19080/api/v1", details["servers"])
+        self.assertIn("operatorSession", details["security_requirements"])
+        self.assertIn("bearerAuth", details["security_requirements"])
+        self.assertEqual(details["security_schemes"]["bearerAuth"]["type"], "http")
+        self.assertEqual(findings["native-api-client-contract.openapi"]["status"], "pass")
+        self.assertEqual(findings["native-api-client-contract.auth"]["status"], "pass")
+        self.assertEqual(findings["native-api-client-contract.direct-read"]["status"], "pass")
 
     def test_native_api_migration_matrix_combines_inventory_and_openapi_metadata(self):
         root = Path(__file__).resolve().parents[2]

@@ -4358,6 +4358,21 @@ def openapi_contract_lines(repo_root: Path | None) -> list[str]:
         return []
 
 
+def openapi_info_version(repo_root: Path | None) -> str | None:
+    in_info = False
+    for line in openapi_contract_lines(repo_root):
+        if line.strip() == "info:":
+            in_info = True
+            continue
+        if in_info and line and not line.startswith("  "):
+            return None
+        if in_info:
+            match = re.match(r"^  version:\s*([^#\s]+)\s*(?:#.*)?$", line)
+            if match:
+                return match.group(1)
+    return None
+
+
 def openapi_server_urls(repo_root: Path | None) -> list[str]:
     lines = openapi_contract_lines(repo_root)
     urls: list[str] = []
@@ -6002,6 +6017,79 @@ def command_native_api_migration_matrix(repo_root: Path) -> dict[str, Any]:
         )
     ]
     result = make_result("native-api-migration-matrix", repo_root, "Native API migration matrix collected.", findings)
+    result["details"] = details
+    return result
+
+
+def command_native_api_client_contract(repo_root: Path) -> dict[str, Any]:
+    contract = native_api_openapi_contract_summary(repo_root)
+    auth_contract = contract.get("auth_contract", {}) if isinstance(contract.get("auth_contract"), dict) else {}
+    operations = openapi_contract_operations(repo_root)
+    direct_operations = [
+        operation
+        for operation in operations
+        if "x-turbovas-direct" in set(operation.get("x_turbovas_fields", []))
+    ]
+    non_get_direct = [openapi_operation_label(operation) for operation in direct_operations if operation.get("method") != "get"]
+    direct_count = len(direct_operations)
+    openapi_status = "pass" if contract.get("alignment_status") == "pass" else "warn"
+    auth_status = "pass" if auth_contract.get("alignment_status") == "pass" else "warn"
+    direct_status = "pass" if direct_count > 0 and not non_get_direct else "warn"
+    details = {
+        "openapi_version": openapi_info_version(repo_root),
+        "operation_count": contract.get("operation_count", 0),
+        "direct_read_operation_count": direct_count,
+        "non_get_direct_operations": non_get_direct,
+        "servers": auth_contract.get("servers", []),
+        "security_requirements": auth_contract.get("security_requirements", []),
+        "security_schemes": auth_contract.get("security_schemes", {}),
+        "openapi_alignment_status": contract.get("alignment_status", "unknown"),
+        "auth_contract_alignment_status": auth_contract.get("alignment_status", "unknown"),
+        "missing_operation_id_count": len(contract.get("missing_operation_ids", [])),
+        "duplicate_operation_id_count": len(contract.get("duplicate_operation_ids", [])),
+        "operations_missing_error_response_count": len(contract.get("operations_missing_error_responses", [])),
+        "missing_error_schema_field_count": len(contract.get("missing_error_schema_fields", [])),
+        "missing_server_count": len(auth_contract.get("missing_servers", [])),
+        "missing_security_scheme_count": len(auth_contract.get("missing_security_schemes", [])),
+    }
+    findings = [
+        finding(
+            openapi_status,
+            "native-api-client-contract.openapi",
+            "OpenAPI operation IDs, Error responses, and collection contracts are generated-client ready."
+            if openapi_status == "pass"
+            else "OpenAPI operation IDs, Error responses, or collection contracts need attention before generated-client use.",
+            details={
+                "operation_count": details["operation_count"],
+                "missing_operation_id_count": details["missing_operation_id_count"],
+                "duplicate_operation_id_count": details["duplicate_operation_id_count"],
+                "operations_missing_error_response_count": details["operations_missing_error_response_count"],
+                "missing_error_schema_field_count": details["missing_error_schema_field_count"],
+            },
+        ),
+        finding(
+            auth_status,
+            "native-api-client-contract.auth",
+            "OpenAPI servers and cookie/bearer auth schemes are present for same-origin and direct clients."
+            if auth_status == "pass"
+            else "OpenAPI servers or auth schemes need attention before generated-client use.",
+            details={
+                "servers": details["servers"],
+                "security_requirements": details["security_requirements"],
+                "missing_server_count": details["missing_server_count"],
+                "missing_security_scheme_count": details["missing_security_scheme_count"],
+            },
+        ),
+        finding(
+            direct_status,
+            "native-api-client-contract.direct-read",
+            f"OpenAPI marks {direct_count} direct read operation(s) for generated/client use."
+            if direct_status == "pass"
+            else "OpenAPI direct markers are missing or include non-GET operations.",
+            details={"direct_read_operation_count": direct_count, "non_get_direct_operations": non_get_direct},
+        ),
+    ]
+    result = make_result("native-api-client-contract", repo_root, "Native API generated-client contract checked.", findings)
     result["details"] = details
     return result
 
@@ -11931,6 +12019,7 @@ def build_parser() -> argparse.ArgumentParser:
     native_tooling_state.add_argument("--compact", action="store_true", help="omit full item and endpoint inventories from JSON output")
     native_tooling_state.add_argument("--summary", action="store_true", help="emit only status/count contract summaries for low-noise closeout checks")
     subparsers.add_parser("native-api-migration-matrix", parents=[common], help="show native API migration metadata by endpoint")
+    subparsers.add_parser("native-api-client-contract", parents=[common], help="check the generated-client native API contract surface")
     subparsers.add_parser("rust-migration-state", parents=[common], help="inspect Rust migration tooling and first C-to-Rust dry-run candidate")
     subparsers.add_parser("doctor", parents=[common], help="run structural and environment health checks")
     subparsers.add_parser("branding-state", parents=[common], help="inventory visible branding and upstream-identity surfaces")
@@ -12045,6 +12134,8 @@ def main(argv: list[str] | None = None) -> int:
         result = command_native_tooling_state(repo_root, compact=args.compact, summary_only=args.summary)
     elif args.command == "native-api-migration-matrix":
         result = command_native_api_migration_matrix(repo_root)
+    elif args.command == "native-api-client-contract":
+        result = command_native_api_client_contract(repo_root)
     elif args.command == "rust-migration-state":
         result = command_rust_migration_state(repo_root)
     elif args.command == "doctor":

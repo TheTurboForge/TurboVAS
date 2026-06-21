@@ -18,6 +18,9 @@ native-tooling-state *args:
 native-api-request *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl native-api-request "$@"
 
+native-api-client-contract *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl native-api-client-contract "$@"
+
 native-api-rust-test *filters:
     @set -- {{filters}}; \
       if [ "${1:-}" = "--" ]; then shift; fi; \
