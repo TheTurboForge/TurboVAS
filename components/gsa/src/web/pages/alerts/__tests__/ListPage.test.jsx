@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import {describe, test, expect, testing} from '@gsa/testing';
+import {afterEach, describe, test, expect, testing} from '@gsa/testing';
 import {
   getSelectItemElementsForSelect,
   screen,
@@ -77,6 +77,8 @@ const nativeRedactedAlert = Alert.fromElement({
 });
 
 const createGmp = ({
+  buildUrl,
+  session = createSession({timezone: 'CET'}),
   getAlerts = testing.fn().mockResolvedValue({
     data: [alert],
     meta: {
@@ -84,6 +86,12 @@ const createGmp = ({
       counts: new CollectionCounts(),
     },
   }),
+  getAllFilters = testing.fn().mockResolvedValue({data: []}),
+  getCredentials = testing.fn().mockResolvedValue({data: []}),
+  getReportConfigs = testing.fn().mockResolvedValue({data: []}),
+  getReportFormats = testing.fn().mockResolvedValue({data: []}),
+  getReportComposerDefaults = testing.fn().mockResolvedValue({data: {}}),
+  getTasks = testing.fn().mockResolvedValue({data: []}),
   getFilters = testing.fn().mockResolvedValue({
     data: [],
     meta: {
@@ -111,6 +119,7 @@ const createGmp = ({
     foo: 'bar',
   }),
 } = {}) => ({
+  ...(buildUrl ? {buildUrl} : {}),
   alerts: {
     get: getAlerts,
     deleteByFilter,
@@ -118,15 +127,32 @@ const createGmp = ({
     delete: deleteByIds,
     export: exportByIds,
   },
+  credentials: {
+    getAll: getCredentials,
+  },
   filters: {
     get: getFilters,
+    getAll: getAllFilters,
+  },
+  reportconfigs: {
+    getAll: getReportConfigs,
+  },
+  reportformats: {
+    getAll: getReportFormats,
   },
   settings: {
     manualUrl,
     reloadInterval,
   },
-  session: createSession({timezone: 'CET'}),
-  user: {currentSettings},
+  session,
+  tasks: {
+    getAll: getTasks,
+  },
+  user: {currentSettings, getReportComposerDefaults, getSetting},
+});
+
+afterEach(() => {
+  testing.unstubAllGlobals();
 });
 
 describe('Alert ListPage tests', () => {
@@ -248,6 +274,83 @@ describe('Alert ListPage tests', () => {
     expect(row[1]).toHaveTextContent('Filter count at least');
     expect(row[1]).toHaveTextContent('SCP');
     expect(row[1]).not.toHaveTextContent('undefined');
+  });
+
+  test('should load alert dialog selector choices through native API', async () => {
+    const buildUrl = testing.fn(
+      (path, _params) => `https://turbovas.example/${path}`,
+    );
+    const payloads = {
+      'api/v1/report-formats': {
+        page: {page: 1, page_size: 500, total: 1, sort: 'name', filter: ''},
+        items: [{id: 'rf-1', name: 'PDF', active: true, trust: 'yes'}],
+      },
+      'api/v1/report-configs': {
+        page: {page: 1, page_size: 500, total: 1, sort: 'name', filter: ''},
+        items: [{id: 'rc-1', name: 'Default Config'}],
+      },
+      'api/v1/filters': {
+        page: {page: 1, page_size: 500, total: 2, sort: 'name', filter: ''},
+        items: [
+          {id: 'filter-result', name: 'Result Filter', filter_type: 'result'},
+          {id: 'filter-info', name: 'Info Filter', filter_type: 'info'},
+        ],
+      },
+      'api/v1/tasks': {
+        page: {page: 1, page_size: 500, total: 1, sort: 'name', filter: ''},
+        items: [{id: 'task-1', name: 'Scheduled Task', status: 'Done'}],
+      },
+    };
+    const fetchMock = testing.fn(url => {
+      const path = Object.keys(payloads).find(candidate =>
+        String(url).includes(candidate),
+      );
+      return Promise.resolve({
+        json: testing.fn().mockResolvedValue(payloads[path]),
+        ok: true,
+        status: 200,
+      });
+    });
+    testing.stubGlobal('fetch', fetchMock);
+    const getAllFilters = testing.fn();
+    const getReportConfigs = testing.fn();
+    const getReportFormats = testing.fn();
+    const getTasks = testing.fn();
+    const gmp = createGmp({
+      buildUrl,
+      getAllFilters,
+      getReportConfigs,
+      getReportFormats,
+      getTasks,
+      session: createSession({token: 'test-token', timezone: 'CET'}),
+    });
+    const {render, store} = rendererWith({
+      gmp,
+      capabilities: true,
+      store: true,
+      router: true,
+    });
+    store.dispatch(loadingActions.success({rowsperpage: {value: '2'}}));
+
+    render(<AlertPage />);
+    await wait();
+
+    fireEvent.click(screen.getByTestId('new-icon'));
+    await screen.findByText('New Alert');
+
+    expect(getReportFormats).not.toHaveBeenCalled();
+    expect(getReportConfigs).not.toHaveBeenCalled();
+    expect(getAllFilters).not.toHaveBeenCalled();
+    expect(getTasks).not.toHaveBeenCalled();
+    for (const path of Object.keys(payloads)) {
+      expect(buildUrl).toHaveBeenCalledWith(path, {
+        token: 'test-token',
+        page: 1,
+        page_size: 500,
+        sort: 'name',
+        filter: '',
+      });
+    }
   });
 
   test('should allow to bulk action on page contents', async () => {

@@ -17,6 +17,10 @@ import {first} from 'gmp/utils/array';
 import {selectSaveId} from 'gmp/utils/id';
 import {isDefined} from 'gmp/utils/identity';
 import {capitalizeFirstLetter, shorten} from 'gmp/utils/string';
+import {fetchNativeFilters} from 'gmp/native-api/filters';
+import {fetchNativeReportConfigs} from 'gmp/native-api/report-configs';
+import {fetchNativeReportFormats} from 'gmp/native-api/report-formats';
+import {fetchNativeTasks} from 'gmp/native-api/tasks';
 import FootNote from 'web/components/footnote/Footnote';
 import Layout from 'web/components/layout/Layout';
 import EntityComponent from 'web/entity/EntityComponent';
@@ -76,6 +80,67 @@ const getValue = (data = {}, def = undefined) => {
 
 const filterResultsFilter = filter => filter.filter_type === 'result';
 const filterSecinfoFilter = filter => filter.filter_type === 'info';
+const ALERT_DIALOG_NATIVE_PAGE_SIZE = 500;
+
+const canUseNativeApi = gmp => typeof gmp?.buildUrl === 'function';
+
+const nativeDialogQuery = page => ({
+  page,
+  pageSize: ALERT_DIALOG_NATIVE_PAGE_SIZE,
+  sort: 'name',
+  filter: '',
+});
+
+const fetchAllNativeDialogItems = async (fetchPage, key) => {
+  const items = [];
+  for (let page = 1; ; page += 1) {
+    const response = await fetchPage(page);
+    const pageItems = response[key] ?? [];
+    items.push(...pageItems);
+    const total = response.page?.total ?? items.length;
+    if (pageItems.length === 0 || items.length >= total) {
+      break;
+    }
+  }
+  return items;
+};
+
+export const fetchNativeAlertDialogLookups = async gmp => {
+  const [reportFormats, reportConfigs, filters, tasks] = await Promise.all([
+    fetchAllNativeDialogItems(
+      page => fetchNativeReportFormats(gmp, nativeDialogQuery(page)),
+      'reportFormats',
+    ),
+    fetchAllNativeDialogItems(
+      page => fetchNativeReportConfigs(gmp, nativeDialogQuery(page)),
+      'reportConfigs',
+    ),
+    fetchAllNativeDialogItems(
+      page => fetchNativeFilters(gmp, nativeDialogQuery(page)),
+      'filters',
+    ),
+    fetchAllNativeDialogItems(
+      page => fetchNativeTasks(gmp, nativeDialogQuery(page)),
+      'tasks',
+    ),
+  ]);
+  return {reportFormats, reportConfigs, filters, tasks};
+};
+
+const fetchInheritedAlertDialogLookups = async gmp => {
+  const [reportFormats, reportConfigs, filters, tasks] = await Promise.all([
+    gmp.reportformats.getAll().then(r => r.data),
+    gmp.reportconfigs.getAll().then(r => r.data),
+    gmp.filters.getAll().then(r => r.data),
+    gmp.tasks.getAll({schedulesOnly: true}).then(r => r.data),
+  ]);
+  return {reportFormats, reportConfigs, filters, tasks};
+};
+
+const fetchAlertDialogLookups = gmp =>
+  canUseNativeApi(gmp)
+    ? fetchNativeAlertDialogLookups(gmp)
+    : fetchInheritedAlertDialogLookups(gmp);
 
 const AlertComponent = ({
   children,
@@ -390,31 +455,17 @@ const AlertComponent = ({
 
   const openAlertDialog = async alertObj => {
     const credentialsPromise = gmp.credentials.getAll().then(r => r.data);
-    const reportFormatsPromise = gmp.reportformats.getAll().then(r => r.data);
-    const reportConfigsPromise = gmp.reportconfigs.getAll().then(r => r.data);
-    const filtersPromise = gmp.filters.getAll().then(r => r.data);
-    const tasksPromise = gmp.tasks
-      .getAll({schedulesOnly: true})
-      .then(r => r.data);
+    const lookupsPromise = fetchAlertDialogLookups(gmp);
     loadDefaults();
 
     if (isDefined(alertObj)) {
       const alertPromise = gmp.alert.get({id: alertObj.id}).then(r => r.data);
-      const [
-        credentials,
-        lalert,
-        reportFormats,
-        reportConfigs,
-        filters,
-        tasks,
-      ] = await Promise.all([
+      const [credentials, lalert, lookups] = await Promise.all([
         credentialsPromise,
         alertPromise,
-        reportFormatsPromise,
-        reportConfigsPromise,
-        filtersPromise,
-        tasksPromise,
+        lookupsPromise,
       ]);
+      const {reportFormats, reportConfigs, filters, tasks} = lookups;
       const {method, condition, event} = lalert;
 
       const emailCredentials = credentials.filter(email_credential_filter);
@@ -720,14 +771,11 @@ const AlertComponent = ({
       setTasks(tasks);
       setTitle(_('Edit Alert {{- name}}', {name: shorten(alertObj.name)}));
     } else {
-      const [credentials, reportFormats, reportConfigs, filters, tasks] =
-        await Promise.all([
-          credentialsPromise,
-          reportFormatsPromise,
-          reportConfigsPromise,
-          filtersPromise,
-          tasksPromise,
-        ]);
+      const [credentials, lookups] = await Promise.all([
+        credentialsPromise,
+        lookupsPromise,
+      ]);
+      const {reportFormats, reportConfigs, filters, tasks} = lookups;
       const resultFilters = filters.filter(filterResultsFilter);
       const secinfoFilters = filters.filter(filterSecinfoFilter);
       const smbCredentials = credentials.filter(smb_credential_filter);
