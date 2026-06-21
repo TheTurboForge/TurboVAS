@@ -2309,6 +2309,23 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertIn("X-Request-Id: client-123_abc.4:5", rendered)
         self.assertNotIn("secret-token", rendered)
 
+    def test_direct_native_api_display_command_redacts_body(self):
+        env = {
+            turbovasctl.TURBOVAS_API_DIRECT_HOST_ENV: "127.0.0.1",
+            turbovasctl.TURBOVAS_API_DIRECT_PORT_ENV: "19080",
+        }
+        command = turbovasctl.direct_native_api_display_command(
+            "/api/v1/reports?page_size=1",
+            token="secret-token",
+            env=env,
+            body="probe-body",
+        )
+        rendered = " ".join(command)
+        self.assertIn("-X GET", rendered)
+        self.assertIn("--data-binary <redacted-body>", rendered)
+        self.assertNotIn("probe-body", rendered)
+        self.assertNotIn("secret-token", rendered)
+
     def test_validate_direct_api_request_id_rejects_unsafe_values(self):
         self.assertEqual(
             turbovasctl.validate_direct_api_request_id("client-123_abc.4:5"),
@@ -2329,6 +2346,7 @@ db2:keys=5,expires=0,avg_ttl=0
         root = Path(__file__).resolve().parents[2]
         native_tooling = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
         self.assertIn("native-api-direct.internal-only-retention-plan", native_tooling)
+        self.assertIn("native-api-direct.request-shape-guard", native_tooling)
         self.assertIn("/retention-plan", native_tooling)
 
     def test_scanner_redis_paths_live_under_runtime_dir(self):

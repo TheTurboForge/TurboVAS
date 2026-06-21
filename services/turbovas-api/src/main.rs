@@ -41,6 +41,7 @@ const DIRECT_API_BIND_ENV: &str = "TURBOVAS_API_DIRECT_BIND";
 const DIRECT_API_BEARER_TOKEN_ENV: &str = "TURBOVAS_API_BEARER_TOKEN";
 const DIRECT_API_REQUEST_ID_HEADER: &str = "x-request-id";
 const MIN_DIRECT_API_BEARER_TOKEN_LENGTH: usize = 32;
+const MAX_DIRECT_API_QUERY_BYTES: usize = 8 * 1024;
 const FEED_METADATA_ROOT_ENV: &str = "TURBOVAS_FEED_METADATA_DIR";
 const FEED_LOCK_ROOT_ENV: &str = "TURBOVAS_FEED_LOCK_DIR";
 const DEFAULT_FEED_METADATA_ROOT: &str = "/runtime/feeds";
@@ -1291,6 +1292,8 @@ enum ApiError {
     Unauthorized,
     #[error("method not allowed")]
     MethodNotAllowed,
+    #[error("request too large")]
+    RequestTooLarge,
     #[error("{0}")]
     BadRequest(String),
     #[error("resource not found")]
@@ -1306,6 +1309,7 @@ impl ApiError {
         match self {
             Self::Unauthorized => StatusCode::UNAUTHORIZED,
             Self::MethodNotAllowed => StatusCode::METHOD_NOT_ALLOWED,
+            Self::RequestTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
             Self::BadRequest(_) => StatusCode::BAD_REQUEST,
             Self::NotFound => StatusCode::NOT_FOUND,
             Self::Database | Self::Config => StatusCode::INTERNAL_SERVER_ERROR,
@@ -1316,6 +1320,7 @@ impl ApiError {
         match self {
             Self::Unauthorized => "unauthorized",
             Self::MethodNotAllowed => "method_not_allowed",
+            Self::RequestTooLarge => "request_too_large",
             Self::BadRequest(_) => "bad_request",
             Self::NotFound => "not_found",
             Self::Database => "database_error",
@@ -1328,6 +1333,10 @@ impl ApiError {
             Self::Unauthorized => "A valid bearer token is required.".to_string(),
             Self::MethodNotAllowed => {
                 "Direct native API access currently allows read-only GET requests only.".to_string()
+            }
+            Self::RequestTooLarge => {
+                "Direct native API requests must fit the bounded read-only request shape."
+                    .to_string()
             }
             Self::BadRequest(message) => message.clone(),
             Self::NotFound => "The requested resource was not found.".to_string(),
@@ -1577,7 +1586,11 @@ async fn require_direct_api_auth(
         if !direct_api_v1_path_is_allowed(&path) {
             ApiError::NotFound.into_response()
         } else if request.method() == axum::http::Method::GET {
-            next.run(request).await
+            if direct_api_request_shape_is_allowed(&request) {
+                next.run(request).await
+            } else {
+                ApiError::RequestTooLarge.into_response()
+            }
         } else {
             ApiError::MethodNotAllowed.into_response()
         }
@@ -1592,6 +1605,27 @@ async fn require_direct_api_auth(
     }
     attach_request_id_header(&mut response, &request_id);
     response
+}
+
+fn direct_api_request_shape_is_allowed(request: &Request) -> bool {
+    if request
+        .uri()
+        .query()
+        .is_some_and(|query| query.len() > MAX_DIRECT_API_QUERY_BYTES)
+    {
+        return false;
+    }
+    if request.headers().get(header::TRANSFER_ENCODING).is_some() {
+        return false;
+    }
+    match request.headers().get(header::CONTENT_LENGTH) {
+        Some(value) => value
+            .to_str()
+            .ok()
+            .and_then(|text| text.parse::<u64>().ok())
+            .is_some_and(|length| length == 0),
+        None => true,
+    }
 }
 
 fn direct_api_v1_path_is_allowed(path: &str) -> bool {
@@ -10422,6 +10456,14 @@ FEED_COMMIT = "not part of the public contract";
     }
 
     #[test]
+    fn direct_api_request_too_large_uses_json_413_contract() {
+        let error = ApiError::RequestTooLarge;
+        assert_eq!(error.status_code(), StatusCode::PAYLOAD_TOO_LARGE);
+        assert_eq!(error.code(), "request_too_large");
+        assert!(error.public_message().contains("bounded read-only"));
+    }
+
+    #[test]
     fn direct_api_bearer_token_requires_bounded_printable_secret() {
         assert!(direct_api_bearer_token_is_acceptable(
             "0123456789abcdef0123456789abcdef"
@@ -10464,6 +10506,53 @@ FEED_COMMIT = "not part of the public contract";
         ));
         assert!(!direct_api_v1_path_is_allowed("/api/v1/internal-preview"));
         assert!(!direct_api_v1_path_is_allowed("/api/v1/reports/id/raw-xml"));
+    }
+
+    #[test]
+    fn direct_api_request_shape_rejects_bodies_and_oversized_queries() {
+        let allowed = Request::builder()
+            .uri("/api/v1/reports?page_size=1")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        assert!(direct_api_request_shape_is_allowed(&allowed));
+
+        let explicit_empty_body = Request::builder()
+            .uri("/api/v1/reports?page_size=1")
+            .header(header::CONTENT_LENGTH, "0")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        assert!(direct_api_request_shape_is_allowed(&explicit_empty_body));
+
+        let body = Request::builder()
+            .uri("/api/v1/reports?page_size=1")
+            .header(header::CONTENT_LENGTH, "1")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        assert!(!direct_api_request_shape_is_allowed(&body));
+
+        let chunked = Request::builder()
+            .uri("/api/v1/reports?page_size=1")
+            .header(header::TRANSFER_ENCODING, "chunked")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        assert!(!direct_api_request_shape_is_allowed(&chunked));
+
+        let malformed_length = Request::builder()
+            .uri("/api/v1/reports?page_size=1")
+            .header(header::CONTENT_LENGTH, "not-a-number")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        assert!(!direct_api_request_shape_is_allowed(&malformed_length));
+
+        let oversized_query = format!(
+            "/api/v1/reports?filter={}",
+            "a".repeat(MAX_DIRECT_API_QUERY_BYTES)
+        );
+        let oversized = Request::builder()
+            .uri(oversized_query)
+            .body(axum::body::Body::empty())
+            .unwrap();
+        assert!(!direct_api_request_shape_is_allowed(&oversized));
     }
 
     #[test]

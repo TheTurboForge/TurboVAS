@@ -85,10 +85,11 @@ tools/turbovasctl native-api-request --direct --json --request-id 'operator-chec
 ```
 
 The direct smoke proves health access, missing-token rejection, wrong-token
-rejection, valid-token JSON access, valid-token non-GET rejection, direct feed
-inventory access, tag-dialog alert resource-name lookup, and internal-only
-endpoint denial for the retention preview when a scope report is available,
-plus continued internal native API smoke.
+rejection, valid-token JSON access, valid-token non-GET rejection, valid-token
+GET request-body rejection, direct feed inventory access, tag-dialog alert
+resource-name lookup, and internal-only endpoint denial for the retention
+preview when a scope report is available, plus continued internal native API
+smoke.
 `native-api-request --request-id` sends a safe `X-Request-Id` value for
 correlation; it is not an authentication or audit identity.
 
@@ -98,7 +99,8 @@ correlation; it is not an authentication or audit identity.
   proxy token, or a Unix socket;
 - how operator identity should be forwarded for audit once direct access moves
   beyond a single development bearer token;
-- rate limits and payload limits for heavyweight report queries;
+- rate limits and any per-endpoint limits beyond the current direct-v1 bounded
+  request-shape guard;
 - TLS/certificate strategy and host-binding defaults for production;
 - CSRF/origin handling for future non-GET browser-accessible native APIs;
 - generated-client packaging and versioning policy.
