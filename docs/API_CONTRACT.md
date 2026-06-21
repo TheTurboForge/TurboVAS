@@ -67,6 +67,10 @@ separate TLS/bootstrap/host-binding posture tracked outside this v1 read API.
 - Authentication: same-origin operator session through the existing `gsad` web
   boundary for browser reads, or bearer token through the opt-in direct native
   API listener. See `docs/NATIVE_API_AUTH_BOUNDARY.md`.
+- Direct v1 method boundary: the opt-in direct listener accepts only read-only
+  `GET` requests under `/api/v1` and returns JSON `405 method_not_allowed` for
+  valid-token non-GET requests until native write/control APIs are separately
+  designed.
 - Response body: JSON objects only; no XML payloads in native product APIs.
 - IDs: UUID strings matching the underlying gvmd resource identifiers.
 - Timestamps: RFC 3339 UTC strings.

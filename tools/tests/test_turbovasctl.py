@@ -2088,6 +2088,21 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertIn("Authorization: Bearer <redacted>", rendered)
         self.assertNotIn("secret-token", rendered)
 
+    def test_direct_native_api_display_command_includes_non_get_method(self):
+        env = {
+            turbovasctl.TURBOVAS_API_DIRECT_HOST_ENV: "127.0.0.1",
+            turbovasctl.TURBOVAS_API_DIRECT_PORT_ENV: "19080",
+        }
+        command = turbovasctl.direct_native_api_display_command(
+            "/api/v1/reports?page_size=1",
+            token="secret-token",
+            env=env,
+            method="POST",
+        )
+        self.assertIn("-X", command)
+        self.assertIn("POST", command)
+        self.assertIn("Authorization: Bearer <redacted>", " ".join(command))
+
     def test_direct_native_api_http_status_parser_keeps_json_error_body(self):
         completed = turbovasctl.subprocess.CompletedProcess([], 0, '{"error":{"code":"unauthorized"}}\n401', "")
         parsed, status = turbovasctl.parse_json_output_with_http_status(completed)

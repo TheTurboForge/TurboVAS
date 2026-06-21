@@ -25,6 +25,9 @@ script/curl -> opt-in direct bearer listener -> turbovas-api -> PostgreSQL
 - `/healthz` is unauthenticated for readiness. `/api/v1/...` on the direct
   listener requires `Authorization: Bearer <token>` and returns JSON `401`
   errors for missing or wrong tokens.
+- The direct listener rejects valid-token non-GET `/api/v1` requests with JSON
+  `405 method_not_allowed`. This prevents future native write/control routes
+  from becoming direct-scriptable without a separate safety design.
 - Direct listener responses include `X-Request-Id`. A client may provide a
   bounded ASCII request ID for correlation; unsafe, empty, or oversized values
   are replaced with a generated `tv-...` ID. Auth failures and direct-listener

@@ -1198,6 +1198,8 @@ struct MetricsPayload {
 enum ApiError {
     #[error("unauthorized")]
     Unauthorized,
+    #[error("method not allowed")]
+    MethodNotAllowed,
     #[error("{0}")]
     BadRequest(String),
     #[error("resource not found")]
@@ -1212,6 +1214,7 @@ impl ApiError {
     fn status_code(&self) -> StatusCode {
         match self {
             Self::Unauthorized => StatusCode::UNAUTHORIZED,
+            Self::MethodNotAllowed => StatusCode::METHOD_NOT_ALLOWED,
             Self::BadRequest(_) => StatusCode::BAD_REQUEST,
             Self::NotFound => StatusCode::NOT_FOUND,
             Self::Database | Self::Config => StatusCode::INTERNAL_SERVER_ERROR,
@@ -1221,6 +1224,7 @@ impl ApiError {
     fn code(&self) -> &'static str {
         match self {
             Self::Unauthorized => "unauthorized",
+            Self::MethodNotAllowed => "method_not_allowed",
             Self::BadRequest(_) => "bad_request",
             Self::NotFound => "not_found",
             Self::Database => "database_error",
@@ -1231,6 +1235,9 @@ impl ApiError {
     fn public_message(&self) -> String {
         match self {
             Self::Unauthorized => "A valid bearer token is required.".to_string(),
+            Self::MethodNotAllowed => {
+                "Direct native API access currently allows read-only GET requests only.".to_string()
+            }
             Self::BadRequest(message) => message.clone(),
             Self::NotFound => "The requested resource was not found.".to_string(),
             Self::Database => "The database query failed.".to_string(),
@@ -1467,7 +1474,11 @@ async fn require_direct_api_auth(
     let mut response = if !api_path {
         next.run(request).await
     } else if bearer_token_matches(request.headers(), &auth.token) {
-        next.run(request).await
+        if request.method() == axum::http::Method::GET {
+            next.run(request).await
+        } else {
+            ApiError::MethodNotAllowed.into_response()
+        }
     } else {
         tracing::warn!(request_id = %request_id, %method, path = %path, "direct native API bearer authentication failed");
         ApiError::Unauthorized.into_response()
@@ -9844,6 +9855,14 @@ mod tests {
             "bearer secret-token".parse().unwrap(),
         );
         assert!(bearer_token_matches(&headers, "secret-token"));
+    }
+
+    #[test]
+    fn direct_api_method_guard_uses_json_405_contract() {
+        let error = ApiError::MethodNotAllowed;
+        assert_eq!(error.status_code(), StatusCode::METHOD_NOT_ALLOWED);
+        assert_eq!(error.code(), "method_not_allowed");
+        assert!(error.public_message().contains("GET"));
     }
 
     #[test]

@@ -970,16 +970,33 @@ def runtime_lock_timeout_finding(exc: RuntimeLockTimeout, check: str) -> dict[st
     )
 
 
-def direct_native_api_curl(repo_root: Path, path: str, *, token: str | None, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+def direct_native_api_curl(
+    repo_root: Path,
+    path: str,
+    *,
+    token: str | None,
+    env: dict[str, str],
+    method: str = "GET",
+) -> subprocess.CompletedProcess[str]:
     command = ["curl", "-sS", "--max-time", "10", "-w", "\n%{http_code}"]
+    if method != "GET":
+        command.extend(["-X", method])
     if token is not None:
         command.extend(["-H", f"Authorization: Bearer {token}"])
     command.append(f"{native_api_direct_base_url(env)}{path}")
     return run_command(command, repo_root, env=env, timeout=30)
 
 
-def direct_native_api_display_command(path: str, *, token: str | None, env: dict[str, str]) -> list[str]:
+def direct_native_api_display_command(
+    path: str,
+    *,
+    token: str | None,
+    env: dict[str, str],
+    method: str = "GET",
+) -> list[str]:
     command = ["curl", "-sS", "--max-time", "10", "-w", "\\n%{http_code}"]
+    if method != "GET":
+        command.extend(["-X", method])
     if token is not None:
         command.extend(["-H", "Authorization: Bearer <redacted>"])
     command.append(f"{native_api_direct_base_url(env)}{path}")
@@ -6266,6 +6283,17 @@ def command_runtime_native_api_direct_smoke(repo_root: Path) -> dict[str, Any]:
     valid_json, valid_status = parse_json_output_with_http_status(valid)
     valid_ok = valid.returncode == 0 and valid_status == 200 and isinstance(valid_json, dict) and isinstance(valid_json.get("items"), list)
     findings.append(native_api_probe_finding("pass" if valid_ok else "fail", "native-api-direct.valid-token", "Direct native API accepts the configured bearer token and returns JSON." if valid_ok else "Direct native API did not return JSON for the configured bearer token.", valid, direct_native_api_display_command("/api/v1/reports?page_size=1", token=env[TURBOVAS_API_BEARER_TOKEN_ENV], env=env), valid_json, {"http_status": valid_status, **summarize_native_api_response(valid_json)}))
+
+    non_get = direct_native_api_curl(
+        repo_root,
+        "/api/v1/reports?page_size=1",
+        token=env[TURBOVAS_API_BEARER_TOKEN_ENV],
+        env=env,
+        method="POST",
+    )
+    non_get_json, non_get_status = parse_json_output_with_http_status(non_get)
+    non_get_ok = non_get.returncode == 0 and non_get_status == 405 and isinstance(non_get_json, dict) and non_get_json.get("error", {}).get("code") == "method_not_allowed"
+    findings.append(native_api_probe_finding("pass" if non_get_ok else "fail", "native-api-direct.read-only-method-guard", "Direct native API rejects valid-token non-GET /api/v1 requests with JSON 405." if non_get_ok else "Direct native API did not reject a valid-token non-GET /api/v1 request correctly.", non_get, direct_native_api_display_command("/api/v1/reports?page_size=1", token=env[TURBOVAS_API_BEARER_TOKEN_ENV], env=env, method="POST"), non_get_json, {"http_status": non_get_status, **summarize_native_api_response(non_get_json)}))
 
     internal = command_runtime_native_api_smoke(repo_root)
     findings.append(finding(internal["status"], "native-api.internal-smoke", internal["summary"], details={"status": internal["status"], "artifacts": internal.get("artifacts", [])}))
