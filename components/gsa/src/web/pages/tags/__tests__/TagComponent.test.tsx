@@ -1,9 +1,10 @@
 /* SPDX-FileCopyrightText: 2025 Greenbone AG
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import {describe, test, expect, testing} from '@gsa/testing';
+import {afterEach, describe, test, expect, testing} from '@gsa/testing';
 import {fireEvent, rendererWith, screen, wait} from 'web/testing';
 import Response from 'gmp/http/response';
 import ResourceName from 'gmp/models/resource-name';
@@ -14,6 +15,7 @@ import {YES_VALUE} from 'gmp/parser';
 import {createSession} from 'gmp/testing';
 import Button from 'web/components/form/Button';
 import TagComponent from 'web/pages/tags/TagComponent';
+import {SELECT_MAX_RESOURCES} from 'web/pages/tags/TagDialog';
 
 const createGmp = ({
   createTagResponse = {id: '123'},
@@ -47,12 +49,20 @@ const createGmp = ({
   disableTag = testing.fn().mockResolvedValue(disableTagResponse),
   getTasks = testing.fn().mockResolvedValue(getTasksResponse),
   getResourceNames = testing.fn().mockResolvedValue(getResourceNamesResponse),
+  native = false,
 } = {}) => ({
+  ...(native
+    ? {
+        buildUrl: testing.fn(
+          (path, _params) => `https://turbovas.example/${path}`,
+        ),
+      }
+    : {}),
   settings: {
     enableGreenboneSensor: true,
     enableKrb5: false,
   },
-  session: createSession(),
+  session: {...createSession(), token: 'test-token', jwt: 'jwt-token'},
   user: {
     currentSettings: testing.fn().mockResolvedValue(
       new Response({
@@ -80,6 +90,45 @@ const createGmp = ({
   resourcenames: {
     getAll: getResourceNames,
   },
+});
+
+const nativeTagPayload = {
+  id: '1234',
+  name: 'My Tag',
+  comment: '',
+  active: true,
+  resource_type: 'task',
+  resource_count: 1,
+  value: 'Some Value',
+};
+
+const nativeTagResourcesPayload = {
+  tag_id: '1234',
+  resource_type: 'task',
+  page: {page: 1, page_size: SELECT_MAX_RESOURCES, total: 1, sort: 'name'},
+  items: [{id: '1', name: 'Task 1', type: 'task'}],
+};
+
+const nativeTagResourceNamesPayload = {
+  page: {page: 1, page_size: SELECT_MAX_RESOURCES, total: 1, sort: 'name'},
+  items: [{id: '1', name: 'Task 1', type: 'task'}],
+};
+
+const stubNativeFetch = (...payloads) => {
+  const fetchMock = testing.fn();
+  payloads.forEach(payload => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: testing.fn().mockResolvedValue(payload),
+    });
+  });
+  testing.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+};
+
+afterEach(() => {
+  testing.unstubAllGlobals();
 });
 
 describe('TagComponent tests', () => {
@@ -117,6 +166,66 @@ describe('TagComponent tests', () => {
     });
 
     expect(onCreated).toHaveBeenCalled();
+  });
+
+  test('should use native tag reads to edit an existing tag', async () => {
+    const fetchMock = stubNativeFetch(
+      nativeTagPayload,
+      nativeTagResourcesPayload,
+      nativeTagResourceNamesPayload,
+    );
+    const gmp = createGmp({native: true});
+    const tag = new Tag({name: 'My Tag', id: '1234', resourceType: 'task'});
+    const onSaved = testing.fn();
+
+    const {render} = rendererWith({gmp, capabilities: true});
+
+    render(
+      <TagComponent onSaved={onSaved}>
+        {({edit}) => <Button data-testid="button" onClick={() => edit(tag)} />}
+      </TagComponent>,
+    );
+
+    fireEvent.click(screen.getByTestId('button'));
+
+    await wait();
+
+    expect(gmp.tag.get).not.toHaveBeenCalled();
+    expect(gmp.tasks.get).not.toHaveBeenCalled();
+    expect(gmp.buildUrl).toHaveBeenCalledWith('api/v1/tags/1234', {
+      token: 'test-token',
+    });
+    expect(gmp.buildUrl).toHaveBeenCalledWith('api/v1/tags/1234/resources', {
+      token: 'test-token',
+      page: 1,
+      page_size: SELECT_MAX_RESOURCES,
+      sort: 'name',
+    });
+    expect(gmp.buildUrl).toHaveBeenCalledWith('api/v1/tags/resource-names/task', {
+      token: 'test-token',
+      page: 1,
+      page_size: SELECT_MAX_RESOURCES,
+      sort: 'name',
+      filter: '',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+
+    screen.getDialog();
+    fireEvent.click(screen.getDialogSaveButton());
+
+    await wait();
+
+    expect(gmp.tag.save).toHaveBeenCalledWith({
+      active: true,
+      comment: '',
+      id: '1234',
+      name: 'My Tag',
+      resourceIds: ['1'],
+      resourceType: 'task',
+      value: 'Some Value',
+    });
+
+    expect(onSaved).toHaveBeenCalled();
   });
 
   test('should create a tag with predefined resource type and ids', async () => {
@@ -348,6 +457,46 @@ describe('TagComponent tests', () => {
       id: '123',
       name: 'My Tag',
       comment: '',
+      resourceIds: ['234'],
+      resourceType: 'task',
+      resourcesAction: 'remove',
+      value: 'Some Value',
+    });
+    expect(onRemoved).toHaveBeenCalled();
+  });
+
+  test('should use native tag detail to remove a tag from a resource', async () => {
+    const fetchMock = stubNativeFetch(nativeTagPayload);
+    const gmp = createGmp({native: true});
+    const onRemoved = testing.fn();
+
+    const {render} = rendererWith({gmp, capabilities: true});
+
+    render(
+      <TagComponent onRemoved={onRemoved}>
+        {({remove}) => (
+          <Button
+            data-testid="button"
+            onClick={() => remove('1234', new Task({id: '234'}))}
+          />
+        )}
+      </TagComponent>,
+    );
+
+    fireEvent.click(screen.getByTestId('button'));
+
+    await wait();
+
+    expect(gmp.tag.get).not.toHaveBeenCalled();
+    expect(gmp.buildUrl).toHaveBeenCalledWith('api/v1/tags/1234', {
+      token: 'test-token',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(gmp.tag.save).toHaveBeenCalledWith({
+      active: true,
+      id: '1234',
+      name: 'My Tag',
+      comment: undefined,
       resourceIds: ['234'],
       resourceType: 'task',
       resourcesAction: 'remove',

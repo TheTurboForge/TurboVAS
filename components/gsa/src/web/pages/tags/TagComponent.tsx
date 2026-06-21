@@ -10,6 +10,7 @@ import {type EntityCommandParams} from 'gmp/commands/entity';
 import type Response from 'gmp/http/response';
 import type Model from 'gmp/models/model';
 import type Tag from 'gmp/models/tag';
+import {fetchNativeTag, fetchNativeTagResources} from 'gmp/native-api/tags';
 import {YES_VALUE} from 'gmp/parser';
 import {
   type EntityType,
@@ -109,6 +110,38 @@ const RESOURCE_TYPES: EntityType[] = [
   'tlscertificate',
   'user',
 ] as const;
+
+const canUseNativeApi = (gmp: {buildUrl?: unknown}) =>
+  typeof gmp?.buildUrl === 'function';
+
+const fetchTag = async (gmp, id: string): Promise<Tag> => {
+  if (canUseNativeApi(gmp)) {
+    return fetchNativeTag(gmp, id);
+  }
+  const response = await gmp.tag.get({id});
+  return response.data;
+};
+
+const fetchTagResources = async (
+  gmp,
+  tag: Tag,
+  resourceType: EntityType,
+): Promise<Model[]> => {
+  if (canUseNativeApi(gmp)) {
+    return fetchNativeTagResources(
+      gmp,
+      tag.id as string,
+      resourceType,
+      SELECT_MAX_RESOURCES,
+    );
+  }
+
+  const filter = 'rows=' + SELECT_MAX_RESOURCES + ' tag_id="' + tag.id;
+  const response = (await gmp[pluralizeType(resourceType)].get({
+    filter,
+  })) as Response<Model[]>;
+  return response.data;
+};
 
 const TagComponent = ({
   children,
@@ -241,23 +274,16 @@ const TagComponent = ({
     const resourceTypesArray = getResourceTypes();
 
     if (isDefined(tag)) {
-      const response = await gmp.tag.get({id: tag.id as string});
-      const loadedTag = response.data;
-      const filter =
-        'rows=' + SELECT_MAX_RESOURCES + ' tag_id="' + loadedTag.id;
-      const resp = (await gmp[
-        pluralizeType(loadedTag.resourceType as EntityType)
-      ].get({
-        filter,
-      })) as Response<Model[]>;
-      const resources = resp.data;
+      const loadedTag = await fetchTag(gmp, tag.id as string);
+      const resourceType = loadedTag.resourceType as EntityType;
+      const resources = await fetchTagResources(gmp, loadedTag, resourceType);
       setActive(loadedTag.active === YES_VALUE);
       setComment(loadedTag.comment);
       setId(tag.id);
       setName(loadedTag.name);
       setResourceCount(loadedTag.resourceCount);
       setResourceIds(resources.map(res => res.id as string));
-      setResourceType(options?.resourceType ?? tag.resourceType);
+      setResourceType(options?.resourceType ?? resourceType);
       setResourceTypes(resourceTypesArray);
       setTitle(_('Edit Tag {{- name}}', {name: shorten(loadedTag.name)}));
       setValue(loadedTag.value);
@@ -303,8 +329,7 @@ const TagComponent = ({
 
   const handleRemove = async (tagId: string, entity: Model): Promise<void> => {
     try {
-      const response = await gmp.tag.get({id: tagId});
-      const tag = response.data;
+      const tag = await fetchTag(gmp, tagId);
       await saveMutation.mutateAsync({
         id: tag.id as string,
         name: tag.name as string,
