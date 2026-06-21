@@ -937,6 +937,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertNotIn("items", details)
         self.assertNotIn("implemented_native_endpoints", details)
         self.assertIn("implemented_native_endpoint_count", details)
+        self.assertIn("direct_api_contract", details)
         self.assertIn("candidate_for_removal_paths", details)
         inventory_details = compact["findings"][0]["details"]
         self.assertNotIn("candidate_for_removal_paths", inventory_details)
@@ -1037,6 +1038,57 @@ class TurboVASCtlTests(unittest.TestCase):
         else:
             self.assertEqual(trashcan_summary["status"], "planned_internal_and_browser_proxied")
         self.assertIn("row-level Trashcan data remains inherited/deferred", trashcan_summary["replacement_candidates"])
+        contract = details["direct_api_contract"]
+        self.assertEqual(contract["alignment_status"], "pass")
+        self.assertGreater(contract["scriptable_read_count"], 0)
+        self.assertGreater(contract["internal_only_count"], 0)
+
+    def test_native_tooling_state_tracks_direct_api_contract_alignment(self):
+        root = Path(__file__).resolve().parents[2]
+        result = turbovasctl.command_native_tooling_state(root)
+        details = result["details"]
+        endpoints = {item["endpoint"]: item for item in details["implemented_native_endpoints"]}
+        contract = details["direct_api_contract"]
+        findings = {item["check"]: item for item in result["findings"]}
+
+        self.assertEqual(contract["alignment_status"], "pass")
+        self.assertEqual(findings["native-tooling.direct-api-contract"]["status"], "pass")
+        self.assertEqual(contract["missing_openapi_direct_markers"], [])
+        self.assertEqual(contract["unexpected_openapi_direct_markers"], [])
+        self.assertEqual(endpoints["/api/v1/reports"]["direct_access"], "scriptable_read")
+        self.assertEqual(endpoints["/api/v1/reports/{report_id}/results"]["direct_access"], "scriptable_read")
+        self.assertEqual(endpoints["/api/v1/tags/resource-names/{resource_type}"]["direct_access"], "scriptable_read")
+        self.assertEqual(endpoints["/api/v1/scopes/{scope_id}/reports/{scope_report_id}/retention-plan"]["direct_access"], "internal_only")
+        self.assertEqual(
+            set(contract["scriptable_read_endpoints"]),
+            {item["endpoint"] for item in details["implemented_native_endpoints"] if item["direct_access"] == "scriptable_read"},
+        )
+        self.assertNotIn(
+            "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/retention-plan",
+            contract["openapi_marked_direct_endpoints"],
+        )
+
+    def test_native_tooling_state_reports_direct_api_contract_drift(self):
+        endpoints = [
+            {"endpoint": "/api/v1/reports", "direct_access": "scriptable_read"},
+            {"endpoint": "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/retention-plan", "direct_access": "internal_only"},
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            openapi = root / "api" / "openapi" / "turbovas-v1.yaml"
+            openapi.parent.mkdir(parents=True)
+            openapi.write_text(
+                "paths:\n"
+                "  /feeds:\n"
+                "    get:\n"
+                "      x-turbovas-direct: true\n",
+                encoding="utf-8",
+            )
+            summary = turbovasctl.native_api_direct_contract_summary(root, endpoints)
+
+        self.assertEqual(summary["alignment_status"], "warn")
+        self.assertEqual(summary["missing_openapi_direct_markers"], ["/api/v1/reports"])
+        self.assertEqual(summary["unexpected_openapi_direct_markers"], ["/api/v1/feeds"])
 
     def test_certbund_report_rows_expand_one_result_per_cert_ref(self):
         rows = turbovasctl.certbund_report_rows(
@@ -1100,7 +1152,17 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_native_api_request_validates_relative_api_paths(self):
         self.assertEqual(turbovasctl.validate_native_api_request_path("/api/v1/reports?page_size=1"), "/api/v1/reports?page_size=1")
         self.assertEqual(turbovasctl.validate_native_api_request_path("/api/v1"), "/api/v1")
-        for bad_path in ("https://example.invalid/api/v1/reports", "//example.invalid/api/v1/reports", "/gmp", "/api/v2/reports", "/api/v1/reports#frag"):
+        for bad_path in (
+            "https://example.invalid/api/v1/reports",
+            "//example.invalid/api/v1/reports",
+            "/gmp",
+            "/api/v2/reports",
+            "/api/v1/reports#frag",
+            "/api/v1/",
+            "/api/v1/reports/",
+            "/api/v1/../reports",
+            "/api/v1//reports",
+        ):
             with self.assertRaises(ValueError):
                 turbovasctl.validate_native_api_request_path(bad_path)
 

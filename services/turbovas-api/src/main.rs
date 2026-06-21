@@ -10415,7 +10415,13 @@ FEED_COMMIT = "not part of the public contract";
     #[test]
     fn direct_api_path_classifier_uses_positive_scriptable_allowlist() {
         assert!(direct_api_v1_path_is_allowed("/api/v1/reports"));
+        assert!(direct_api_v1_path_is_allowed(
+            "/api/v1/reports/report-id/results"
+        ));
         assert!(direct_api_v1_path_is_allowed("/api/v1/feeds"));
+        assert!(direct_api_v1_path_is_allowed(
+            "/api/v1/tags/resource-names/alert"
+        ));
         assert!(direct_api_v1_path_is_allowed(
             "/api/v1/cpes/cpe:/a:example:thing/1.0"
         ));
@@ -10428,6 +10434,10 @@ FEED_COMMIT = "not part of the public contract";
         ));
         assert!(!direct_api_v1_path_is_allowed(
             "/api/v1/scopes//reports/report-id/results"
+        ));
+        assert!(!direct_api_v1_path_is_allowed("/api/v1/reports//results"));
+        assert!(!direct_api_v1_path_is_allowed(
+            "/api/v1/scopes/scope-id/reports/scope-report-id"
         ));
         assert!(!direct_api_v1_path_is_allowed("/api/v1/internal-preview"));
         assert!(!direct_api_v1_path_is_allowed("/api/v1/reports/id/raw-xml"));

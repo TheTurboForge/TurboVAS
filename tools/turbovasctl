@@ -293,6 +293,81 @@ NATIVE_TOOLING_PRODUCT_GVM_TOOLS_SCRIPTS = frozenset(
         "generate-scope-report.gmp.py",
     }
 )
+NATIVE_API_TEMPLATE_PLACEHOLDER = re.compile(r"\{[^/{}]+\}")
+DIRECT_API_SCRIPTABLE_ENDPOINTS = frozenset(
+    {
+        "/api/v1/results",
+        "/api/v1/results/{}",
+        "/api/v1/vulnerabilities",
+        "/api/v1/cves",
+        "/api/v1/cves/{}",
+        "/api/v1/cpes",
+        "/api/v1/cpes/{}",
+        "/api/v1/cert-bund-advisories",
+        "/api/v1/cert-bund-advisories/{}",
+        "/api/v1/dfn-cert-advisories",
+        "/api/v1/dfn-cert-advisories/{}",
+        "/api/v1/nvts",
+        "/api/v1/nvts/{}",
+        "/api/v1/operating-systems",
+        "/api/v1/operating-systems/{}",
+        "/api/v1/hosts",
+        "/api/v1/hosts/{}",
+        "/api/v1/tls-certificates",
+        "/api/v1/tls-certificates/{}",
+        "/api/v1/scanners",
+        "/api/v1/scanners/{}",
+        "/api/v1/filters",
+        "/api/v1/filters/{}",
+        "/api/v1/feeds",
+        "/api/v1/alerts",
+        "/api/v1/tags",
+        "/api/v1/tags/resource-names/{}",
+        "/api/v1/tags/{}",
+        "/api/v1/tags/{}/resources",
+        "/api/v1/overrides",
+        "/api/v1/overrides/{}",
+        "/api/v1/port-lists",
+        "/api/v1/port-lists/{}",
+        "/api/v1/schedules",
+        "/api/v1/schedules/{}",
+        "/api/v1/scan-configs",
+        "/api/v1/scan-configs/{}",
+        "/api/v1/scan-configs/{}/families",
+        "/api/v1/report-configs",
+        "/api/v1/report-configs/{}",
+        "/api/v1/report-formats",
+        "/api/v1/report-formats/{}",
+        "/api/v1/trashcan/summary",
+        "/api/v1/reports",
+        "/api/v1/reports/{}",
+        "/api/v1/reports/{}/results",
+        "/api/v1/reports/{}/hosts",
+        "/api/v1/reports/{}/ports",
+        "/api/v1/reports/{}/applications",
+        "/api/v1/reports/{}/operating-systems",
+        "/api/v1/reports/{}/cves",
+        "/api/v1/reports/{}/tls-certificates",
+        "/api/v1/reports/{}/errors",
+        "/api/v1/reports/{}/metrics",
+        "/api/v1/scopes",
+        "/api/v1/scopes/{}",
+        "/api/v1/targets",
+        "/api/v1/targets/{}",
+        "/api/v1/tasks",
+        "/api/v1/tasks/{}",
+        "/api/v1/scope-reports",
+        "/api/v1/scopes/{}/reports/{}/results",
+        "/api/v1/scopes/{}/reports/{}/hosts",
+        "/api/v1/scopes/{}/reports/{}/ports",
+        "/api/v1/scopes/{}/reports/{}/applications",
+        "/api/v1/scopes/{}/reports/{}/operating-systems",
+        "/api/v1/scopes/{}/reports/{}/cves",
+        "/api/v1/scopes/{}/reports/{}/tls-certificates",
+        "/api/v1/scopes/{}/reports/{}/errors",
+        "/api/v1/scopes/{}/reports/{}/metrics",
+    }
+)
 NATIVE_TOOLING_SCAN_PREFIXES = (
     "tools/",
     "docs/",
@@ -3232,6 +3307,87 @@ def source_file_contains(repo_root: Path | None, relative_path: str, needle: str
         return False
 
 
+def normalize_native_api_endpoint_template(endpoint: str) -> str:
+    return NATIVE_API_TEMPLATE_PLACEHOLDER.sub("{}", endpoint)
+
+
+def native_api_direct_access(endpoint: str) -> str:
+    normalized = normalize_native_api_endpoint_template(endpoint)
+    if normalized in DIRECT_API_SCRIPTABLE_ENDPOINTS:
+        return "scriptable_read"
+    if endpoint.startswith("/api/v1/") or endpoint == "/api/v1":
+        return "internal_only"
+    return "not_native_api"
+
+
+def openapi_direct_endpoint_templates(repo_root: Path | None) -> list[str]:
+    if repo_root is None:
+        return []
+    path = repo_root / "api" / "openapi" / "turbovas-v1.yaml"
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+
+    current_path: str | None = None
+    in_get = False
+    templates: list[str] = []
+    for line in lines:
+        path_match = re.match(r"^  (/[^:]+):$", line)
+        if path_match:
+            current_path = f"/api/v1{path_match.group(1)}"
+            in_get = False
+            continue
+        if line.startswith("  ") and not line.startswith("    "):
+            in_get = False
+        if line == "    get:":
+            in_get = True
+            continue
+        if in_get and line.strip() == "x-turbovas-direct: true" and current_path:
+            templates.append(current_path)
+    return sorted(templates)
+
+
+def native_api_direct_contract_summary(repo_root: Path | None, endpoints: list[dict[str, Any]]) -> dict[str, Any]:
+    scriptable = sorted(
+        item["endpoint"]
+        for item in endpoints
+        if item.get("direct_access") == "scriptable_read" and isinstance(item.get("endpoint"), str)
+    )
+    internal_only = sorted(
+        item["endpoint"]
+        for item in endpoints
+        if item.get("direct_access") == "internal_only" and isinstance(item.get("endpoint"), str)
+    )
+    openapi_marked = openapi_direct_endpoint_templates(repo_root)
+    scriptable_by_normalized = {normalize_native_api_endpoint_template(endpoint): endpoint for endpoint in scriptable}
+    openapi_by_normalized = {normalize_native_api_endpoint_template(endpoint): endpoint for endpoint in openapi_marked}
+    missing = [scriptable_by_normalized[key] for key in sorted(set(scriptable_by_normalized) - set(openapi_by_normalized))]
+    unexpected = [openapi_by_normalized[key] for key in sorted(set(openapi_by_normalized) - set(scriptable_by_normalized))]
+    return {
+        "alignment_status": "pass" if not missing and not unexpected else "warn",
+        "scriptable_read_count": len(scriptable),
+        "internal_only_count": len(internal_only),
+        "openapi_marked_direct_count": len(openapi_marked),
+        "scriptable_read_endpoints": scriptable,
+        "internal_only_endpoints": internal_only,
+        "openapi_marked_direct_endpoints": openapi_marked,
+        "missing_openapi_direct_markers": missing,
+        "unexpected_openapi_direct_markers": unexpected,
+    }
+
+
+def annotate_native_tooling_direct_api(summary: dict[str, Any], repo_root: Path | None) -> None:
+    endpoints = summary.get("implemented_native_endpoints", [])
+    if not isinstance(endpoints, list):
+        summary["direct_api_contract"] = native_api_direct_contract_summary(repo_root, [])
+        return
+    for item in endpoints:
+        if isinstance(item, dict) and isinstance(item.get("endpoint"), str):
+            item["direct_access"] = native_api_direct_access(item["endpoint"])
+    summary["direct_api_contract"] = native_api_direct_contract_summary(repo_root, [item for item in endpoints if isinstance(item, dict)])
+
+
 def native_api_endpoint_declared(repo_root: Path | None, endpoint: str) -> bool:
     return source_file_contains(repo_root, "services/turbovas-api/src/main.rs", f'.route("{endpoint}"')
 
@@ -3665,6 +3821,15 @@ def compact_native_tooling_summary(summary: dict[str, Any]) -> dict[str, Any]:
         for category, category_summary in summary.get("by_category", {}).items()
         if isinstance(category_summary, dict)
     }
+    direct_contract = summary.get("direct_api_contract", {})
+    compact_direct_contract = {
+        "alignment_status": direct_contract.get("alignment_status", "unknown") if isinstance(direct_contract, dict) else "unknown",
+        "scriptable_read_count": direct_contract.get("scriptable_read_count", 0) if isinstance(direct_contract, dict) else 0,
+        "internal_only_count": direct_contract.get("internal_only_count", 0) if isinstance(direct_contract, dict) else 0,
+        "openapi_marked_direct_count": direct_contract.get("openapi_marked_direct_count", 0) if isinstance(direct_contract, dict) else 0,
+        "missing_openapi_direct_marker_count": len(direct_contract.get("missing_openapi_direct_markers", [])) if isinstance(direct_contract, dict) else 0,
+        "unexpected_openapi_direct_marker_count": len(direct_contract.get("unexpected_openapi_direct_markers", [])) if isinstance(direct_contract, dict) else 0,
+    }
     return {
         "total_items": summary.get("total_items", 0),
         "by_category": by_category,
@@ -3672,6 +3837,7 @@ def compact_native_tooling_summary(summary: dict[str, Any]) -> dict[str, Any]:
         "unknown_paths": summary.get("by_category", {}).get("unknown", {}).get("paths", []),
         "implemented_native_endpoint_count": len(summary.get("implemented_native_endpoints", [])),
         "implemented_native_endpoints_by_status": endpoint_statuses,
+        "direct_api_contract": compact_direct_contract,
         "next_replacement_candidates": summary.get("next_replacement_candidates", []),
     }
 
@@ -3683,16 +3849,28 @@ def compact_native_tooling_finding_details(summary: dict[str, Any]) -> dict[str,
         "by_category": compact["by_category"],
         "implemented_native_endpoint_count": compact["implemented_native_endpoint_count"],
         "implemented_native_endpoints_by_status": compact["implemented_native_endpoints_by_status"],
+        "direct_api_contract": compact["direct_api_contract"],
     }
 
 
 def command_native_tooling_state(repo_root: Path, compact: bool = False) -> dict[str, Any]:
     items = native_tooling_inventory(repo_root)
     summary = summarize_native_tooling(items, repo_root)
+    annotate_native_tooling_direct_api(summary, repo_root)
     unknown_count = summary["by_category"]["unknown"]["count"]
+    direct_contract = summary.get("direct_api_contract", {})
+    direct_alignment_status = direct_contract.get("alignment_status", "warn") if isinstance(direct_contract, dict) else "warn"
     finding_details = compact_native_tooling_finding_details(summary) if compact else summary
     findings = [
         finding("pass", "native-tooling.inventory", f"Classified {len(items)} inherited tooling dependency surface(s).", details=finding_details),
+        finding(
+            "pass" if direct_alignment_status == "pass" else "warn",
+            "native-tooling.direct-api-contract",
+            "Direct scriptable native API endpoints are aligned with OpenAPI x-turbovas-direct markers."
+            if direct_alignment_status == "pass"
+            else "Direct scriptable native API endpoint inventory and OpenAPI markers differ.",
+            details=direct_contract,
+        ),
         finding("warn" if unknown_count else "pass", "native-tooling.unknown", f"{unknown_count} inherited tooling surface(s) are outside the current classification map." if unknown_count else "No inherited tooling surfaces were left unclassified.", details={"paths": summary["by_category"]["unknown"]["paths"]}),
         finding("pass", "native-tooling.end-state", "End-state remains full removal of required python-gvm and gvm-tools dependence after native API replacements land."),
     ]
@@ -6574,6 +6752,26 @@ def command_runtime_native_api_direct_smoke(repo_root: Path) -> dict[str, Any]:
     unclassified_ok = unclassified.returncode == 0 and unclassified_status == 404 and isinstance(unclassified_json, dict) and unclassified_json.get("error", {}).get("code") == "not_found"
     findings.append(native_api_probe_finding("pass" if unclassified_ok else "fail", "native-api-direct.positive-allowlist", "Direct native API denies unclassified /api/v1 GET routes with JSON 404." if unclassified_ok else "Direct native API did not deny an unclassified /api/v1 GET route correctly.", unclassified, direct_native_api_display_command("/api/v1/__unclassified_probe__", token=env[TURBOVAS_API_BEARER_TOKEN_ENV], env=env), unclassified_json, {"http_status": unclassified_status, **summarize_native_api_response(unclassified_json)}))
 
+    malformed_dynamic = direct_native_api_curl(
+        repo_root,
+        "/api/v1/reports//results",
+        token=env[TURBOVAS_API_BEARER_TOKEN_ENV],
+        env=env,
+    )
+    malformed_dynamic_json, malformed_dynamic_status = parse_json_output_with_http_status(malformed_dynamic)
+    malformed_dynamic_ok = malformed_dynamic.returncode == 0 and malformed_dynamic_status == 404 and isinstance(malformed_dynamic_json, dict) and malformed_dynamic_json.get("error", {}).get("code") == "not_found"
+    findings.append(native_api_probe_finding("pass" if malformed_dynamic_ok else "fail", "native-api-direct.empty-dynamic-segment", "Direct native API denies empty dynamic path segments with JSON 404." if malformed_dynamic_ok else "Direct native API did not deny an empty dynamic path segment correctly.", malformed_dynamic, direct_native_api_display_command("/api/v1/reports//results", token=env[TURBOVAS_API_BEARER_TOKEN_ENV], env=env), malformed_dynamic_json, {"http_status": malformed_dynamic_status, **summarize_native_api_response(malformed_dynamic_json)}))
+
+    scope_report_detail = direct_native_api_curl(
+        repo_root,
+        "/api/v1/scopes/scope-id/reports/scope-report-id",
+        token=env[TURBOVAS_API_BEARER_TOKEN_ENV],
+        env=env,
+    )
+    scope_report_detail_json, scope_report_detail_status = parse_json_output_with_http_status(scope_report_detail)
+    scope_report_detail_ok = scope_report_detail.returncode == 0 and scope_report_detail_status == 404 and isinstance(scope_report_detail_json, dict) and scope_report_detail_json.get("error", {}).get("code") == "not_found"
+    findings.append(native_api_probe_finding("pass" if scope_report_detail_ok else "fail", "native-api-direct.internal-only-scope-report-detail", "Direct native API denies the unclassified scope-report detail scaffold with JSON 404." if scope_report_detail_ok else "Direct native API did not deny the unclassified scope-report detail scaffold correctly.", scope_report_detail, direct_native_api_display_command("/api/v1/scopes/scope-id/reports/scope-report-id", token=env[TURBOVAS_API_BEARER_TOKEN_ENV], env=env), scope_report_detail_json, {"http_status": scope_report_detail_status, **summarize_native_api_response(scope_report_detail_json)}))
+
     scope_reports = native_api_curl(repo_root, "/api/v1/scope-reports?page_size=1&sort=-creation_time")
     scope_reports_json = parse_json_output(scope_reports)
     scope_report_items = scope_reports_json.get("items", []) if isinstance(scope_reports_json, dict) else []
@@ -6751,6 +6949,9 @@ def validate_native_api_request_path(path: str) -> str:
         raise ValueError("native API path must not contain a fragment")
     if parsed.path != "/api/v1" and not parsed.path.startswith("/api/v1/"):
         raise ValueError("native API path must start with /api/v1/")
+    path_segments = parsed.path.split("/")[1:]
+    if parsed.path != "/api/v1" and ("" in path_segments or "." in path_segments or ".." in path_segments):
+        raise ValueError("native API path must not contain empty, '.', or '..' segments")
     return urllib.parse.urlunsplit(("", "", parsed.path, parsed.query, ""))
 
 

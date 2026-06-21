@@ -16,6 +16,7 @@ security:
 paths:
   /results:
     get:
+      x-turbovas-direct: true
       summary: List top-level scan results
       parameters:
         - $ref: '#/components/parameters/Page'
@@ -31,6 +32,7 @@ paths:
                 $ref: '#/components/schemas/ResultCollection'
   /results/{result_id}:
     get:
+      x-turbovas-direct: true
       summary: Read one scan result metadata row
       description: Basic read-only raw result metadata backed by gvmd/PostgreSQL. Rich inherited detail content such as overrides, tags, EPSS/CVE context, exports, actions, and create-override workflows remains on the inherited result detail path until native parity is explicitly proven.
       parameters:
@@ -44,6 +46,7 @@ paths:
                 $ref: '#/components/schemas/Result'
   /vulnerabilities:
     get:
+      x-turbovas-direct: true
       summary: List top-level vulnerabilities from scan results
       parameters:
         - $ref: '#/components/parameters/Page'
@@ -59,6 +62,7 @@ paths:
                 $ref: '#/components/schemas/VulnerabilityCollection'
   /cves:
     get:
+      x-turbovas-direct: true
       summary: List Security Information CVEs
       description: Searchable CVE intelligence catalog backed by SCAP feed metadata in gvmd/PostgreSQL. This is distinct from observed report CVEs and vulnerability findings.
       parameters:
@@ -75,6 +79,7 @@ paths:
                 $ref: '#/components/schemas/CatalogCveCollection'
   /cves/{cve_id}:
     get:
+      x-turbovas-direct: true
       summary: Read one Security Information CVE
       parameters:
         - $ref: '#/components/parameters/CveId'
@@ -87,6 +92,7 @@ paths:
                 $ref: '#/components/schemas/CatalogCve'
   /cpes:
     get:
+      x-turbovas-direct: true
       summary: List Security Information CPEs
       description: Searchable CPE intelligence catalog backed by SCAP feed metadata in gvmd/PostgreSQL. This is distinct from observed operating-system and application evidence in raw and scope reports.
       parameters:
@@ -103,6 +109,7 @@ paths:
                 $ref: '#/components/schemas/CatalogCpeCollection'
   /cpes/{cpe_id}:
     get:
+      x-turbovas-direct: true
       summary: Read one Security Information CPE
       parameters:
         - $ref: '#/components/parameters/CpeId'
@@ -115,6 +122,7 @@ paths:
                 $ref: '#/components/schemas/CatalogCpe'
   /cert-bund-advisories:
     get:
+      x-turbovas-direct: true
       summary: List Security Information CERT-Bund advisories
       description: Searchable CERT-Bund advisory list backed by CERT feed metadata already imported into gvmd/PostgreSQL. Rich advisory detail remains inherited from feed XML/XSLT.
       parameters:
@@ -131,6 +139,7 @@ paths:
                 $ref: '#/components/schemas/CertBundAdvisoryCollection'
   /cert-bund-advisories/{cert_bund_advisory_id}:
     get:
+      x-turbovas-direct: true
       summary: Read one Security Information CERT-Bund advisory catalog entry
       description: Catalog-detail metadata backed by CERT feed metadata already imported into gvmd/PostgreSQL. This endpoint intentionally does not reconstruct XML-only rich advisory fields such as revision history, platform, risk, reference URLs, or description blocks.
       parameters:
@@ -144,6 +153,7 @@ paths:
                 $ref: '#/components/schemas/CertBundAdvisory'
   /dfn-cert-advisories:
     get:
+      x-turbovas-direct: true
       summary: List Security Information DFN-CERT advisories
       description: Searchable DFN-CERT advisory list backed by CERT feed metadata already imported into gvmd/PostgreSQL. Rich advisory detail remains inherited from feed XML/XSLT.
       parameters:
@@ -160,6 +170,7 @@ paths:
                 $ref: '#/components/schemas/DfnCertAdvisoryCollection'
   /dfn-cert-advisories/{dfn_cert_advisory_id}:
     get:
+      x-turbovas-direct: true
       summary: Read one Security Information DFN-CERT advisory catalog entry
       description: Catalog-detail metadata backed by CERT feed metadata already imported into gvmd/PostgreSQL. This endpoint intentionally does not reconstruct XML-only rich advisory fields such as advisory links or additional feed links.
       parameters:
@@ -173,6 +184,7 @@ paths:
                 $ref: '#/components/schemas/DfnCertAdvisory'
   /nvts:
     get:
+      x-turbovas-direct: true
       summary: List Security Information NVTs
       description: Searchable NVT catalog backed by gvmd/PostgreSQL feed metadata. This list contract is intentionally separate from rich NVT detail, preferences, and export behavior, which remain inherited until a separate typed contract is designed.
       parameters:
@@ -189,6 +201,7 @@ paths:
                 $ref: '#/components/schemas/NvtCatalogCollection'
   /nvts/{nvt_id}:
     get:
+      x-turbovas-direct: true
       summary: Read one Security Information NVT catalog entry
       description: Catalog-detail metadata backed by NVT feed metadata already imported into gvmd/PostgreSQL. This endpoint uses NVT numeric dotted OIDs and intentionally excludes preferences, selector/config expansion, export, feed-control, scanner-control, and write semantics.
       parameters:
@@ -202,6 +215,7 @@ paths:
                 $ref: '#/components/schemas/NvtCatalogDetail'
   /operating-systems:
     get:
+      x-turbovas-direct: true
       summary: List top-level operating-system assets
       description: Inherited asset view backed by gvmd/PostgreSQL operating-system evidence, distinct from report operating-system evidence tabs.
       parameters:
@@ -218,6 +232,7 @@ paths:
                 $ref: '#/components/schemas/OperatingSystemAssetCollection'
   /operating-systems/{os_id}:
     get:
+      x-turbovas-direct: true
       summary: Read one top-level operating-system asset
       description: Read-only asset metadata backed by gvmd/PostgreSQL `oss` records, associated host operating-system evidence, host details, and host severity state. This endpoint does not expose export, delete, scanner-control, feed-control, or write behavior.
       parameters:
@@ -231,6 +246,7 @@ paths:
                 $ref: '#/components/schemas/OperatingSystemAsset'
   /hosts:
     get:
+      x-turbovas-direct: true
       summary: List top-level host assets
       description: Inherited host asset view backed by gvmd/PostgreSQL host identifiers, details, and severity state.
       parameters:
@@ -247,6 +263,7 @@ paths:
                 $ref: '#/components/schemas/HostAssetCollection'
   /hosts/{host_id}:
     get:
+      x-turbovas-direct: true
       summary: Read one top-level host asset
       description: Read-only host asset metadata backed by gvmd/PostgreSQL host, host identifier, host operating-system, severity, and whitelisted host detail state. This endpoint intentionally excludes host writes, delete-identifier behavior, XML export, target creation, user tags, raw report-host detail expansion, credential/privacy-sensitive identifiers, and report/result/port/application history.
       parameters:
@@ -260,6 +277,7 @@ paths:
                 $ref: '#/components/schemas/HostAssetDetail'
   /tls-certificates:
     get:
+      x-turbovas-direct: true
       summary: List top-level TLS certificate assets
       description: Inherited TLS certificate asset view backed by gvmd/PostgreSQL certificate, source, and location tables.
       parameters:
@@ -276,6 +294,7 @@ paths:
                 $ref: '#/components/schemas/TlsCertificateAssetCollection'
   /tls-certificates/{certificate_id}:
     get:
+      x-turbovas-direct: true
       summary: Read one top-level TLS certificate asset
       description: Read-only TLS certificate asset metadata and source provenance backed by gvmd/PostgreSQL certificate, source, location, and origin tables. Certificate bytes, export, delete, scanner-control, feed-control, and write behavior are intentionally excluded.
       parameters:
@@ -289,6 +308,7 @@ paths:
                 $ref: '#/components/schemas/TlsCertificateAssetDetail'
   /scanners:
     get:
+      x-turbovas-direct: true
       summary: List scanner metadata
       description: Read-only scanner list metadata backed by gvmd/PostgreSQL. Credential secrets, scanner CA material, and control operations are intentionally excluded.
       parameters:
@@ -305,6 +325,7 @@ paths:
                 $ref: '#/components/schemas/ScannerAssetCollection'
   /scanners/{scanner_id}:
     get:
+      x-turbovas-direct: true
       summary: Read one scanner metadata record
       description: Read-only scanner metadata backed by gvmd/PostgreSQL. Credential secrets, scanner CA material, live scanner status, verify/control operations, export/download behavior, and writes are intentionally excluded.
       parameters:
@@ -318,6 +339,7 @@ paths:
                 $ref: '#/components/schemas/ScannerAsset'
   /filters:
     get:
+      x-turbovas-direct: true
       summary: List saved filters
       description: Read-only saved-filter metadata backed by gvmd/PostgreSQL. Filter terms are operator configuration data and remain available only through authenticated operator access.
       parameters:
@@ -335,6 +357,7 @@ paths:
                 $ref: '#/components/schemas/FilterAssetCollection'
   /filters/{filter_id}:
     get:
+      x-turbovas-direct: true
       summary: Read one saved filter
       parameters:
         - $ref: '#/components/parameters/FilterId'
@@ -359,6 +382,7 @@ paths:
                 $ref: '#/components/schemas/FeedInventory'
   /alerts:
     get:
+      x-turbovas-direct: true
       summary: List redacted alert metadata
       description: Read-only alert metadata backed by gvmd/PostgreSQL. This list intentionally excludes alert condition data, event data, method delivery payloads, credentials, destinations, message bodies, certificates, export/test actions, and all alert mutations.
       parameters:
@@ -375,6 +399,7 @@ paths:
                 $ref: '#/components/schemas/AlertAssetCollection'
   /tags:
     get:
+      x-turbovas-direct: true
       summary: List tags
       description: Read-only tag metadata backed by gvmd/PostgreSQL. Tag create, modify, clone, enable/disable, export, delete, and assigned-resource expansion remain on inherited compatibility paths while native write/resource semantics are designed.
       parameters:
@@ -414,6 +439,7 @@ paths:
                 $ref: '#/components/schemas/TagResourceNameCollection'
   /tags/{tag_id}:
     get:
+      x-turbovas-direct: true
       summary: Read one tag
       parameters:
         - $ref: '#/components/parameters/TagId'
@@ -426,6 +452,7 @@ paths:
                 $ref: '#/components/schemas/TagAsset'
   /tags/{tag_id}/resources:
     get:
+      x-turbovas-direct: true
       summary: List assigned tag resource references
       description: Read-only active-table tag resource references for a strict whitelist of asset and security-information resource types. Tag mutation, trash resources, credentials, users, permissions, filters, alerts, schedules, scanners, overrides, reports, and results remain on inherited compatibility paths while native semantics are designed.
       parameters:
@@ -443,6 +470,7 @@ paths:
                 $ref: '#/components/schemas/TagResourceCollection'
   /overrides:
     get:
+      x-turbovas-direct: true
       summary: List overrides
       description: Read-only override metadata backed by gvmd/PostgreSQL. Create, modify, clone, export, delete, trashcan mutation, and result-specific override expansion remain on inherited compatibility paths while native write semantics are designed.
       parameters:
@@ -459,6 +487,7 @@ paths:
                 $ref: '#/components/schemas/OverrideAssetCollection'
   /overrides/{override_id}:
     get:
+      x-turbovas-direct: true
       summary: Read one override
       parameters:
         - $ref: '#/components/parameters/OverrideId'
@@ -471,6 +500,7 @@ paths:
                 $ref: '#/components/schemas/OverrideAsset'
   /port-lists:
     get:
+      x-turbovas-direct: true
       summary: List port lists
       description: Read-only port-list metadata backed by gvmd/PostgreSQL. Create, modify, import, export, and delete operations remain on inherited compatibility paths while native write semantics are designed.
       parameters:
@@ -487,6 +517,7 @@ paths:
                 $ref: '#/components/schemas/PortListAssetCollection'
   /port-lists/{port_list_id}:
     get:
+      x-turbovas-direct: true
       summary: Read one port list
       parameters:
         - $ref: '#/components/parameters/PortListId'
@@ -499,6 +530,7 @@ paths:
                 $ref: '#/components/schemas/PortListAsset'
   /schedules:
     get:
+      x-turbovas-direct: true
       summary: List schedules
       description: Read-only schedule metadata backed by gvmd/PostgreSQL. Create, modify, clone, export, and delete operations remain on inherited compatibility paths while native write semantics are designed.
       parameters:
@@ -515,6 +547,7 @@ paths:
                 $ref: '#/components/schemas/ScheduleAssetCollection'
   /schedules/{schedule_id}:
     get:
+      x-turbovas-direct: true
       summary: Read one schedule
       parameters:
         - $ref: '#/components/parameters/ScheduleId'
@@ -527,6 +560,7 @@ paths:
                 $ref: '#/components/schemas/ScheduleAsset'
   /scan-configs:
     get:
+      x-turbovas-direct: true
       summary: List scan configs
       description: Read-only scan-config metadata backed by gvmd/PostgreSQL. Preference values, NVT selector expansion, family edit payloads, import/export, scanner control, and create/modify/delete operations remain on inherited compatibility paths while native write/resource semantics are designed.
       parameters:
@@ -550,6 +584,7 @@ paths:
                 $ref: '#/components/schemas/ScanConfigAssetCollection'
   /scan-configs/{scan_config_id}:
     get:
+      x-turbovas-direct: true
       summary: Read one scan config metadata record
       description: Metadata-only detail for automation and proof probes. Preferences, import/export, scanner control, and write operations remain on inherited compatibility paths while native contracts are designed.
       parameters:
@@ -563,6 +598,7 @@ paths:
                 $ref: '#/components/schemas/ScanConfigAsset'
   /scan-configs/{scan_config_id}/families:
     get:
+      x-turbovas-direct: true
       summary: Read scan config NVT family selection summary
       description: Read-only expansion of the NVT Families detail tab. Scanner preferences, NVT preferences, selector edit payloads, import/export, and writes remain on inherited compatibility paths.
       parameters:
@@ -576,6 +612,7 @@ paths:
                 $ref: '#/components/schemas/ScanConfigFamilies'
   /report-configs:
     get:
+      x-turbovas-direct: true
       summary: List report configs
       description: Read-only report-config metadata backed by gvmd/PostgreSQL. Create, modify, clone, export, and delete operations remain on inherited compatibility paths while native write semantics are designed.
       parameters:
@@ -592,6 +629,7 @@ paths:
                 $ref: '#/components/schemas/ReportConfigAssetCollection'
   /report-configs/{report_config_id}:
     get:
+      x-turbovas-direct: true
       summary: Read one report config
       parameters:
         - $ref: '#/components/parameters/ReportConfigId'
@@ -604,6 +642,7 @@ paths:
                 $ref: '#/components/schemas/ReportConfigAsset'
   /report-formats:
     get:
+      x-turbovas-direct: true
       summary: List report formats
       description: Read-only report-format metadata backed by gvmd/PostgreSQL. Create, modify, import, export, verify, and delete operations remain on inherited compatibility paths while native write semantics are designed.
       parameters:
@@ -620,6 +659,7 @@ paths:
                 $ref: '#/components/schemas/ReportFormatAssetCollection'
   /report-formats/{report_format_id}:
     get:
+      x-turbovas-direct: true
       summary: Read one report format
       parameters:
         - $ref: '#/components/parameters/ReportFormatId'
@@ -632,6 +672,7 @@ paths:
                 $ref: '#/components/schemas/ReportFormatAsset'
   /trashcan/summary:
     get:
+      x-turbovas-direct: true
       summary: Summarize Trashcan item counts
       description: Counts-only read of base Trashcan resources backed by gvmd/PostgreSQL. The endpoint returns all supported resource types, including zero-count rows, and intentionally excludes row payloads, identifiers, names, comments, credential data, target hosts, scanner fields, scan-config preferences, alert method data, results_trash, and child trash tables. The endpoint is read-only and may be reached through the internal/browser proxy path or the opt-in bearer-auth direct listener.
       responses:
@@ -643,6 +684,7 @@ paths:
                 $ref: '#/components/schemas/TrashcanSummary'
   /reports:
     get:
+      x-turbovas-direct: true
       summary: List raw scan reports
       parameters:
         - $ref: '#/components/parameters/Page'
@@ -658,6 +700,7 @@ paths:
                 $ref: '#/components/schemas/ReportCollection'
   /reports/{report_id}:
     get:
+      x-turbovas-direct: true
       summary: Read one raw scan report summary
       parameters:
         - $ref: '#/components/parameters/ReportId'
@@ -670,6 +713,7 @@ paths:
                 $ref: '#/components/schemas/Report'
   /reports/{report_id}/results:
     get:
+      x-turbovas-direct: true
       summary: List raw scan report results
       parameters:
         - $ref: '#/components/parameters/ReportId'
@@ -686,6 +730,7 @@ paths:
                 $ref: '#/components/schemas/ResultCollection'
   /reports/{report_id}/hosts:
     get:
+      x-turbovas-direct: true
       summary: List raw scan report hosts
       parameters:
         - $ref: '#/components/parameters/ReportId'
@@ -702,6 +747,7 @@ paths:
                 $ref: '#/components/schemas/ReportHostCollection'
   /reports/{report_id}/ports:
     get:
+      x-turbovas-direct: true
       summary: List raw scan report ports
       parameters:
         - $ref: '#/components/parameters/ReportId'
@@ -718,6 +764,7 @@ paths:
                 $ref: '#/components/schemas/PortCollection'
   /reports/{report_id}/applications:
     get:
+      x-turbovas-direct: true
       summary: List raw scan report applications
       parameters:
         - $ref: '#/components/parameters/ReportId'
@@ -734,6 +781,7 @@ paths:
                 $ref: '#/components/schemas/ApplicationCollection'
   /reports/{report_id}/operating-systems:
     get:
+      x-turbovas-direct: true
       summary: List raw scan report operating systems
       parameters:
         - $ref: '#/components/parameters/ReportId'
@@ -750,6 +798,7 @@ paths:
                 $ref: '#/components/schemas/OperatingSystemCollection'
   /reports/{report_id}/cves:
     get:
+      x-turbovas-direct: true
       summary: List raw scan report CVEs
       parameters:
         - $ref: '#/components/parameters/ReportId'
@@ -766,6 +815,7 @@ paths:
                 $ref: '#/components/schemas/CveCollection'
   /reports/{report_id}/tls-certificates:
     get:
+      x-turbovas-direct: true
       summary: List raw scan report TLS certificates
       parameters:
         - $ref: '#/components/parameters/ReportId'
@@ -782,6 +832,7 @@ paths:
                 $ref: '#/components/schemas/TlsCertificateCollection'
   /reports/{report_id}/errors:
     get:
+      x-turbovas-direct: true
       summary: List raw scan report Error Messages
       parameters:
         - $ref: '#/components/parameters/ReportId'
@@ -798,6 +849,7 @@ paths:
                 $ref: '#/components/schemas/ErrorMessageCollection'
   /reports/{report_id}/metrics:
     get:
+      x-turbovas-direct: true
       summary: Read raw report metrics
       parameters:
         - $ref: '#/components/parameters/ReportId'
@@ -810,6 +862,7 @@ paths:
                 $ref: '#/components/schemas/ReportMetrics'
   /scopes:
     get:
+      x-turbovas-direct: true
       summary: List scopes
       parameters:
         - $ref: '#/components/parameters/Page'
@@ -825,6 +878,7 @@ paths:
                 $ref: '#/components/schemas/ScopeCollection'
   /scopes/{scope_id}:
     get:
+      x-turbovas-direct: true
       summary: Read one scope
       parameters:
         - $ref: '#/components/parameters/ScopeId'
@@ -837,6 +891,7 @@ paths:
                 $ref: '#/components/schemas/Scope'
   /targets:
     get:
+      x-turbovas-direct: true
       summary: List scan targets
       parameters:
         - $ref: '#/components/parameters/Page'
@@ -852,6 +907,7 @@ paths:
                 $ref: '#/components/schemas/TargetCollection'
   /targets/{target_id}:
     get:
+      x-turbovas-direct: true
       summary: Read one scan target summary
       parameters:
         - $ref: '#/components/parameters/TargetId'
@@ -864,6 +920,7 @@ paths:
                 $ref: '#/components/schemas/Target'
   /tasks:
     get:
+      x-turbovas-direct: true
       summary: List scan tasks
       parameters:
         - $ref: '#/components/parameters/Page'
@@ -879,6 +936,7 @@ paths:
                 $ref: '#/components/schemas/TaskCollection'
   /tasks/{task_id}:
     get:
+      x-turbovas-direct: true
       summary: Read one scan task summary
       parameters:
         - $ref: '#/components/parameters/TaskId'
@@ -891,6 +949,7 @@ paths:
                 $ref: '#/components/schemas/Task'
   /scope-reports:
     get:
+      x-turbovas-direct: true
       summary: List generated scope reports
       parameters:
         - $ref: '#/components/parameters/Page'
@@ -919,6 +978,7 @@ paths:
                 $ref: '#/components/schemas/ScopeReport'
   /scopes/{scope_id}/reports/{scope_report_id}/results:
     get:
+      x-turbovas-direct: true
       summary: List deduplicated scope report results
       parameters:
         - $ref: '#/components/parameters/ScopeId'
@@ -936,6 +996,7 @@ paths:
                 $ref: '#/components/schemas/ResultCollection'
   /scopes/{scope_id}/reports/{scope_report_id}/hosts:
     get:
+      x-turbovas-direct: true
       summary: List scope report hosts
       parameters:
         - $ref: '#/components/parameters/ScopeId'
@@ -953,6 +1014,7 @@ paths:
                 $ref: '#/components/schemas/HostCollection'
   /scopes/{scope_id}/reports/{scope_report_id}/ports:
     get:
+      x-turbovas-direct: true
       summary: List scope report ports
       parameters:
         - $ref: '#/components/parameters/ScopeId'
@@ -970,6 +1032,7 @@ paths:
                 $ref: '#/components/schemas/PortCollection'
   /scopes/{scope_id}/reports/{scope_report_id}/applications:
     get:
+      x-turbovas-direct: true
       summary: List scope report applications
       parameters:
         - $ref: '#/components/parameters/ScopeId'
@@ -987,6 +1050,7 @@ paths:
                 $ref: '#/components/schemas/ApplicationCollection'
   /scopes/{scope_id}/reports/{scope_report_id}/operating-systems:
     get:
+      x-turbovas-direct: true
       summary: List scope report operating systems
       parameters:
         - $ref: '#/components/parameters/ScopeId'
@@ -1004,6 +1068,7 @@ paths:
                 $ref: '#/components/schemas/OperatingSystemCollection'
   /scopes/{scope_id}/reports/{scope_report_id}/cves:
     get:
+      x-turbovas-direct: true
       summary: List scope report CVEs
       parameters:
         - $ref: '#/components/parameters/ScopeId'
@@ -1021,6 +1086,7 @@ paths:
                 $ref: '#/components/schemas/CveCollection'
   /scopes/{scope_id}/reports/{scope_report_id}/tls-certificates:
     get:
+      x-turbovas-direct: true
       summary: List scope report TLS certificates
       parameters:
         - $ref: '#/components/parameters/ScopeId'
@@ -1038,6 +1104,7 @@ paths:
                 $ref: '#/components/schemas/TlsCertificateCollection'
   /scopes/{scope_id}/reports/{scope_report_id}/errors:
     get:
+      x-turbovas-direct: true
       summary: List scope report Error Messages
       parameters:
         - $ref: '#/components/parameters/ScopeId'
@@ -1055,6 +1122,7 @@ paths:
                 $ref: '#/components/schemas/ErrorMessageCollection'
   /scopes/{scope_id}/reports/{scope_report_id}/metrics:
     get:
+      x-turbovas-direct: true
       summary: Read scope report metrics
       parameters:
         - $ref: '#/components/parameters/ScopeId'

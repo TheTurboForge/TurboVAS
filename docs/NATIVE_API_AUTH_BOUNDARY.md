@@ -33,6 +33,10 @@ script/curl -> opt-in direct bearer listener -> turbovas-api -> PostgreSQL
   preview/scaffold endpoints, starting with the scope-report retention plan
   preview, return JSON `404 not_found` on the direct listener even when the
   bearer token is valid.
+- Direct-read OpenAPI operations carry `x-turbovas-direct: true` and
+  `just native-tooling-state --json` reports marker/inventory alignment through
+  `native-tooling.direct-api-contract`. Treat drift there as a contract bug
+  before expanding direct exposure.
 - Direct listener responses include `X-Request-Id`. A client may provide a
   bounded ASCII request ID for correlation; unsafe, empty, or oversized values
   are replaced with a generated `tv-...` ID. Auth failures and direct-listener

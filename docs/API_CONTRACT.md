@@ -81,6 +81,10 @@ separate TLS/bootstrap/host-binding posture tracked outside this v1 read API.
   routes and internal-only native previews such as the scope-report retention
   plan preview return JSON `404 not_found` on the direct listener even though
   they remain available to internal runtime validation.
+- Direct v1 contract metadata: scriptable direct-read operations carry
+  `x-turbovas-direct: true` in `api/openapi/turbovas-v1.yaml`. The
+  `native-tooling-state` command compares those markers with the implementation
+  inventory and reports drift as `native-tooling.direct-api-contract`.
 - Response body: JSON objects only; no XML payloads in native product APIs.
 - IDs: UUID strings matching the underlying gvmd resource identifiers.
 - Timestamps: RFC 3339 UTC strings.
