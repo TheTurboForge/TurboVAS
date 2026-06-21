@@ -312,20 +312,27 @@ OPENAPI_ALLOWED_TURBOVAS_OPERATION_FIELDS = frozenset(
 )
 OPENAPI_ALLOWED_EXPOSURE_VALUES = frozenset({"direct-read", "internal-only"})
 OPENAPI_ALLOWED_MATURITY_VALUES = frozenset({"live-read", "preview-read"})
-OPENAPI_ALLOWED_REPLACES_VALUES = frozenset({"feed-status-read", "nvt-catalog-detail-read", "none", "tag-resource-name-read"})
-OPENAPI_ALLOWED_INHERITED_STILL_OWNS_VALUES = frozenset({"feed-sync-import-control", "nvt-rich-detail", "retention-mutations", "tag-write-control"})
+OPENAPI_ALLOWED_REPLACES_VALUES = frozenset({"alert-metadata-list-read", "feed-status-read", "nvt-catalog-detail-read", "none", "tag-resource-name-read", "trashcan-count-summary-read"})
+OPENAPI_ALLOWED_INHERITED_STILL_OWNS_VALUES = frozenset({"alert-detail-delivery-control", "feed-sync-import-control", "nvt-rich-detail", "retention-mutations", "tag-write-control", "trashcan-row-data-and-mutations"})
 OPENAPI_ALLOWED_MIGRATION_METADATA_VALUES = {
     "x-turbovas-inherited-still-owns": OPENAPI_ALLOWED_INHERITED_STILL_OWNS_VALUES,
     "x-turbovas-maturity": OPENAPI_ALLOWED_MATURITY_VALUES,
     "x-turbovas-replaces": OPENAPI_ALLOWED_REPLACES_VALUES,
 }
 OPENAPI_REQUIRED_EXPOSURE = {
+    ("get", "/alerts"): "direct-read",
     ("get", "/feeds"): "direct-read",
     ("get", "/nvts/{nvt_id}"): "direct-read",
     ("get", "/tags/resource-names/{resource_type}"): "direct-read",
+    ("get", "/trashcan/summary"): "direct-read",
     ("get", "/scopes/{scope_id}/reports/{scope_report_id}/retention-plan"): "internal-only",
 }
 OPENAPI_REQUIRED_MIGRATION_METADATA = {
+    ("get", "/alerts"): {
+        "x-turbovas-inherited-still-owns": "alert-detail-delivery-control",
+        "x-turbovas-maturity": "live-read",
+        "x-turbovas-replaces": "alert-metadata-list-read",
+    },
     ("get", "/feeds"): {
         "x-turbovas-inherited-still-owns": "feed-sync-import-control",
         "x-turbovas-maturity": "live-read",
@@ -340,6 +347,11 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-inherited-still-owns": "tag-write-control",
         "x-turbovas-maturity": "live-read",
         "x-turbovas-replaces": "tag-resource-name-read",
+    },
+    ("get", "/trashcan/summary"): {
+        "x-turbovas-inherited-still-owns": "trashcan-row-data-and-mutations",
+        "x-turbovas-maturity": "live-read",
+        "x-turbovas-replaces": "trashcan-count-summary-read",
     },
     ("get", "/scopes/{scope_id}/reports/{scope_report_id}/retention-plan"): {
         "x-turbovas-inherited-still-owns": "retention-mutations",

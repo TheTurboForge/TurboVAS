@@ -678,6 +678,10 @@ paths:
     get:
       operationId: getAlerts
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: alert-metadata-list-read
+      x-turbovas-inherited-still-owns: alert-detail-delivery-control
       summary: List redacted alert metadata
       description: Read-only alert metadata backed by gvmd/PostgreSQL. This list intentionally excludes alert condition data, event data, method delivery payloads, credentials, destinations, message bodies, certificates, export/test actions, and all alert mutations.
       parameters:
@@ -1190,6 +1194,10 @@ paths:
     get:
       operationId: getTrashcanSummary
       x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: trashcan-count-summary-read
+      x-turbovas-inherited-still-owns: trashcan-row-data-and-mutations
       summary: Summarize Trashcan item counts
       description: Counts-only read of base Trashcan resources backed by gvmd/PostgreSQL. The endpoint returns all supported resource types, including zero-count rows, and intentionally excludes row payloads, identifiers, names, comments, credential data, target hosts, scanner fields, scan-config preferences, alert method data, results_trash, and child trash tables. The endpoint is read-only and may be reached through the internal/browser proxy path or the opt-in bearer-auth direct listener.
       responses:
