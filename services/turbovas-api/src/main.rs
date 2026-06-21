@@ -392,6 +392,210 @@ const OPERATING_SYSTEM_ASSET_SORT_FIELDS: &[(&str, &str)] = &[
     ("all_hosts", "all_hosts"),
     ("modified", "modified_at_unix"),
 ];
+const REPORT_HOST_DEFAULT_SORT: &str = "host";
+const REPORT_HOST_SORT_FIELDS: &[(&str, &str)] = &[
+    ("host", "host"),
+    ("hostname", "hostname"),
+    ("ports_count", "ports_count"),
+    ("applications_count", "applications_count"),
+    ("distance", "distance"),
+    ("authentication_state", "authentication_state"),
+    ("start_time", "start_time_unix"),
+    ("end_time", "end_time_unix"),
+    ("result_count", "result_count"),
+    ("vulnerability_count", "vulnerability_count"),
+    ("critical", "severity_critical"),
+    ("high", "severity_high"),
+    ("medium", "severity_medium"),
+    ("low", "severity_low"),
+    ("log", "severity_log"),
+    ("false_positive", "severity_false_positive"),
+    ("severity", "max_severity"),
+    ("max_severity", "max_severity"),
+];
+const REPORT_PORT_DEFAULT_SORT: &str = "port";
+const REPORT_PORT_SORT_FIELDS: &[(&str, &str)] = &[
+    ("port", "port"),
+    ("protocol", "protocol"),
+    ("host_count", "host_count"),
+    ("result_count", "result_count"),
+    ("vulnerability_count", "vulnerability_count"),
+    ("severity", "max_severity"),
+    ("max_severity", "max_severity"),
+];
+const REPORT_APPLICATION_DEFAULT_SORT: &str = "name";
+const REPORT_APPLICATION_SORT_FIELDS: &[(&str, &str)] = &[
+    ("name", "name"),
+    ("cpe", "cpe"),
+    ("hosts", "host_count"),
+    ("host_count", "host_count"),
+    ("occurrences", "result_count"),
+    ("result_count", "result_count"),
+    ("vulnerability_count", "vulnerability_count"),
+    ("severity", "max_severity"),
+    ("max_severity", "max_severity"),
+];
+const REPORT_OPERATING_SYSTEM_DEFAULT_SORT: &str = "name";
+const REPORT_OPERATING_SYSTEM_SORT_FIELDS: &[(&str, &str)] = &[
+    ("name", "name"),
+    ("cpe", "cpe"),
+    ("hosts", "host_count"),
+    ("host_count", "host_count"),
+    ("result_count", "result_count"),
+    ("vulnerability_count", "vulnerability_count"),
+    ("severity", "max_severity"),
+    ("max_severity", "max_severity"),
+];
+const REPORT_TLS_CERTIFICATE_DEFAULT_SORT: &str = "-not_after";
+const REPORT_TLS_CERTIFICATE_SORT_FIELDS: &[(&str, &str)] = &[
+    ("id", "id"),
+    ("fingerprint_sha256", "fingerprint_sha256"),
+    ("subject", "subject"),
+    ("dn", "subject"),
+    ("issuer", "issuer"),
+    ("serial", "serial"),
+    ("not_before", "not_before_unix"),
+    ("notvalidbefore", "not_before_unix"),
+    ("not_after", "not_after_unix"),
+    ("notvalidafter", "not_after_unix"),
+    ("host_count", "host_count"),
+    ("port_count", "port_count"),
+    ("result_count", "result_count"),
+];
+const REPORT_CVE_DEFAULT_SORT: &str = "-max_severity";
+const REPORT_CVE_SORT_FIELDS: &[(&str, &str)] = &[
+    ("id", "id"),
+    ("affected_system_count", "affected_system_count"),
+    ("result_count", "result_count"),
+    ("severity", "max_severity"),
+    ("max_severity", "max_severity"),
+];
+const REPORT_ERROR_DEFAULT_SORT: &str = "-created_at";
+const REPORT_ERROR_SORT_FIELDS: &[(&str, &str)] = &[
+    ("id", "id"),
+    ("host", "host"),
+    ("port", "port"),
+    ("nvt_oid", "nvt_oid"),
+    ("description", "description"),
+    ("created_at", "created_at_unix"),
+];
+const TARGET_DEFAULT_SORT: &str = "name";
+const TARGET_SORT_FIELDS: &[(&str, &str)] = &[
+    ("id", "uuid"),
+    ("name", "name"),
+    ("port_list", "port_list_name"),
+    ("task_count", "task_count"),
+    ("max_hosts", "host_entry_count"),
+    ("creation_time", "creation_time"),
+    ("modification_time", "modification_time"),
+];
+const TASK_DEFAULT_SORT: &str = "name";
+const TASK_SORT_FIELDS: &[(&str, &str)] = &[
+    ("id", "uuid"),
+    ("name", "name"),
+    ("status", "status"),
+    ("progress", "progress"),
+    ("target", "target_name"),
+    ("config", "config_name"),
+    ("scanner", "scanner_name"),
+    ("schedule", "schedule_name"),
+    ("report_count", "report_count_total"),
+    ("last_report", "last_report_timestamp"),
+    ("max_severity", "max_severity"),
+    ("trend", "trend"),
+    ("creation_time", "creation_time"),
+    ("modification_time", "modification_time"),
+];
+const SCOPE_DEFAULT_SORT: &str = "name";
+const SCOPE_SORT_FIELDS: &[(&str, &str)] = &[
+    ("id", "uuid"),
+    ("name", "name"),
+    ("protection_requirement", "protection_requirement"),
+    ("target_count", "target_count"),
+    ("host_count", "host_count"),
+    ("scope_report_count", "scope_report_count"),
+    ("creation_time", "creation_time"),
+    ("modification_time", "modification_time"),
+];
+const SCOPE_REPORT_DEFAULT_SORT: &str = "-creation_time";
+const SCOPE_REPORT_SORT_FIELDS: &[(&str, &str)] = &[
+    ("creation_time", "creation_time"),
+    ("modification_time", "modification_time"),
+    ("latest_evidence_time", "latest_evidence_time"),
+    ("scope_name", "scope_name"),
+    ("source_report_count", "source_report_count"),
+    ("source_target_count", "source_target_count"),
+    ("member_host_count", "member_host_count"),
+    ("evidence_host_count", "evidence_host_count"),
+    ("missing_host_count", "missing_host_count"),
+    ("result_count", "result_count"),
+    ("vulnerability_count", "vulnerability_count"),
+    ("max_severity", "max_severity"),
+];
+const SCOPE_REPORT_HOST_DEFAULT_SORT: &str = "host";
+const SCOPE_REPORT_HOST_SORT_FIELDS: &[(&str, &str)] = &[
+    ("host", "host"),
+    ("scope_membership", "scope_membership"),
+    ("source_report_count", "source_report_count"),
+    ("result_count", "result_count"),
+    ("vulnerability_count", "vulnerability_count"),
+    ("authenticated_scan_state", "authenticated_scan_state"),
+];
+const SCOPE_REPORT_PORT_DEFAULT_SORT: &str = "port";
+const SCOPE_REPORT_PORT_SORT_FIELDS: &[(&str, &str)] = &[
+    ("port", "port"),
+    ("protocol", "protocol"),
+    ("host_count", "host_count"),
+    ("result_count", "result_count"),
+    ("vulnerability_count", "vulnerability_count"),
+    ("max_severity", "max_severity"),
+];
+const SCOPE_REPORT_APPLICATION_DEFAULT_SORT: &str = "name";
+const SCOPE_REPORT_APPLICATION_SORT_FIELDS: &[(&str, &str)] = &[
+    ("name", "name"),
+    ("cpe", "cpe"),
+    ("host_count", "host_count"),
+    ("result_count", "result_count"),
+    ("vulnerability_count", "vulnerability_count"),
+    ("max_severity", "max_severity"),
+];
+const SCOPE_REPORT_OPERATING_SYSTEM_DEFAULT_SORT: &str = "name";
+const SCOPE_REPORT_OPERATING_SYSTEM_SORT_FIELDS: &[(&str, &str)] = &[
+    ("name", "name"),
+    ("cpe", "cpe"),
+    ("host_count", "host_count"),
+    ("result_count", "result_count"),
+    ("vulnerability_count", "vulnerability_count"),
+    ("max_severity", "max_severity"),
+];
+const SCOPE_REPORT_TLS_CERTIFICATE_DEFAULT_SORT: &str = "-not_after";
+const SCOPE_REPORT_TLS_CERTIFICATE_SORT_FIELDS: &[(&str, &str)] = &[
+    ("id", "id"),
+    ("fingerprint_sha256", "fingerprint_sha256"),
+    ("subject", "subject"),
+    ("issuer", "issuer"),
+    ("serial", "serial"),
+    ("not_before", "not_before_unix"),
+    ("not_after", "not_after_unix"),
+    ("host_count", "host_count"),
+    ("port_count", "port_count"),
+    ("result_count", "result_count"),
+];
+const SCOPE_REPORT_CVE_DEFAULT_SORT: &str = "id";
+const SCOPE_REPORT_CVE_SORT_FIELDS: &[(&str, &str)] = &[
+    ("id", "id"),
+    ("affected_system_count", "affected_system_count"),
+    ("result_count", "result_count"),
+    ("max_severity", "max_severity"),
+];
+const SCOPE_REPORT_ERROR_DEFAULT_SORT: &str = "created_at";
+const SCOPE_REPORT_ERROR_SORT_FIELDS: &[(&str, &str)] = &[
+    ("id", "id"),
+    ("host", "host"),
+    ("port", "port"),
+    ("nvt_oid", "nvt_oid"),
+    ("created_at", "created_at_unix"),
+];
 
 #[derive(Debug, Serialize)]
 struct ErrorBody {
@@ -5453,19 +5657,8 @@ async fn report_ports(
     Query(query): Query<CollectionQuery>,
 ) -> Result<Json<Collection<PortItem>>, ApiError> {
     parse_uuid(&report_id)?;
-    let params = normalize_collection_query(query, "port")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("port", "port"),
-            ("protocol", "protocol"),
-            ("host_count", "host_count"),
-            ("result_count", "result_count"),
-            ("vulnerability_count", "vulnerability_count"),
-            ("severity", "max_severity"),
-            ("max_severity", "max_severity"),
-        ],
-    )?;
+    let params = normalize_collection_query(query, REPORT_PORT_DEFAULT_SORT)?;
+    let sort_sql = sort_clause(&params.sort, REPORT_PORT_SORT_FIELDS)?;
     let sql = format!(
         "WITH selected_report AS (\n\
              SELECT id, uuid FROM reports WHERE lower(uuid) = lower($1)\n\
@@ -5533,21 +5726,8 @@ async fn report_applications(
     Query(query): Query<CollectionQuery>,
 ) -> Result<Json<Collection<ApplicationItem>>, ApiError> {
     parse_uuid(&report_id)?;
-    let params = normalize_collection_query(query, "name")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("name", "name"),
-            ("cpe", "cpe"),
-            ("hosts", "host_count"),
-            ("host_count", "host_count"),
-            ("occurrences", "result_count"),
-            ("result_count", "result_count"),
-            ("vulnerability_count", "vulnerability_count"),
-            ("severity", "max_severity"),
-            ("max_severity", "max_severity"),
-        ],
-    )?;
+    let params = normalize_collection_query(query, REPORT_APPLICATION_DEFAULT_SORT)?;
+    let sort_sql = sort_clause(&params.sort, REPORT_APPLICATION_SORT_FIELDS)?;
     let sql = format!(
         "WITH selected_report AS (\n\
              SELECT id, uuid FROM reports WHERE lower(uuid) = lower($1)\n\
@@ -5683,20 +5863,8 @@ async fn report_operating_systems(
     Query(query): Query<CollectionQuery>,
 ) -> Result<Json<Collection<OperatingSystemItem>>, ApiError> {
     parse_uuid(&report_id)?;
-    let params = normalize_collection_query(query, "name")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("name", "name"),
-            ("cpe", "cpe"),
-            ("hosts", "host_count"),
-            ("host_count", "host_count"),
-            ("result_count", "result_count"),
-            ("vulnerability_count", "vulnerability_count"),
-            ("severity", "max_severity"),
-            ("max_severity", "max_severity"),
-        ],
-    )?;
+    let params = normalize_collection_query(query, REPORT_OPERATING_SYSTEM_DEFAULT_SORT)?;
+    let sort_sql = sort_clause(&params.sort, REPORT_OPERATING_SYSTEM_SORT_FIELDS)?;
     let sql = format!(
         "WITH selected_report AS (\n\
              SELECT id, uuid FROM reports WHERE lower(uuid) = lower($1)\n\
@@ -5777,25 +5945,8 @@ async fn report_tls_certificates(
     Query(query): Query<CollectionQuery>,
 ) -> Result<Json<Collection<TlsCertificateItem>>, ApiError> {
     parse_uuid(&report_id)?;
-    let params = normalize_collection_query(query, "-not_after")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("id", "id"),
-            ("fingerprint_sha256", "fingerprint_sha256"),
-            ("subject", "subject"),
-            ("dn", "subject"),
-            ("issuer", "issuer"),
-            ("serial", "serial"),
-            ("not_before", "not_before_unix"),
-            ("notvalidbefore", "not_before_unix"),
-            ("not_after", "not_after_unix"),
-            ("notvalidafter", "not_after_unix"),
-            ("host_count", "host_count"),
-            ("port_count", "port_count"),
-            ("result_count", "result_count"),
-        ],
-    )?;
+    let params = normalize_collection_query(query, REPORT_TLS_CERTIFICATE_DEFAULT_SORT)?;
+    let sort_sql = sort_clause(&params.sort, REPORT_TLS_CERTIFICATE_SORT_FIELDS)?;
     let sql = format!(
         "WITH selected_report AS (\n\
              SELECT id, uuid FROM reports WHERE lower(uuid) = lower($1)\n\
@@ -5875,17 +6026,8 @@ async fn report_cves(
     Query(query): Query<CollectionQuery>,
 ) -> Result<Json<Collection<CveItem>>, ApiError> {
     parse_uuid(&report_id)?;
-    let params = normalize_collection_query(query, "-max_severity")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("id", "id"),
-            ("affected_system_count", "affected_system_count"),
-            ("result_count", "result_count"),
-            ("severity", "max_severity"),
-            ("max_severity", "max_severity"),
-        ],
-    )?;
+    let params = normalize_collection_query(query, REPORT_CVE_DEFAULT_SORT)?;
+    let sort_sql = sort_clause(&params.sort, REPORT_CVE_SORT_FIELDS)?;
     let sql = format!(
         "WITH selected_report AS (\n\
              SELECT id, uuid FROM reports WHERE lower(uuid) = lower($1)\n\
@@ -5943,18 +6085,8 @@ async fn report_errors(
     Query(query): Query<CollectionQuery>,
 ) -> Result<Json<Collection<ErrorMessageItem>>, ApiError> {
     parse_uuid(&report_id)?;
-    let params = normalize_collection_query(query, "-created_at")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("id", "id"),
-            ("host", "host"),
-            ("port", "port"),
-            ("nvt_oid", "nvt_oid"),
-            ("description", "description"),
-            ("created_at", "created_at_unix"),
-        ],
-    )?;
+    let params = normalize_collection_query(query, REPORT_ERROR_DEFAULT_SORT)?;
+    let sort_sql = sort_clause(&params.sort, REPORT_ERROR_SORT_FIELDS)?;
     let sql = format!(
         "WITH selected_report AS (\n\
              SELECT id, uuid FROM reports WHERE lower(uuid) = lower($1)\n\
@@ -6310,30 +6442,8 @@ async fn report_hosts(
     Query(query): Query<CollectionQuery>,
 ) -> Result<Json<Collection<ReportHostItem>>, ApiError> {
     parse_uuid(&report_id)?;
-    let params = normalize_collection_query(query, "host")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("host", "host"),
-            ("hostname", "hostname"),
-            ("ports_count", "ports_count"),
-            ("applications_count", "applications_count"),
-            ("distance", "distance"),
-            ("authentication_state", "authentication_state"),
-            ("start_time", "start_time_unix"),
-            ("end_time", "end_time_unix"),
-            ("result_count", "result_count"),
-            ("vulnerability_count", "vulnerability_count"),
-            ("critical", "severity_critical"),
-            ("high", "severity_high"),
-            ("medium", "severity_medium"),
-            ("low", "severity_low"),
-            ("log", "severity_log"),
-            ("false_positive", "severity_false_positive"),
-            ("severity", "max_severity"),
-            ("max_severity", "max_severity"),
-        ],
-    )?;
+    let params = normalize_collection_query(query, REPORT_HOST_DEFAULT_SORT)?;
+    let sort_sql = sort_clause(&params.sort, REPORT_HOST_SORT_FIELDS)?;
     let sql = format!(
         r#"WITH selected_report AS (
              SELECT id, uuid FROM reports WHERE lower(uuid) = lower($1)
@@ -6462,19 +6572,8 @@ async fn targets(
     State(state): State<AppState>,
     Query(query): Query<CollectionQuery>,
 ) -> Result<Json<Collection<TargetItem>>, ApiError> {
-    let params = normalize_collection_query(query, "name")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("id", "uuid"),
-            ("name", "name"),
-            ("port_list", "port_list_name"),
-            ("task_count", "task_count"),
-            ("max_hosts", "host_entry_count"),
-            ("creation_time", "creation_time"),
-            ("modification_time", "modification_time"),
-        ],
-    )?;
+    let params = normalize_collection_query(query, TARGET_DEFAULT_SORT)?;
+    let sort_sql = sort_clause(&params.sort, TARGET_SORT_FIELDS)?;
     let sql = target_sql(
         "($1 = ''\n\
             OR lower(uuid) = lower($1)\n\
@@ -6616,26 +6715,8 @@ async fn tasks(
     State(state): State<AppState>,
     Query(query): Query<CollectionQuery>,
 ) -> Result<Json<Collection<TaskItem>>, ApiError> {
-    let params = normalize_collection_query(query, "name")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("id", "uuid"),
-            ("name", "name"),
-            ("status", "status"),
-            ("progress", "progress"),
-            ("target", "target_name"),
-            ("config", "config_name"),
-            ("scanner", "scanner_name"),
-            ("schedule", "schedule_name"),
-            ("report_count", "report_count_total"),
-            ("last_report", "last_report_timestamp"),
-            ("max_severity", "max_severity"),
-            ("trend", "trend"),
-            ("creation_time", "creation_time"),
-            ("modification_time", "modification_time"),
-        ],
-    )?;
+    let params = normalize_collection_query(query, TASK_DEFAULT_SORT)?;
+    let sort_sql = sort_clause(&params.sort, TASK_SORT_FIELDS)?;
     let sql = task_sql(
         "($1 = ''\n\
             OR lower(uuid) = lower($1)\n\
@@ -6831,20 +6912,8 @@ async fn scopes(
     State(state): State<AppState>,
     Query(query): Query<CollectionQuery>,
 ) -> Result<Json<Collection<ScopeItem>>, ApiError> {
-    let params = normalize_collection_query(query, "name")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("id", "uuid"),
-            ("name", "name"),
-            ("protection_requirement", "protection_requirement"),
-            ("target_count", "target_count"),
-            ("host_count", "host_count"),
-            ("scope_report_count", "scope_report_count"),
-            ("creation_time", "creation_time"),
-            ("modification_time", "modification_time"),
-        ],
-    )?;
+    let params = normalize_collection_query(query, SCOPE_DEFAULT_SORT)?;
+    let sort_sql = sort_clause(&params.sort, SCOPE_SORT_FIELDS)?;
     let sql = scope_sql(
         "($1 = ''\n\
             OR lower(uuid) = lower($1)\n\
@@ -7641,17 +7710,8 @@ async fn scope_report_errors(
 ) -> Result<Json<Collection<ErrorMessageItem>>, ApiError> {
     parse_uuid(&scope_id)?;
     parse_uuid(&scope_report_id)?;
-    let params = normalize_collection_query(query, "created_at")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("id", "id"),
-            ("host", "host"),
-            ("port", "port"),
-            ("nvt_oid", "nvt_oid"),
-            ("created_at", "created_at_unix"),
-        ],
-    )?;
+    let params = normalize_collection_query(query, SCOPE_REPORT_ERROR_DEFAULT_SORT)?;
+    let sort_sql = sort_clause(&params.sort, SCOPE_REPORT_ERROR_SORT_FIELDS)?;
     let sql = format!(
         "WITH selected_scope_report AS (\n\
              SELECT sr.id, sr.scope, coalesce(s.is_global, 0)::int AS is_global\n\
@@ -7733,24 +7793,8 @@ async fn scope_reports(
     State(state): State<AppState>,
     Query(query): Query<CollectionQuery>,
 ) -> Result<Json<Collection<ScopeReportItem>>, ApiError> {
-    let params = normalize_collection_query(query, "-creation_time")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("creation_time", "creation_time"),
-            ("modification_time", "modification_time"),
-            ("latest_evidence_time", "latest_evidence_time"),
-            ("scope_name", "scope_name"),
-            ("source_report_count", "source_report_count"),
-            ("source_target_count", "source_target_count"),
-            ("member_host_count", "member_host_count"),
-            ("evidence_host_count", "evidence_host_count"),
-            ("missing_host_count", "missing_host_count"),
-            ("result_count", "result_count"),
-            ("vulnerability_count", "vulnerability_count"),
-            ("max_severity", "max_severity"),
-        ],
-    )?;
+    let params = normalize_collection_query(query, SCOPE_REPORT_DEFAULT_SORT)?;
+    let sort_sql = sort_clause(&params.sort, SCOPE_REPORT_SORT_FIELDS)?;
     let sql = format!(
         "WITH filtered AS (\n\
            SELECT sr.id, sr.scope, sr.uuid, sr.scope_uuid, sr.scope_name, sr.protection_requirement,\n\
@@ -7964,18 +8008,8 @@ async fn scope_report_hosts(
 ) -> Result<Json<Collection<HostItem>>, ApiError> {
     parse_uuid(&scope_id)?;
     parse_uuid(&scope_report_id)?;
-    let params = normalize_collection_query(query, "host")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("host", "host"),
-            ("scope_membership", "scope_membership"),
-            ("source_report_count", "source_report_count"),
-            ("result_count", "result_count"),
-            ("vulnerability_count", "vulnerability_count"),
-            ("authenticated_scan_state", "authenticated_scan_state"),
-        ],
-    )?;
+    let params = normalize_collection_query(query, SCOPE_REPORT_HOST_DEFAULT_SORT)?;
+    let sort_sql = sort_clause(&params.sort, SCOPE_REPORT_HOST_SORT_FIELDS)?;
     let sql = format!(
         "WITH selected_scope_report AS (\n\
              SELECT sr.id, sr.scope, coalesce(s.is_global, 0)::int AS is_global\n\
@@ -8089,18 +8123,8 @@ async fn scope_report_ports(
 ) -> Result<Json<Collection<PortItem>>, ApiError> {
     parse_uuid(&scope_id)?;
     parse_uuid(&scope_report_id)?;
-    let params = normalize_collection_query(query, "port")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("port", "port"),
-            ("protocol", "protocol"),
-            ("host_count", "host_count"),
-            ("result_count", "result_count"),
-            ("vulnerability_count", "vulnerability_count"),
-            ("max_severity", "max_severity"),
-        ],
-    )?;
+    let params = normalize_collection_query(query, SCOPE_REPORT_PORT_DEFAULT_SORT)?;
+    let sort_sql = sort_clause(&params.sort, SCOPE_REPORT_PORT_SORT_FIELDS)?;
     let sql = format!(
         "WITH selected_scope_report AS (\n\
              SELECT sr.id, sr.scope, coalesce(s.is_global, 0)::int AS is_global\n\
@@ -8190,18 +8214,8 @@ async fn scope_report_applications(
 ) -> Result<Json<Collection<ApplicationItem>>, ApiError> {
     parse_uuid(&scope_id)?;
     parse_uuid(&scope_report_id)?;
-    let params = normalize_collection_query(query, "name")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("name", "name"),
-            ("cpe", "cpe"),
-            ("host_count", "host_count"),
-            ("result_count", "result_count"),
-            ("vulnerability_count", "vulnerability_count"),
-            ("max_severity", "max_severity"),
-        ],
-    )?;
+    let params = normalize_collection_query(query, SCOPE_REPORT_APPLICATION_DEFAULT_SORT)?;
+    let sort_sql = sort_clause(&params.sort, SCOPE_REPORT_APPLICATION_SORT_FIELDS)?;
     let sql = format!(
         "WITH selected_scope_report AS (\n\
              SELECT sr.id, sr.scope, coalesce(s.is_global, 0)::int AS is_global\n\
@@ -8360,18 +8374,8 @@ async fn scope_report_operating_systems(
 ) -> Result<Json<Collection<OperatingSystemItem>>, ApiError> {
     parse_uuid(&scope_id)?;
     parse_uuid(&scope_report_id)?;
-    let params = normalize_collection_query(query, "name")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("name", "name"),
-            ("cpe", "cpe"),
-            ("host_count", "host_count"),
-            ("result_count", "result_count"),
-            ("vulnerability_count", "vulnerability_count"),
-            ("max_severity", "max_severity"),
-        ],
-    )?;
+    let params = normalize_collection_query(query, SCOPE_REPORT_OPERATING_SYSTEM_DEFAULT_SORT)?;
+    let sort_sql = sort_clause(&params.sort, SCOPE_REPORT_OPERATING_SYSTEM_SORT_FIELDS)?;
     let sql = format!(
         "WITH selected_scope_report AS (\n\
              SELECT sr.id, sr.scope, coalesce(s.is_global, 0)::int AS is_global\n\
@@ -8473,22 +8477,8 @@ async fn scope_report_tls_certificates(
 ) -> Result<Json<Collection<TlsCertificateItem>>, ApiError> {
     parse_uuid(&scope_id)?;
     parse_uuid(&scope_report_id)?;
-    let params = normalize_collection_query(query, "-not_after")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("id", "id"),
-            ("fingerprint_sha256", "fingerprint_sha256"),
-            ("subject", "subject"),
-            ("issuer", "issuer"),
-            ("serial", "serial"),
-            ("not_before", "not_before_unix"),
-            ("not_after", "not_after_unix"),
-            ("host_count", "host_count"),
-            ("port_count", "port_count"),
-            ("result_count", "result_count"),
-        ],
-    )?;
+    let params = normalize_collection_query(query, SCOPE_REPORT_TLS_CERTIFICATE_DEFAULT_SORT)?;
+    let sort_sql = sort_clause(&params.sort, SCOPE_REPORT_TLS_CERTIFICATE_SORT_FIELDS)?;
     let sql = format!(
         "WITH selected_scope_report AS (\n\
              SELECT sr.id, sr.scope, coalesce(s.is_global, 0)::int AS is_global\n\
@@ -8582,16 +8572,8 @@ async fn scope_report_cves(
 ) -> Result<Json<Collection<CveItem>>, ApiError> {
     parse_uuid(&scope_id)?;
     parse_uuid(&scope_report_id)?;
-    let params = normalize_collection_query(query, "id")?;
-    let sort_sql = sort_clause(
-        &params.sort,
-        &[
-            ("id", "id"),
-            ("affected_system_count", "affected_system_count"),
-            ("result_count", "result_count"),
-            ("max_severity", "max_severity"),
-        ],
-    )?;
+    let params = normalize_collection_query(query, SCOPE_REPORT_CVE_DEFAULT_SORT)?;
+    let sort_sql = sort_clause(&params.sort, SCOPE_REPORT_CVE_SORT_FIELDS)?;
     let sql = format!(
         "WITH selected_scope_report AS (\n\
              SELECT sr.id, sr.scope, coalesce(s.is_global, 0)::int AS is_global\n\
@@ -10470,6 +10452,152 @@ mod tests {
         },
     ];
 
+    const REPORT_EVIDENCE_COLLECTION_CONTRACTS: &[CollectionContract] = &[
+        CollectionContract {
+            path: "/api/v1/reports/{report_id}/hosts",
+            default_sort: REPORT_HOST_DEFAULT_SORT,
+            allowed_sort_fields: REPORT_HOST_SORT_FIELDS,
+            filter_fields: &[
+                "host",
+                "hostname",
+                "best_os_cpe",
+                "best_os_txt",
+                "authentication_state",
+            ],
+            tie_breakers: &["host"],
+        },
+        CollectionContract {
+            path: "/api/v1/reports/{report_id}/ports",
+            default_sort: REPORT_PORT_DEFAULT_SORT,
+            allowed_sort_fields: REPORT_PORT_SORT_FIELDS,
+            filter_fields: &["port", "protocol"],
+            tie_breakers: &["port"],
+        },
+        CollectionContract {
+            path: "/api/v1/reports/{report_id}/applications",
+            default_sort: REPORT_APPLICATION_DEFAULT_SORT,
+            allowed_sort_fields: REPORT_APPLICATION_SORT_FIELDS,
+            filter_fields: &["name", "cpe"],
+            tie_breakers: &["name"],
+        },
+        CollectionContract {
+            path: "/api/v1/reports/{report_id}/operating-systems",
+            default_sort: REPORT_OPERATING_SYSTEM_DEFAULT_SORT,
+            allowed_sort_fields: REPORT_OPERATING_SYSTEM_SORT_FIELDS,
+            filter_fields: &["name", "cpe"],
+            tie_breakers: &["name"],
+        },
+        CollectionContract {
+            path: "/api/v1/reports/{report_id}/tls-certificates",
+            default_sort: REPORT_TLS_CERTIFICATE_DEFAULT_SORT,
+            allowed_sort_fields: REPORT_TLS_CERTIFICATE_SORT_FIELDS,
+            filter_fields: &["id", "fingerprint_sha256", "subject", "issuer", "serial"],
+            tie_breakers: &["id"],
+        },
+        CollectionContract {
+            path: "/api/v1/reports/{report_id}/cves",
+            default_sort: REPORT_CVE_DEFAULT_SORT,
+            allowed_sort_fields: REPORT_CVE_SORT_FIELDS,
+            filter_fields: &["id"],
+            tie_breakers: &["id"],
+        },
+        CollectionContract {
+            path: "/api/v1/reports/{report_id}/errors",
+            default_sort: REPORT_ERROR_DEFAULT_SORT,
+            allowed_sort_fields: REPORT_ERROR_SORT_FIELDS,
+            filter_fields: &["id", "host", "port", "nvt_oid", "description"],
+            tie_breakers: &["id"],
+        },
+        CollectionContract {
+            path: "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/hosts",
+            default_sort: SCOPE_REPORT_HOST_DEFAULT_SORT,
+            allowed_sort_fields: SCOPE_REPORT_HOST_SORT_FIELDS,
+            filter_fields: &["host", "scope_membership", "authenticated_scan_state"],
+            tie_breakers: &["host"],
+        },
+        CollectionContract {
+            path: "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/ports",
+            default_sort: SCOPE_REPORT_PORT_DEFAULT_SORT,
+            allowed_sort_fields: SCOPE_REPORT_PORT_SORT_FIELDS,
+            filter_fields: &["port", "protocol"],
+            tie_breakers: &["port"],
+        },
+        CollectionContract {
+            path: "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/applications",
+            default_sort: SCOPE_REPORT_APPLICATION_DEFAULT_SORT,
+            allowed_sort_fields: SCOPE_REPORT_APPLICATION_SORT_FIELDS,
+            filter_fields: &["name", "cpe"],
+            tie_breakers: &["name"],
+        },
+        CollectionContract {
+            path: "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/operating-systems",
+            default_sort: SCOPE_REPORT_OPERATING_SYSTEM_DEFAULT_SORT,
+            allowed_sort_fields: SCOPE_REPORT_OPERATING_SYSTEM_SORT_FIELDS,
+            filter_fields: &["name", "cpe"],
+            tie_breakers: &["name"],
+        },
+        CollectionContract {
+            path: "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/tls-certificates",
+            default_sort: SCOPE_REPORT_TLS_CERTIFICATE_DEFAULT_SORT,
+            allowed_sort_fields: SCOPE_REPORT_TLS_CERTIFICATE_SORT_FIELDS,
+            filter_fields: &["id", "fingerprint_sha256", "subject", "issuer", "serial"],
+            tie_breakers: &["id"],
+        },
+        CollectionContract {
+            path: "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/cves",
+            default_sort: SCOPE_REPORT_CVE_DEFAULT_SORT,
+            allowed_sort_fields: SCOPE_REPORT_CVE_SORT_FIELDS,
+            filter_fields: &["id"],
+            tie_breakers: &["id"],
+        },
+        CollectionContract {
+            path: "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/errors",
+            default_sort: SCOPE_REPORT_ERROR_DEFAULT_SORT,
+            allowed_sort_fields: SCOPE_REPORT_ERROR_SORT_FIELDS,
+            filter_fields: &["id", "host", "port", "nvt_oid", "description"],
+            tie_breakers: &["id"],
+        },
+    ];
+
+    const SCOPE_TASK_TARGET_COLLECTION_CONTRACTS: &[CollectionContract] = &[
+        CollectionContract {
+            path: "/api/v1/targets",
+            default_sort: TARGET_DEFAULT_SORT,
+            allowed_sort_fields: TARGET_SORT_FIELDS,
+            filter_fields: &["uuid", "name", "comment", "port_list_name", "hosts"],
+            tie_breakers: &["name"],
+        },
+        CollectionContract {
+            path: "/api/v1/tasks",
+            default_sort: TASK_DEFAULT_SORT,
+            allowed_sort_fields: TASK_SORT_FIELDS,
+            filter_fields: &[
+                "uuid",
+                "name",
+                "comment",
+                "status",
+                "target_name",
+                "config_name",
+                "scanner_name",
+            ],
+            tie_breakers: &["name"],
+        },
+        CollectionContract {
+            path: "/api/v1/scopes",
+            default_sort: SCOPE_DEFAULT_SORT,
+            allowed_sort_fields: SCOPE_SORT_FIELDS,
+            filter_fields: &["uuid", "name", "comment", "protection_requirement"],
+            tie_breakers: &["uuid"],
+        },
+        CollectionContract {
+            path: "/api/v1/scope-reports",
+            default_sort: SCOPE_REPORT_DEFAULT_SORT,
+            allowed_sort_fields: SCOPE_REPORT_SORT_FIELDS,
+            filter_fields: &["uuid", "scope_uuid", "scope_name"],
+            tie_breakers: &["uuid"],
+        },
+    ];
+
     const ASSET_CATALOG_COLLECTION_CONTRACTS: &[CollectionContract] = &[
         CollectionContract {
             path: "/api/v1/hosts",
@@ -10865,6 +10993,73 @@ mod tests {
         assert!(sort_field_names(NVT_CATALOG_SORT_FIELDS).contains(&"solution_type"));
         assert!(sort_field_names(OPERATING_SYSTEM_ASSET_SORT_FIELDS).contains(&"latest_severity"));
         assert!(sort_clause("created_at", CPE_CATALOG_SORT_FIELDS).is_err());
+    }
+
+    #[test]
+    fn report_evidence_collection_contracts_define_sort_filter_and_tie_breakers() {
+        let paths: Vec<&str> = REPORT_EVIDENCE_COLLECTION_CONTRACTS
+            .iter()
+            .map(|contract| contract.path)
+            .collect();
+        assert_eq!(
+            paths,
+            vec![
+                "/api/v1/reports/{report_id}/hosts",
+                "/api/v1/reports/{report_id}/ports",
+                "/api/v1/reports/{report_id}/applications",
+                "/api/v1/reports/{report_id}/operating-systems",
+                "/api/v1/reports/{report_id}/tls-certificates",
+                "/api/v1/reports/{report_id}/cves",
+                "/api/v1/reports/{report_id}/errors",
+                "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/hosts",
+                "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/ports",
+                "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/applications",
+                "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/operating-systems",
+                "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/tls-certificates",
+                "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/cves",
+                "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/errors",
+            ]
+        );
+        for contract in REPORT_EVIDENCE_COLLECTION_CONTRACTS {
+            assert_collection_contract(contract);
+        }
+        assert!(sort_field_names(REPORT_HOST_SORT_FIELDS).contains(&"authentication_state"));
+        assert!(sort_field_names(REPORT_PORT_SORT_FIELDS).contains(&"severity"));
+        assert!(sort_field_names(REPORT_APPLICATION_SORT_FIELDS).contains(&"occurrences"));
+        assert!(sort_field_names(REPORT_TLS_CERTIFICATE_SORT_FIELDS).contains(&"notvalidafter"));
+        assert!(sort_field_names(REPORT_CVE_SORT_FIELDS).contains(&"severity"));
+        assert!(sort_field_names(REPORT_ERROR_SORT_FIELDS).contains(&"description"));
+        assert!(sort_field_names(SCOPE_REPORT_HOST_SORT_FIELDS).contains(&"scope_membership"));
+        assert!(sort_field_names(SCOPE_REPORT_PORT_SORT_FIELDS).contains(&"max_severity"));
+        assert!(!sort_field_names(SCOPE_REPORT_PORT_SORT_FIELDS).contains(&"severity"));
+        assert!(sort_field_names(SCOPE_REPORT_TLS_CERTIFICATE_SORT_FIELDS).contains(&"not_after"));
+        assert!(!sort_field_names(SCOPE_REPORT_TLS_CERTIFICATE_SORT_FIELDS).contains(&"dn"));
+        assert!(sort_clause("severity", SCOPE_REPORT_CVE_SORT_FIELDS).is_err());
+    }
+
+    #[test]
+    fn scope_task_target_collection_contracts_define_sort_filter_and_tie_breakers() {
+        let paths: Vec<&str> = SCOPE_TASK_TARGET_COLLECTION_CONTRACTS
+            .iter()
+            .map(|contract| contract.path)
+            .collect();
+        assert_eq!(
+            paths,
+            vec![
+                "/api/v1/targets",
+                "/api/v1/tasks",
+                "/api/v1/scopes",
+                "/api/v1/scope-reports",
+            ]
+        );
+        for contract in SCOPE_TASK_TARGET_COLLECTION_CONTRACTS {
+            assert_collection_contract(contract);
+        }
+        assert!(sort_field_names(TARGET_SORT_FIELDS).contains(&"port_list"));
+        assert!(sort_field_names(TASK_SORT_FIELDS).contains(&"last_report"));
+        assert!(sort_field_names(SCOPE_SORT_FIELDS).contains(&"protection_requirement"));
+        assert!(sort_field_names(SCOPE_REPORT_SORT_FIELDS).contains(&"latest_evidence_time"));
+        assert!(sort_clause("created_at", TARGET_SORT_FIELDS).is_err());
     }
 
     #[test]
