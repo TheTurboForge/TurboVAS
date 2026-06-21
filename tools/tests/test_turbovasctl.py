@@ -228,6 +228,11 @@ class TurboVASCtlTests(unittest.TestCase):
             self.assertIn("artifacts", decoded)
             self.assertIn("metadata", decoded)
 
+    def test_runtime_app_up_retry_is_limited_to_docker_removal_races(self):
+        self.assertTrue(turbovasctl.compose_app_up_transient_error("Error response from daemon: No such container: abc123"))
+        self.assertTrue(turbovasctl.compose_app_up_transient_error("removal of container abc123 is already in progress"))
+        self.assertFalse(turbovasctl.compose_app_up_transient_error("database migration failed"))
+
     def test_inventory_reports_missing_components(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

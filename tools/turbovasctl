@@ -28,6 +28,11 @@ from typing import Any, Iterable
 
 
 STATUSES = ("pass", "warn", "fail")
+COMPOSE_APP_UP_TRANSIENT_ERRORS = (
+    "No such container:",
+    "removal of container",
+    "is already in progress",
+)
 SHORT_SECRET_BOUNDARY_CHARS = r"A-Za-z0-9_./-"
 LONG_SECRET_MIN_LENGTH = 12
 DECIMAL_BYTE_UNITS = {"B": 1, "KB": 1000, "kB": 1000, "MB": 1000**2, "GB": 1000**3, "TB": 1000**4}
@@ -2837,6 +2842,64 @@ def process_step_finding(status: str, check: str, message: str, result: subproce
     return finding(status, check, message, details=details)
 
 
+def compose_app_up_transient_error(output: str) -> bool:
+    return any(fragment in output for fragment in COMPOSE_APP_UP_TRANSIENT_ERRORS)
+
+
+def app_services_running(repo_root: Path) -> bool:
+    return all(container_running(repo_root, service) for service in APP_SERVICES)
+
+
+def compose_app_services_up_with_retry(repo_root: Path, check: str, message: str, timeout: int = 900) -> list[dict[str, Any]]:
+    command = compose_command(repo_root, "--profile", "app", "up", "-d", "--no-deps", "--build", *APP_SERVICES)
+    result = run_command(command, repo_root, env=runtime_env(repo_root), timeout=timeout)
+    if result.returncode == 0:
+        return [process_step_finding("pass", check, f"{message} exit code 0.", result, command)]
+
+    if not compose_app_up_transient_error(result.stdout):
+        return [process_step_finding("fail", check, f"{message} exit code {result.returncode}.", result, command)]
+
+    findings = [
+        process_step_finding(
+            "warn",
+            f"{check}.transient",
+            f"{message} hit Docker container-removal race exit code {result.returncode}; retrying with already-built images.",
+            result,
+            command,
+        )
+    ]
+    retry_command = compose_command(repo_root, "--profile", "app", "up", "-d", "--no-deps", *APP_SERVICES)
+    for attempt in range(1, 3):
+        time.sleep(8 * attempt)
+        retry = run_command(retry_command, repo_root, env=runtime_env(repo_root), timeout=300)
+        if retry.returncode == 0:
+            findings.append(process_step_finding("pass", f"{check}.retry", f"{message} retry {attempt} exit code 0.", retry, retry_command))
+            return findings
+        if app_services_running(repo_root):
+            findings.append(
+                process_step_finding(
+                    "warn",
+                    f"{check}.retry",
+                    f"{message} retry {attempt} reported exit code {retry.returncode}, but all app services are running after Docker settled.",
+                    retry,
+                    retry_command,
+                )
+            )
+            return findings
+        findings.append(
+            process_step_finding(
+                "warn" if attempt == 1 and compose_app_up_transient_error(retry.stdout) else "fail",
+                f"{check}.retry-{attempt}",
+                f"{message} retry {attempt} exit code {retry.returncode}.",
+                retry,
+                retry_command,
+            )
+        )
+        if not compose_app_up_transient_error(retry.stdout):
+            return findings
+    return findings
+
+
 def log_review_matches(lines: Iterable[str], service: str | None = None) -> list[dict[str, Any]]:
     matches: list[dict[str, Any]] = []
     material = list(lines)
@@ -5418,8 +5481,7 @@ def command_runtime_feed_import_init(repo_root: Path) -> dict[str, Any]:
             import_failed = True
             break
 
-    restart = run_command(compose_command(repo_root, "--profile", "app", "up", "-d", "--no-deps", "--build", *APP_SERVICES), repo_root, env=runtime_env(repo_root), timeout=900)
-    findings.append(finding("pass" if restart.returncode == 0 else "fail", "runtime.app-restart", f"Restart app services after feed import exit code {restart.returncode}.", details={"output_tail": output_tail(restart.stdout, 120)}))
+    findings.extend(compose_app_services_up_with_retry(repo_root, "runtime.app-restart", "Restart app services after feed import"))
     for service in APP_SERVICES:
         running = container_running(repo_root, service)
         findings.append(finding("pass" if running else "fail", "runtime.app.running", f"{service} container is {'running' if running else 'not running'} after feed import.", details={"service": service, "logs_tail": [] if running else service_log_tail(repo_root, service)}))
@@ -6677,8 +6739,7 @@ def command_runtime_app_up(repo_root: Path) -> dict[str, Any]:
     if aggregate_status(findings) == "fail":
         return make_result("runtime-app-up", repo_root, "Application runtime startup stopped at prerequisites.", findings, [str(runtime_dir(repo_root))])
 
-    result = run_command(compose_command(repo_root, "--profile", "app", "up", "-d", "--no-deps", "--build", *APP_SERVICES), repo_root, env=runtime_env(repo_root))
-    findings.append(finding("pass" if result.returncode == 0 else "fail", "compose.app-up", f"docker compose app up exit code {result.returncode}.", details={"output_tail": output_tail(result.stdout, 120)}))
+    findings.extend(compose_app_services_up_with_retry(repo_root, "compose.app-up", "docker compose app up"))
     for service in APP_SERVICES:
         running = container_running(repo_root, service)
         findings.append(finding("pass" if running else "warn", "runtime.app.running", f"{service} container is {'running' if running else 'not running'}.", details={"service": service, "logs_tail": [] if running else service_log_tail(repo_root, service)}))
