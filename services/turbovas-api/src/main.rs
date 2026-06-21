@@ -26,10 +26,12 @@ use tokio_postgres::{Config as PgConfig, NoTls, Row};
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 use uuid::Uuid;
 
+mod auth;
 mod collections;
 mod errors;
 mod request_ids;
 
+use auth::*;
 use collections::*;
 use errors::ApiError;
 use request_ids::*;
@@ -46,7 +48,6 @@ struct DirectApiAuth {
 
 const DIRECT_API_BIND_ENV: &str = "TURBOVAS_API_DIRECT_BIND";
 const DIRECT_API_BEARER_TOKEN_ENV: &str = "TURBOVAS_API_BEARER_TOKEN";
-const MIN_DIRECT_API_BEARER_TOKEN_LENGTH: usize = 32;
 const MAX_DIRECT_API_QUERY_BYTES: usize = 8 * 1024;
 const FEED_METADATA_ROOT_ENV: &str = "TURBOVAS_FEED_METADATA_DIR";
 const FEED_LOCK_ROOT_ENV: &str = "TURBOVAS_FEED_LOCK_DIR";
@@ -1536,11 +1537,6 @@ fn direct_api_config() -> Result<Option<(String, DirectApiAuth)>, ApiError> {
     Ok(Some((bind, DirectApiAuth { token })))
 }
 
-fn direct_api_bearer_token_is_acceptable(token: &str) -> bool {
-    token.len() >= MIN_DIRECT_API_BEARER_TOKEN_LENGTH
-        && token.bytes().all(|byte| (0x21..=0x7e).contains(&byte))
-}
-
 async fn require_direct_api_auth(
     State(auth): State<DirectApiAuth>,
     request: Request,
@@ -1709,36 +1705,6 @@ fn direct_api_wildcard_tail_is_allowed(tail: &str) -> bool {
         && tail
             .split('/')
             .all(|segment| !segment.is_empty() && segment != "." && segment != "..")
-}
-
-fn bearer_token_matches(headers: &HeaderMap, expected: &str) -> bool {
-    let Some(value) = headers
-        .get(header::AUTHORIZATION)
-        .and_then(|value| value.to_str().ok())
-    else {
-        return false;
-    };
-    let mut parts = value.splitn(2, ' ');
-    let Some(scheme) = parts.next() else {
-        return false;
-    };
-    let Some(token) = parts.next() else {
-        return false;
-    };
-    scheme.eq_ignore_ascii_case("Bearer") && constant_time_str_eq(token, expected)
-}
-
-fn constant_time_str_eq(candidate: &str, expected: &str) -> bool {
-    let candidate = candidate.as_bytes();
-    let expected = expected.as_bytes();
-    let max_len = candidate.len().max(expected.len());
-    let mut diff = candidate.len() ^ expected.len();
-    for index in 0..max_len {
-        let candidate_byte = candidate.get(index).copied().unwrap_or(0);
-        let expected_byte = expected.get(index).copied().unwrap_or(0);
-        diff |= usize::from(candidate_byte ^ expected_byte);
-    }
-    diff == 0
 }
 
 async fn shutdown_signal() {
