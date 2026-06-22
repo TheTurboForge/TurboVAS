@@ -67,7 +67,7 @@ browser, direct API, production-posture, or release-readiness question.
 
 - `just status`: show repository branch, HEAD, upstream, and worktree state.
 - `just inventory`: list the expected monorepo components.
-- `just native-tooling-state --status-only --json`: inventory inherited GMP, `python-gvm`, and `gvm-tools` dependency surfaces for native API retirement with compact status/non-pass output.
+- `just native-tooling-state --status-only --json`: inventory inherited GMP, `python-gvm`, and `gvm-tools` dependency surfaces for native API retirement with chat-safe status/non-pass output. Use `--summary` for compact count/contract detail, and reserve `--compact` for review work that needs removal-candidate paths.
 - `just rust-migration-state`: inspect Rust/C migration tools and the first non-production C-to-Rust dry-run candidate.
 - `just doctor`: run structural and environment readiness checks.
 - `just branding-state`: inventory visible TurboVAS/upstream identity and branding residue, including public image assets and SVG icon files.

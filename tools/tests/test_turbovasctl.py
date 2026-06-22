@@ -1395,6 +1395,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertNotIn("paths", summary["findings"][4]["details"])
         self.assertEqual(summary["findings"][4]["details"], {"count": 0})
         self.assertLess(len(json.dumps(summary)), len(json.dumps(compact)))
+        self.assertLess(len(json.dumps(summary)), len(json.dumps(compact)) // 2)
 
     def test_native_tooling_state_status_only_is_chat_safe(self):
         root = Path(__file__).resolve().parents[2]
