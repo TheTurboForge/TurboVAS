@@ -378,6 +378,7 @@ pub(crate) const TARGET_DEFAULT_SORT: &str = "name";
 pub(crate) const TARGET_SORT_FIELDS: &[(&str, &str)] = &[
     ("id", "uuid"),
     ("name", "name"),
+    ("hosts", "hosts"),
     ("port_list", "port_list_name"),
     ("task_count", "task_count"),
     ("max_hosts", "host_entry_count"),

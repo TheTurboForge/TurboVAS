@@ -9408,6 +9408,29 @@ mod tests {
         fields.iter().map(|(name, _)| *name).collect()
     }
 
+    fn gsa_target_native_sort_fields() -> Vec<&'static str> {
+        let source = include_str!("../../../components/gsa/src/gmp/native-api/targets.ts");
+        let body = source
+            .split_once("const TARGET_SORT_FIELDS: Record<string, string> = {")
+            .expect("GSA target native sort map must exist")
+            .1
+            .split_once("};")
+            .expect("GSA target native sort map must close")
+            .0;
+        body.lines()
+            .filter_map(|line| {
+                let value = line
+                    .trim()
+                    .split_once(':')?
+                    .1
+                    .trim()
+                    .trim_end_matches(',')
+                    .trim();
+                value.strip_prefix('\'')?.strip_suffix('\'')
+            })
+            .collect()
+    }
+
     fn assert_collection_contract(contract: &CollectionContract) {
         assert!(
             !contract.filter_fields.is_empty(),
@@ -9790,6 +9813,13 @@ mod tests {
         for contract in SCOPE_TASK_TARGET_COLLECTION_CONTRACTS {
             assert_collection_contract(contract);
         }
+        for sort_field in gsa_target_native_sort_fields() {
+            assert!(
+                sort_clause(sort_field, TARGET_SORT_FIELDS).is_ok(),
+                "GSA target native sort field {sort_field} must be accepted by Rust target sort fields"
+            );
+        }
+        assert!(sort_field_names(TARGET_SORT_FIELDS).contains(&"hosts"));
         assert!(sort_field_names(TARGET_SORT_FIELDS).contains(&"port_list"));
         assert!(sort_field_names(TASK_SORT_FIELDS).contains(&"last_report"));
         assert!(sort_field_names(SCOPE_SORT_FIELDS).contains(&"protection_requirement"));
