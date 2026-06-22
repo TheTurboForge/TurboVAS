@@ -134,6 +134,17 @@ describe('FeedStatusCommand tests', () => {
 
     const result = await cmd.checkFeedSync();
     expect(result.isSyncing).toBe(false);
+    expect(fakeHttp.request).toHaveBeenCalledWith('get', {
+      url: 'http://example.test/api/v1/feeds',
+      args: {
+        token: undefined,
+      },
+    });
+    expect(fakeHttp.request).not.toHaveBeenCalledWith('get', {
+      args: {
+        cmd: 'get_feeds',
+      },
+    });
   });
 
   test('should throw an error when readFeedInformation fails', async () => {

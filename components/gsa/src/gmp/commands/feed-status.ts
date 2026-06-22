@@ -122,6 +122,10 @@ class FeedStatusCommand extends HttpCommand {
   }
 
   async readFeedInformation() {
+    return this.readNativeFeedInformation();
+  }
+
+  private async readNativeFeedInformation() {
     const url = buildServerUrl(
       this.http.apiServer,
       'api/v1/feeds',
@@ -134,6 +138,12 @@ class FeedStatusCommand extends HttpCommand {
     const payload = JSON.parse(response.data) as NativeFeedInventory;
     const feeds = map(payload.items ?? [], feed => createFeed(feed));
     return response.setData(feeds);
+  }
+
+  private readInheritedFeedOwnerAndPermissions() {
+    // Feed owner/resource-access flags are still inherited GMP compatibility
+    // data used only to improve target/task creation rejection messages.
+    return this.httpGetWithTransform();
   }
 
   /**
@@ -171,7 +181,7 @@ class FeedStatusCommand extends HttpCommand {
    */
   async checkFeedOwnerAndPermissions() {
     try {
-      const response = await this.httpGetWithTransform();
+      const response = await this.readInheritedFeedOwnerAndPermissions();
       const data = response.data as FeedStatusElement;
       const isFeedOwnerSet = parseBoolean(
         data.get_feeds.get_feeds_response.feed_owner_set,
