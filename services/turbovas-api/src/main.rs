@@ -9644,6 +9644,61 @@ mod tests {
     }
 
     #[test]
+    fn scope_report_native_routes_remain_get_only_read_paths() {
+        let source = include_str!("main.rs");
+        let start = ".route(\"/api/v1/scope-reports\", get(scope_reports))";
+        let end = "\n        .with_state(state);";
+        let routes = source
+            .split_once(start)
+            .expect("scope report routes must be registered")
+            .1
+            .split_once(end)
+            .expect("scope report routes must precede app state")
+            .0;
+
+        for path in [
+            "/api/v1/scope-reports/:scope_report_id",
+            "/api/v1/scopes/:scope_id/reports/:scope_report_id/results",
+            "/api/v1/scopes/:scope_id/reports/:scope_report_id/hosts",
+            "/api/v1/scopes/:scope_id/reports/:scope_report_id/ports",
+            "/api/v1/scopes/:scope_id/reports/:scope_report_id/applications",
+            "/api/v1/scopes/:scope_id/reports/:scope_report_id/operating-systems",
+            "/api/v1/scopes/:scope_id/reports/:scope_report_id/cves",
+            "/api/v1/scopes/:scope_id/reports/:scope_report_id/tls-certificates",
+            "/api/v1/scopes/:scope_id/reports/:scope_report_id/errors",
+            "/api/v1/scopes/:scope_id/reports/:scope_report_id/metrics",
+            "/api/v1/scopes/:scope_id/reports/:scope_report_id/retention-plan",
+        ] {
+            assert!(routes.contains(path));
+        }
+        for handler in [
+            "get(scope_report_detail)",
+            "get(scope_report_results)",
+            "get(scope_report_hosts)",
+            "get(scope_report_ports)",
+            "get(scope_report_applications)",
+            "get(scope_report_operating_systems)",
+            "get(scope_report_cves)",
+            "get(scope_report_tls_certificates)",
+            "get(scope_report_errors)",
+            "get(scope_report_metrics)",
+            "get(scope_report_retention_plan)",
+        ] {
+            assert!(routes.contains(handler));
+        }
+        for forbidden in [
+            "post(scope_report",
+            "put(scope_report",
+            "patch(scope_report",
+            "delete(scope_report",
+            "start_task",
+            "resume_task",
+        ] {
+            assert!(!routes.contains(forbidden));
+        }
+    }
+
+    #[test]
     fn scope_task_target_collection_contracts_define_sort_filter_and_tie_breakers() {
         let paths: Vec<&str> = SCOPE_TASK_TARGET_COLLECTION_CONTRACTS
             .iter()
