@@ -74,7 +74,7 @@ surfaces.
 | --- | --- | --- |
 | `git diff --check` | Patch formatting has no trailing whitespace or conflict markers. | Build, runtime, behavior, or license safety. |
 | `just native-tooling-state --status-only --json` | Native API inventory, browser-proxy, direct-read, and OpenAPI contract alignment with chat-safe status/non-pass output. Use `--summary` only when compact count details are needed. | Runtime data parity, browser behavior, or production readiness. |
-| `just native-api-client-contract --json` | OpenAPI server/auth/error/direct-read metadata is ready for generated-client use. | Endpoint response correctness or direct listener availability. |
+| `just native-api-client-contract --status-only --json` | OpenAPI server/auth/error/direct-read metadata is ready for generated-client use with compact status/non-pass output. Use full `--json` only when investigating a contract mismatch. | Endpoint response correctness or direct listener availability. |
 | `just runtime-native-api-smoke --json` | Internal native API sidecar can answer representative live runtime reads. | Browser workflows, direct scriptable access, or production posture. |
 | `just runtime-native-api-direct-smoke --json` | Opt-in direct bearer-auth development listener rejects bad access and serves allowlisted reads. | Production TLS, host-binding safety, or write/control authorization. |
 | `just runtime-browser-smoke --json` | Key operator workflows render through GSA/browser against the dev runtime. | Deep route regression, generated-client contracts, or release readiness. |
