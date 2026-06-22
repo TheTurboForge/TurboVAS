@@ -154,10 +154,10 @@ paths:
       x-turbovas-direct: true
       x-turbovas-exposure: direct-read
       x-turbovas-maturity: live-read
-      x-turbovas-replaces: cve-catalog-detail-reference-read
+      x-turbovas-replaces: cve-catalog-detail-epss-reference-read
       x-turbovas-inherited-still-owns: scap-rich-context
       summary: Read one Security Information CVE
-      description: Read-only CVE catalog detail backed by gvmd/PostgreSQL. Native detail includes CERT advisory and NVT references for display. Export and remaining rich/raw SCAP context stay inherited.
+      description: Read-only CVE catalog detail backed by gvmd/PostgreSQL. Native detail includes EPSS score/percentile plus CERT advisory and NVT references for display. Export and remaining rich/raw SCAP context stay inherited.
       parameters:
         - $ref: '#/components/parameters/CveId'
       responses:
