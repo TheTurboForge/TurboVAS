@@ -1612,7 +1612,7 @@ class TurboVASCtlTests(unittest.TestCase):
             "task-scan-control-writes-and-deletes",
             "tls-certificate-export-delete-and-rich-history",
             "trashcan-row-data-and-mutations",
-            "vulnerability-rich-context-exports-and-actions",
+            "vulnerability-exports-and-actions",
         ]
         self.assertEqual(contract["allowed_replaces_values"], expected_replaces_values)
         self.assertEqual(contract["allowed_inherited_still_owns_values"], expected_inherited_still_owns_values)

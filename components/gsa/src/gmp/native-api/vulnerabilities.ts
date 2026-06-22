@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2026 TurboVAS contributors
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -29,12 +30,32 @@ interface NativePage {
 interface NativeVulnerabilityPayload {
   id: string;
   name: string;
+  family?: string;
   oldest_result?: string;
   newest_result?: string;
   severity: number;
   qod: number;
   result_count: number;
   host_count: number;
+  cves?: string[];
+  cert_refs?: string[];
+  xrefs?: string[];
+  max_epss?: NativeNvtEpssPayload;
+  max_severity?: NativeNvtEpssPayload;
+  summary?: string;
+  insight?: string;
+  affected?: string;
+  impact?: string;
+  detection?: string;
+  solution_type?: string;
+  solution?: string;
+}
+
+interface NativeNvtEpssPayload {
+  score?: number;
+  percentile?: number;
+  cve?: string;
+  severity?: number;
 }
 
 interface NativeVulnerabilitiesPayload {
@@ -77,6 +98,36 @@ const numberValue = (value: unknown, fallback = 0): number => {
   const parsed = Number.parseFloat(String(value ?? fallback));
   return Number.isFinite(parsed) ? parsed : fallback;
 };
+
+const refPartsFromNative = (value: string) => {
+  const separator = value.indexOf(':');
+  if (separator <= 0) {
+    return {type: 'other', value};
+  }
+  return {type: value.slice(0, separator), value: value.slice(separator + 1)};
+};
+
+const certFromNative = (value: string) => {
+  const parts = refPartsFromNative(value);
+  return {type: parts.type, id: parts.value};
+};
+
+const xrefFromNative = (value: string) => {
+  const parts = refPartsFromNative(value);
+  return {type: parts.type, ref: parts.value};
+};
+
+const epssFromNative = (value?: NativeNvtEpssPayload) =>
+  value
+    ? {
+        score: numberValue(value.score),
+        percentile: numberValue(value.percentile),
+        cve: {
+          id: stringValue(value.cve),
+          severity: numberValue(value.severity),
+        },
+      }
+    : undefined;
 
 const nativeSortFromFilter = (filter?: Filter): string => {
   const reverse = filter?.get('sort-reverse');
@@ -139,10 +190,15 @@ const fetchNativeJson = async <T>(
 
 const nativeVulnerabilityToModel = (
   item: NativeVulnerabilityPayload,
-): Vulnerability =>
-  Vulnerability.fromElement({
+): Vulnerability => {
+  const solutionType = stringValue(item.solution_type);
+  const solutionDescription = stringValue(item.solution);
+  const maxEpss = epssFromNative(item.max_epss);
+  const maxSeverity = epssFromNative(item.max_severity);
+  return Vulnerability.fromElement({
     _id: stringValue(item.id),
     name: stringValue(item.name),
+    family: stringValue(item.family),
     results: {
       count: integerValue(item.result_count),
       oldest: stringValue(item.oldest_result),
@@ -151,7 +207,30 @@ const nativeVulnerabilityToModel = (
     hosts: {count: integerValue(item.host_count)},
     severity: numberValue(item.severity),
     qod: integerValue(item.qod),
+    cves: item.cves ?? [],
+    certs: (item.cert_refs ?? []).map(certFromNative),
+    xrefs: (item.xrefs ?? []).map(xrefFromNative),
+    epss:
+      maxEpss || maxSeverity
+        ? {
+            maxEpss,
+            maxSeverity,
+          }
+        : undefined,
+    summary: stringValue(item.summary),
+    insight: stringValue(item.insight),
+    affected: stringValue(item.affected),
+    impact: stringValue(item.impact),
+    detection: stringValue(item.detection),
+    solution:
+      solutionType || solutionDescription
+        ? {
+            type: solutionType,
+            description: solutionDescription,
+          }
+        : undefined,
   });
+};
 
 export const fetchNativeVulnerabilities = async (
   gmp: NativeApiGmp,

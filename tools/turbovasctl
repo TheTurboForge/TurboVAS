@@ -444,7 +444,7 @@ OPENAPI_ALLOWED_INHERITED_STILL_OWNS_VALUES = frozenset(
         "task-scan-control-writes-and-deletes",
         "tls-certificate-export-delete-and-rich-history",
         "trashcan-row-data-and-mutations",
-        "vulnerability-rich-context-exports-and-actions",
+        "vulnerability-exports-and-actions",
     }
 )
 OPENAPI_ALLOWED_MIGRATION_METADATA_VALUES = {
@@ -728,7 +728,7 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-replaces": "result-detail-metadata-read",
     },
     ("get", "/vulnerabilities"): {
-        "x-turbovas-inherited-still-owns": "vulnerability-rich-context-exports-and-actions",
+        "x-turbovas-inherited-still-owns": "vulnerability-exports-and-actions",
         "x-turbovas-maturity": "live-read",
         "x-turbovas-replaces": "vulnerability-list-read",
     },

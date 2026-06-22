@@ -630,12 +630,38 @@ struct ResultItem {
 struct VulnerabilityItem {
     id: String,
     name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    family: Option<String>,
     oldest_result: Option<String>,
     newest_result: Option<String>,
     severity: f64,
     qod: i64,
     result_count: i64,
     host_count: i64,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    cves: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    cert_refs: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    xrefs: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_epss: Option<NvtEpssItem>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_severity: Option<NvtEpssItem>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    summary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    insight: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    affected: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    impact: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    detection: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    solution_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    solution: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -4080,6 +4106,23 @@ async fn vulnerabilities(
         r#"WITH vulnerability_rows AS (
              SELECT coalesce(nullif(r.nvt, ''), r.uuid::text) AS id,
                     coalesce(max(nullif(n.name, '')), max(nullif(r.nvt, '')), 'Unknown vulnerability') AS name,
+                    max(nullif(n.family, '')) AS family,
+                    max(n.cve) AS cve_text,
+                    max(n.epss_score::double precision) AS epss_score,
+                    max(n.epss_percentile::double precision) AS epss_percentile,
+                    max(n.epss_cve) AS epss_cve,
+                    max(n.epss_severity::double precision) AS epss_severity,
+                    max(n.max_epss_score::double precision) AS max_epss_score,
+                    max(n.max_epss_percentile::double precision) AS max_epss_percentile,
+                    max(n.max_epss_cve) AS max_epss_cve,
+                    max(n.max_epss_severity::double precision) AS max_epss_severity,
+                    max(nullif(n.summary, '')) AS summary,
+                    max(nullif(n.insight, '')) AS insight,
+                    max(nullif(n.affected, '')) AS affected,
+                    max(nullif(n.impact, '')) AS impact,
+                    max(nullif(n.detection, '')) AS detection,
+                    max(nullif(n.solution_type, '')) AS solution_type,
+                    max(nullif(n.solution, '')) AS solution,
                     min(coalesce(r.date, 0))::bigint AS oldest_result_unix,
                     max(coalesce(r.date, 0))::bigint AS newest_result_unix,
                     max(coalesce(r.severity, 0))::double precision AS severity,
@@ -4101,9 +4144,38 @@ async fn vulnerabilities(
               WHERE ($1 = ''
                      OR lower(id) LIKE '%' || lower($1) || '%'
                      OR lower(name) LIKE '%' || lower($1) || '%')
+         ),
+         page_rows AS (
+             SELECT count(*) OVER()::bigint AS total, * FROM filtered
+              ORDER BY {sort_sql}, name ASC, id ASC LIMIT $2 OFFSET $3
+         ),
+         page_with_refs AS (
+             SELECT p.*,
+                    CASE
+                      WHEN cardinality(coalesce(refs.cves, ARRAY[]::text[])) > 0
+                      THEN refs.cves
+                      WHEN coalesce(p.cve_text, '') <> ''
+                      THEN regexp_split_to_array(p.cve_text, '\\s*,\\s*')
+                      ELSE ARRAY[]::text[]
+                    END AS cves,
+                    coalesce(refs.cert_refs, ARRAY[]::text[]) AS cert_refs,
+                    coalesce(refs.xrefs, ARRAY[]::text[]) AS xrefs
+               FROM page_rows p
+               LEFT JOIN LATERAL (
+                   SELECT array_agg(vr.ref_id::text ORDER BY vr.ref_id)
+                            FILTER (WHERE vr.ref_id IS NOT NULL
+                                    AND lower(vr.type) IN ('cve', 'cve_id')) AS cves,
+                          array_agg(lower(vr.type) || ':' || vr.ref_id::text ORDER BY lower(vr.type), vr.ref_id)
+                            FILTER (WHERE vr.ref_id IS NOT NULL
+                                    AND lower(vr.type) IN ('dfn-cert', 'cert-bund')) AS cert_refs,
+                          array_agg(lower(vr.type) || ':' || vr.ref_id::text ORDER BY lower(vr.type), vr.ref_id)
+                            FILTER (WHERE vr.ref_id IS NOT NULL
+                                    AND lower(vr.type) NOT IN ('cve', 'cve_id', 'dfn-cert', 'cert-bund')) AS xrefs
+                     FROM vt_refs vr
+                    WHERE vr.vt_oid = p.id
+               ) refs ON true
          )
-         SELECT count(*) OVER()::bigint AS total, * FROM filtered
-          ORDER BY {sort_sql}, name ASC, id ASC LIMIT $2 OFFSET $3;"#,
+         SELECT * FROM page_with_refs;"#,
     );
     let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
     let rows = client
@@ -8094,12 +8166,25 @@ fn vulnerability_from_row(row: &Row) -> VulnerabilityItem {
     VulnerabilityItem {
         id: row.get("id"),
         name: row.get("name"),
+        family: optional_row_string(row, "family"),
         oldest_result: unix_ts_to_rfc3339(row.get("oldest_result_unix")),
         newest_result: unix_ts_to_rfc3339(row.get("newest_result_unix")),
         severity: row.get("severity"),
         qod: row.get("qod"),
         result_count: row.get("result_count"),
         host_count: row.get("host_count"),
+        cves: optional_row_strings(row, "cves"),
+        cert_refs: optional_row_strings(row, "cert_refs"),
+        xrefs: optional_row_strings(row, "xrefs"),
+        max_epss: nvt_epss_from_row(row),
+        max_severity: nvt_max_severity_from_row(row),
+        summary: optional_row_string(row, "summary"),
+        insight: optional_row_string(row, "insight"),
+        affected: optional_row_string(row, "affected"),
+        impact: optional_row_string(row, "impact"),
+        detection: optional_row_string(row, "detection"),
+        solution_type: optional_row_string(row, "solution_type"),
+        solution: optional_row_string(row, "solution"),
     }
 }
 

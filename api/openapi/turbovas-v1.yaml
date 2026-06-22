@@ -87,7 +87,7 @@ paths:
       x-turbovas-exposure: direct-read
       x-turbovas-maturity: live-read
       x-turbovas-replaces: vulnerability-list-read
-      x-turbovas-inherited-still-owns: vulnerability-rich-context-exports-and-actions
+      x-turbovas-inherited-still-owns: vulnerability-exports-and-actions
       summary: List top-level vulnerabilities from scan results
       parameters:
         - $ref: '#/components/parameters/Page'
@@ -3923,6 +3923,8 @@ components:
           description: NVT OID for the vulnerability row.
         name:
           type: string
+        family:
+          type: string
         oldest_result:
           type: string
           format: date-time
@@ -3937,6 +3939,36 @@ components:
           type: integer
         host_count:
           type: integer
+        cves:
+          type: array
+          items:
+            type: string
+        cert_refs:
+          type: array
+          items:
+            type: string
+        xrefs:
+          type: array
+          items:
+            type: string
+        max_epss:
+          $ref: '#/components/schemas/NvtEpss'
+        max_severity:
+          $ref: '#/components/schemas/NvtEpss'
+        summary:
+          type: string
+        insight:
+          type: string
+        affected:
+          type: string
+        impact:
+          type: string
+        detection:
+          type: string
+        solution_type:
+          type: string
+        solution:
+          type: string
     OperatingSystemAsset:
       type: object
       required: [id, name, hosts, all_hosts]
