@@ -981,6 +981,7 @@ class TurboVASCtlTests(unittest.TestCase):
             "console.warn = consoleError",
             "console.warn = originalConsoleError",
             "console.error = consoleWarn",
+            "const consoleError = console.log",
         )
         offenders: list[str] = []
         for source_root in source_roots:

@@ -63,7 +63,7 @@ describe('Schedule model tests', () => {
 
   test('should handle invalid ical data safely', () => {
     // eslint-disable-next-line no-console
-    const consoleError = console.log;
+    const consoleError = console.error;
     const errorLog = testing.fn();
 
     console.error = errorLog;
