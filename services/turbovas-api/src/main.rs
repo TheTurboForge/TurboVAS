@@ -394,6 +394,20 @@ struct CatalogEpssItem {
 }
 
 #[derive(Debug, Serialize)]
+struct CatalogCveCertReference {
+    name: String,
+    title: String,
+    #[serde(rename = "type")]
+    cert_type: String,
+}
+
+#[derive(Debug, Serialize)]
+struct CatalogCveNvtReference {
+    id: String,
+    name: String,
+}
+
+#[derive(Debug, Serialize)]
 struct CatalogCveItem {
     id: String,
     name: String,
@@ -402,6 +416,10 @@ struct CatalogCveItem {
     cvss_base_vector: String,
     severity: f64,
     products: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    cert_refs: Vec<CatalogCveCertReference>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    nvt_refs: Vec<CatalogCveNvtReference>,
     #[serde(skip_serializing_if = "Option::is_none")]
     epss: Option<CatalogEpssItem>,
     published_at: Option<String>,
@@ -4426,7 +4444,79 @@ async fn cve_catalog_detail(
             ApiError::Database
         })?
         .ok_or(ApiError::NotFound)?;
-    Ok(Json(catalog_cve_from_row(&row)))
+    let mut item = catalog_cve_from_row(&row);
+    item.cert_refs = cve_cert_refs(&client, &cve_id).await?;
+    item.nvt_refs = cve_nvt_refs(&client, &cve_id).await?;
+    Ok(Json(item))
+}
+
+async fn cve_cert_refs(
+    client: &tokio_postgres::Client,
+    cve_id: &str,
+) -> Result<Vec<CatalogCveCertReference>, ApiError> {
+    let rows = client
+        .query(
+            r#"SELECT *
+                 FROM (
+                       SELECT 'CERT-Bund'::text AS cert_type,
+                              d.name AS name,
+                              coalesce(d.title, '') AS title
+                         FROM cert.cert_bund_cves dc
+                         JOIN cert.cert_bund_advs d ON d.id = dc.adv_id
+                        WHERE lower(dc.cve_name) = lower($1)
+                        UNION ALL
+                       SELECT 'DFN-CERT'::text AS cert_type,
+                              d.name AS name,
+                              coalesce(d.title, '') AS title
+                         FROM cert.dfn_cert_cves dc
+                         JOIN cert.dfn_cert_advs d ON d.id = dc.adv_id
+                        WHERE lower(dc.cve_name) = lower($1)
+                      ) refs
+                ORDER BY cert_type ASC, name ASC;"#,
+            &[&cve_id],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "CVE catalog CERT reference query failed");
+            ApiError::Database
+        })?;
+    Ok(rows
+        .iter()
+        .map(|row| CatalogCveCertReference {
+            cert_type: row.get("cert_type"),
+            name: row.get("name"),
+            title: row.get("title"),
+        })
+        .collect())
+}
+
+async fn cve_nvt_refs(
+    client: &tokio_postgres::Client,
+    cve_id: &str,
+) -> Result<Vec<CatalogCveNvtReference>, ApiError> {
+    let rows = client
+        .query(
+            r#"SELECT DISTINCT n.oid AS id,
+                              coalesce(nullif(n.name, ''), n.oid) AS name
+                 FROM vt_refs vr
+                 JOIN nvts n ON n.oid = vr.vt_oid
+                WHERE lower(vr.ref_id) = lower($1)
+                  AND lower(vr.type) IN ('cve', 'cve_id')
+                ORDER BY name ASC, id ASC;"#,
+            &[&cve_id],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "CVE catalog NVT reference query failed");
+            ApiError::Database
+        })?;
+    Ok(rows
+        .iter()
+        .map(|row| CatalogCveNvtReference {
+            id: row.get("id"),
+            name: row.get("name"),
+        })
+        .collect())
 }
 
 async fn dfn_cert_advisories(
@@ -8802,6 +8892,8 @@ fn catalog_cve_from_row(row: &Row) -> CatalogCveItem {
         cvss_base_vector: row.get("cvss_base_vector"),
         severity: row.get("severity"),
         products: split_catalog_products(row.get("products")),
+        cert_refs: Vec::new(),
+        nvt_refs: Vec::new(),
         epss: epss_score
             .zip(epss_percentile)
             .map(|(score, percentile)| CatalogEpssItem { score, percentile }),
@@ -10291,6 +10383,45 @@ mod tests {
         assert!(sort_field_names(NVT_CATALOG_SORT_FIELDS).contains(&"solution_type"));
         assert!(sort_field_names(OPERATING_SYSTEM_ASSET_SORT_FIELDS).contains(&"latest_severity"));
         assert!(sort_clause("created_at", CPE_CATALOG_SORT_FIELDS).is_err());
+    }
+
+    #[test]
+    fn cve_catalog_detail_reads_reference_context_without_mutation_workflows() {
+        let source = include_str!("main.rs");
+        let detail_source = source
+            .split_once("async fn cve_catalog_detail")
+            .expect("CVE catalog detail handler must exist")
+            .1
+            .split_once("async fn dfn_cert_advisories")
+            .expect("CVE catalog detail handler must precede advisory handlers")
+            .0;
+        let list_source = source
+            .split_once("async fn cve_catalog(")
+            .expect("CVE catalog list handler must exist")
+            .1
+            .split_once("async fn cve_catalog_detail")
+            .expect("CVE catalog list handler must precede detail handler")
+            .0;
+        let payload_source = source
+            .split_once("struct CatalogCveItem {")
+            .expect("CVE catalog payload must exist")
+            .1
+            .split_once("struct CatalogCpeCveItem")
+            .expect("CVE catalog payload must precede CPE CVE payload")
+            .0;
+
+        assert!(payload_source.contains("cert_refs: Vec<CatalogCveCertReference>"));
+        assert!(payload_source.contains("nvt_refs: Vec<CatalogCveNvtReference>"));
+        assert!(detail_source.contains("item.cert_refs = cve_cert_refs(&client, &cve_id).await?"));
+        assert!(detail_source.contains("item.nvt_refs = cve_nvt_refs(&client, &cve_id).await?"));
+        assert!(detail_source.contains("FROM cert.cert_bund_cves dc"));
+        assert!(detail_source.contains("FROM cert.dfn_cert_cves dc"));
+        assert!(detail_source.contains("FROM vt_refs vr"));
+        assert!(!list_source.contains("cve_cert_refs"));
+        assert!(!list_source.contains("cve_nvt_refs"));
+        for inherited_workflow in ["export", "delete", "modify", "create"] {
+            assert!(!detail_source.contains(inherited_workflow));
+        }
     }
 
     #[test]

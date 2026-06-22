@@ -31,6 +31,17 @@ interface NativeCatalogEpssPayload {
   percentile?: number;
 }
 
+interface NativeCatalogCveCertRefPayload {
+  name: string;
+  title?: string;
+  type: string;
+}
+
+interface NativeCatalogCveNvtRefPayload {
+  id: string;
+  name?: string;
+}
+
 interface NativeCatalogCvePayload {
   id: string;
   name?: string;
@@ -39,6 +50,8 @@ interface NativeCatalogCvePayload {
   cvss_base_vector?: string;
   severity?: number;
   products?: string[];
+  cert_refs?: NativeCatalogCveCertRefPayload[];
+  nvt_refs?: NativeCatalogCveNvtRefPayload[];
   epss?: NativeCatalogEpssPayload;
   published_at?: string;
   modified_at?: string;
@@ -155,6 +168,19 @@ const nativeCveToModel = (item: NativeCatalogCvePayload): Cve =>
       cvss_vector: stringValue(item.cvss_base_vector),
       severity: numberValue(item.severity),
       products: (item.products ?? []).join(' '),
+      cert: {
+        cert_ref: (item.cert_refs ?? []).map(ref => ({
+          _type: stringValue(ref.type),
+          name: stringValue(ref.name),
+          title: stringValue(ref.title),
+        })),
+      },
+      nvts: {
+        nvt: (item.nvt_refs ?? []).map(ref => ({
+          _oid: stringValue(ref.id),
+          name: stringValue(ref.name),
+        })),
+      },
       epss: item.epss
         ? {
             score: numberValue(item.epss.score),
@@ -168,17 +194,13 @@ export const fetchNativeCves = async (
   gmp: NativeApiGmp,
   query: NativeCvesQuery,
 ): Promise<NativeCvesResponse> => {
-  const payload = await fetchNativeJson<NativeCvesPayload>(
-    gmp,
-    'api/v1/cves',
-    {
-      token: gmp.session.token,
-      page: query.page,
-      page_size: query.pageSize,
-      sort: query.sort,
-      filter: query.filter,
-    },
-  );
+  const payload = await fetchNativeJson<NativeCvesPayload>(gmp, 'api/v1/cves', {
+    token: gmp.session.token,
+    page: query.page,
+    page_size: query.pageSize,
+    sort: query.sort,
+    filter: query.filter,
+  });
   const page = {
     page: integerValue(payload.page?.page, 1),
     page_size: integerValue(payload.page?.page_size, query.pageSize),

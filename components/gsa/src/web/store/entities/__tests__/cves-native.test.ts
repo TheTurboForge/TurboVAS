@@ -6,7 +6,10 @@
 import {afterEach, describe, expect, test, testing} from '@gsa/testing';
 import {fetchNativeCve, fetchNativeCves} from 'gmp/native-api/cves';
 
-const createGmp = ({jwt, token = 'test-token'}: {jwt?: string; token?: string} = {}) => ({
+const createGmp = ({
+  jwt,
+  token = 'test-token',
+}: {jwt?: string; token?: string} = {}) => ({
   buildUrl: testing.fn((path: string) => `https://turbovas.example/${path}`),
   session: {jwt, token},
 });
@@ -19,7 +22,13 @@ describe('native API CVE catalog', () => {
   test('fetches top-level CVEs as inherited Cve models', async () => {
     const fetchMock = testing.fn().mockResolvedValue({
       json: testing.fn().mockResolvedValue({
-        page: {page: 1, page_size: 25, total: 1, sort: '-severity', filter: 'lightllm'},
+        page: {
+          page: 1,
+          page_size: 25,
+          total: 1,
+          sort: '-severity',
+          filter: 'lightllm',
+        },
         items: [
           {
             id: 'CVE-2026-26220',
@@ -52,8 +61,12 @@ describe('native API CVE catalog', () => {
     expect(response.counts.filtered).toEqual(1);
     expect(cve.id).toEqual('CVE-2026-26220');
     expect(cve.name).toEqual('CVE-2026-26220');
-    expect(cve.description).toEqual('LightLLM remote code execution vulnerability.');
-    expect(cve.cvssBaseVector).toEqual('CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H');
+    expect(cve.description).toEqual(
+      'LightLLM remote code execution vulnerability.',
+    );
+    expect(cve.cvssBaseVector).toEqual(
+      'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H',
+    );
     expect(cve.severity).toEqual(9.8);
     expect(cve.products).toEqual(['cpe:/a:example:lightllm:1.1.0']);
     expect(cve.epss?.score).toEqual(0.42);
@@ -64,13 +77,16 @@ describe('native API CVE catalog', () => {
       sort: '-severity',
       filter: 'lightllm',
     });
-    expect(fetchMock).toHaveBeenCalledWith('https://turbovas.example/api/v1/cves', {
-      credentials: 'include',
-      headers: {
-        Accept: 'application/json',
-        Authorization: 'Bearer jwt-token',
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://turbovas.example/api/v1/cves',
+      {
+        credentials: 'include',
+        headers: {
+          Accept: 'application/json',
+          Authorization: 'Bearer jwt-token',
+        },
       },
-    });
+    );
   });
 
   test('fetches one CVE detail through the native API', async () => {
@@ -82,6 +98,19 @@ describe('native API CVE catalog', () => {
         cvss_base_vector: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H',
         severity: 9.8,
         products: [],
+        cert_refs: [
+          {
+            name: 'CB-K26/0001',
+            title: 'Example CERT-Bund advisory',
+            type: 'CERT-Bund',
+          },
+        ],
+        nvt_refs: [
+          {
+            id: '1.3.6.1.4.1.25623.1.0.900001',
+            name: 'Example vulnerability test',
+          },
+        ],
       }),
       ok: true,
       status: 200,
@@ -92,6 +121,20 @@ describe('native API CVE catalog', () => {
     const cve = await fetchNativeCve(gmp, 'CVE-2026-26220');
 
     expect(cve.id).toEqual('CVE-2026-26220');
+    expect(cve.certs).toEqual([
+      {
+        cert_type: 'CERT-Bund',
+        name: 'CB-K26/0001',
+        title: 'Example CERT-Bund advisory',
+      },
+    ]);
+    expect(cve.nvts).toEqual([
+      {
+        id: '1.3.6.1.4.1.25623.1.0.900001',
+        name: 'Example vulnerability test',
+        oid: '1.3.6.1.4.1.25623.1.0.900001',
+      },
+    ]);
     expect(gmp.buildUrl).toHaveBeenCalledWith('api/v1/cves/CVE-2026-26220', {
       token: 'test-token',
     });

@@ -347,6 +347,7 @@ OPENAPI_ALLOWED_REPLACES_VALUES = frozenset(
         "cert-bund-advisory-list-read",
         "cpe-catalog-detail-read",
         "cpe-catalog-list-read",
+        "cve-catalog-detail-reference-read",
         "cve-catalog-detail-read",
         "cve-catalog-list-read",
         "dfn-cert-advisory-catalog-detail-read",
@@ -564,7 +565,7 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
     ("get", "/cves/{cve_id}"): {
         "x-turbovas-inherited-still-owns": "scap-rich-context",
         "x-turbovas-maturity": "live-read",
-        "x-turbovas-replaces": "cve-catalog-detail-read",
+        "x-turbovas-replaces": "cve-catalog-detail-reference-read",
     },
     ("get", "/dfn-cert-advisories"): {
         "x-turbovas-inherited-still-owns": "cert-advisory-rich-detail-export",
