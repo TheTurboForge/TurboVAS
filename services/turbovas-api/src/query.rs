@@ -176,6 +176,28 @@ mod tests {
     }
 
     #[test]
+    fn normalize_collection_rejects_bad_page() {
+        let err = normalize_collection_query(
+            CollectionQuery {
+                page: Some(0),
+                page_size: Some(25),
+                sort: None,
+                filter: None,
+                filter_type: None,
+                active: None,
+                predefined: None,
+                resource_type: None,
+                text: None,
+                task_name: None,
+                value: None,
+            },
+            "host",
+        )
+        .unwrap_err();
+        assert!(matches!(err, ApiError::BadRequest(_)));
+    }
+
+    #[test]
     fn normalize_collection_rejects_bad_page_size() {
         let err = normalize_collection_query(
             CollectionQuery {

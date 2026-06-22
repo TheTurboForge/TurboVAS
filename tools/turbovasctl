@@ -10164,17 +10164,39 @@ def native_api_probe_finding(
     return finding(status, check, message, details=details)
 
 
-def native_api_expected_bad_request_finding(repo_root: Path, check: str, path: str, expected_code: str) -> dict[str, Any]:
+def native_api_oversized_filter_path(repo_root: Path, base_path: str) -> tuple[str, int]:
+    max_filter_length = rust_collection_contract_constants(repo_root).get("max_filter_length")
+    if not isinstance(max_filter_length, int) or max_filter_length < 0:
+        max_filter_length = 4096
+    oversized_filter = "x" * (max_filter_length + 1)
+    separator = "&" if "?" in base_path else "?"
+    return f"{base_path}{separator}filter={urllib.parse.quote(oversized_filter, safe='')}", len(
+        oversized_filter
+    )
+
+
+def native_api_expected_bad_request_finding(
+    repo_root: Path,
+    check: str,
+    path: str,
+    expected_code: str,
+    display_path: str | None = None,
+    extra_summary: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     result = native_api_curl_with_http_status(repo_root, path)
     parsed, http_status = parse_json_output_with_http_status(result)
     actual_code = parsed.get("error", {}).get("code") if isinstance(parsed, dict) else None
     ok = result.returncode == 0 and http_status == 400 and actual_code == expected_code
+    display_path = display_path or path
+    summary = {"http_status": http_status, "error_code": actual_code, **summarize_native_api_response(parsed)}
+    if extra_summary:
+        summary.update(extra_summary)
     return native_api_probe_finding(
         "pass" if ok else "fail",
         check,
-        f"Native API rejected {path} with JSON 400 {expected_code}."
+        f"Native API rejected {display_path} with JSON 400 {expected_code}."
         if ok
-        else f"Native API did not reject {path} with JSON 400 {expected_code}.",
+        else f"Native API did not reject {display_path} with JSON 400 {expected_code}.",
         result,
         compose_command(
             repo_root,
@@ -10187,10 +10209,10 @@ def native_api_expected_bad_request_finding(repo_root: Path, check: str, path: s
             "10",
             "-w",
             "\\n%{http_code}",
-            f"http://127.0.0.1:{TURBOVAS_API_CONTAINER_PORT}{path}",
+            f"http://127.0.0.1:{TURBOVAS_API_CONTAINER_PORT}{display_path}",
         ),
         parsed,
-        {"http_status": http_status, "error_code": actual_code, **summarize_native_api_response(parsed)},
+        summary,
     )
 
 
@@ -10341,9 +10363,30 @@ def command_runtime_native_api_smoke(repo_root: Path) -> dict[str, Any]:
     findings.append(
         native_api_expected_bad_request_finding(
             repo_root,
+            "native-api.scope-reports.invalid-page",
+            "/api/v1/scope-reports?page=0&page_size=1",
+            "bad_request",
+        )
+    )
+    findings.append(
+        native_api_expected_bad_request_finding(
+            repo_root,
             "native-api.scope-reports.oversized-page-size",
             "/api/v1/scope-reports?page_size=501",
             "bad_request",
+        )
+    )
+    oversized_filter_path, oversized_filter_length = native_api_oversized_filter_path(
+        repo_root, "/api/v1/scope-reports?page_size=1"
+    )
+    findings.append(
+        native_api_expected_bad_request_finding(
+            repo_root,
+            "native-api.scope-reports.oversized-filter",
+            oversized_filter_path,
+            "bad_request",
+            display_path="/api/v1/scope-reports?page_size=1&filter=OVERSIZED_FILTER",
+            extra_summary={"filter_length": oversized_filter_length},
         )
     )
     if report_items:

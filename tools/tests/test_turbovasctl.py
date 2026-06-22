@@ -827,8 +827,13 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("def native_api_expected_bad_request_finding", source)
         self.assertIn("native-api.scope-reports.invalid-sort", source)
         self.assertIn("/api/v1/scope-reports?page_size=1&sort=not_a_scope_report_sort", source)
+        self.assertIn("native-api.scope-reports.invalid-page", source)
+        self.assertIn("/api/v1/scope-reports?page=0&page_size=1", source)
         self.assertIn("native-api.scope-reports.oversized-page-size", source)
         self.assertIn("/api/v1/scope-reports?page_size=501", source)
+        self.assertIn("def native_api_oversized_filter_path", source)
+        self.assertIn("native-api.scope-reports.oversized-filter", source)
+        self.assertIn("filter=OVERSIZED_FILTER", source)
         self.assertIn("native-api.targets.invalid-sort", source)
         self.assertIn("/api/v1/targets?page_size=1&sort=not_a_target_sort", source)
         self.assertIn("native-api.vulnerabilities.invalid-sort", source)
@@ -1013,6 +1018,23 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(finding["details"]["response_summary"]["http_status"], 400)
         self.assertEqual(finding["details"]["response_summary"]["error_code"], "bad_request")
         self.assertNotIn("output_tail", finding["details"])
+
+    def test_native_api_oversized_filter_path_reads_rust_limit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            collections = root / "services" / "turbovas-api" / "src"
+            collections.mkdir(parents=True)
+            (collections / "collections.rs").write_text(
+                "pub(crate) const MAX_COLLECTION_FILTER_LENGTH: usize = 3;\n",
+                encoding="utf-8",
+            )
+
+            path, length = turbovasctl.native_api_oversized_filter_path(
+                root, "/api/v1/scope-reports?page_size=1"
+            )
+
+        self.assertEqual(length, 4)
+        self.assertEqual(path, "/api/v1/scope-reports?page_size=1&filter=xxxx")
 
     def test_security_policy_check_validates_seeded_policy(self):
         root = Path(__file__).resolve().parents[2]
