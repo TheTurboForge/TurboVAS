@@ -5974,6 +5974,7 @@ def compact_native_tooling_summary(summary: dict[str, Any]) -> dict[str, Any]:
         "alignment_status": openapi_contract.get("alignment_status", "unknown") if isinstance(openapi_contract, dict) else "unknown",
         "operation_count": openapi_contract.get("operation_count", 0) if isinstance(openapi_contract, dict) else 0,
         "missing_operation_id_count": len(openapi_contract.get("missing_operation_ids", [])) if isinstance(openapi_contract, dict) else 0,
+        "missing_operation_summary_count": len(openapi_contract.get("missing_operation_summaries", [])) if isinstance(openapi_contract, dict) else 0,
         "duplicate_operation_id_count": len(openapi_contract.get("duplicate_operation_ids", [])) if isinstance(openapi_contract, dict) else 0,
         "nondeterministic_operation_id_count": len(openapi_contract.get("nondeterministic_operation_ids", [])) if isinstance(openapi_contract, dict) else 0,
         "unexpected_turbovas_operation_field_count": len(openapi_contract.get("unexpected_turbovas_operation_fields", [])) if isinstance(openapi_contract, dict) else 0,
@@ -6056,6 +6057,7 @@ def native_tooling_status_only_details(summary: dict[str, Any]) -> dict[str, Any
         "openapi_contract": {
             "alignment_status": openapi_contract.get("alignment_status", "unknown"),
             "operation_count": openapi_contract.get("operation_count", 0),
+            "missing_operation_summary_count": openapi_contract.get("missing_operation_summary_count", 0),
             "openapi_collection_operation_count": openapi_contract.get("openapi_collection_operation_count", 0),
             "rust_collection_contract_count": openapi_contract.get("rust_collection_contract_count", 0),
         },

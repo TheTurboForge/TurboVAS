@@ -1343,6 +1343,7 @@ class TurboVASCtlTests(unittest.TestCase):
             {
                 "alignment_status",
                 "operation_count",
+                "missing_operation_summary_count",
                 "openapi_collection_operation_count",
                 "rust_collection_contract_count",
             },
@@ -1717,6 +1718,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(collection_contract["missing_openapi_collection_parameters"], [])
         self.assertEqual(collection_contract["missing_rust_collection_contracts"], [])
         compact = turbovasctl.compact_native_tooling_summary(details)
+        self.assertEqual(compact["openapi_contract"]["missing_operation_summary_count"], 0)
         self.assertEqual(compact["openapi_contract"]["collection_query_alignment_status"], "pass")
         self.assertEqual(compact["openapi_contract"]["rust_collection_contract_count"], 43)
         self.assertEqual(compact["openapi_contract"]["openapi_collection_operation_count"], 43)
@@ -1724,6 +1726,8 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(compact["openapi_contract"]["incomplete_collection_parameter_count"], 0)
         self.assertEqual(compact["openapi_contract"]["missing_openapi_collection_parameter_count"], 0)
         self.assertEqual(compact["openapi_contract"]["missing_rust_collection_contract_count"], 0)
+        status_only = turbovasctl.native_tooling_status_only_details(details)
+        self.assertEqual(status_only["openapi_contract"]["missing_operation_summary_count"], 0)
         self.assertIn("getResultsByResultId", contract["operation_ids"])
         self.assertIn("getAlertsByAlertId", contract["operation_ids"])
         self.assertIn("getScopesByScopeIdReportsByScopeReportIdRetentionPlan", contract["operation_ids"])
