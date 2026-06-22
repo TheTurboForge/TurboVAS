@@ -56,7 +56,7 @@ paths:
       x-turbovas-replaces: result-detail-metadata-read
       x-turbovas-inherited-still-owns: result-overrides-tags-exports-and-actions
       summary: Read one scan result metadata row
-      description: Read-only raw result detail backed by gvmd/PostgreSQL. Native detail includes result/NVT explanatory text needed by the Information tab; inherited paths still own overrides, user tags, EPSS/CVE context, exports, actions, and create-override workflows until native parity is explicitly proven.
+      description: Read-only raw result detail backed by gvmd/PostgreSQL. Native detail includes result/NVT explanatory text and NVT-level EPSS context needed by the Information tab; inherited paths still own overrides, user tags, exports, actions, and create-override workflows until native parity is explicitly proven.
       parameters:
         - $ref: '#/components/parameters/ResultId'
       responses:
@@ -3874,6 +3874,10 @@ components:
           type: array
           items:
             type: string
+        max_epss:
+          $ref: '#/components/schemas/NvtEpss'
+        max_severity:
+          $ref: '#/components/schemas/NvtEpss'
         description:
           type: string
         description_excerpt:

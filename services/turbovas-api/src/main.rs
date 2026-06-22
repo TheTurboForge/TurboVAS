@@ -593,6 +593,10 @@ struct ResultItem {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     xrefs: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    max_epss: Option<NvtEpssItem>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_severity: Option<NvtEpssItem>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     description: Option<String>,
     description_excerpt: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -5439,6 +5443,14 @@ async fn results(
                     coalesce(n.name, r.nvt, '') AS name,
                     nullif(n.family, '') AS nvt_family,
                     n.cve AS cve_text,
+                    n.epss_score::double precision AS epss_score,
+                    n.epss_percentile::double precision AS epss_percentile,
+                    n.epss_cve AS epss_cve,
+                    n.epss_severity::double precision AS epss_severity,
+                    n.max_epss_score::double precision AS max_epss_score,
+                    n.max_epss_percentile::double precision AS max_epss_percentile,
+                    n.max_epss_cve AS max_epss_cve,
+                    n.max_epss_severity::double precision AS max_epss_severity,
                     nullif(left(coalesce(r.description, ''), 240), '') AS description_excerpt,
                     nullif(n.solution_type, '') AS solution_type,
                     nullif(n.solution, '') AS solution,
@@ -5534,6 +5546,14 @@ async fn result_detail(
                          coalesce(r.nvt, '') AS nvt_oid,
                          coalesce(n.name, r.nvt, '') AS name,
                          nullif(n.family, '') AS nvt_family,
+                         n.epss_score::double precision AS epss_score,
+                         n.epss_percentile::double precision AS epss_percentile,
+                         n.epss_cve AS epss_cve,
+                         n.epss_severity::double precision AS epss_severity,
+                         n.max_epss_score::double precision AS max_epss_score,
+                         n.max_epss_percentile::double precision AS max_epss_percentile,
+                         n.max_epss_cve AS max_epss_cve,
+                         n.max_epss_severity::double precision AS max_epss_severity,
                          CASE
                            WHEN cardinality(coalesce(refs.cves, ARRAY[]::text[])) > 0
                            THEN refs.cves
@@ -5616,6 +5636,14 @@ async fn report_results(
                     coalesce(n.name, r.nvt, '') AS name,\n\
                     nullif(n.family, '') AS nvt_family,\n\
                     n.cve AS cve_text,\n\
+                    n.epss_score::double precision AS epss_score,\n\
+                    n.epss_percentile::double precision AS epss_percentile,\n\
+                    n.epss_cve AS epss_cve,\n\
+                    n.epss_severity::double precision AS epss_severity,\n\
+                    n.max_epss_score::double precision AS max_epss_score,\n\
+                    n.max_epss_percentile::double precision AS max_epss_percentile,\n\
+                    n.max_epss_cve AS max_epss_cve,\n\
+                    n.max_epss_severity::double precision AS max_epss_severity,\n\
                     nullif(left(coalesce(r.description, ''), 240), '') AS description_excerpt,\n\
                     coalesce(r.severity, 0)::double precision AS severity,\n\
                     coalesce(r.qod, 0)::bigint AS qod,\n\
@@ -6568,6 +6596,14 @@ fn scope_report_results_sql(sort_sql: &str) -> String {
                     coalesce(n.name, r.nvt, '') AS name,\n\
                     nullif(n.family, '') AS nvt_family,\n\
                     n.cve AS cve_text,\n\
+                    n.epss_score::double precision AS epss_score,\n\
+                    n.epss_percentile::double precision AS epss_percentile,\n\
+                    n.epss_cve AS epss_cve,\n\
+                    n.epss_severity::double precision AS epss_severity,\n\
+                    n.max_epss_score::double precision AS max_epss_score,\n\
+                    n.max_epss_percentile::double precision AS max_epss_percentile,\n\
+                    n.max_epss_cve AS max_epss_cve,\n\
+                    n.max_epss_severity::double precision AS max_epss_severity,\n\
                     nullif(left(coalesce(r.description, ''), 240), '') AS description_excerpt,\n\
                     coalesce(r.severity, 0)::double precision AS severity,\n\
                     coalesce(r.qod, 0)::bigint AS qod,\n\
@@ -6587,7 +6623,7 @@ fn scope_report_results_sql(sort_sql: &str) -> String {
                 AND coalesce(nullif(r.host, ''), r.hostname, '') <> ''\n\
          ),\n\
          result_rows AS (\n\
-             SELECT id, host, hostname, port, nvt_oid, name, nvt_family, cve_text, description_excerpt, severity, qod, created_at_unix, source_report_id\n\
+             SELECT id, host, hostname, port, nvt_oid, name, nvt_family, cve_text, epss_score, epss_percentile, epss_cve, epss_severity, max_epss_score, max_epss_percentile, max_epss_cve, max_epss_severity, description_excerpt, severity, qod, created_at_unix, source_report_id\n\
                FROM ranked WHERE rn = 1\n\
          ),\n\
          filtered AS (\n\
@@ -9073,6 +9109,8 @@ fn result_from_row(row: &Row) -> ResultItem {
         cves: optional_row_strings(row, "cves"),
         cert_refs: optional_row_strings(row, "cert_refs"),
         xrefs: optional_row_strings(row, "xrefs"),
+        max_epss: nvt_epss_from_row(row),
+        max_severity: nvt_max_severity_from_row(row),
         description: optional_row_string(row, "description"),
         description_excerpt: row.get("description_excerpt"),
         summary: optional_row_string(row, "summary"),
@@ -10193,6 +10231,81 @@ mod tests {
             "resume_task",
         ] {
             assert!(!routes.contains(forbidden));
+        }
+    }
+
+    #[test]
+    fn result_rows_expose_nvt_epss_context_without_mutation_workflows() {
+        let source = include_str!("main.rs");
+        let result_payload = source
+            .split_once("struct ResultItem {")
+            .expect("result payload struct must exist")
+            .1
+            .split_once("struct VulnerabilityItem")
+            .expect("result payload must precede vulnerability payload")
+            .0;
+        let result_sql_sources = [
+            source
+                .split_once("async fn results")
+                .expect("result list handler must exist")
+                .1
+                .split_once("async fn result_detail")
+                .expect("result list handler must precede result detail")
+                .0,
+            source
+                .split_once("async fn result_detail")
+                .expect("result detail handler must exist")
+                .1
+                .split_once("async fn report_results")
+                .expect("result detail handler must precede report result list")
+                .0,
+            source
+                .split_once("async fn report_results")
+                .expect("report result list handler must exist")
+                .1
+                .split_once("async fn report_hosts")
+                .expect("report result list handler must precede report host list")
+                .0,
+            source
+                .split_once("fn scope_report_results_sql")
+                .expect("scope report result SQL helper must exist")
+                .1
+                .split_once("async fn scope_report_metrics")
+                .expect("scope report result SQL helper must precede metrics")
+                .0,
+        ];
+        let row_mapper = source
+            .split_once("fn result_from_row")
+            .expect("result row mapper must exist")
+            .1
+            .split_once("fn report_host_from_row")
+            .expect("result row mapper must precede report host mapper")
+            .0;
+
+        for expected in [
+            "max_epss: Option<NvtEpssItem>",
+            "max_severity: Option<NvtEpssItem>",
+        ] {
+            assert!(result_payload.contains(expected));
+        }
+        for sql_source in result_sql_sources {
+            for expected in [
+                "n.epss_score",
+                "n.epss_percentile",
+                "n.epss_cve",
+                "n.epss_severity",
+                "n.max_epss_score",
+                "n.max_epss_percentile",
+                "n.max_epss_cve",
+                "n.max_epss_severity",
+            ] {
+                assert!(sql_source.contains(expected));
+            }
+        }
+        assert!(row_mapper.contains("max_epss: nvt_epss_from_row(row)"));
+        assert!(row_mapper.contains("max_severity: nvt_max_severity_from_row(row)"));
+        for inherited_workflow in ["overrides", "user_tags", "export", "create_override"] {
+            assert!(!result_sql_sources[1].contains(inherited_workflow));
         }
     }
 

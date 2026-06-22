@@ -127,6 +127,13 @@ interface NativeReportCollectionPayload {
   items?: NativeReportItem[];
 }
 
+interface NativeNvtEpssPayload {
+  score?: number;
+  percentile?: number;
+  cve?: string;
+  severity?: number;
+}
+
 interface NativeReportResultPayload {
   id: string;
   host: string;
@@ -139,6 +146,8 @@ interface NativeReportResultPayload {
   cves?: string[];
   cert_refs?: string[];
   xrefs?: string[];
+  max_epss?: NativeNvtEpssPayload;
+  max_severity?: NativeNvtEpssPayload;
   description_excerpt?: string;
   description?: string;
   summary?: string;
@@ -737,7 +746,9 @@ export const nativeReportHostsQueryFromFilter = (
   };
 };
 
-export const nativeReportQueryFromFilter = (filter?: Filter): NativeReportQuery => {
+export const nativeReportQueryFromFilter = (
+  filter?: Filter,
+): NativeReportQuery => {
   const pageSize = Math.max(1, integerValue(filter?.get('rows'), 25));
   const first = Math.max(1, integerValue(filter?.get('first'), 1));
   return {
@@ -791,11 +802,25 @@ const nativeResultNvtTagsFromPayload = (
   return parts.join('|');
 };
 
+const nativeResultEpssFromPayload = (value?: NativeNvtEpssPayload) =>
+  value
+    ? {
+        score: numberValue(value.score),
+        percentile: numberValue(value.percentile),
+        cve: {
+          _id: stringValue(value.cve),
+          severity: numberValue(value.severity),
+        },
+      }
+    : undefined;
+
 const nativeResultToModel = (item: NativeReportResultPayload): Result => {
   const solutionType = stringValue(item.solution_type);
   const solutionText = stringValue(item.solution);
   const description =
     stringValue(item.description) || stringValue(item.description_excerpt);
+  const maxEpss = nativeResultEpssFromPayload(item.max_epss);
+  const maxSeverity = nativeResultEpssFromPayload(item.max_severity);
   const element = {
     _id: stringValue(item.id),
     name: stringValue(item.name),
@@ -819,6 +844,13 @@ const nativeResultToModel = (item: NativeReportResultPayload): Result => {
           ? {
               _type: solutionType,
               __text: solutionText,
+            }
+          : undefined,
+      epss:
+        maxEpss || maxSeverity
+          ? {
+              max_epss: maxEpss,
+              max_severity: maxSeverity,
             }
           : undefined,
     },
