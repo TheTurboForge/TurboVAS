@@ -6235,6 +6235,41 @@ def doctor_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
     return compact
 
 
+def security_policy_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
+    compact = dict(result)
+    findings = result.get("findings", [])
+    non_pass = [compact_doctor_finding(item) for item in findings if item.get("status") != "pass"]
+    details = result.get("details", {}) if isinstance(result.get("details"), dict) else {}
+    compact["details"] = {
+        "area_count": details.get("area_count", 0),
+        "finding_count": len(findings),
+        "non_pass_count": len(non_pass),
+    }
+    compact["findings"] = non_pass or [
+        finding("pass", "security-policy.status-only", "Security policy check passed; no non-pass findings.")
+    ]
+    return compact
+
+
+def path_coupling_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
+    compact = dict(result)
+    findings = result.get("findings", [])
+    non_pass = [compact_doctor_finding(item) for item in findings if item.get("status") != "pass"]
+    details = result.get("details", {}) if isinstance(result.get("details"), dict) else {}
+    summary = details.get("summary", {}) if isinstance(details.get("summary"), dict) else {}
+    non_doc_paths = summary.get("non_documentation_dev_checkout_paths", [])
+    compact["details"] = {
+        "reference_count": details.get("reference_count", summary.get("total_references", 0)),
+        "non_documentation_dev_checkout_path_count": len(non_doc_paths) if isinstance(non_doc_paths, list) else 0,
+        "finding_count": len(findings),
+        "non_pass_count": len(non_pass),
+    }
+    compact["findings"] = non_pass or [
+        finding("pass", "path-coupling.status-only", "Path-coupling check passed; no non-pass findings.")
+    ]
+    return compact
+
+
 def native_api_migration_matrix_rows(repo_root: Path) -> list[dict[str, Any]]:
     items = native_tooling_inventory(repo_root)
     summary = summarize_native_tooling(items, repo_root)
@@ -7000,7 +7035,7 @@ def command_runtime_redis_state(repo_root: Path) -> dict[str, Any]:
     return result
 
 
-def command_path_coupling_state(repo_root: Path) -> dict[str, Any]:
+def command_path_coupling_state(repo_root: Path, status_only: bool = False) -> dict[str, Any]:
     references = path_coupling_references(repo_root)
     summary = summarize_path_coupling(references)
     warning_paths = summary["non_documentation_dev_checkout_paths"]
@@ -7017,6 +7052,8 @@ def command_path_coupling_state(repo_root: Path) -> dict[str, Any]:
     ]
     result = make_result("path-coupling-state", repo_root, "Absolute path and runtime path coupling state collected.", findings)
     result["details"] = {"references": references[:200], "summary": summary, "reference_count": len(references)}
+    if status_only:
+        result = path_coupling_status_only_result(result)
     return result
 
 
@@ -7712,7 +7749,7 @@ def security_policy_area_findings(repo_root: Path, areas: list[dict[str, Any]]) 
     return findings
 
 
-def command_security_policy_check(repo_root: Path) -> dict[str, Any]:
+def command_security_policy_check(repo_root: Path, status_only: bool = False) -> dict[str, Any]:
     findings: list[dict[str, Any]] = []
     doc_path = repo_root / SECURITY_POLICY_DOC
     policy_path = repo_root / SECURITY_SENSITIVE_PATHS_FILE
@@ -7734,6 +7771,8 @@ def command_security_policy_check(repo_root: Path) -> dict[str, Any]:
     area_summaries = [normalize_security_policy_area(area) for area in area_dicts]
     result = make_result("security-policy-check", repo_root, "Security-sensitive path policy checked.", findings, [str(SECURITY_POLICY_DOC), str(SECURITY_SENSITIVE_PATHS_FILE)])
     result["details"] = {"areas": area_summaries, "area_count": len(area_summaries)}
+    if status_only:
+        result = security_policy_status_only_result(result)
     return result
 
 
@@ -12994,8 +13033,10 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("runtime-db-introspect", parents=[common], help="inspect fixed read-only database catalog facts")
     subparsers.add_parser("runtime-performance-snapshot", parents=[common], help="capture a lightweight runtime performance snapshot")
     subparsers.add_parser("runtime-redis-state", parents=[common], help="inspect Redis dependency and runtime boundary state")
-    subparsers.add_parser("security-policy-check", parents=[common], help="validate security-sensitive path policy scaffolding")
-    subparsers.add_parser("path-coupling-state", parents=[common], help="inspect absolute checkout/runtime path coupling")
+    security_policy = subparsers.add_parser("security-policy-check", parents=[common], help="validate security-sensitive path policy scaffolding")
+    security_policy.add_argument("--status-only", action="store_true", help="emit compact details and only non-pass findings for chat-safe security policy checks")
+    path_coupling = subparsers.add_parser("path-coupling-state", parents=[common], help="inspect absolute checkout/runtime path coupling")
+    path_coupling.add_argument("--status-only", action="store_true", help="emit compact details and only non-pass findings for chat-safe path-coupling checks")
     subparsers.add_parser("runtime-app-up", parents=[common], help="start experimental application services")
     subparsers.add_parser("runtime-app-down", parents=[common], help="stop experimental application services")
     subparsers.add_parser("runtime-app-smoke", parents=[common], help="run experimental application service smoke checks")
@@ -13136,9 +13177,9 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "runtime-redis-state":
         result = command_runtime_redis_state(repo_root)
     elif args.command == "security-policy-check":
-        result = command_security_policy_check(repo_root)
+        result = command_security_policy_check(repo_root, status_only=args.status_only)
     elif args.command == "path-coupling-state":
-        result = command_path_coupling_state(repo_root)
+        result = command_path_coupling_state(repo_root, status_only=args.status_only)
     elif args.command == "runtime-app-up":
         result = command_runtime_app_up(repo_root)
     elif args.command == "runtime-app-down":

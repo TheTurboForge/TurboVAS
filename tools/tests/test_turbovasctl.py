@@ -1192,6 +1192,27 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("native-api", area_ids)
         self.assertGreaterEqual(result["details"]["area_count"], 7)
 
+    def test_security_policy_status_only_is_chat_safe(self):
+        root = Path(__file__).resolve().parents[2]
+        full = turbovasctl.command_security_policy_check(root)
+        compact = turbovasctl.command_security_policy_check(root, status_only=True)
+
+        self.assertEqual(compact["status"], "pass")
+        self.assertEqual(compact["details"]["area_count"], full["details"]["area_count"])
+        self.assertEqual(compact["details"]["non_pass_count"], 0)
+        self.assertNotIn("areas", compact["details"])
+        self.assertEqual(
+            compact["findings"],
+            [
+                {
+                    "status": "pass",
+                    "check": "security-policy.status-only",
+                    "message": "Security policy check passed; no non-pass findings.",
+                }
+            ],
+        )
+        self.assertLess(len(json.dumps(compact)), len(json.dumps(full)))
+
     def test_path_coupling_helpers_classify_expected_markers(self):
         self.assertEqual(turbovasctl.path_coupling_category("docs/README.md"), "documentation")
         self.assertEqual(turbovasctl.path_coupling_category("docker/runtime/README.md"), "documentation")
@@ -1200,6 +1221,18 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("dev_checkout_path", markers)
         self.assertIn("build_prefix_path", markers)
         self.assertIn("container_runtime_path", markers)
+
+    def test_path_coupling_status_only_is_chat_safe(self):
+        root = Path(__file__).resolve().parents[2]
+        full = turbovasctl.command_path_coupling_state(root)
+        compact = turbovasctl.command_path_coupling_state(root, status_only=True)
+
+        self.assertEqual(compact["details"]["reference_count"], full["details"]["reference_count"])
+        self.assertNotIn("references", compact["details"])
+        self.assertIn("non_documentation_dev_checkout_path_count", compact["details"])
+        for item in compact["findings"]:
+            self.assertNotIn("by_category", json.dumps(item.get("details", {})))
+        self.assertLess(len(json.dumps(compact)), len(json.dumps(full)))
 
     def test_native_tooling_state_classifies_dependency_surfaces(self):
         root = Path(__file__).resolve().parents[2]
