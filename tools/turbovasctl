@@ -9223,13 +9223,21 @@ def command_runtime_native_api_direct_smoke(repo_root: Path) -> dict[str, Any]:
     findings.append(native_api_direct_config_shape_finding(env, check="native-api-direct.config-shape"))
     host = native_api_direct_host(env)
     wildcard_host = host_is_wildcard(host)
+    non_loopback_host = not wildcard_host and not host_is_loopback(host)
+    if wildcard_host:
+        host_status = "fail"
+        host_message = "Direct native API host binding must not use a wildcard host in this development helper."
+    elif non_loopback_host:
+        host_status = "fail"
+        host_message = "Direct native API host binding must remain loopback-bounded until production TLS/bootstrap/host-binding hardening exists."
+    else:
+        host_status = "pass"
+        host_message = "Direct native API host binding is explicit and loopback-bounded."
     findings.append(
         finding(
-            "fail" if wildcard_host else "pass",
+            host_status,
             "native-api-direct.host-binding",
-            "Direct native API host binding is explicit."
-            if not wildcard_host
-            else "Direct native API host binding must not use a wildcard host in this development helper.",
+            host_message,
             details={
                 "host": host,
                 "host_port": native_api_direct_port(env),
