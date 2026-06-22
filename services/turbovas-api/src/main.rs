@@ -10514,6 +10514,7 @@ mod tests {
 
         assert!(sql.contains("WITH latest_completed AS"));
         assert!(sql.contains("SELECT DISTINCT ON (task.target)"));
+        assert!(sql.contains("coalesce(task.usage_type, 'scan') = 'scan'"));
         assert!(sql.contains("reports.scan_run_status = 1"));
         assert!(sql.contains("ORDER BY task.target, coalesce(reports.end_time, reports.creation_time) DESC, reports.id DESC"));
         assert!(sql.contains("SELECT srs.source_report, srs.source_report_uuid, srs.target,"));
@@ -10721,6 +10722,37 @@ mod tests {
             "resume_task",
         ] {
             assert!(!routes.contains(forbidden));
+        }
+    }
+
+    #[test]
+    fn scope_report_handlers_do_not_trigger_scanner_or_task_control() {
+        let source = include_str!("main.rs");
+        let start = "async fn scope_report_results(";
+        let end = "\n}\n\nfn scope_report_from_row";
+        let handlers = source
+            .split_once(start)
+            .expect("scope report handlers must exist")
+            .1
+            .split_once(end)
+            .expect("scope report handlers must precede row mapping helpers")
+            .0;
+        let lower_handlers = handlers.to_ascii_lowercase();
+
+        for forbidden in [
+            "start_task",
+            "resume_task",
+            "stop_task",
+            "osp_",
+            "create_report",
+            "insert into reports",
+            "update tasks",
+            "delete from reports",
+        ] {
+            assert!(
+                !lower_handlers.contains(forbidden),
+                "scope report read handlers must not trigger scanner or task control: {forbidden}"
+            );
         }
     }
 
