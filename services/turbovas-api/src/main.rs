@@ -11190,6 +11190,48 @@ mod tests {
     }
 
     #[test]
+    fn global_scope_membership_queries_include_targets_and_hosts() {
+        let sql = scope_sql("true", "name ASC", "");
+        assert!(sql.contains("THEN (SELECT count(*) FROM targets)::bigint"));
+        assert!(sql.contains(
+            "ELSE (SELECT count(*) FROM scope_targets st WHERE st.scope = s.id)::bigint"
+        ));
+        assert!(sql.contains("THEN (SELECT count(*) FROM hosts)::bigint"));
+        assert!(
+            sql.contains(
+                "ELSE (SELECT count(*) FROM scope_hosts sh WHERE sh.scope = s.id)::bigint"
+            )
+        );
+
+        let source = include_str!("main.rs");
+        let targets_body = source
+            .split_once("async fn scope_targets(")
+            .expect("scope target helper must exist")
+            .1
+            .split_once("async fn scope_hosts(")
+            .expect("scope target helper must precede scope host helper")
+            .0;
+        assert!(
+            targets_body
+                .contains("SELECT uuid, coalesce(name, uuid) FROM targets ORDER BY name, uuid;")
+        );
+        assert!(targets_body.contains("SELECT target_uuid, coalesce(target_name, target_uuid) FROM scope_targets WHERE scope = $1 ORDER BY target_name, target_uuid;"));
+
+        let hosts_body = source
+            .split_once("async fn scope_hosts(")
+            .expect("scope host helper must exist")
+            .1
+            .split_once("fn scope_candidate_hosts_sql")
+            .expect("scope host helper must precede candidate host SQL")
+            .0;
+        assert!(
+            hosts_body
+                .contains("SELECT uuid, coalesce(name, uuid) FROM hosts ORDER BY name, uuid;")
+        );
+        assert!(hosts_body.contains("SELECT host_uuid, coalesce(host_name, host_uuid) FROM scope_hosts WHERE scope = $1 ORDER BY host_name, host_uuid;"));
+    }
+
+    #[test]
     fn bearer_auth_accepts_only_matching_bearer_token() {
         let mut headers = HeaderMap::new();
         assert!(!bearer_token_matches(&headers, "secret-token"));
