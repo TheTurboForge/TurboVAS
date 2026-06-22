@@ -428,7 +428,6 @@ OPENAPI_ALLOWED_INHERITED_STILL_OWNS_VALUES = frozenset(
         "raw-report-generation-xml-export-retention-and-mutations",
         "report-config-export-writes-and-deletes",
         "report-format-import-export-verify-writes-and-deletes",
-        "result-overrides-tags-exports-and-actions",
         "result-tags-exports-and-actions",
         "result-exports-and-actions",
         "retention-mutations",

@@ -1646,7 +1646,6 @@ class TurboVASCtlTests(unittest.TestCase):
             "report-config-export-writes-and-deletes",
             "report-format-import-export-verify-writes-and-deletes",
             "result-exports-and-actions",
-            "result-overrides-tags-exports-and-actions",
             "result-tags-exports-and-actions",
             "retention-mutations",
             "saved-filter-writes-and-alert-linkage",
@@ -1672,6 +1671,13 @@ class TurboVASCtlTests(unittest.TestCase):
         )
         self.assertEqual(contract["allowed_replaces_values"], actual_replaces_values)
         self.assertEqual(contract["allowed_inherited_still_owns_values"], expected_inherited_still_owns_values)
+        actual_inherited_still_owns_values = sorted(
+            {
+                operation["x_turbovas_values"]["x-turbovas-inherited-still-owns"]
+                for operation in turbovasctl.openapi_contract_operations(root)
+            }
+        )
+        self.assertEqual(contract["allowed_inherited_still_owns_values"], actual_inherited_still_owns_values)
         self.assertEqual(contract["missing_exposure_operations"], [])
         self.assertEqual(contract["invalid_exposure_operations"], [])
         self.assertEqual(contract["exposure_mismatches"], [])
