@@ -971,6 +971,13 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn('for filter in "$@"; do', justfile)
         self.assertIn('cargo test --manifest-path services/turbovas-api/Cargo.toml --locked "$filter";', justfile)
 
+    def test_gsa_vitest_recipe_runs_from_gsa_package(self):
+        justfile = (Path(__file__).resolve().parents[2] / "justfile").read_text(encoding="utf-8")
+        self.assertIn('gsa-vitest *args:', justfile)
+        self.assertIn('usage: just gsa-vitest -- <vitest-run-args>', justfile)
+        self.assertIn('cd components/gsa && npm exec vitest -- run "$@"', justfile)
+        self.assertNotIn('npm --prefix components/gsa exec vitest', justfile)
+
     def test_gsa_tests_do_not_restore_console_to_wrong_method(self):
         repo_root = Path(__file__).resolve().parents[2]
         source_roots = [

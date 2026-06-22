@@ -35,6 +35,15 @@ native-api-rust-test *filters:
         done; \
       fi
 
+gsa-vitest *args:
+    @set -- {{args}}; \
+      if [ "${1:-}" = "--" ]; then shift; fi; \
+      if [ "$#" -eq 0 ]; then \
+        echo "usage: just gsa-vitest -- <vitest-run-args>" >&2; \
+        exit 2; \
+      fi; \
+      cd components/gsa && npm exec vitest -- run "$@"
+
 rust-migration-state *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl rust-migration-state "$@"
 
