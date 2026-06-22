@@ -1269,7 +1269,34 @@ class TurboVASCtlTests(unittest.TestCase):
 
         self.assertEqual(status_only["status"], "pass")
         self.assertEqual(status_only["details"]["total_items"], summary["details"]["total_items"])
+        self.assertEqual(
+            set(status_only["details"]),
+            {
+                "total_items",
+                "implemented_native_endpoint_count",
+                "direct_api_contract",
+                "browser_proxy_contract",
+                "openapi_contract",
+            },
+        )
         self.assertIn("direct_api_contract", status_only["details"])
+        self.assertEqual(
+            set(status_only["details"]["direct_api_contract"]),
+            {"alignment_status", "rust_route_count", "scriptable_read_count", "internal_only_count"},
+        )
+        self.assertEqual(
+            set(status_only["details"]["browser_proxy_contract"]),
+            {"alignment_status", "browser_proxied_count", "internal_only_count", "gsad_proxy_allowlist_count"},
+        )
+        self.assertEqual(
+            set(status_only["details"]["openapi_contract"]),
+            {
+                "alignment_status",
+                "operation_count",
+                "openapi_collection_operation_count",
+                "rust_collection_contract_count",
+            },
+        )
         self.assertEqual(
             status_only["findings"],
             [
@@ -1280,7 +1307,7 @@ class TurboVASCtlTests(unittest.TestCase):
                 }
             ],
         )
-        self.assertLess(len(json.dumps(status_only)), len(json.dumps(summary)))
+        self.assertLess(len(json.dumps(status_only)), len(json.dumps(summary)) // 2)
 
     def test_native_tooling_state_tracks_direct_api_contract_alignment(self):
         root = Path(__file__).resolve().parents[2]

@@ -6013,6 +6013,35 @@ def compact_native_tooling_finding_details(summary: dict[str, Any]) -> dict[str,
     }
 
 
+def native_tooling_status_only_details(summary: dict[str, Any]) -> dict[str, Any]:
+    compact = compact_native_tooling_finding_details(summary)
+    direct_contract = compact["direct_api_contract"]
+    browser_proxy_contract = compact["browser_proxy_contract"]
+    openapi_contract = compact["openapi_contract"]
+    return {
+        "total_items": compact["total_items"],
+        "implemented_native_endpoint_count": compact["implemented_native_endpoint_count"],
+        "direct_api_contract": {
+            "alignment_status": direct_contract.get("alignment_status", "unknown"),
+            "rust_route_count": direct_contract.get("rust_route_count", 0),
+            "scriptable_read_count": direct_contract.get("scriptable_read_count", 0),
+            "internal_only_count": direct_contract.get("internal_only_count", 0),
+        },
+        "browser_proxy_contract": {
+            "alignment_status": browser_proxy_contract.get("alignment_status", "unknown"),
+            "browser_proxied_count": browser_proxy_contract.get("browser_proxied_count", 0),
+            "internal_only_count": browser_proxy_contract.get("internal_only_count", 0),
+            "gsad_proxy_allowlist_count": browser_proxy_contract.get("gsad_proxy_allowlist_count", 0),
+        },
+        "openapi_contract": {
+            "alignment_status": openapi_contract.get("alignment_status", "unknown"),
+            "operation_count": openapi_contract.get("operation_count", 0),
+            "openapi_collection_operation_count": openapi_contract.get("openapi_collection_operation_count", 0),
+            "rust_collection_contract_count": openapi_contract.get("rust_collection_contract_count", 0),
+        },
+    }
+
+
 def native_tooling_status_only_findings(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
     non_pass = [item for item in findings if item.get("status") != "pass"]
     if non_pass:
@@ -6368,7 +6397,7 @@ def command_native_tooling_state(repo_root: Path, compact: bool = False, summary
     ]
     result = make_result("native-tooling-state", repo_root, "Inherited GMP/python-gvm/gvm-tools dependency state collected.", findings)
     if status_only:
-        result["details"] = summary_details
+        result["details"] = native_tooling_status_only_details(summary)
         result["findings"] = native_tooling_status_only_findings(findings)
     elif summary_only:
         result["details"] = summary_details
