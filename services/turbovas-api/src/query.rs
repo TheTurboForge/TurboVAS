@@ -146,10 +146,14 @@ pub(crate) fn normalize_collection_query(
             "filter must be at most {MAX_COLLECTION_FILTER_LENGTH} bytes"
         )));
     }
+    let offset = (page - 1)
+        .checked_mul(page_size)
+        .ok_or_else(|| ApiError::BadRequest("page offset is too large".to_string()))?;
+
     Ok(NormalizedQuery {
         page,
         page_size,
-        offset: (page - 1) * page_size,
+        offset,
         sort,
         filter,
     })
@@ -257,6 +261,30 @@ mod tests {
         )
         .unwrap_err();
         assert!(matches!(err, ApiError::BadRequest(_)));
+    }
+
+    #[test]
+    fn normalize_collection_rejects_overflowing_offset() {
+        let err = normalize_collection_query(
+            CollectionQuery {
+                page: Some(i64::MAX),
+                page_size: Some(MAX_COLLECTION_PAGE_SIZE),
+                sort: None,
+                filter: None,
+                filter_type: None,
+                active: None,
+                predefined: None,
+                resource_type: None,
+                text: None,
+                task_name: None,
+                value: None,
+            },
+            "host",
+        )
+        .unwrap_err();
+        assert!(
+            matches!(err, ApiError::BadRequest(message) if message == "page offset is too large")
+        );
     }
 
     #[test]
