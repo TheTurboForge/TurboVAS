@@ -943,6 +943,29 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn('for filter in "$@"; do', justfile)
         self.assertIn('cargo test --manifest-path services/turbovas-api/Cargo.toml --locked "$filter";', justfile)
 
+    def test_gsa_tests_do_not_restore_console_to_wrong_method(self):
+        repo_root = Path(__file__).resolve().parents[2]
+        source_roots = [
+            repo_root / "components/gsa/src/web",
+            repo_root / "components/gsa/src/gmp",
+        ]
+        forbidden = (
+            "console.warn = consoleError",
+            "console.warn = originalConsoleError",
+            "console.error = consoleWarn",
+        )
+        offenders: list[str] = []
+        for source_root in source_roots:
+            for path in source_root.rglob("*"):
+                if not path.is_file() or path.suffix not in {".js", ".jsx", ".ts", ".tsx"}:
+                    continue
+                text = path.read_text(encoding="utf-8")
+                for marker in forbidden:
+                    if marker in text:
+                        offenders.append(f"{path.relative_to(repo_root)}: {marker}")
+
+        self.assertEqual(offenders, [])
+
     def test_native_api_smoke_summarizes_large_responses(self):
         payload = {
             "summary": {"alive_system_count": 4, "vulnerability_count": 2},
