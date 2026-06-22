@@ -6069,6 +6069,43 @@ def native_api_browser_access_from_status(status: str | None) -> str:
     return "unknown"
 
 
+def compact_license_status_finding(item: dict[str, Any]) -> dict[str, Any]:
+    compact = {key: value for key, value in item.items() if key != "details"}
+    details = item.get("details")
+    if isinstance(details, dict):
+        compact_details = dict(details)
+        manifest = compact_details.pop("manifest", None)
+        if isinstance(manifest, dict):
+            compact_details["manifest_entry_count"] = len(manifest)
+        compact["details"] = compact_details
+    return compact
+
+
+def license_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
+    findings = result.get("findings", [])
+    non_pass = [compact_license_status_finding(item) for item in findings if item.get("status") != "pass"]
+    if non_pass:
+        compact_findings = non_pass
+    else:
+        compact_findings = [
+            finding(
+                "pass",
+                "license.status-only",
+                "License/provenance checks passed; no non-pass findings.",
+            )
+        ]
+    details = result.get("details") if isinstance(result.get("details"), dict) else {}
+    result = dict(result)
+    result["details"] = {
+        "diff_scope": details.get("diff_scope", "baseline"),
+        "modified_imported_only": bool(details.get("modified_imported_only", False)),
+        "finding_count": len(findings),
+        "non_pass_count": len(non_pass),
+    }
+    result["findings"] = compact_findings
+    return result
+
+
 def native_api_migration_matrix_rows(repo_root: Path) -> list[dict[str, Any]]:
     items = native_tooling_inventory(repo_root)
     summary = summarize_native_tooling(items, repo_root)
@@ -7056,6 +7093,7 @@ def command_license_report(
     *,
     diff_scope: str = "baseline",
     modified_imported_only: bool = False,
+    status_only: bool = False,
 ) -> dict[str, Any]:
     findings: list[dict[str, Any]] = []
     if modified_imported_only:
@@ -7070,6 +7108,8 @@ def command_license_report(
         )
         result = make_result("license-report", repo_root, "Modified imported file license/provenance checks completed.", findings)
         result["details"] = {"diff_scope": diff_scope, "modified_imported_only": True}
+        if status_only:
+            result = license_status_only_result(result)
         return result
 
     if diff_scope != "baseline":
@@ -7081,7 +7121,10 @@ def command_license_report(
                 details={"diff_scope": diff_scope},
             )
         )
-        return make_result("license-report", repo_root, "License/provenance checks completed.", findings)
+        result = make_result("license-report", repo_root, "License/provenance checks completed.", findings)
+        if status_only:
+            result = license_status_only_result(result)
+        return result
 
     for component in COMPONENTS:
         component_path = repo_root / component.path
@@ -7124,7 +7167,10 @@ def command_license_report(
 
     findings.append(enterprise_feed_key_support_finding(repo_root))
     findings.append(public_readiness_finding(public_release, mode))
-    return make_result("license-report", repo_root, "License/provenance checks completed.", findings)
+    result = make_result("license-report", repo_root, "License/provenance checks completed.", findings)
+    if status_only:
+        result = license_status_only_result(result)
+    return result
 
 
 def command_deps(repo_root: Path, component: str | None = None) -> dict[str, Any]:
@@ -12574,6 +12620,7 @@ def build_parser() -> argparse.ArgumentParser:
     license_report.add_argument("--mode", choices=PUBLICATION_MODES, default="source-public", help="publication mode for --public-release gating")
     license_report.add_argument("--diff-scope", choices=("baseline", "staged", "worktree"), default="baseline", help="diff scope for focused modified-imported-file checks")
     license_report.add_argument("--modified-imported-only", action="store_true", help="run only the fast modified-imported-file notice checks")
+    license_report.add_argument("--status-only", action="store_true", help="emit compact details and only non-pass findings for chat-safe closeout checks")
     subparsers.add_parser("production-posture-check", parents=[common], help="run the non-destructive production posture checklist")
     deps = subparsers.add_parser("deps", parents=[common], help="check dependency readiness")
     deps.add_argument("component", nargs="?", help="component name")
@@ -12690,7 +12737,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "branding-state":
         result = command_branding_state(repo_root)
     elif args.command == "license-report":
-        result = command_license_report(repo_root, public_release=args.public_release, mode=args.mode, diff_scope=args.diff_scope, modified_imported_only=args.modified_imported_only)
+        result = command_license_report(repo_root, public_release=args.public_release, mode=args.mode, diff_scope=args.diff_scope, modified_imported_only=args.modified_imported_only, status_only=args.status_only)
     elif args.command == "production-posture-check":
         result = command_production_posture_check(repo_root)
     elif args.command == "deps":

@@ -230,6 +230,54 @@ class TurboVASCtlTests(unittest.TestCase):
             self.assertIn("artifacts", decoded)
             self.assertIn("metadata", decoded)
 
+    def test_license_status_only_omits_pass_manifest_details(self):
+        result = {
+            "status": "pass",
+            "summary": "ok",
+            "details": {"diff_scope": "staged", "modified_imported_only": True},
+            "findings": [
+                {
+                    "status": "pass",
+                    "check": "license.modified-imported-no-comment-manifest",
+                    "message": "ok",
+                    "details": {"manifest": {"a": "b"}},
+                }
+            ],
+        }
+
+        compact = turbovasctl.license_status_only_result(result)
+
+        self.assertEqual(compact["details"], {"diff_scope": "staged", "modified_imported_only": True, "finding_count": 1, "non_pass_count": 0})
+        self.assertEqual(compact["findings"], [{"status": "pass", "check": "license.status-only", "message": "License/provenance checks passed; no non-pass findings."}])
+
+    def test_license_status_only_keeps_failure_evidence_without_manifest_body(self):
+        result = {
+            "status": "fail",
+            "summary": "not ok",
+            "details": {"diff_scope": "staged", "modified_imported_only": True},
+            "findings": [
+                {
+                    "status": "fail",
+                    "check": "license.modified-imported-notices",
+                    "message": "missing",
+                    "details": {"missing": ["components/gsa/example.ts"]},
+                },
+                {
+                    "status": "fail",
+                    "check": "license.modified-imported-no-comment-manifest",
+                    "message": "manifest",
+                    "details": {"manifest": {"a": "b", "c": "d"}, "undocumented": ["x"]},
+                },
+            ],
+        }
+
+        compact = turbovasctl.license_status_only_result(result)
+
+        self.assertEqual(compact["details"]["non_pass_count"], 2)
+        self.assertEqual(compact["findings"][0]["details"], {"missing": ["components/gsa/example.ts"]})
+        self.assertNotIn("manifest", compact["findings"][1]["details"])
+        self.assertEqual(compact["findings"][1]["details"]["manifest_entry_count"], 2)
+
     def test_runtime_app_up_retry_is_limited_to_docker_removal_races(self):
         self.assertTrue(turbovasctl.compose_app_up_transient_error("Error response from daemon: No such container: abc123"))
         self.assertTrue(turbovasctl.compose_app_up_transient_error("removal of container abc123 is already in progress"))
