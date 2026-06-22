@@ -582,6 +582,31 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertNotIn("str(scope_probe)", browser_smoke_command)
         self.assertNotIn("str(scope_probe)", browser_regression_command)
 
+    def test_runtime_scope_smoke_extracts_organization_proof_finding(self):
+        proof = turbovasctl.runtime_scope_organization_proof_finding(
+            {
+                "status": "pass",
+                "details": {
+                    "organization_scope": {"target_count": 4, "host_count": 7},
+                    "organization_scope_report": {"source_report_count": 4},
+                    "scope_after_add": {"target_count": 2, "host_count": 2},
+                    "scope_after_remove": {"target_count": 1, "host_count": 1},
+                    "cleanup": {"scope": "deleted", "scope_report": "deleted"},
+                },
+            }
+        )
+
+        self.assertIsNotNone(proof)
+        assert proof is not None
+        self.assertEqual(proof["status"], "pass")
+        self.assertEqual(proof["check"], "runtime-scope.organization-proof")
+        self.assertEqual(proof["details"]["organization_target_count"], 4)
+        self.assertEqual(proof["details"]["organization_host_count"], 7)
+        self.assertEqual(proof["details"]["organization_source_report_count"], 4)
+        self.assertEqual(proof["details"]["scope_after_add_target_count"], 2)
+        self.assertEqual(proof["details"]["scope_after_remove_host_count"], 1)
+        self.assertEqual(proof["details"]["cleanup_scope"], "deleted")
+
     def test_report_metrics_ui_is_exposed_on_raw_and_scope_report_details(self):
         root = Path(__file__).resolve().parents[2]
         raw_details = (root / "components" / "gsa" / "src" / "web" / "pages" / "reports" / "DetailsContent.tsx").read_text(encoding="utf-8")

@@ -9246,10 +9246,64 @@ def command_runtime_scope(repo_root: Path, action: str) -> dict[str, Any]:
             details={"helper": parsed, "output_tail": output_tail(result.stdout, 120, [password])},
         )
     )
+    if action == "smoke":
+        organization_proof = runtime_scope_organization_proof_finding(parsed)
+        if organization_proof is not None:
+            findings.append(organization_proof)
     artifacts = list(parsed.get("artifacts", [])) if parsed and isinstance(parsed.get("artifacts"), list) else [str(artifact_dir)]
     summary = parsed.get("summary") if parsed else f"Runtime scope {action} command completed with exit code {result.returncode}."
     return make_result(command_name, repo_root, summary, findings, artifacts)
 
+
+
+def runtime_scope_organization_proof_finding(parsed: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not parsed or parsed.get("status") not in {"pass", "warn"}:
+        return None
+    details = parsed.get("details")
+    if not isinstance(details, dict):
+        return None
+    organization = details.get("organization_scope")
+    organization_report = details.get("organization_scope_report")
+    scope_after_add = details.get("scope_after_add")
+    scope_after_remove = details.get("scope_after_remove")
+    cleanup = details.get("cleanup")
+    if not all(
+        isinstance(value, dict)
+        for value in (organization, organization_report, scope_after_add, scope_after_remove, cleanup)
+    ):
+        return None
+
+    proof = {
+        "organization_target_count": organization.get("target_count"),
+        "organization_host_count": organization.get("host_count"),
+        "organization_source_report_count": organization_report.get("source_report_count"),
+        "scope_after_add_target_count": scope_after_add.get("target_count"),
+        "scope_after_add_host_count": scope_after_add.get("host_count"),
+        "scope_after_remove_target_count": scope_after_remove.get("target_count"),
+        "scope_after_remove_host_count": scope_after_remove.get("host_count"),
+        "cleanup_scope": cleanup.get("scope"),
+        "cleanup_scope_report": cleanup.get("scope_report"),
+    }
+    expected = {
+        "organization_target_count": lambda value: isinstance(value, int) and value > 0,
+        "organization_host_count": lambda value: isinstance(value, int) and value > 0,
+        "organization_source_report_count": lambda value: isinstance(value, int) and value > 0,
+        "scope_after_add_target_count": lambda value: isinstance(value, int) and value >= 2,
+        "scope_after_add_host_count": lambda value: isinstance(value, int) and value >= 2,
+        "scope_after_remove_target_count": lambda value: value == 1,
+        "scope_after_remove_host_count": lambda value: value == 1,
+        "cleanup_scope": lambda value: value == "deleted",
+        "cleanup_scope_report": lambda value: value == "deleted",
+    }
+    status = "pass" if all(check(proof.get(key)) for key, check in expected.items()) else "warn"
+    return finding(
+        status,
+        "runtime-scope.organization-proof",
+        "Organization scope membership and source-report proof is available."
+        if status == "pass"
+        else "Organization scope membership proof is incomplete; inspect the scope smoke artifact.",
+        details=proof,
+    )
 
 
 def command_runtime_metrics(repo_root: Path, action: str, report_id: str | None = None, scope_report_id: str | None = None) -> dict[str, Any]:
