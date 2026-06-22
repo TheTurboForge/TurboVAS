@@ -385,6 +385,7 @@ OPENAPI_ALLOWED_REPLACES_VALUES = frozenset(
         "scan-config-family-summary-read",
         "scan-config-metadata-detail-info-read",
         "scan-config-metadata-list-read",
+        "scanner-metadata-detail-info-tags-and-task-backlink-read",
         "scanner-metadata-detail-info-read",
         "scanner-metadata-list-read",
         "schedule-metadata-detail-read",
@@ -432,6 +433,7 @@ OPENAPI_ALLOWED_INHERITED_STILL_OWNS_VALUES = frozenset(
         "retention-mutations",
         "saved-filter-writes-and-alert-linkage",
         "scanner-control-credentials-writes-and-deletes",
+        "remote-scanner-certificate-context-control-credentials-writes-downloads-and-deletes",
         "scan-config-preferences-export-import-writes-and-deletes",
         "scap-rich-context",
         "schedule-writes-exports-and-deletes",
@@ -636,9 +638,9 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-replaces": "scanner-metadata-list-read",
     },
     ("get", "/scanners/{scanner_id}"): {
-        "x-turbovas-inherited-still-owns": "scanner-control-credentials-writes-and-deletes",
+        "x-turbovas-inherited-still-owns": "remote-scanner-certificate-context-control-credentials-writes-downloads-and-deletes",
         "x-turbovas-maturity": "live-read",
-        "x-turbovas-replaces": "scanner-metadata-detail-info-read",
+        "x-turbovas-replaces": "scanner-metadata-detail-info-tags-and-task-backlink-read",
     },
     ("get", "/scan-configs"): {
         "x-turbovas-inherited-still-owns": "scan-config-preferences-export-import-writes-and-deletes",

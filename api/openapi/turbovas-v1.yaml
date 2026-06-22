@@ -687,10 +687,10 @@ paths:
       x-turbovas-direct: true
       x-turbovas-exposure: direct-read
       x-turbovas-maturity: live-read
-      x-turbovas-replaces: scanner-metadata-detail-info-read
-      x-turbovas-inherited-still-owns: scanner-control-credentials-writes-and-deletes
-      summary: Read one scanner metadata record
-      description: Read-only scanner metadata backed by gvmd/PostgreSQL. Credential secrets, scanner CA material, live scanner status, verify/control operations, export/download behavior, and writes are intentionally excluded.
+      x-turbovas-replaces: scanner-metadata-detail-info-tags-and-task-backlink-read
+      x-turbovas-inherited-still-owns: remote-scanner-certificate-context-control-credentials-writes-downloads-and-deletes
+      summary: Read one scanner metadata record with safe backlinks
+      description: Read-only scanner metadata backed by gvmd/PostgreSQL. Detail includes active user tags and non-hidden task backlinks. Credential secrets, scanner CA material, credential certificate metadata, live scanner status, verify/control operations, export/download behavior, and writes are intentionally excluded.
       parameters:
         - $ref: '#/components/parameters/ScannerId'
       responses:
@@ -699,7 +699,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ScannerAsset'
+                $ref: '#/components/schemas/ScannerAssetDetail'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -3051,6 +3051,21 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ScannerAsset'
+    ScannerAssetDetail:
+      allOf:
+        - $ref: '#/components/schemas/ScannerAsset'
+        - type: object
+          properties:
+            tasks:
+              type: array
+              description: Non-hidden task backlinks that use this scanner. Scanner control remains inherited.
+              items:
+                $ref: '#/components/schemas/ScannerTaskReference'
+            user_tags:
+              type: array
+              description: Active user tags attached directly to this scanner. Write/tag actions remain inherited.
+              items:
+                $ref: '#/components/schemas/ReportUserTag'
     ScanConfigAssetCollection:
       type: object
       required: [page, items]
@@ -4168,6 +4183,17 @@ components:
           type: string
           format: uuid
         name:
+          type: string
+    ScannerTaskReference:
+      type: object
+      required: [id, name, usage_type]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        usage_type:
           type: string
     ScannerAsset:
       type: object

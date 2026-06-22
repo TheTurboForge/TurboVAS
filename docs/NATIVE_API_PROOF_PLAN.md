@@ -98,10 +98,12 @@ status, and source provenance now read native metadata through the authenticated
 export, delete, tag writes/actions, and retained actions. The native detail
 remains read-only metadata/source provenance and intentionally excludes stored
 certificate bytes and file-transfer semantics.
-Scanner detail Information fields now read native metadata through the
-authenticated `gsad` proxy while inherited GMP context still owns verify,
-export/download, credential/certificate download context, User Tags, delete,
-clone, edit, and scanner-control behavior.
+Scanner detail now reads native metadata, active User Tags, and non-hidden task
+backlinks through the authenticated `gsad` proxy for safe socket/builtin
+page-load reads, while inherited GMP remains the fallback for remote scanner
+certificate context and still owns verify, export/download,
+credential/certificate download context, delete, clone, edit, and
+scanner-control behavior.
 Scan Config detail Information fields now read native metadata through the
 authenticated `gsad` proxy while inherited GMP context still owns preferences,
 family/NVT expansion, scanner reference context, task backlinks, User Tags,
@@ -176,7 +178,7 @@ where it exists:
 - `GET /api/v1/tasks`
 - `GET /api/v1/tasks/{task_id}`
 - `GET /api/v1/scanners`
-- `GET /api/v1/scanners/{scanner_id}` metadata only
+- `GET /api/v1/scanners/{scanner_id}` metadata, active User Tags, and task backlinks only
 - `GET /api/v1/scan-configs`
 - `GET /api/v1/scan-configs/{scan_config_id}` metadata only
 - `GET /api/v1/filters`
@@ -207,9 +209,10 @@ including credential metadata that the inherited UI already displayed. Task
 list/detail reads are also browser-proxied with the read-only metadata required
 by the current operator view. Target writes, task writes/start/stop, credential
 material, and scanner-control semantics remain inherited. Scanner metadata list
-and detail Information reads are browser-proxied, while verify/export/download,
-credential/certificate download context, User Tags, and scanner writes remain
-inherited.
+and safe socket/builtin detail page-load reads are browser-proxied, including
+active User Tags and non-hidden task backlinks. Remote scanner certificate
+context, verify/export/download, credential/certificate download context, and
+scanner writes remain inherited.
 Port-list list/detail reads are browser-proxied, including port ranges and target
 backlinks; port-list writes and import/export actions remain inherited. Override
 list/detail metadata reads are browser-proxied, including NVT identity, active

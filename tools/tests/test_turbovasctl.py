@@ -1447,6 +1447,7 @@ class TurboVASCtlTests(unittest.TestCase):
             "scan-config-metadata-detail-info-read",
             "scan-config-metadata-list-read",
             "scanner-metadata-detail-info-read",
+            "scanner-metadata-detail-info-tags-and-task-backlink-read",
             "scanner-metadata-list-read",
             "schedule-metadata-detail-read",
             "schedule-metadata-list-read",
@@ -1485,6 +1486,7 @@ class TurboVASCtlTests(unittest.TestCase):
             "override-writes-exports-trash-and-result-expansion",
             "port-list-import-export-writes-and-deletes",
             "raw-report-generation-xml-export-retention-and-mutations",
+            "remote-scanner-certificate-context-control-credentials-writes-downloads-and-deletes",
             "report-config-export-writes-and-deletes",
             "report-format-import-export-verify-writes-and-deletes",
             "result-overrides-tags-exports-and-actions",
@@ -1642,7 +1644,7 @@ class TurboVASCtlTests(unittest.TestCase):
             "/api/v1/tls-certificates": ("getTlsCertificates", "tls-certificate-asset-list-read", "tls-certificate-export-delete-and-rich-history"),
             "/api/v1/tls-certificates/{certificate_id}": ("getTlsCertificatesByCertificateId", "tls-certificate-asset-detail-info-read", "tls-certificate-export-delete-and-rich-history"),
             "/api/v1/scanners": ("getScanners", "scanner-metadata-list-read", "scanner-control-credentials-writes-and-deletes"),
-            "/api/v1/scanners/{scanner_id}": ("getScannersByScannerId", "scanner-metadata-detail-info-read", "scanner-control-credentials-writes-and-deletes"),
+            "/api/v1/scanners/{scanner_id}": ("getScannersByScannerId", "scanner-metadata-detail-info-tags-and-task-backlink-read", "remote-scanner-certificate-context-control-credentials-writes-downloads-and-deletes"),
             "/api/v1/scan-configs": ("getScanConfigs", "scan-config-metadata-list-read", "scan-config-preferences-export-import-writes-and-deletes"),
             "/api/v1/scan-configs/{scan_config_id}": ("getScanConfigsByScanConfigId", "scan-config-metadata-detail-info-read", "scan-config-preferences-export-import-writes-and-deletes"),
             "/api/v1/scan-configs/{scan_config_id}/families": ("getScanConfigsByScanConfigIdFamilies", "scan-config-family-summary-read", "scan-config-preferences-export-import-writes-and-deletes"),
@@ -2252,7 +2254,7 @@ class TurboVASCtlTests(unittest.TestCase):
             (tls_certificates, "getTlsCertificates", "tls-certificate-asset-list-read", "tls-certificate-export-delete-and-rich-history"),
             (tls_certificate_detail, "getTlsCertificatesByCertificateId", "tls-certificate-asset-detail-info-read", "tls-certificate-export-delete-and-rich-history"),
             (scanners, "getScanners", "scanner-metadata-list-read", "scanner-control-credentials-writes-and-deletes"),
-            (scanner_detail, "getScannersByScannerId", "scanner-metadata-detail-info-read", "scanner-control-credentials-writes-and-deletes"),
+            (scanner_detail, "getScannersByScannerId", "scanner-metadata-detail-info-tags-and-task-backlink-read", "remote-scanner-certificate-context-control-credentials-writes-downloads-and-deletes"),
             (scan_configs, "getScanConfigs", "scan-config-metadata-list-read", "scan-config-preferences-export-import-writes-and-deletes"),
             (scan_config_detail, "getScanConfigsByScanConfigId", "scan-config-metadata-detail-info-read", "scan-config-preferences-export-import-writes-and-deletes"),
             (scan_config_families, "getScanConfigsByScanConfigIdFamilies", "scan-config-family-summary-read", "scan-config-preferences-export-import-writes-and-deletes"),
@@ -2528,13 +2530,14 @@ class TurboVASCtlTests(unittest.TestCase):
         openapi = (root / "api" / "openapi" / "turbovas-v1.yaml").read_text(encoding="utf-8")
         api_source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
         native_tooling = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
+        tls_detail_source = api_source.split("async fn tls_certificate_asset_detail", 1)[1].split("async fn scanner_assets", 1)[0]
 
         self.assertIn('/api/v1/tls-certificates/:certificate_id', api_source)
         self.assertIn('parse_uuid(&certificate_id)?;', api_source)
-        self.assertIn('WHERE c.uuid = $1', api_source)
-        self.assertIn('JOIN tls_certificate_sources src ON src.tls_certificate = c.id', api_source)
+        self.assertIn('WHERE c.uuid = $1', tls_detail_source)
+        self.assertIn('JOIN tls_certificate_sources src ON src.tls_certificate = c.id', tls_detail_source)
         self.assertIn('TlsCertificateSourceItem', api_source)
-        self.assertNotIn('c.certificate', api_source)
+        self.assertNotIn('c.certificate', tls_detail_source)
         self.assertIn('/tls-certificates/{certificate_id}:', openapi)
         self.assertIn("#/components/parameters/TlsCertificateId", openapi)
         self.assertIn('TlsCertificateAssetDetail', openapi)
@@ -2555,11 +2558,17 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn('LEFT JOIN credentials c ON c.id = s.credential', scanner_detail_source)
         self.assertIn('nullif(c.uuid, \'\') AS credential_id', scanner_detail_source)
         self.assertIn('nullif(c.name, \'\') AS credential_name', scanner_detail_source)
+        self.assertIn('scanner_task_references(&client, &scanner_id)', scanner_detail_source)
+        self.assertIn('scanner_user_tags(&client, &scanner_id)', scanner_detail_source)
         self.assertNotIn('ca_pub', scanner_detail_source)
         self.assertNotIn('credential_value', scanner_detail_source)
         self.assertNotIn('password', scanner_detail_source)
+        self.assertNotIn('private_key', scanner_detail_source)
+        self.assertNotIn('certificate_info', scanner_detail_source)
         self.assertIn('/scanners/{scanner_id}:', openapi)
         self.assertIn("#/components/parameters/ScannerId", openapi)
+        self.assertIn('ScannerAssetDetail', openapi)
+        self.assertIn('ScannerTaskReference', openapi)
         self.assertIn('/api/v1/scanners/{scanner_id}', native_tooling)
         self.assertIn('native-api.scanner-detail', native_tooling)
 

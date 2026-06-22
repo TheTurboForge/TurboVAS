@@ -203,11 +203,12 @@ start/stop, and other scanner-control actions remain on the inherited path.
 
 Native scanner metadata rows include scanner identity, host/socket, port,
 inherited scanner type, safe credential references, relay metadata, and
-timestamps. Scanner detail Information overlays this read-only metadata in GSA
-while inherited GMP context keeps User Tags, CA/certificate data, credential
+timestamps. Scanner detail adds active User Tags and non-hidden task backlinks
+for safe socket/builtin page-load reads. Inherited GMP remains the fallback for
+remote scanner certificate context and keeps CA/certificate data, credential
 download context, verify/export/download/delete/clone/edit actions, and scanner
-control behavior. Native scanner reads do not expose credential secret values or
-scanner CA material.
+control behavior. Native scanner reads do not expose credential secret values,
+credential certificate metadata, or scanner CA material.
 
 Native operating-system asset rows include the `oss.uuid` identity, CPE/name,
 title, latest/highest/average host severity, current best-OS host count, all

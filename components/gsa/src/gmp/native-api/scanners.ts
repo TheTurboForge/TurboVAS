@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2026 TurboVAS contributors
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -31,6 +32,19 @@ interface NativeScannerCredentialPayload {
   name: string;
 }
 
+interface NativeScannerTaskPayload {
+  id: string;
+  name: string;
+  usage_type?: string;
+}
+
+interface NativeUserTagPayload {
+  id: string;
+  name: string;
+  value: string;
+  comment: string;
+}
+
 interface NativeScannerPayload {
   id: string;
   name: string;
@@ -41,6 +55,8 @@ interface NativeScannerPayload {
   credential?: NativeScannerCredentialPayload;
   relay_host?: string;
   relay_port?: number;
+  tasks?: NativeScannerTaskPayload[];
+  user_tags?: NativeUserTagPayload[];
   created_at?: string;
   modified_at?: string;
 }
@@ -143,7 +159,25 @@ const fetchNativeJson = async <T>(
   return (await response.json()) as T;
 };
 
-const nativeScannerToModel = (item: NativeScannerPayload): Scanner =>
+const nativeUserTagsElement = (tags: NativeUserTagPayload[] = []) => ({
+  tag: tags.map(tag => ({
+    _id: stringValue(tag.id),
+    name: stringValue(tag.name),
+    value: stringValue(tag.value),
+    comment: stringValue(tag.comment),
+  })),
+});
+
+const nativeTaskToElement = (task: NativeScannerTaskPayload) => ({
+  _id: stringValue(task.id),
+  name: stringValue(task.name),
+  usage_type: 'scan' as const,
+});
+
+const nativeScannerToModel = (
+  item: NativeScannerPayload,
+  {detail = false}: {detail?: boolean} = {},
+): Scanner =>
   Scanner.fromElement({
     _id: stringValue(item.id),
     name: stringValue(item.name),
@@ -161,6 +195,10 @@ const nativeScannerToModel = (item: NativeScannerPayload): Scanner =>
       : undefined,
     relay_host: stringValue(item.relay_host),
     relay_port: integerValue(item.relay_port),
+    tasks: detail
+      ? {task: (item.tasks ?? []).map(nativeTaskToElement)}
+      : undefined,
+    user_tags: detail ? nativeUserTagsElement(item.user_tags ?? []) : undefined,
   });
 
 export const fetchNativeScanners = async (
@@ -185,7 +223,7 @@ export const fetchNativeScanners = async (
     sort: stringValue(payload.page?.sort),
     filter: stringValue(payload.page?.filter),
   };
-  const scanners = (payload.items ?? []).map(nativeScannerToModel);
+  const scanners = (payload.items ?? []).map(item => nativeScannerToModel(item));
   return {
     scanners,
     counts: nativeCounts(page, scanners.length),
@@ -203,6 +241,6 @@ export const fetchNativeScanner = async (
     {token: gmp.session.token},
   );
   return {
-    scanner: nativeScannerToModel(payload),
+    scanner: nativeScannerToModel(payload, {detail: true}),
   };
 };

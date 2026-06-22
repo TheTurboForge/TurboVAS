@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2026 TurboVAS contributors
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -106,6 +107,21 @@ describe('native API scanner detail', () => {
           id: '6d799e1f-a81b-4b33-8090-5d4b0ed8ec77',
           name: 'Scanner credential',
         },
+        tasks: [
+          {
+            id: 'task-1',
+            name: 'Native task',
+            usage_type: 'scan',
+          },
+        ],
+        user_tags: [
+          {
+            id: 'tag-1',
+            name: 'Native tag',
+            value: 'true',
+            comment: 'active tag',
+          },
+        ],
         created_at: '2026-06-18T18:00:00Z',
         modified_at: '2026-06-18T20:00:00Z',
       }),
@@ -124,6 +140,10 @@ describe('native API scanner detail', () => {
     expect(scanner.hasUnixSocket()).toEqual(true);
     expect(scanner.scannerType).toEqual('2');
     expect(scanner.credential?.name).toEqual('Scanner credential');
+    expect(scanner.tasks[0].name).toEqual('Native task');
+    expect(scanner.userTags[0].name).toEqual('Native tag');
+    expect(scanner.caPub).toBeUndefined();
+    expect(scanner.credential?.certificateInfo).toBeUndefined();
     expect(gmp.buildUrl).toHaveBeenCalledWith(`api/v1/scanners/${id}`, {
       token: 'test-token',
     });
@@ -139,7 +159,86 @@ describe('native API scanner detail', () => {
     );
   });
 
-  test('loads inherited detail context before overlaying native Information fields', async () => {
+  test('loads Unix-socket detail without inherited GMP page-load request', async () => {
+    const id = '08b69003-5fc2-4037-a479-93b440211c73';
+    const fetchMock = testing.fn().mockResolvedValue({
+      json: testing.fn().mockResolvedValue({
+        id,
+        name: 'Native Scanner',
+        comment: 'native comment',
+        host: '/runtime/run/ospd/ospd-openvas.sock',
+        port: 0,
+        scanner_type: 2,
+        credential: {
+          id: '6d799e1f-a81b-4b33-8090-5d4b0ed8ec77',
+          name: 'Native credential',
+        },
+        tasks: [
+          {
+            id: 'task-1',
+            name: 'Native task',
+            usage_type: 'scan',
+          },
+        ],
+        user_tags: [
+          {
+            id: 'tag-1',
+            name: 'Native tag',
+            value: 'true',
+            comment: 'active tag',
+          },
+        ],
+        created_at: '2026-06-18T18:00:00Z',
+        modified_at: '2026-06-18T20:00:00Z',
+      }),
+      ok: true,
+      status: 200,
+    });
+    testing.stubGlobal('fetch', fetchMock);
+    const gmp = {
+      ...createGmp({jwt: 'jwt-token'}),
+      scanner: {
+        get: testing.fn(),
+      },
+    };
+    const actions: Array<{type: string; data?: Scanner}> = [];
+    const dispatch = testing.fn(action => {
+      actions.push(action);
+      return action;
+    });
+    const getState = () => ({
+      entities: {
+        scanner: {
+          byId: {},
+          errors: {},
+          isLoading: {},
+        },
+      },
+    });
+
+    await loadEntity(gmp)(id)(dispatch, getState);
+
+    const success = actions.find(
+      action => action.type === 'ENTITY_LOADING_SUCCESS',
+    );
+    const scanner = success?.data;
+    expect(gmp.scanner.get).not.toHaveBeenCalled();
+    expect(scanner).toBeInstanceOf(Scanner);
+    expect(scanner?.name).toEqual('Native Scanner');
+    expect(scanner?.comment).toEqual('native comment');
+    expect(scanner?.host).toEqual('/runtime/run/ospd/ospd-openvas.sock');
+    expect(scanner?.port).toEqual(0);
+    expect(scanner?.scannerType).toEqual('2');
+    expect(scanner?.credential).toBeInstanceOf(Credential);
+    expect(scanner?.credential?.name).toEqual('Native credential');
+    expect(scanner?.credential?.certificateInfo).toBeUndefined();
+    expect(scanner?.caPub).toBeUndefined();
+    expect(scanner?.tasks?.[0].name).toEqual('Native task');
+    expect(scanner?.userTags?.[0].name).toEqual('Native tag');
+    expect(scanner?.isWritable()).toEqual(true);
+  });
+
+  test('keeps inherited detail context for remote scanner certificate fields', async () => {
     const id = '08b69003-5fc2-4037-a479-93b440211c73';
     const calls: string[] = [];
     const inherited = Scanner.fromElement({
@@ -175,9 +274,9 @@ describe('native API scanner detail', () => {
           id,
           name: 'Native Scanner',
           comment: 'native comment',
-          host: '/runtime/run/ospd/ospd-openvas.sock',
-          port: 0,
-          scanner_type: 2,
+          host: '127.0.0.1',
+          port: 443,
+          scanner_type: 5,
           credential: {
             id: '6d799e1f-a81b-4b33-8090-5d4b0ed8ec77',
             name: 'Native credential',
@@ -220,14 +319,14 @@ describe('native API scanner detail', () => {
       action => action.type === 'ENTITY_LOADING_SUCCESS',
     );
     const scanner = success?.data;
-    expect(calls).toEqual(['gmp', 'native']);
+    expect(calls).toEqual(['native', 'gmp']);
     expect(gmp.scanner.get).toHaveBeenCalledWith({id});
     expect(scanner).toBeInstanceOf(Scanner);
     expect(scanner?.name).toEqual('Native Scanner');
     expect(scanner?.comment).toEqual('native comment');
-    expect(scanner?.host).toEqual('/runtime/run/ospd/ospd-openvas.sock');
-    expect(scanner?.port).toEqual(0);
-    expect(scanner?.scannerType).toEqual('2');
+    expect(scanner?.host).toEqual('127.0.0.1');
+    expect(scanner?.port).toEqual(443);
+    expect(scanner?.scannerType).toEqual('5');
     expect(scanner?.credential).toBeInstanceOf(Credential);
     expect(scanner?.credential?.name).toEqual('Native credential');
     expect(scanner?.credential?.certificateInfo?.issuer).toEqual(

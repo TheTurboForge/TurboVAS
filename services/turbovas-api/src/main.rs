@@ -799,6 +799,23 @@ struct ScannerAssetItem {
 }
 
 #[derive(Serialize)]
+struct ScannerTaskReference {
+    id: String,
+    name: String,
+    usage_type: String,
+}
+
+#[derive(Serialize)]
+struct ScannerAssetDetail {
+    #[serde(flatten)]
+    asset: ScannerAssetItem,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    tasks: Vec<ScannerTaskReference>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    user_tags: Vec<ReportUserTag>,
+}
+
+#[derive(Serialize)]
 struct ScanConfigOwner {
     name: String,
 }
@@ -2045,7 +2062,7 @@ async fn scanner_assets(
 async fn scanner_asset_detail(
     State(state): State<AppState>,
     Path(scanner_id): Path<String>,
-) -> Result<Json<ScannerAssetItem>, ApiError> {
+) -> Result<Json<ScannerAssetDetail>, ApiError> {
     let scanner_id = parse_uuid(&scanner_id)?.to_string();
     let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
     let row = client
@@ -2074,7 +2091,82 @@ async fn scanner_asset_detail(
             ApiError::Database
         })?
         .ok_or(ApiError::NotFound)?;
-    Ok(Json(scanner_asset_from_row(&row)))
+    let tasks = scanner_task_references(&client, &scanner_id).await?;
+    let user_tags = scanner_user_tags(&client, &scanner_id).await?;
+    Ok(Json(ScannerAssetDetail {
+        asset: scanner_asset_from_row(&row),
+        tasks,
+        user_tags,
+    }))
+}
+
+fn scanner_task_references_sql() -> &'static str {
+    r#"SELECT t.uuid AS id,
+              coalesce(t.name, '') AS name,
+              coalesce(t.usage_type, 'scan') AS usage_type
+         FROM scanners s
+         JOIN tasks t ON t.scanner = s.id
+        WHERE lower(s.uuid) = lower($1)
+          AND coalesce(t.hidden, 0) = 0
+        ORDER BY t.name ASC, t.uuid ASC;"#
+}
+
+async fn scanner_task_references(
+    client: &tokio_postgres::Client,
+    scanner_id: &str,
+) -> Result<Vec<ScannerTaskReference>, ApiError> {
+    let rows = client
+        .query(scanner_task_references_sql(), &[&scanner_id])
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "scanner task-reference query failed");
+            ApiError::Database
+        })?;
+    Ok(rows
+        .iter()
+        .map(|row| ScannerTaskReference {
+            id: row.get("id"),
+            name: row.get("name"),
+            usage_type: row.get("usage_type"),
+        })
+        .collect())
+}
+
+fn scanner_user_tags_sql() -> &'static str {
+    r#"SELECT t.uuid AS id,
+              coalesce(t.name, '') AS name,
+              coalesce(t.value, '') AS value,
+              coalesce(t.comment, '') AS comment
+         FROM tags t
+         JOIN tag_resources tr ON tr.tag = t.id
+         JOIN scanners ON scanners.id = tr.resource
+        WHERE lower(scanners.uuid) = lower($1)
+          AND tr.resource_type = 'scanner'
+          AND tr.resource_location = 0
+          AND coalesce(t.active, 0) = 1
+        ORDER BY t.name ASC, t.uuid ASC;"#
+}
+
+async fn scanner_user_tags(
+    client: &tokio_postgres::Client,
+    scanner_id: &str,
+) -> Result<Vec<ReportUserTag>, ApiError> {
+    let rows = client
+        .query(scanner_user_tags_sql(), &[&scanner_id])
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "scanner user-tag query failed");
+            ApiError::Database
+        })?;
+    Ok(rows
+        .iter()
+        .map(|row| ReportUserTag {
+            id: row.get("id"),
+            name: row.get("name"),
+            value: row.get("value"),
+            comment: row.get("comment"),
+        })
+        .collect())
 }
 
 fn scan_config_asset_from_row(row: &Row) -> ScanConfigAssetItem {
@@ -10378,6 +10470,74 @@ mod tests {
         assert!(detail_source.contains("tls_certificate_user_tags"));
         assert!(!detail_source.contains("c.certificate"));
         assert!(!detail_source.contains("certificate_format"));
+    }
+
+    #[test]
+    fn scanner_user_tags_are_detail_only_active_scanner_tags() {
+        let source = include_str!("main.rs");
+        let scanner_list_payload = source
+            .split_once("struct ScannerAssetItem {")
+            .expect("scanner list payload struct must exist")
+            .1
+            .split_once("struct ScannerTaskReference")
+            .expect("scanner list payload struct must precede detail references")
+            .0;
+        let scanner_detail_payload = source
+            .split_once("struct ScannerAssetDetail {")
+            .expect("scanner detail payload struct must exist")
+            .1
+            .split_once("struct ScanConfigOwner")
+            .expect("scanner detail payload struct must precede scan config owner")
+            .0;
+
+        assert!(!scanner_list_payload.contains("user_tags"));
+        assert!(scanner_detail_payload.contains("user_tags: Vec<ReportUserTag>"));
+
+        let sql = scanner_user_tags_sql();
+        assert!(sql.contains("FROM tags t"));
+        assert!(sql.contains("JOIN tag_resources tr ON tr.tag = t.id"));
+        assert!(sql.contains("JOIN scanners ON scanners.id = tr.resource"));
+        assert!(sql.contains("lower(scanners.uuid) = lower($1)"));
+        assert!(sql.contains("tr.resource_type = 'scanner'"));
+        assert!(sql.contains("tr.resource_location = 0"));
+        assert!(sql.contains("coalesce(t.active, 0) = 1"));
+        assert!(!sql.contains("credential"));
+        assert!(!sql.contains("reports"));
+        assert!(!sql.contains("results"));
+    }
+
+    #[test]
+    fn scanner_task_references_are_non_hidden_backlinks_only() {
+        let sql = scanner_task_references_sql();
+        assert!(sql.contains("FROM scanners s"));
+        assert!(sql.contains("JOIN tasks t ON t.scanner = s.id"));
+        assert!(sql.contains("lower(s.uuid) = lower($1)"));
+        assert!(sql.contains("coalesce(t.hidden, 0) = 0"));
+        assert!(sql.contains("coalesce(t.usage_type, 'scan') AS usage_type"));
+        assert!(!sql.contains("credentials"));
+        assert!(!sql.contains("results"));
+    }
+
+    #[test]
+    fn scanner_detail_contract_excludes_certificate_and_secret_material() {
+        let source = include_str!("main.rs");
+        let detail_source = source
+            .split_once("async fn scanner_asset_detail")
+            .expect("scanner detail handler must exist")
+            .1
+            .split_once("fn scan_config_asset_from_row")
+            .expect("scanner detail handler must precede scan config assets")
+            .0;
+
+        assert!(detail_source.contains("scanner_task_references"));
+        assert!(detail_source.contains("scanner_user_tags"));
+        assert!(!detail_source.contains("ca_pub"));
+        assert!(!detail_source.contains("credential_value"));
+        assert!(!detail_source.contains("private_key"));
+        assert!(!detail_source.contains("password"));
+        assert!(!detail_source.contains("secret"));
+        assert!(!detail_source.contains("certificate_info"));
+        assert!(!detail_source.contains("send_scanner_info"));
     }
 
     #[test]

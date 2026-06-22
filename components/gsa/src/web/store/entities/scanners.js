@@ -10,6 +10,7 @@ import {
   fetchNativeScanners,
   nativeScannersQueryFromFilter,
 } from 'gmp/native-api/scanners';
+import {CVE_SCANNER_TYPE} from 'gmp/models/scanner';
 
 const {
   loadAllEntities,
@@ -60,6 +61,9 @@ const mergeNativeInformation = (inherited, native) =>
     ),
   });
 
+const canUseNativeOnlyDetail = scanner =>
+  scanner.hasUnixSocket() || scanner.scannerType === CVE_SCANNER_TYPE;
+
 const nativeLoadEntities = gmp => filter => (dispatch, getState) => {
   if (!canUseNativeApi(gmp)) {
     return loadEntities(gmp)(filter)(dispatch, getState);
@@ -102,10 +106,15 @@ const nativeLoadEntity = gmp => id => (dispatch, getState) => {
 
   dispatch(entityLoadingActions.request(id));
 
-  return gmp.scanner
-    .get({id})
-    .then(inheritedResponse =>
-      fetchNativeScanner(gmp, id).then(nativeResponse =>
+  return fetchNativeScanner(gmp, id)
+    .then(nativeResponse => {
+      if (canUseNativeOnlyDetail(nativeResponse.scanner)) {
+        return dispatch(
+          entityLoadingActions.success(id, nativeResponse.scanner),
+        );
+      }
+
+      return gmp.scanner.get({id}).then(inheritedResponse =>
         dispatch(
           entityLoadingActions.success(
             id,
@@ -115,8 +124,8 @@ const nativeLoadEntity = gmp => id => (dispatch, getState) => {
             ),
           ),
         ),
-      ),
-    )
+      );
+    })
     .catch(error => dispatch(entityLoadingActions.error(id, error)));
 };
 
