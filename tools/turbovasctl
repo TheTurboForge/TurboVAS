@@ -6259,7 +6259,26 @@ def native_api_migration_matrix_contract_summary(rows: list[dict[str, Any]]) -> 
     }
 
 
-def command_native_api_migration_matrix(repo_root: Path) -> dict[str, Any]:
+def native_api_migration_matrix_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
+    details = result.get("details") if isinstance(result.get("details"), dict) else {}
+    findings = result.get("findings", [])
+    non_pass = [item for item in findings if item.get("status") != "pass"]
+    compact = dict(result)
+    compact["details"] = {
+        "summary": details.get("summary", {}),
+        "contract": details.get("contract", {}),
+    }
+    compact["findings"] = non_pass or [
+        finding(
+            "pass",
+            "native-api-migration-matrix.status-only",
+            "Native API migration matrix passed; no non-pass findings.",
+        )
+    ]
+    return compact
+
+
+def command_native_api_migration_matrix(repo_root: Path, status_only: bool = False) -> dict[str, Any]:
     rows = native_api_migration_matrix_rows(repo_root)
     contract = native_api_migration_matrix_contract_summary(rows)
     summary = native_api_migration_matrix_summary(rows)
@@ -6308,6 +6327,8 @@ def command_native_api_migration_matrix(repo_root: Path) -> dict[str, Any]:
     ]
     result = make_result("native-api-migration-matrix", repo_root, "Native API migration matrix collected.", findings)
     result["details"] = details
+    if status_only:
+        result = native_api_migration_matrix_status_only_result(result)
     return result
 
 
@@ -12610,7 +12631,8 @@ def build_parser() -> argparse.ArgumentParser:
     native_tooling_state.add_argument("--compact", action="store_true", help="omit full item and endpoint inventories from JSON output")
     native_tooling_state.add_argument("--summary", action="store_true", help="emit only status/count contract summaries for low-noise closeout checks")
     native_tooling_state.add_argument("--status-only", action="store_true", help="emit compact details and only non-pass findings for chat-safe closeout checks")
-    subparsers.add_parser("native-api-migration-matrix", parents=[common], help="show native API migration metadata by endpoint")
+    migration_matrix = subparsers.add_parser("native-api-migration-matrix", parents=[common], help="show native API migration metadata by endpoint")
+    migration_matrix.add_argument("--status-only", action="store_true", help="emit summary/contract details and only non-pass findings for chat-safe API planning")
     subparsers.add_parser("native-api-client-contract", parents=[common], help="check the generated-client native API contract surface")
     subparsers.add_parser("rust-migration-state", parents=[common], help="inspect Rust migration tooling and first C-to-Rust dry-run candidate")
     subparsers.add_parser("doctor", parents=[common], help="run structural and environment health checks")
@@ -12727,7 +12749,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "native-tooling-state":
         result = command_native_tooling_state(repo_root, compact=args.compact, summary_only=args.summary, status_only=args.status_only)
     elif args.command == "native-api-migration-matrix":
-        result = command_native_api_migration_matrix(repo_root)
+        result = command_native_api_migration_matrix(repo_root, status_only=args.status_only)
     elif args.command == "native-api-client-contract":
         result = command_native_api_client_contract(repo_root)
     elif args.command == "rust-migration-state":

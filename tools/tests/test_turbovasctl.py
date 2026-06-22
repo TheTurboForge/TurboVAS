@@ -1961,6 +1961,25 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(summary["direct_exposure_mismatch_count"], 2)
         self.assertEqual(summary["direct_marker_mismatch_count"], 2)
 
+    def test_native_api_migration_matrix_status_only_omits_items(self):
+        result = {
+            "status": "pass",
+            "summary": "ok",
+            "details": {
+                "summary": {"total_rows": 2},
+                "contract": {"rows_missing_openapi": []},
+                "items": [{"endpoint": "/api/v1/reports"}],
+            },
+            "findings": [
+                {"status": "pass", "check": "native-api-migration-matrix.rows", "message": "ok"},
+            ],
+        }
+
+        compact = turbovasctl.native_api_migration_matrix_status_only_result(result)
+
+        self.assertEqual(compact["details"], {"summary": {"total_rows": 2}, "contract": {"rows_missing_openapi": []}})
+        self.assertEqual(compact["findings"], [{"status": "pass", "check": "native-api-migration-matrix.status-only", "message": "Native API migration matrix passed; no non-pass findings."}])
+
     def test_openapi_operation_id_generator_is_stable_and_collision_free(self):
         root = Path(__file__).resolve().parents[2]
         operations = turbovasctl.openapi_contract_operations(root)
