@@ -8175,19 +8175,6 @@ fn target_credentials(row: &Row) -> TargetCredentials {
     }
 }
 
-fn alive_test_labels(value: i64) -> Vec<String> {
-    let label = match value {
-        0 => "Scan Config Default",
-        1 => "ICMP Ping",
-        2 => "TCP-ACK Service Ping",
-        3 => "TCP-SYN Service Ping",
-        4 => "ARP Ping",
-        5 => "Consider Alive",
-        _ => "Unknown",
-    };
-    vec![label.to_string()]
-}
-
 fn target_task_references(row: &Row) -> Vec<TargetReference> {
     let ids: Vec<String> = row.get("task_ids");
     let names: Vec<String> = row.get("task_names");
