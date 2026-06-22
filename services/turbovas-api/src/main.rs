@@ -5535,6 +5535,7 @@ async fn results(
     let sql = format!(
         r#"WITH result_rows AS (
              SELECT r.uuid AS id,
+                    r.id AS result_internal_id,
                     lower(coalesce(nullif(r.host, ''), r.hostname, '')) AS host,
                     h.uuid AS host_asset_id,
                     nullif(r.hostname, '') AS hostname,
@@ -5597,7 +5598,20 @@ async fn results(
                       ELSE ARRAY[]::text[]
                     END AS cves,
                     coalesce(refs.cert_refs, ARRAY[]::text[]) AS cert_refs,
-                    coalesce(refs.xrefs, ARRAY[]::text[]) AS xrefs
+                    coalesce(refs.xrefs, ARRAY[]::text[]) AS xrefs,
+                    coalesce(active_overrides.override_ids, ARRAY[]::text[]) AS override_ids,
+                    coalesce(active_overrides.override_nvt_ids, ARRAY[]::text[]) AS override_nvt_ids,
+                    coalesce(active_overrides.override_nvt_names, ARRAY[]::text[]) AS override_nvt_names,
+                    coalesce(active_overrides.override_nvt_types, ARRAY[]::text[]) AS override_nvt_types,
+                    coalesce(active_overrides.override_texts, ARRAY[]::text[]) AS override_texts,
+                    coalesce(active_overrides.override_hosts, ARRAY[]::text[]) AS override_hosts,
+                    coalesce(active_overrides.override_ports, ARRAY[]::text[]) AS override_ports,
+                    coalesce(active_overrides.override_severities, ARRAY[]::double precision[]) AS override_severities,
+                    coalesce(active_overrides.override_new_severities, ARRAY[]::double precision[]) AS override_new_severities,
+                    coalesce(active_overrides.override_created_at_unix, ARRAY[]::bigint[]) AS override_created_at_unix,
+                    coalesce(active_overrides.override_modified_at_unix, ARRAY[]::bigint[]) AS override_modified_at_unix,
+                    coalesce(active_overrides.override_end_time_unix, ARRAY[]::bigint[]) AS override_end_time_unix,
+                    coalesce(active_overrides.override_active_ints, ARRAY[]::integer[]) AS override_active_ints
                FROM page_rows p
                LEFT JOIN LATERAL (
                    SELECT array_agg(vr.ref_id::text ORDER BY vr.ref_id)
@@ -5612,6 +5626,48 @@ async fn results(
                      FROM vt_refs vr
                     WHERE vr.vt_oid = p.nvt_oid
                ) refs ON true
+               LEFT JOIN LATERAL (
+                   SELECT array_agg(m.id ORDER BY m.modified_at_unix DESC, m.created_at_unix DESC, m.id ASC) AS override_ids,
+                          array_agg(m.nvt_id ORDER BY m.modified_at_unix DESC, m.created_at_unix DESC, m.id ASC) AS override_nvt_ids,
+                          array_agg(m.nvt_name ORDER BY m.modified_at_unix DESC, m.created_at_unix DESC, m.id ASC) AS override_nvt_names,
+                          array_agg(m.nvt_type ORDER BY m.modified_at_unix DESC, m.created_at_unix DESC, m.id ASC) AS override_nvt_types,
+                          array_agg(m.text ORDER BY m.modified_at_unix DESC, m.created_at_unix DESC, m.id ASC) AS override_texts,
+                          array_agg(m.hosts ORDER BY m.modified_at_unix DESC, m.created_at_unix DESC, m.id ASC) AS override_hosts,
+                          array_agg(m.port ORDER BY m.modified_at_unix DESC, m.created_at_unix DESC, m.id ASC) AS override_ports,
+                          array_agg(m.severity ORDER BY m.modified_at_unix DESC, m.created_at_unix DESC, m.id ASC) AS override_severities,
+                          array_agg(m.new_severity ORDER BY m.modified_at_unix DESC, m.created_at_unix DESC, m.id ASC) AS override_new_severities,
+                          array_agg(m.created_at_unix ORDER BY m.modified_at_unix DESC, m.created_at_unix DESC, m.id ASC) AS override_created_at_unix,
+                          array_agg(m.modified_at_unix ORDER BY m.modified_at_unix DESC, m.created_at_unix DESC, m.id ASC) AS override_modified_at_unix,
+                          array_agg(m.end_time_unix ORDER BY m.modified_at_unix DESC, m.created_at_unix DESC, m.id ASC) AS override_end_time_unix,
+                          array_agg(m.active_int ORDER BY m.modified_at_unix DESC, m.created_at_unix DESC, m.id ASC) AS override_active_ints
+                     FROM (
+                         SELECT DISTINCT ON (o.id)
+                                o.uuid AS id,
+                                coalesce(o.nvt, '') AS nvt_id,
+                                CASE
+                                  WHEN coalesce(o.nvt, '') LIKE 'CVE-%' THEN coalesce(o.nvt, '')
+                                  ELSE coalesce(n.name, o.nvt, '')
+                                END AS nvt_name,
+                                CASE
+                                  WHEN coalesce(o.nvt, '') LIKE 'CVE-%' THEN 'cve'
+                                  ELSE 'nvt'
+                                END AS nvt_type,
+                                coalesce(o.text, '') AS text,
+                                coalesce(o.hosts, '') AS hosts,
+                                coalesce(o.port, '') AS port,
+                                o.severity::double precision AS severity,
+                                o.new_severity::double precision AS new_severity,
+                                coalesce(o.creation_time, 0)::bigint AS created_at_unix,
+                                coalesce(o.modification_time, 0)::bigint AS modified_at_unix,
+                                coalesce(o.end_time, 0)::bigint AS end_time_unix,
+                                CAST (((coalesce(o.end_time, 0) = 0) OR (coalesce(o.end_time, 0) >= m_now())) AS integer) AS active_int
+                           FROM result_overrides ro
+                           JOIN overrides o ON o.id = ro.override
+                      LEFT JOIN nvts n ON n.oid = o.nvt
+                          WHERE ro.result = p.result_internal_id
+                          ORDER BY o.id, coalesce(o.modification_time, o.creation_time, 0) DESC, o.uuid ASC
+                     ) m
+               ) active_overrides ON true
          )
          SELECT * FROM page_with_refs;"#,
     );
@@ -9332,8 +9388,61 @@ fn result_from_row(row: &Row) -> ResultItem {
         ),
         source_report_id,
         user_tags: Vec::new(),
-        overrides: Vec::new(),
+        overrides: result_overrides_from_row(row),
     }
+}
+
+fn result_overrides_from_row(row: &Row) -> Vec<ResultOverrideItem> {
+    let ids = optional_row_strings(row, "override_ids");
+    let nvt_ids = optional_row_strings(row, "override_nvt_ids");
+    let nvt_names = optional_row_strings(row, "override_nvt_names");
+    let nvt_types = optional_row_strings(row, "override_nvt_types");
+    let texts = optional_row_strings(row, "override_texts");
+    let hosts = optional_row_strings(row, "override_hosts");
+    let ports = optional_row_strings(row, "override_ports");
+    let severities = row
+        .try_get::<_, Vec<Option<f64>>>("override_severities")
+        .unwrap_or_default();
+    let new_severities = row
+        .try_get::<_, Vec<Option<f64>>>("override_new_severities")
+        .unwrap_or_default();
+    let created_at = row
+        .try_get::<_, Vec<i64>>("override_created_at_unix")
+        .unwrap_or_default();
+    let modified_at = row
+        .try_get::<_, Vec<i64>>("override_modified_at_unix")
+        .unwrap_or_default();
+    let end_times = row
+        .try_get::<_, Vec<i64>>("override_end_time_unix")
+        .unwrap_or_default();
+    let active_ints = row
+        .try_get::<_, Vec<i32>>("override_active_ints")
+        .unwrap_or_default();
+
+    ids.into_iter()
+        .enumerate()
+        .map(|(index, id)| ResultOverrideItem {
+            id,
+            nvt: ResultOverrideNvtReference {
+                id: nvt_ids.get(index).cloned().unwrap_or_default(),
+                name: nvt_names.get(index).cloned().unwrap_or_default(),
+                nvt_type: nvt_types
+                    .get(index)
+                    .cloned()
+                    .unwrap_or_else(|| "nvt".to_string()),
+            },
+            text: texts.get(index).cloned().unwrap_or_default(),
+            text_excerpt: false,
+            hosts: hosts.get(index).cloned().unwrap_or_default(),
+            port: ports.get(index).cloned().unwrap_or_default(),
+            severity: severities.get(index).copied().unwrap_or(None),
+            new_severity: new_severities.get(index).copied().unwrap_or(None),
+            active: active_ints.get(index).copied().unwrap_or_default() != 0,
+            end_time: unix_ts_to_rfc3339(end_times.get(index).copied().unwrap_or_default()),
+            created_at: unix_ts_to_rfc3339(created_at.get(index).copied().unwrap_or_default()),
+            modified_at: unix_ts_to_rfc3339(modified_at.get(index).copied().unwrap_or_default()),
+        })
+        .collect()
 }
 
 fn result_override_from_row(row: &Row) -> ResultOverrideItem {
@@ -10527,6 +10636,11 @@ mod tests {
         }
         assert!(row_mapper.contains("max_epss: nvt_epss_from_row(row)"));
         assert!(row_mapper.contains("max_severity: nvt_max_severity_from_row(row)"));
+        assert!(row_mapper.contains("overrides: result_overrides_from_row(row)"));
+        assert!(result_sql_sources[0].contains("r.id AS result_internal_id"));
+        assert!(result_sql_sources[0].contains("ro.result = p.result_internal_id"));
+        assert!(result_sql_sources[0].contains("array_agg(m.id ORDER BY"));
+        assert!(result_sql_sources[0].contains("override_active_ints"));
         assert!(result_sql_sources[1].contains("result_user_tags(&client, &result_id)"));
         assert!(result_sql_sources[1].contains("result_effective_overrides(&client, &result_id)"));
         assert!(result_sql_sources[1].contains("tr.resource_type = 'result'"));

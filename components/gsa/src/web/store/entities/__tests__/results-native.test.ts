@@ -47,6 +47,24 @@ describe('native API result list', () => {
             task: {id: 'task-1', name: 'LAN scan'},
             source_report_id: 'report-1',
             raw_evidence_href: '/result/result-1',
+            overrides: [
+              {
+                id: 'override-1',
+                nvt: {
+                  id: '1.3.6.1.4.1.25623.1.0.900001',
+                  name: 'Example vulnerability',
+                  type: 'nvt',
+                },
+                text: 'Accepted risk for this host',
+                text_excerpt: false,
+                hosts: '192.168.178.42',
+                port: '443/tcp',
+                severity: 7.5,
+                new_severity: -1,
+                active: true,
+                modified_at: '2026-06-18T21:00:00Z',
+              },
+            ],
           },
         ],
       }),
@@ -82,6 +100,9 @@ describe('native API result list', () => {
     expect(result.report?.id).toEqual('report-1');
     expect(result.task?.id).toEqual('task-1');
     expect(result.scan_nvt_version).toEqual('20260618T1200');
+    expect(result.overrides).toHaveLength(1);
+    expect(result.overrides[0].id).toEqual('override-1');
+    expect(result.overrides[0].isActive()).toEqual(true);
     expect(gmp.buildUrl).toHaveBeenCalledWith('api/v1/results', {
       token: 'test-token',
       page: 1,
@@ -231,7 +252,9 @@ describe('native API result list', () => {
     expect(response.result.overrides).toHaveLength(1);
     expect(response.result.overrides[0].id).toEqual('override-1');
     expect(response.result.overrides[0].isActive()).toEqual(true);
-    expect(response.result.overrides[0].text).toEqual('Temporary accepted risk');
+    expect(response.result.overrides[0].text).toEqual(
+      'Temporary accepted risk',
+    );
     expect(response.result.overrides[0].newSeverity).toEqual(-1);
     expect(gmp.buildUrl).toHaveBeenCalledWith(`api/v1/results/${id}`, {
       token: 'test-token',
