@@ -3653,9 +3653,48 @@ db2:keys=5,expires=0,avg_ttl=0
         checks = {item["check"]: item for item in result["findings"]}
         self.assertEqual(result["status"], "fail")
         self.assertEqual(checks["native-api-direct-bootstrap.config-shape"]["status"], "fail")
+        self.assertEqual(checks["native-api-direct-bootstrap.host-binding"]["status"], "fail")
         self.assertEqual(checks["production.native-api-direct.config-shape"]["status"], "fail")
+        self.assertEqual(checks["production.native-api-direct.configured-binding"]["status"], "fail")
         self.assertIn("container port 9081", rendered)
         self.assertNotIn(token, rendered)
+
+    def test_direct_native_api_smoke_fails_wrong_container_bind_before_runtime_restart(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            root.mkdir()
+            token = "0123456789abcdef0123456789abcdef"
+            original_bind = turbovasctl.os.environ.get(turbovasctl.TURBOVAS_API_DIRECT_BIND_ENV)
+            original_token = turbovasctl.os.environ.get(turbovasctl.TURBOVAS_API_BEARER_TOKEN_ENV)
+            commands: list[tuple[str, ...]] = []
+
+            def fake_run_command(command, *_args, **_kwargs):
+                commands.append(tuple(command))
+                return turbovasctl.subprocess.CompletedProcess(command, 0, "", "")
+
+            try:
+                turbovasctl.os.environ[turbovasctl.TURBOVAS_API_DIRECT_BIND_ENV] = "0.0.0.0:9999"
+                turbovasctl.os.environ[turbovasctl.TURBOVAS_API_BEARER_TOKEN_ENV] = token
+                with unittest.mock.patch.object(turbovasctl, "run_command", side_effect=fake_run_command), unittest.mock.patch.object(turbovasctl, "direct_native_api_curl") as curl:
+                    result = turbovasctl.command_runtime_native_api_direct_smoke(root)
+            finally:
+                if original_bind is None:
+                    turbovasctl.os.environ.pop(turbovasctl.TURBOVAS_API_DIRECT_BIND_ENV, None)
+                else:
+                    turbovasctl.os.environ[turbovasctl.TURBOVAS_API_DIRECT_BIND_ENV] = original_bind
+                if original_token is None:
+                    turbovasctl.os.environ.pop(turbovasctl.TURBOVAS_API_BEARER_TOKEN_ENV, None)
+                else:
+                    turbovasctl.os.environ[turbovasctl.TURBOVAS_API_BEARER_TOKEN_ENV] = original_token
+
+        checks = {item["check"]: item for item in result["findings"]}
+        self.assertEqual(result["status"], "fail")
+        self.assertEqual(checks["native-api-direct.config-shape"]["status"], "fail")
+        self.assertEqual(checks["native-api-direct.host-binding"]["status"], "fail")
+        self.assertEqual(len(commands), 1)
+        self.assertIn("config", commands[0])
+        self.assertNotIn("build", commands[0])
+        curl.assert_not_called()
 
     def test_direct_native_api_smoke_fails_non_loopback_before_runtime_restart(self):
         with tempfile.TemporaryDirectory() as tmp:
