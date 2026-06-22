@@ -1557,7 +1557,15 @@ class TurboVASCtlTests(unittest.TestCase):
         )
         self.assertEqual(contract["unexpected_turbovas_operation_fields"], [])
         self.assertEqual(contract["allowed_exposure_values"], ["direct-read", "internal-only"])
+        actual_exposure_values = sorted(
+            {operation["x_turbovas_values"]["x-turbovas-exposure"] for operation in turbovasctl.openapi_contract_operations(root)}
+        )
+        self.assertEqual(contract["allowed_exposure_values"], actual_exposure_values)
         self.assertEqual(contract["allowed_maturity_values"], ["live-read", "preview-read"])
+        actual_maturity_values = sorted(
+            {operation["x_turbovas_values"]["x-turbovas-maturity"] for operation in turbovasctl.openapi_contract_operations(root)}
+        )
+        self.assertEqual(contract["allowed_maturity_values"], actual_maturity_values)
         expected_replaces_values = [
             "alert-metadata-detail-read",
             "alert-metadata-list-read",
