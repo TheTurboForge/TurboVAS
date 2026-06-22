@@ -34,6 +34,7 @@ TOML_DECODE_ERROR = getattr(tomllib, "TOMLDecodeError", ValueError)
 
 
 STATUSES = ("pass", "warn", "fail")
+MINIMUM_TURBOVASCTL_PYTHON = (3, 11)
 COMPOSE_APP_UP_TRANSIENT_ERRORS = (
     "No such container:",
     "removal of container",
@@ -4274,6 +4275,21 @@ def version_tuple(version: str) -> tuple[int, ...]:
         else:
             break
     return tuple(parts)
+
+
+def python_version_finding() -> dict[str, Any]:
+    version = tool_version("python3")
+    if not version:
+        return finding("warn", "tool.python-version", "python3 version could not be detected.")
+    parsed = version_tuple(version.removeprefix("Python "))
+    status = "pass" if parsed >= MINIMUM_TURBOVASCTL_PYTHON else "warn"
+    required = ".".join(str(part) for part in MINIMUM_TURBOVASCTL_PYTHON)
+    message = (
+        f"python3 version {version} satisfies TurboVAS tooling requirement >= {required}."
+        if status == "pass"
+        else f"python3 version {version} is older than TurboVAS tooling requirement >= {required}; TOML-backed checks need Python 3.11+."
+    )
+    return finding(status, "tool.python-version", message, details={"version": version, "minimum": required})
 
 
 def command_status(repo_root: Path) -> dict[str, Any]:
@@ -12555,6 +12571,7 @@ def command_doctor(repo_root: Path) -> dict[str, Any]:
     findings.append(finding("fail" if nested else "pass", "component.nested_git", "Nested .git directories were found." if nested else "No nested .git directories found under components/.", details={"paths": nested} if nested else None))
     for tool in BASELINE_TOOLS:
         findings.append(finding("pass" if shutil.which(tool) else "warn", "tool.available", f"{tool} is available." if shutil.which(tool) else f"{tool} is not available on PATH."))
+    findings.append(python_version_finding())
     license_result = command_license_report(repo_root)
     findings.append(finding(license_result["status"], "license.compliance", license_result["summary"], details={"status": license_result["status"], "findings": license_result["findings"]}))
     findings.append(finding("pass", "surface.available", "Build readiness surface is available.", details={"commands": ["just deps", "just configure", "just build", "just build-core-c", "just build-c-services", "just build-ui", "just build-python", "just build-baseline"]}))

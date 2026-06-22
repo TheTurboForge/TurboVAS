@@ -1855,6 +1855,21 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIsNone(payload)
         self.assertIn("Python 3.11", error)
 
+    def test_python_version_finding_warns_below_minimum(self):
+        with unittest.mock.patch.object(turbovasctl, "tool_version", return_value="Python 3.10.12"):
+            finding = turbovasctl.python_version_finding()
+
+        self.assertEqual(finding["status"], "warn")
+        self.assertEqual(finding["check"], "tool.python-version")
+        self.assertIn("Python 3.11", finding["message"])
+
+    def test_python_version_finding_passes_minimum(self):
+        with unittest.mock.patch.object(turbovasctl, "tool_version", return_value="Python 3.11.8"):
+            finding = turbovasctl.python_version_finding()
+
+        self.assertEqual(finding["status"], "pass")
+        self.assertEqual(finding["details"]["minimum"], "3.11")
+
     def test_native_api_migration_matrix_combines_inventory_and_openapi_metadata(self):
         root = Path(__file__).resolve().parents[2]
         result = turbovasctl.command_native_api_migration_matrix(root)
