@@ -85,9 +85,13 @@ separate TLS/bootstrap/host-binding posture tracked outside this v1 read API.
   reject request bodies, transfer-encoded bodies, and oversized query strings
   with JSON `413 request_too_large`. Malformed `Content-Length` is rejected as
   malformed HTTP before middleware in the live stack, currently with HTTP 400.
-  This first
-  bound is listener-level hardening; endpoint-specific cost limits and rate
-  limits remain separate B-130/B-134 work.
+  This first bound is listener-level hardening; endpoint-specific cost limits
+  and full rate limits remain separate B-130/B-134 work.
+- Direct v1 pressure guard: authenticated direct `GET` requests also pass
+  through a fixed in-flight request cap. When the cap is reached, the listener
+  returns JSON `429 too_many_requests` with `X-Request-Id`. This is a coarse
+  development pressure guard, not per-operator or per-IP production rate
+  limiting.
 - Direct v1 endpoint boundary: bearer-authenticated direct access exposes only
   explicitly allowlisted scriptable read endpoints. Unclassified `/api/v1`
   routes and internal-only native previews such as the scope-report retention

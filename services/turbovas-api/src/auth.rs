@@ -2,13 +2,70 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use std::sync::{
+    Arc,
+    atomic::{AtomicUsize, Ordering},
+};
+
 use axum::http::{HeaderMap, header};
 
 const MIN_DIRECT_API_BEARER_TOKEN_LENGTH: usize = 32;
+const DIRECT_API_MAX_IN_FLIGHT_REQUESTS: usize = 32;
 
 #[derive(Clone)]
 pub(crate) struct DirectApiAuth {
     pub(crate) token: String,
+    in_flight_requests: Arc<AtomicUsize>,
+    max_in_flight_requests: usize,
+}
+
+pub(crate) struct DirectApiRequestSlot {
+    in_flight_requests: Arc<AtomicUsize>,
+}
+
+impl Drop for DirectApiRequestSlot {
+    fn drop(&mut self) {
+        self.in_flight_requests.fetch_sub(1, Ordering::Release);
+    }
+}
+
+impl DirectApiAuth {
+    pub(crate) fn new(token: String) -> Self {
+        Self::with_max_in_flight_requests(token, DIRECT_API_MAX_IN_FLIGHT_REQUESTS)
+    }
+
+    pub(crate) fn with_max_in_flight_requests(
+        token: String,
+        max_in_flight_requests: usize,
+    ) -> Self {
+        Self {
+            token,
+            in_flight_requests: Arc::new(AtomicUsize::new(0)),
+            max_in_flight_requests,
+        }
+    }
+
+    pub(crate) fn try_acquire_request_slot(&self) -> Option<DirectApiRequestSlot> {
+        let mut current = self.in_flight_requests.load(Ordering::Acquire);
+        loop {
+            if current >= self.max_in_flight_requests {
+                return None;
+            }
+            match self.in_flight_requests.compare_exchange_weak(
+                current,
+                current + 1,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            ) {
+                Ok(_) => {
+                    return Some(DirectApiRequestSlot {
+                        in_flight_requests: Arc::clone(&self.in_flight_requests),
+                    });
+                }
+                Err(actual) => current = actual,
+            }
+        }
+    }
 }
 
 pub(crate) fn direct_api_bearer_token_is_acceptable(token: &str) -> bool {

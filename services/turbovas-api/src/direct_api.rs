@@ -6,7 +6,7 @@ use std::{env, fs};
 
 use axum::{
     extract::{Request, State},
-    http::{Method, Uri},
+    http::{Method, StatusCode, Uri},
     middleware::Next,
     response::{IntoResponse, Response},
 };
@@ -37,7 +37,7 @@ pub(crate) fn direct_api_config() -> Result<Option<(String, DirectApiAuth)>, Api
     if !direct_api_bearer_token_is_acceptable(&token) {
         return Err(ApiError::Config);
     }
-    Ok(Some((bind, DirectApiAuth { token })))
+    Ok(Some((bind, DirectApiAuth::new(token))))
 }
 
 fn direct_api_bearer_token() -> Result<String, ApiError> {
@@ -84,7 +84,11 @@ pub(crate) async fn require_direct_api_auth(
             ApiError::NotFound.into_response()
         } else if request.method() == Method::GET {
             if direct_api_request_shape_is_allowed(&request) {
-                next.run(request).await
+                if let Some(_slot) = auth.try_acquire_request_slot() {
+                    next.run(request).await
+                } else {
+                    ApiError::TooManyRequests.into_response()
+                }
             } else {
                 ApiError::RequestTooLarge.into_response()
             }
@@ -97,7 +101,9 @@ pub(crate) async fn require_direct_api_auth(
     };
 
     let status = response.status();
-    if authenticated_api_path && status.is_server_error() {
+    if authenticated_api_path && status == StatusCode::TOO_MANY_REQUESTS {
+        tracing::warn!(request_id = %request_id, %method, path = %path, status = status.as_u16(), "direct native API request rejected by in-flight limit");
+    } else if authenticated_api_path && status.is_server_error() {
         tracing::warn!(request_id = %request_id, %method, path = %path, status = status.as_u16(), "direct native API request completed with server error");
     } else if authenticated_api_path {
         tracing::info!(request_id = %request_id, %method, path = %path, status = status.as_u16(), "direct native API request completed");
@@ -243,6 +249,20 @@ mod tests {
             .parse()
             .unwrap();
         assert_eq!(direct_api_audit_path(&uri), "/api/v1/reports");
+    }
+
+    #[test]
+    fn direct_api_auth_slots_enforce_in_flight_cap_and_release_on_drop() {
+        let auth = DirectApiAuth::with_max_in_flight_requests(
+            "token-0123456789abcdef0123456789abcdef".to_string(),
+            1,
+        );
+        let first = auth
+            .try_acquire_request_slot()
+            .expect("first direct request slot should be available");
+        assert!(auth.try_acquire_request_slot().is_none());
+        drop(first);
+        assert!(auth.try_acquire_request_slot().is_some());
     }
 
     #[test]

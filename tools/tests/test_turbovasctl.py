@@ -1909,7 +1909,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("Unauthorized", summary["missing_shared_error_responses"])
         self.assertEqual(summary["invalid_shared_error_responses"], [{"response": "BadRequest", "actual": "#/components/schemas/Other", "expected": "#/components/schemas/Error"}])
         missing_statuses = {item["status"] for item in summary["operations_missing_error_responses"]}
-        self.assertEqual(missing_statuses, {"401", "405", "413", "500"})
+        self.assertEqual(missing_statuses, {"401", "405", "413", "429", "500"})
         missing_error_schema = {item["field"] for item in summary["missing_error_schema_fields"]}
         self.assertIn("properties.error.required", missing_error_schema)
         self.assertIn("properties.error.properties.code.type", missing_error_schema)

@@ -870,6 +870,7 @@ OPENAPI_SHARED_ERROR_RESPONSES = {
     "NotFound": "#/components/schemas/Error",
     "MethodNotAllowed": "#/components/schemas/Error",
     "RequestTooLarge": "#/components/schemas/Error",
+    "TooManyRequests": "#/components/schemas/Error",
     "InternalError": "#/components/schemas/Error",
 }
 OPENAPI_ERROR_SCHEMA_EXPECTED_FIELDS = {
@@ -888,6 +889,7 @@ OPENAPI_COMMON_ERROR_RESPONSE_REFS = {
     "401": "Unauthorized",
     "405": "MethodNotAllowed",
     "413": "RequestTooLarge",
+    "429": "TooManyRequests",
     "500": "InternalError",
 }
 OPENAPI_PARAMETERIZED_ERROR_RESPONSE_REFS = {"404": "NotFound"}

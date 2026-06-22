@@ -9789,6 +9789,14 @@ mod tests {
     }
 
     #[test]
+    fn direct_api_in_flight_cap_uses_json_429_contract() {
+        let error = ApiError::TooManyRequests;
+        assert_eq!(error.status_code(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(error.code(), "too_many_requests");
+        assert!(error.public_message().contains("maximum number"));
+    }
+
+    #[test]
     fn direct_api_bearer_token_requires_bounded_printable_secret() {
         assert!(direct_api_bearer_token_is_acceptable(
             "0123456789abcdef0123456789abcdef"

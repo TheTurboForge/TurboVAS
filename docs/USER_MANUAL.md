@@ -87,6 +87,8 @@ enables and validates an opt-in bearer-auth direct listener, defaulting to
 loopback. That direct mode is for read-only `/api/v1` development proof work;
 it is not production deployment guidance and does not authorize scanner control,
 credential, feed, account, or destructive write endpoints.
+It also has a fixed in-flight development pressure guard; hitting the cap
+returns JSON `429 too_many_requests` rather than queueing unbounded work.
 The helper creates an ignored runtime bearer-token secret and mounts it into the
 direct API container as a read-only token file. Explicit
 `TURBOVAS_API_BEARER_TOKEN` values still work as a development override, but

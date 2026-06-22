@@ -43,6 +43,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /results/{result_id}:
@@ -74,6 +76,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /vulnerabilities:
@@ -105,6 +109,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /cves:
@@ -137,6 +143,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /cves/{cve_id}:
@@ -167,6 +175,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /cpes:
@@ -199,6 +209,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /cpes/{cpe_id}:
@@ -229,6 +241,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /cert-bund-advisories:
@@ -261,6 +275,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /cert-bund-advisories/{cert_bund_advisory_id}:
@@ -292,6 +308,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /dfn-cert-advisories:
@@ -324,6 +342,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /dfn-cert-advisories/{dfn_cert_advisory_id}:
@@ -355,6 +375,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /nvts:
@@ -387,6 +409,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /nvts/{nvt_id}:
@@ -418,6 +442,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /operating-systems:
@@ -450,6 +476,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /operating-systems/{os_id}:
@@ -481,6 +509,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /hosts:
@@ -513,6 +543,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /hosts/{host_id}:
@@ -544,6 +576,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /tls-certificates:
@@ -576,6 +610,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /tls-certificates/{certificate_id}:
@@ -607,6 +643,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /scanners:
@@ -639,6 +677,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /scanners/{scanner_id}:
@@ -670,6 +710,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /filters:
@@ -703,6 +745,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /filters/{filter_id}:
@@ -733,6 +777,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /feeds:
@@ -760,6 +806,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /alerts:
@@ -792,6 +840,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /tags:
@@ -824,6 +874,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /tags/resource-names/{resource_type}:
@@ -864,6 +916,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /tags/{tag_id}:
@@ -894,6 +948,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /tags/{tag_id}/resources:
@@ -929,6 +985,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /overrides:
@@ -961,6 +1019,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /overrides/{override_id}:
@@ -991,6 +1051,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /port-lists:
@@ -1023,6 +1085,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /port-lists/{port_list_id}:
@@ -1053,6 +1117,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /schedules:
@@ -1085,6 +1151,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /schedules/{schedule_id}:
@@ -1115,6 +1183,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /scan-configs:
@@ -1154,6 +1224,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /scan-configs/{scan_config_id}:
@@ -1185,6 +1257,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /scan-configs/{scan_config_id}/families:
@@ -1216,6 +1290,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /report-configs:
@@ -1248,6 +1324,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /report-configs/{report_config_id}:
@@ -1278,6 +1356,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /report-formats:
@@ -1310,6 +1390,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /report-formats/{report_format_id}:
@@ -1340,6 +1422,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /trashcan/summary:
@@ -1367,6 +1451,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /reports:
@@ -1398,6 +1484,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /reports/{report_id}:
@@ -1428,6 +1516,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /reports/{report_id}/results:
@@ -1462,6 +1552,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /reports/{report_id}/hosts:
@@ -1496,6 +1588,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /reports/{report_id}/ports:
@@ -1530,6 +1624,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /reports/{report_id}/applications:
@@ -1564,6 +1660,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /reports/{report_id}/operating-systems:
@@ -1598,6 +1696,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /reports/{report_id}/cves:
@@ -1632,6 +1732,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /reports/{report_id}/tls-certificates:
@@ -1666,6 +1768,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /reports/{report_id}/errors:
@@ -1700,6 +1804,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /reports/{report_id}/metrics:
@@ -1730,6 +1836,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /scopes:
@@ -1761,6 +1869,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /scopes/{scope_id}:
@@ -1791,6 +1901,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /targets:
@@ -1822,6 +1934,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /targets/{target_id}:
@@ -1852,6 +1966,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /tasks:
@@ -1883,6 +1999,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /tasks/{task_id}:
@@ -1913,6 +2031,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /scope-reports:
@@ -1944,6 +2064,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /scope-reports/{scope_report_id}:
@@ -1974,6 +2096,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /scopes/{scope_id}/reports/{scope_report_id}/results:
@@ -2009,6 +2133,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /scopes/{scope_id}/reports/{scope_report_id}/hosts:
@@ -2044,6 +2170,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /scopes/{scope_id}/reports/{scope_report_id}/ports:
@@ -2079,6 +2207,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /scopes/{scope_id}/reports/{scope_report_id}/applications:
@@ -2114,6 +2244,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /scopes/{scope_id}/reports/{scope_report_id}/operating-systems:
@@ -2149,6 +2281,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /scopes/{scope_id}/reports/{scope_report_id}/cves:
@@ -2184,6 +2318,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /scopes/{scope_id}/reports/{scope_report_id}/tls-certificates:
@@ -2219,6 +2355,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /scopes/{scope_id}/reports/{scope_report_id}/errors:
@@ -2254,6 +2392,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /scopes/{scope_id}/reports/{scope_report_id}/metrics:
@@ -2285,6 +2425,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
   /scopes/{scope_id}/reports/{scope_report_id}/retention-plan:
@@ -2316,6 +2458,8 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
 components:
@@ -2356,6 +2500,12 @@ components:
             $ref: '#/components/schemas/Error'
     RequestTooLarge:
       description: The direct native API request exceeded the accepted size limits.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    TooManyRequests:
+      description: The direct native API listener is handling too many concurrent requests.
       content:
         application/json:
           schema:

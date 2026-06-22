@@ -28,6 +28,8 @@ pub(crate) enum ApiError {
     MethodNotAllowed,
     #[error("request too large")]
     RequestTooLarge,
+    #[error("too many requests")]
+    TooManyRequests,
     #[error("{0}")]
     BadRequest(String),
     #[error("resource not found")]
@@ -44,6 +46,7 @@ impl ApiError {
             Self::Unauthorized => StatusCode::UNAUTHORIZED,
             Self::MethodNotAllowed => StatusCode::METHOD_NOT_ALLOWED,
             Self::RequestTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
+            Self::TooManyRequests => StatusCode::TOO_MANY_REQUESTS,
             Self::BadRequest(_) => StatusCode::BAD_REQUEST,
             Self::NotFound => StatusCode::NOT_FOUND,
             Self::Database | Self::Config => StatusCode::INTERNAL_SERVER_ERROR,
@@ -55,6 +58,7 @@ impl ApiError {
             Self::Unauthorized => "unauthorized",
             Self::MethodNotAllowed => "method_not_allowed",
             Self::RequestTooLarge => "request_too_large",
+            Self::TooManyRequests => "too_many_requests",
             Self::BadRequest(_) => "bad_request",
             Self::NotFound => "not_found",
             Self::Database => "database_error",
@@ -70,6 +74,10 @@ impl ApiError {
             }
             Self::RequestTooLarge => {
                 "Direct native API requests must fit the bounded read-only request shape."
+                    .to_string()
+            }
+            Self::TooManyRequests => {
+                "The direct native API listener is already handling the maximum number of in-flight requests."
                     .to_string()
             }
             Self::BadRequest(message) => message.clone(),

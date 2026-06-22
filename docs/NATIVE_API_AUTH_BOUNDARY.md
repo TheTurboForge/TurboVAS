@@ -34,6 +34,10 @@ script/curl -> opt-in direct bearer listener -> turbovas-api -> PostgreSQL
 - The direct listener rejects valid-token non-GET `/api/v1` requests with JSON
   `405 method_not_allowed`. This prevents future native write/control routes
   from becoming direct-scriptable without a separate safety design.
+- The direct listener applies a fixed in-flight cap to authenticated direct
+  `GET` requests and returns JSON `429 too_many_requests` with `X-Request-Id`
+  when the cap is reached. This is a coarse development pressure guard, not a
+  substitute for production rate limiting or per-operator authorization.
 - Direct listener exposure is a positive allowlist, not simply every
   bearer-authenticated `GET`. Unclassified `/api/v1` routes and internal-only
   preview/scaffold endpoints, starting with the scope-report retention plan
@@ -119,8 +123,9 @@ access, missing-token rejection, wrong-token
 rejection, generated, safe client-supplied, and unsafe client-replaced
 `X-Request-Id` response headers, valid-token JSON access without browser CORS
 access headers, valid-token non-GET rejection, request-body,
-`Transfer-Encoding`, malformed `Content-Length`, and oversized-query rejection,
-direct feed inventory access, tag-dialog alert resource-name lookup, and
+`Transfer-Encoding`, malformed `Content-Length`, oversized-query rejection, and
+the in-flight cap's JSON `429` contract through focused Rust tests; runtime
+smoke covers direct feed inventory access, tag-dialog alert resource-name lookup, and
 internal-only endpoint denial for the retention preview when a scope report is
 available, plus continued internal native API smoke. Malformed HTTP framing can
 be rejected by the HTTP parser before native middleware; the smoke records that
