@@ -5,11 +5,12 @@
 
 import {afterEach, describe, expect, test, testing} from '@gsa/testing';
 import {
+  fetchNativeAlert,
   fetchNativeAlerts,
   nativeAlertsQueryFromFilter,
 } from 'gmp/native-api/alerts';
 import Filter from 'gmp/models/filter';
-import {loadEntities} from 'web/store/entities/alerts';
+import {loadEntities, loadEntity} from 'web/store/entities/alerts';
 import {createState} from 'web/store/entities/utils/testing';
 import {filterIdentifier} from 'web/store/utils';
 
@@ -121,6 +122,66 @@ describe('native API alerts', () => {
     });
   });
 
+  test('fetches redacted alert detail metadata with task backlinks', async () => {
+    const fetchMock = testing.fn().mockResolvedValue({
+      json: testing.fn().mockResolvedValue({
+        id: '4e110580-5281-4e8e-bbc5-322f3ef8d9e8',
+        name: 'Notify SecOps',
+        comment: 'Native detail metadata only',
+        owner: {name: 'admin'},
+        active: true,
+        in_use: true,
+        task_count: 1,
+        event: {type: 'Task run status changed'},
+        condition: {type: 'Filter count at least'},
+        method: {type: 'SCP'},
+        method_data_redacted: true,
+        filter: {
+          id: 'filter-1',
+          name: 'High results',
+        },
+        tasks: [
+          {
+            id: '65da9d26-9e74-4b56-af0f-63825a851a23',
+            name: 'Authorized LAN task',
+          },
+        ],
+      }),
+      ok: true,
+      status: 200,
+    });
+    testing.stubGlobal('fetch', fetchMock);
+    const gmp = createGmp({jwt: 'jwt-token'});
+
+    const alert = await fetchNativeAlert(
+      gmp,
+      '4e110580-5281-4e8e-bbc5-322f3ef8d9e8',
+    );
+
+    expect(alert.id).toEqual('4e110580-5281-4e8e-bbc5-322f3ef8d9e8');
+    expect(alert.name).toEqual('Notify SecOps');
+    expect(alert.comment).toEqual('Native detail metadata only');
+    expect(alert.method?.type).toEqual('SCP');
+    expect(alert.method?.data).toEqual({});
+    expect(alert.tasks).toHaveLength(1);
+    expect(alert.tasks[0].id).toEqual('65da9d26-9e74-4b56-af0f-63825a851a23');
+    expect(alert.tasks[0].name).toEqual('Authorized LAN task');
+    expect(gmp.buildUrl).toHaveBeenCalledWith(
+      'api/v1/alerts/4e110580-5281-4e8e-bbc5-322f3ef8d9e8',
+      {token: 'test-token'},
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://turbovas.example/api/v1/alerts/4e110580-5281-4e8e-bbc5-322f3ef8d9e8',
+      {
+        credentials: 'include',
+        headers: {
+          Accept: 'application/json',
+          Authorization: 'Bearer jwt-token',
+        },
+      },
+    );
+  });
+
   test('loads the alert store through same-origin native API', async () => {
     const filter = Filter.fromString(
       'first=1 rows=10 sort=condition search=secops',
@@ -178,5 +239,53 @@ describe('native API alerts', () => {
     expect(successAction.data[0].condition.type).toEqual(
       'Filter count at least',
     );
+  });
+
+  test('loads alert detail store entries through same-origin native API', async () => {
+    const id = '4e110580-5281-4e8e-bbc5-322f3ef8d9e8';
+    const rootState = createState('alert', {
+      isLoading: {
+        [id]: false,
+      },
+    });
+    const getState = testing.fn().mockReturnValue(rootState);
+    const dispatch = testing.fn();
+    const fetchMock = testing.fn().mockResolvedValue({
+      json: testing.fn().mockResolvedValue({
+        id,
+        name: 'Notify SecOps',
+        active: true,
+        in_use: false,
+        task_count: 1,
+        event: {type: 'Task run status changed'},
+        condition: {type: 'Filter count at least'},
+        method: {type: 'SCP'},
+        method_data_redacted: true,
+        tasks: [
+          {
+            id: '65da9d26-9e74-4b56-af0f-63825a851a23',
+            name: 'Authorized LAN task',
+          },
+        ],
+      }),
+      ok: true,
+      status: 200,
+    });
+    testing.stubGlobal('fetch', fetchMock);
+    const gmp = createGmp();
+
+    await loadEntity(gmp)(id)(dispatch, getState);
+
+    expect(gmp.buildUrl).toHaveBeenCalledWith(
+      'api/v1/alerts/4e110580-5281-4e8e-bbc5-322f3ef8d9e8',
+      {token: 'test-token'},
+    );
+    expect(dispatch).toHaveBeenCalledTimes(2);
+    const successAction = dispatch.mock.calls[1][0];
+    expect(successAction.type).toEqual('ENTITY_LOADING_SUCCESS');
+    expect(successAction.data.name).toEqual('Notify SecOps');
+    expect(successAction.data.method.data).toEqual({});
+    expect(successAction.data.tasks).toHaveLength(1);
+    expect(successAction.data.tasks[0].name).toEqual('Authorized LAN task');
   });
 });

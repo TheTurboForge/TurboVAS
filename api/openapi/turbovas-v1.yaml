@@ -844,6 +844,39 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
+  /alerts/{alert_id}:
+    get:
+      operationId: getAlertsByAlertId
+      x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: alert-metadata-detail-read
+      x-turbovas-inherited-still-owns: alert-detail-delivery-control
+      summary: Read one redacted alert metadata row
+      description: Read-only alert detail metadata backed by gvmd/PostgreSQL. This detail response intentionally excludes alert condition data, event data, method delivery payloads, credentials, destinations, message bodies, certificates, export/test actions, and all alert mutations; task references are id/name metadata only.
+      parameters:
+        - $ref: '#/components/parameters/AlertId'
+      responses:
+        '200':
+          description: Redacted alert detail metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertAsset'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '413':
+          $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /tags:
     get:
       operationId: getTags
@@ -2657,6 +2690,13 @@ components:
       schema:
         type: string
         format: uuid
+    AlertId:
+      name: alert_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     TagId:
       name: tag_id
       in: path
@@ -4307,9 +4347,13 @@ components:
           $ref: '#/components/schemas/AlertTypeLabel'
         method_data_redacted:
           type: boolean
-          description: Always true for this metadata list; alert method delivery payloads remain on inherited operator-only paths until a safe redacted detail contract exists.
+          description: Always true for native alert metadata responses; alert method delivery payloads remain on inherited operator-only paths until a safe redacted delivery contract exists.
         filter:
           $ref: '#/components/schemas/AlertReference'
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlertReference'
         created_at:
           type: string
           format: date-time

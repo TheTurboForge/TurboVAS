@@ -351,7 +351,7 @@ async function assertTagResourceNameProxy(page) {
 async function assertAlertMetadataProxy(page) {
   const alerts = await fetchNativeJsonWithBrowserToken(page, '/api/v1/alerts?page_size=1&sort=name');
   const alertItems = Array.isArray(alerts.body?.items) ? alerts.body.items : null;
-  const allowedKeys = new Set(['id', 'name', 'comment', 'owner', 'active', 'in_use', 'task_count', 'event', 'condition', 'method', 'method_data_redacted', 'filter', 'created_at', 'modified_at']);
+  const allowedKeys = new Set(['id', 'name', 'comment', 'owner', 'active', 'in_use', 'task_count', 'event', 'condition', 'method', 'method_data_redacted', 'filter', 'tasks', 'created_at', 'modified_at']);
   const forbiddenKeys = new Set(['alert_method_data', 'method_data', 'event_data', 'condition_data', 'credential', 'credentials', 'password', 'secret', 'token', 'url', 'host', 'hosts', 'path', 'email', 'message', 'certificate', 'cert']);
   const unexpected = [];
   const forbidden = [];
@@ -372,9 +372,9 @@ async function assertAlertMetadataProxy(page) {
 
   const detail = await fetchNativeJsonWithBrowserToken(page, '/api/v1/alerts/00000000-0000-0000-0000-000000000000');
   add(
-    [400, 404].includes(detail.status) ? 'pass' : 'fail',
-    'alert.detail-blocked-native-api',
-    [400, 404].includes(detail.status) ? 'Alert detail remains unavailable through the same-origin native proxy.' : 'Alert detail unexpectedly returned through the same-origin native proxy.',
+    detail.status === 404 ? 'pass' : 'fail',
+    'alert.detail-missing-row-native-api',
+    detail.status === 404 ? 'Alert detail native proxy returns JSON 404 for a valid UUID with no row.' : 'Alert detail native proxy returned an unexpected status for a valid UUID with no row.',
     { status: detail.status, message: detail.body?.error?.message || detail.textSample },
   );
 }

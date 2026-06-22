@@ -342,6 +342,7 @@ OPENAPI_ALLOWED_MATURITY_VALUES = frozenset({"live-read", "preview-read"})
 OPENAPI_ALLOWED_REPLACES_VALUES = frozenset(
     {
         "alert-metadata-list-read",
+        "alert-metadata-detail-read",
         "cert-bund-advisory-catalog-detail-read",
         "cert-bund-advisory-list-read",
         "cpe-catalog-detail-read",
@@ -451,6 +452,7 @@ OPENAPI_ALLOWED_MIGRATION_METADATA_VALUES = {
 }
 OPENAPI_REQUIRED_EXPOSURE = {
     ("get", "/alerts"): "direct-read",
+    ("get", "/alerts/{alert_id}"): "direct-read",
     ("get", "/cert-bund-advisories"): "direct-read",
     ("get", "/cert-bund-advisories/{cert_bund_advisory_id}"): "direct-read",
     ("get", "/cpes"): "direct-read",
@@ -507,6 +509,11 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-inherited-still-owns": "alert-detail-delivery-control",
         "x-turbovas-maturity": "live-read",
         "x-turbovas-replaces": "alert-metadata-list-read",
+    },
+    ("get", "/alerts/{alert_id}"): {
+        "x-turbovas-inherited-still-owns": "alert-detail-delivery-control",
+        "x-turbovas-maturity": "live-read",
+        "x-turbovas-replaces": "alert-metadata-detail-read",
     },
     ("get", "/feeds"): {
         "x-turbovas-inherited-still-owns": "feed-sync-import-control",
@@ -920,6 +927,7 @@ DIRECT_API_SCRIPTABLE_ENDPOINTS = frozenset(
         "/api/v1/filters/{}",
         "/api/v1/feeds",
         "/api/v1/alerts",
+        "/api/v1/alerts/{}",
         "/api/v1/tags",
         "/api/v1/tags/resource-names/{}",
         "/api/v1/tags/{}",
@@ -992,6 +1000,7 @@ ALERT_ALLOWED_PAYLOAD_KEYS = frozenset(
         "condition",
         "method",
         "filter",
+        "tasks",
         "task_count",
         "method_data_redacted",
         "created_at",
@@ -5293,6 +5302,7 @@ def native_api_gsad_proxy_allowlist_templates(repo_root: Path | None) -> tuple[l
         "tls_certificate_prefix",
         "scanner_prefix",
         "filter_prefix",
+        "alert_prefix",
         "tag_resource_names_prefix",
         "override_prefix",
         "port_list_prefix",
@@ -5406,14 +5416,22 @@ def annotate_native_tooling_direct_api(summary: dict[str, Any], repo_root: Path 
 
 
 def native_api_endpoint_declared(repo_root: Path | None, endpoint: str) -> bool:
-    return source_file_contains(repo_root, "services/turbovas-api/src/main.rs", f'.route("{endpoint}"')
+    normalized = normalize_native_api_endpoint_template(endpoint)
+    return normalized in {
+        normalize_native_api_endpoint_template(route)
+        for route in rust_native_api_route_templates(repo_root)
+    }
 
 
 def native_browser_proxy_endpoint_status(repo_root: Path | None, endpoint: str) -> str:
     if repo_root is None:
         return "planned_internal_and_browser_proxied"
     api_declared = native_api_endpoint_declared(repo_root, endpoint)
-    proxy_declared = source_file_contains(repo_root, "components/gsad/src/gsad_native_api.c", endpoint)
+    normalized = normalize_native_api_endpoint_template(endpoint)
+    proxy_declared = normalized in {
+        normalize_native_api_endpoint_template(template)
+        for template in native_api_gsad_proxy_allowlist_templates(repo_root)[0]
+    }
     if api_declared and proxy_declared:
         return "implemented_internal_and_browser_proxied"
     if api_declared or proxy_declared:
@@ -5427,6 +5445,10 @@ def trashcan_summary_endpoint_status(repo_root: Path | None) -> str:
 
 def alerts_endpoint_status(repo_root: Path | None) -> str:
     return native_browser_proxy_endpoint_status(repo_root, "/api/v1/alerts")
+
+
+def alert_detail_endpoint_status(repo_root: Path | None) -> str:
+    return native_browser_proxy_endpoint_status(repo_root, "/api/v1/alerts/{alert_id}")
 
 
 def summarize_native_tooling(items: list[dict[str, Any]], repo_root: Path | None = None) -> dict[str, Any]:
@@ -5602,8 +5624,18 @@ def summarize_native_tooling(items: list[dict[str, Any]], repo_root: Path | None
                 "status": alerts_endpoint_status(repo_root),
                 "replacement_candidates": ["GSA Alerts metadata list (migrated through gsad same-origin proxy)", "read-only alert metadata automation", "native-api-request helper"],
                 "notes": [
-                    "Metadata list only; no alert detail endpoint in this tooling slice.",
+                    "Metadata list only; alert delivery and payload detail remain inherited.",
                     "Alert method delivery values and event/condition payload data remain redacted or absent.",
+                    "No alert writes, test delivery, credentials, URLs, hosts, paths, email/message bodies, or certificate data.",
+                ],
+            },
+            {
+                "endpoint": "/api/v1/alerts/{alert_id}",
+                "status": alert_detail_endpoint_status(repo_root),
+                "replacement_candidates": ["GSA Alert detail redacted metadata (migrated through gsad same-origin proxy)", "read-only alert detail automation", "native-api-request helper"],
+                "notes": [
+                    "Redacted metadata detail only; alert delivery and payload detail remain inherited.",
+                    "Task references are id/name metadata only.",
                     "No alert writes, test delivery, credentials, URLs, hosts, paths, email/message bodies, or certificate data.",
                 ],
             },
@@ -9868,6 +9900,17 @@ def summarize_native_alerts_response(parsed: dict[str, Any] | None) -> dict[str,
     return summary
 
 
+def summarize_native_alert_detail_response(parsed: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(parsed, dict):
+        return {"parsed": False}
+    summary = summarize_native_alert_item(parsed)
+    summary["parsed"] = True
+    tasks = parsed.get("tasks")
+    if isinstance(tasks, list):
+        summary["task_count_in_response"] = len(tasks)
+    return summary
+
+
 def forbidden_alert_payload_keys(value: Any) -> list[str]:
     found: list[str] = []
     if isinstance(value, dict):
@@ -9895,6 +9938,12 @@ def alert_metadata_item_ok(item: Any) -> bool:
         return False
     alert_filter = item.get("filter")
     if alert_filter is not None and not (isinstance(alert_filter, dict) and set(alert_filter) <= {"id", "name"}):
+        return False
+    tasks = item.get("tasks")
+    if tasks is not None and not (
+        isinstance(tasks, list)
+        and all(isinstance(task, dict) and set(task) <= {"id", "name"} for task in tasks)
+    ):
         return False
     for nested_key in ("event", "condition", "method"):
         nested = item.get(nested_key)
@@ -10652,6 +10701,30 @@ def command_runtime_native_api_smoke(repo_root: Path) -> dict[str, Any]:
                 {**alerts_summary, "forbidden_keys": forbidden_keys, "unexpected_keys": unexpected_keys},
             )
         )
+        if alerts.returncode == 0 and alert_items:
+            alert_id = alert_items[0].get("id") if isinstance(alert_items[0], dict) else None
+            if isinstance(alert_id, str) and alert_id:
+                alert_detail_path = f"/api/v1/alerts/{urllib.parse.quote(alert_id, safe='')}"
+                alert_detail = native_api_curl(repo_root, alert_detail_path)
+                alert_detail_json = parse_json_output(alert_detail)
+                alert_detail_summary = summarize_native_alert_detail_response(alert_detail_json)
+                details["alert_detail"] = alert_detail_summary
+                alert_detail_ok = alert_metadata_item_ok(alert_detail_json)
+                detail_forbidden_keys = sorted(set(forbidden_alert_payload_keys(alert_detail_json)))
+                detail_unexpected_keys = sorted(set(alert_detail_json) - ALERT_ALLOWED_PAYLOAD_KEYS) if isinstance(alert_detail_json, dict) else []
+                findings.append(
+                    native_api_probe_finding(
+                        "pass" if alert_detail.returncode == 0 and alert_detail_ok else "fail",
+                        "native-api.alert-detail",
+                        "Native API Alert detail probe returned redacted metadata JSON."
+                        if alert_detail.returncode == 0 and alert_detail_ok
+                        else "Native API Alert detail failed or returned non-redacted alert payload data.",
+                        alert_detail,
+                        compose_command(repo_root, "exec", "-T", "turbovas-api", "curl", "-fsS", f"http://127.0.0.1:9080{alert_detail_path}"),
+                        alert_detail_json,
+                        {**alert_detail_summary, "forbidden_keys": detail_forbidden_keys, "unexpected_keys": detail_unexpected_keys},
+                    )
+                )
     else:
         findings.append(
             finding(

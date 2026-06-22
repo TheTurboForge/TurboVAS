@@ -48,6 +48,7 @@ interface NativeAlertPayload {
   method?: NativeAlertTypeLabelPayload;
   method_data_redacted?: boolean;
   filter?: NativeAlertReferencePayload;
+  tasks?: NativeAlertReferencePayload[];
   created_at?: string;
   modified_at?: string;
 }
@@ -165,6 +166,16 @@ const nativeReferenceElement = (reference?: NativeAlertReferencePayload) =>
         name: stringValue(reference.name, stringValue(reference.id)),
       };
 
+const nativeTaskElements = (tasks?: NativeAlertReferencePayload[]) => ({
+  task: (tasks ?? [])
+    .filter(task => task.id !== undefined)
+    .map(task => ({
+      _id: stringValue(task.id),
+      name: stringValue(task.name, stringValue(task.id)),
+      usage_type: 'scan' as const,
+    })),
+});
+
 const nativeAlertToModel = (item: NativeAlertPayload): Alert =>
   Alert.fromElement({
     _id: stringValue(item.id),
@@ -189,6 +200,7 @@ const nativeAlertToModel = (item: NativeAlertPayload): Alert =>
     condition: nativeTypeElement(item.condition),
     method: nativeTypeElement(item.method),
     filter: nativeReferenceElement(item.filter),
+    tasks: nativeTaskElements(item.tasks),
   });
 
 const normalizePage = (
@@ -224,4 +236,16 @@ export const fetchNativeAlerts = async (
     counts: nativeCounts(page, alerts.length),
     page,
   };
+};
+
+export const fetchNativeAlert = async (
+  gmp: NativeApiGmp,
+  id: string,
+): Promise<Alert> => {
+  const payload = await fetchNativeJson<NativeAlertPayload>(
+    gmp,
+    `api/v1/alerts/${encodeURIComponent(id)}`,
+    {token: gmp.session.token},
+  );
+  return nativeAlertToModel(payload);
 };

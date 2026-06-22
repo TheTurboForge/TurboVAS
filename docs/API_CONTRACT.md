@@ -31,6 +31,9 @@ The first API phase is read-only and report-focused:
   scan configs.
 - saved filter list and detail reads, including filter term metadata and alert
   backlinks, inside authenticated operator access only.
+- redacted alert list and detail metadata reads, including safe task id/name
+  backlinks; method delivery values and event/condition payload data remain
+  absent from the native contract.
 - read-only runtime feed inventory metadata and sync-status reads from
   `/api/v1/feeds` backed by fixed allowlisted runtime feed metadata and lock
   files; no feed sync/import/update, mirroring, bundling, redistribution, or
@@ -380,5 +383,6 @@ positive-severity vulnerability metric rows only.
 - Do not keep `python-gvm` or `gvm-tools` as permanent TurboVAS product
   dependencies once native replacements exist.
 - Do not retain inherited read-only `gvm-tools` list wrappers after a native
-  metadata endpoint covers the retained safe contract; for Alerts, the retained
-  contract is redacted metadata only, not method/event/condition payload data.
+  metadata endpoint covers the retained safe contract; for Alerts, the native
+  list/detail contract is redacted metadata only, not method/event/condition
+  payload data.
