@@ -11160,6 +11160,36 @@ mod tests {
     }
 
     #[test]
+    fn scope_detail_loads_membership_candidates_and_reports() {
+        let source = include_str!("main.rs");
+        let body = source
+            .split_once("async fn scope_detail(")
+            .expect("scope detail handler must exist")
+            .1
+            .split_once("fn scope_sql")
+            .expect("scope detail handler must precede scope_sql")
+            .0;
+
+        for expected in [
+            "let targets = scope_targets(&client, scope_pk, global).await?;",
+            "let hosts = scope_hosts(&client, scope_pk, global).await?;",
+            "let candidate_hosts = scope_candidate_hosts(&client, scope_pk, global).await?;",
+            "let scope_reports = scope_report_references(&client, scope_pk).await?;",
+        ] {
+            assert!(
+                body.contains(expected),
+                "missing scope detail load: {expected}"
+            );
+        }
+
+        assert!(body.contains("scope_from_row("));
+        assert!(body.contains("targets,"));
+        assert!(body.contains("hosts,"));
+        assert!(body.contains("candidate_hosts,"));
+        assert!(body.contains("scope_reports,"));
+    }
+
+    #[test]
     fn bearer_auth_accepts_only_matching_bearer_token() {
         let mut headers = HeaderMap::new();
         assert!(!bearer_token_matches(&headers, "secret-token"));
