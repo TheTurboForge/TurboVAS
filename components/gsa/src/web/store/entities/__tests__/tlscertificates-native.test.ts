@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2026 TurboVAS contributors
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -110,7 +111,36 @@ describe('native API TLS certificates list', () => {
         in_use: true,
         created_at: '2026-06-18T17:00:00Z',
         modified_at: '2026-06-18T20:00:00Z',
-        sources: [],
+        valid: true,
+        trust: false,
+        time_status: 'valid',
+        user_tags: [
+          {
+            id: 'tag-1',
+            name: 'Watched Certificate',
+            value: 'true',
+            comment: 'operator review',
+          },
+        ],
+        sources: [
+          {
+            id: 'source-1',
+            timestamp: '2026-06-18T20:00:00Z',
+            tls_versions: 'TLSv1.2,TLSv1.3',
+            location: {
+              id: 'location-1',
+              host_ip: '192.168.178.42',
+              port: '443/tcp',
+              host_asset_id: 'host-1',
+            },
+            origin: {
+              id: 'origin-1',
+              origin_type: 'Report',
+              origin_id: 'report-1',
+              origin_data: '1.3.6.1.4.1.25623.1.0.103692',
+            },
+          },
+        ],
       }),
       ok: true,
       status: 200,
@@ -130,38 +160,25 @@ describe('native API TLS certificates list', () => {
     expect(certificate.issuerDn).toEqual('CN=Example Issuer');
     expect(certificate.serial).toEqual('00FAF93A4C7FB6B9CC');
     expect(certificate.sha256Fingerprint).toEqual('sha256-value');
+    expect(certificate.valid).toEqual(true);
+    expect(certificate.trust).toEqual(false);
+    expect(certificate.timeStatus).toEqual('valid');
+    expect(certificate.isWritable()).toEqual(true);
+    expect(certificate.userTags?.[0].name).toEqual('Watched Certificate');
+    expect(certificate.sourceHosts).toEqual([
+      {id: 'host-1', ip: '192.168.178.42'},
+    ]);
+    expect(certificate.sourcePorts).toEqual(['443/tcp']);
+    expect(certificate.sourceReports?.[0].id).toEqual('report-1');
+    expect(certificate.certificate).toBeUndefined();
     expect(gmp.buildUrl).toHaveBeenCalledWith(
       'api/v1/tls-certificates/a4d44986-29ce-4b85-9def-0ac63108d198',
       {token: 'test-token'},
     );
   });
 
-  test('loads native Information fields without replacing inherited action context', async () => {
+  test('loads native detail without inherited GMP detail request', async () => {
     const id = 'a4d44986-29ce-4b85-9def-0ac63108d198';
-    const inherited = TlsCertificate.fromElement({
-      _id: id,
-      certificate: {__text: 'CERTIFICATE-BYTES'},
-      subject_dn: 'CN=old.example',
-      valid: 1,
-      trust: 0,
-      writable: 1,
-      user_tags: {
-        tag: [{_id: 'tag-1', name: 'Watched Certificate', value: 'true'}],
-      },
-      sources: {
-        source: [
-          {
-            location: {
-              host: {
-                asset: {_id: 'host-1'},
-                ip: '192.168.178.42',
-              },
-              port: '443/tcp',
-            },
-          },
-        ],
-      },
-    });
     const fetchMock = testing.fn().mockResolvedValue({
       json: testing.fn().mockResolvedValue({
         id,
@@ -176,7 +193,36 @@ describe('native API TLS certificates list', () => {
         expiration_time: '2027-06-18T18:00:00Z',
         last_seen: '2026-06-18T20:00:00Z',
         in_use: true,
-        sources: [],
+        valid: true,
+        trust: false,
+        time_status: 'valid',
+        user_tags: [
+          {
+            id: 'tag-1',
+            name: 'Watched Certificate',
+            value: 'true',
+            comment: 'operator review',
+          },
+        ],
+        sources: [
+          {
+            id: 'source-1',
+            timestamp: '2026-06-18T20:00:00Z',
+            tls_versions: 'TLSv1.3',
+            location: {
+              id: 'location-1',
+              host_ip: '192.168.178.42',
+              port: '443/tcp',
+              host_asset_id: 'host-1',
+            },
+            origin: {
+              id: 'origin-1',
+              origin_type: 'Report',
+              origin_id: 'report-1',
+              origin_data: '1.3.6.1.4.1.25623.1.0.103692',
+            },
+          },
+        ],
       }),
       ok: true,
       status: 200,
@@ -185,7 +231,7 @@ describe('native API TLS certificates list', () => {
     const gmp = {
       ...createGmp({jwt: 'jwt-token'}),
       tlscertificate: {
-        get: testing.fn().mockResolvedValue({data: inherited}),
+        get: testing.fn(),
       },
     };
     const actions: Array<{type: string; data?: TlsCertificate}> = [];
@@ -209,20 +255,22 @@ describe('native API TLS certificates list', () => {
       action => action.type === 'ENTITY_LOADING_SUCCESS',
     );
     const certificate = success?.data;
-    expect(gmp.tlscertificate.get).toHaveBeenCalledWith({id});
+    expect(gmp.tlscertificate.get).not.toHaveBeenCalled();
     expect(certificate).toBeInstanceOf(TlsCertificate);
     expect(certificate?.name).toEqual('CN=example.local');
     expect(certificate?.subjectDn).toEqual('CN=example.local');
     expect(certificate?.issuerDn).toEqual('CN=Example Issuer');
     expect(certificate?.sha256Fingerprint).toEqual('sha256-value');
-    expect(certificate?.certificate).toEqual('CERTIFICATE-BYTES');
+    expect(certificate?.certificate).toBeUndefined();
     expect(certificate?.valid).toEqual(true);
     expect(certificate?.trust).toEqual(false);
     expect(certificate?.isWritable()).toEqual(true);
     expect(certificate?.userTags?.length).toEqual(1);
+    expect(certificate?.userTags?.[0].name).toEqual('Watched Certificate');
     expect(certificate?.sourceHosts).toEqual([
       {id: 'host-1', ip: '192.168.178.42'},
     ]);
     expect(certificate?.sourcePorts).toEqual(['443/tcp']);
+    expect(certificate?.sourceReports?.[0].id).toEqual('report-1');
   });
 });

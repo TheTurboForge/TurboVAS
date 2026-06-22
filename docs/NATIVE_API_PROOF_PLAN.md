@@ -92,11 +92,12 @@ creation, delete identifier, tag writes/actions, and GMP-only `details=1`
 behavior. The native metadata uses `hosts.uuid`, bounded safe identifier/source
 metadata, host OS associations, latest whitelisted host details, and active host
 User Tags.
-TLS Certificate detail Information fields now read native metadata through the
-authenticated `gsad` proxy while inherited GMP context still owns certificate
-download bytes, User Tags, export, delete, and retained actions. The native
-detail remains read-only metadata/source provenance and intentionally excludes
-stored certificate bytes and file-transfer semantics.
+TLS Certificate detail Information fields, active User Tags, validity/trust
+status, and source provenance now read native metadata through the authenticated
+`gsad` proxy while inherited GMP context still owns certificate download bytes,
+export, delete, tag writes/actions, and retained actions. The native detail
+remains read-only metadata/source provenance and intentionally excludes stored
+certificate bytes and file-transfer semantics.
 Scanner detail Information fields now read native metadata through the
 authenticated `gsad` proxy while inherited GMP context still owns verify,
 export/download, credential/certificate download context, User Tags, delete,

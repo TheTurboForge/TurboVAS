@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2026 TurboVAS contributors
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -26,6 +27,35 @@ interface NativePage {
   filter: string;
 }
 
+interface NativeUserTagPayload {
+  id: string;
+  name: string;
+  value: string;
+  comment: string;
+}
+
+interface NativeTlsCertificateSourceLocationPayload {
+  id: string;
+  host_ip?: string;
+  port?: string;
+  host_asset_id?: string;
+}
+
+interface NativeTlsCertificateSourceOriginPayload {
+  id: string;
+  origin_type?: string;
+  origin_id?: string;
+  origin_data?: string;
+}
+
+interface NativeTlsCertificateSourcePayload {
+  id: string;
+  timestamp?: string;
+  tls_versions?: string;
+  location?: NativeTlsCertificateSourceLocationPayload;
+  origin?: NativeTlsCertificateSourceOriginPayload;
+}
+
 interface NativeTlsCertificatePayload {
   id: string;
   name: string;
@@ -38,10 +68,15 @@ interface NativeTlsCertificatePayload {
   activation_time?: string;
   expiration_time?: string;
   last_seen?: string;
+  valid?: boolean;
+  trust?: boolean;
+  time_status?: string;
   source_host_count?: number;
   source_port_count?: number;
   source_count?: number;
   in_use?: boolean;
+  sources?: NativeTlsCertificateSourcePayload[];
+  user_tags?: NativeUserTagPayload[];
   created_at?: string;
   modified_at?: string;
 }
@@ -50,6 +85,12 @@ interface NativeTlsCertificatesPayload {
   page?: Partial<NativePage>;
   items?: NativeTlsCertificatePayload[];
 }
+
+type NativeTlsCertificateTimeStatus =
+  | 'inactive'
+  | 'valid'
+  | 'expired'
+  | 'unknown';
 
 export interface NativeTlsCertificateResponse {
   tlsCertificate: TlsCertificate;
@@ -87,6 +128,19 @@ const integerValue = (value: unknown, fallback = 0): number => {
   const parsed = Number.parseInt(String(value ?? fallback), 10);
   return Number.isFinite(parsed) ? parsed : fallback;
 };
+
+const booleanToYesNo = (value: unknown): 1 | 0 | undefined =>
+  typeof value === 'boolean' ? (value ? 1 : 0) : undefined;
+
+const nativeTimeStatus = (
+  value: unknown,
+): NativeTlsCertificateTimeStatus | undefined =>
+  value === 'inactive' ||
+  value === 'valid' ||
+  value === 'expired' ||
+  value === 'unknown'
+    ? value
+    : undefined;
 
 const nativeSortFromFilter = (filter?: Filter): string => {
   const reverse = filter?.get('sort-reverse');
@@ -147,8 +201,51 @@ const fetchNativeJson = async <T>(
   return (await response.json()) as T;
 };
 
+const nativeUserTagsElement = (tags: NativeUserTagPayload[] = []) => ({
+  tag: tags.map(tag => ({
+    _id: stringValue(tag.id),
+    name: stringValue(tag.name),
+    value: stringValue(tag.value),
+    comment: stringValue(tag.comment),
+  })),
+});
+
+const nativeSourceToElement = (source: NativeTlsCertificateSourcePayload) => ({
+  _id: stringValue(source.id),
+  timestamp: stringValue(source.timestamp),
+  tls_versions: stringValue(source.tls_versions),
+  location: source.location
+    ? {
+        _id: stringValue(source.location.id),
+        host: source.location.host_asset_id
+          ? {
+              asset: {_id: stringValue(source.location.host_asset_id)},
+              ip: stringValue(source.location.host_ip),
+            }
+          : undefined,
+        port: stringValue(source.location.port),
+      }
+    : undefined,
+  origin: source.origin
+    ? {
+        _id: stringValue(source.origin.id),
+        origin_type: stringValue(source.origin.origin_type),
+        origin_id: stringValue(source.origin.origin_id),
+        origin_data: stringValue(source.origin.origin_data),
+        report:
+          source.origin.origin_type === 'Report'
+            ? {
+                _id: stringValue(source.origin.origin_id),
+                date: stringValue(source.timestamp),
+              }
+            : undefined,
+      }
+    : undefined,
+});
+
 const nativeTlsCertificateToModel = (
   item: NativeTlsCertificatePayload,
+  {detail = false}: {detail?: boolean} = {},
 ): TlsCertificate =>
   TlsCertificate.fromElement({
     _id: stringValue(item.id),
@@ -164,6 +261,14 @@ const nativeTlsCertificateToModel = (
     activation_time: stringValue(item.activation_time),
     expiration_time: stringValue(item.expiration_time),
     last_seen: stringValue(item.last_seen),
+    valid: detail ? booleanToYesNo(item.valid) : undefined,
+    trust: detail ? booleanToYesNo(item.trust) : undefined,
+    time_status: detail ? nativeTimeStatus(item.time_status) : undefined,
+    writable: detail ? 1 : undefined,
+    user_tags: detail ? nativeUserTagsElement(item.user_tags ?? []) : undefined,
+    sources: detail
+      ? {source: (item.sources ?? []).map(nativeSourceToElement)}
+      : undefined,
     in_use: item.in_use ? 1 : 0,
   });
 
@@ -189,7 +294,9 @@ export const fetchNativeTlsCertificates = async (
     sort: stringValue(payload.page?.sort),
     filter: stringValue(payload.page?.filter),
   };
-  const tlsCertificates = (payload.items ?? []).map(nativeTlsCertificateToModel);
+  const tlsCertificates = (payload.items ?? []).map(item =>
+    nativeTlsCertificateToModel(item),
+  );
   return {
     tlsCertificates,
     counts: nativeCounts(page, tlsCertificates.length),
@@ -207,6 +314,6 @@ export const fetchNativeTlsCertificate = async (
     {token: gmp.session.token},
   );
   return {
-    tlsCertificate: nativeTlsCertificateToModel(payload),
+    tlsCertificate: nativeTlsCertificateToModel(payload, {detail: true}),
   };
 };

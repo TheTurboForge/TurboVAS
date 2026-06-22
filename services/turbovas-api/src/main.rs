@@ -427,6 +427,8 @@ struct TlsCertificateSourceLocation {
     id: String,
     host_ip: String,
     port: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    host_asset_id: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -453,6 +455,8 @@ struct TlsCertificateAssetDetail {
     #[serde(flatten)]
     asset: TlsCertificateAssetItem,
     sources: Vec<TlsCertificateSourceItem>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    user_tags: Vec<ReportUserTag>,
 }
 
 #[derive(Debug, Serialize)]
@@ -1125,6 +1129,12 @@ struct TlsCertificateAssetItem {
     activation_time: Option<String>,
     expiration_time: Option<String>,
     last_seen: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    valid: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    trust: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    time_status: Option<String>,
     source_host_count: i64,
     source_port_count: i64,
     source_count: i64,
@@ -1856,6 +1866,20 @@ async fn tls_certificate_asset_detail(
                     coalesce(c.sha256_fingerprint, '') AS sha256_fingerprint,
                     coalesce(c.activation_time, 0)::bigint AS activation_time_unix,
                     coalesce(c.expiration_time, 0)::bigint AS expiration_time_unix,
+                    CAST (((coalesce(c.expiration_time, 0) >= m_now()
+                             OR coalesce(c.expiration_time, 0) = -1)
+                            AND (coalesce(c.activation_time, 0) <= m_now()
+                                 OR coalesce(c.activation_time, 0) = -1)) AS integer) AS valid_int,
+                    coalesce(c.trust, 0)::integer AS trust_int,
+                    (CASE WHEN (coalesce(c.activation_time, 0) = -1)
+                                OR (coalesce(c.expiration_time, 0) = 1)
+                          THEN 'unknown'
+                          WHEN (coalesce(c.expiration_time, 0) < m_now()
+                                AND coalesce(c.expiration_time, 0) != 0)
+                          THEN 'expired'
+                          WHEN (coalesce(c.activation_time, 0) > m_now())
+                          THEN 'inactive'
+                          ELSE 'valid' END) AS time_status,
                     coalesce(max(src.timestamp), 0)::bigint AS last_seen_unix,
                     count(DISTINCT lower(loc.host_ip))::bigint AS source_host_count,
                     count(DISTINCT loc.port)::bigint AS source_port_count,
@@ -1887,6 +1911,7 @@ async fn tls_certificate_asset_detail(
                     loc.uuid AS location_id,
                     coalesce(loc.host_ip, '') AS location_host_ip,
                     coalesce(loc.port, '') AS location_port,
+                    host_asset.uuid AS host_asset_id,
                     origin.uuid AS origin_uuid,
                     coalesce(origin.origin_type, '') AS origin_type,
                     coalesce(origin.origin_id, '') AS origin_resource_id,
@@ -1895,6 +1920,16 @@ async fn tls_certificate_asset_detail(
                JOIN tls_certificate_sources src ON src.tls_certificate = c.id
                LEFT JOIN tls_certificate_locations loc ON loc.id = src.location
                LEFT JOIN tls_certificate_origins origin ON origin.id = src.origin
+               LEFT JOIN LATERAL (
+                    SELECT h.uuid
+                      FROM host_identifiers hi
+                      JOIN hosts h ON h.id = hi.host
+                     WHERE hi.name = 'ip'
+                       AND hi.value = loc.host_ip
+                       AND hi.source_id = origin.origin_id
+                     ORDER BY hi.modification_time DESC NULLS LAST, hi.id DESC
+                     LIMIT 1
+               ) host_asset ON true
               WHERE c.uuid = $1
               ORDER BY src.timestamp DESC NULLS LAST, src.uuid ASC;"#,
             &[&certificate_id],
@@ -1904,13 +1939,52 @@ async fn tls_certificate_asset_detail(
             tracing::warn!(%error, "TLS certificate asset source query failed");
             ApiError::Database
         })?;
+    let user_tags = tls_certificate_user_tags(&client, &certificate_id).await?;
     Ok(Json(TlsCertificateAssetDetail {
         asset: tls_certificate_asset_from_row(&row),
         sources: source_rows
             .iter()
             .map(tls_certificate_source_from_row)
             .collect(),
+        user_tags,
     }))
+}
+
+fn tls_certificate_user_tags_sql() -> &'static str {
+    r#"SELECT t.uuid AS id,
+              coalesce(t.name, '') AS name,
+              coalesce(t.value, '') AS value,
+              coalesce(t.comment, '') AS comment
+         FROM tags t
+         JOIN tag_resources tr ON tr.tag = t.id
+         JOIN tls_certificates ON tls_certificates.id = tr.resource
+        WHERE lower(tls_certificates.uuid) = lower($1)
+          AND tr.resource_type = 'tls_certificate'
+          AND tr.resource_location = 0
+          AND coalesce(t.active, 0) = 1
+        ORDER BY t.name ASC, t.uuid ASC;"#
+}
+
+async fn tls_certificate_user_tags(
+    client: &tokio_postgres::Client,
+    certificate_id: &str,
+) -> Result<Vec<ReportUserTag>, ApiError> {
+    let rows = client
+        .query(tls_certificate_user_tags_sql(), &[&certificate_id])
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "TLS certificate user-tag query failed");
+            ApiError::Database
+        })?;
+    Ok(rows
+        .iter()
+        .map(|row| ReportUserTag {
+            id: row.get("id"),
+            name: row.get("name"),
+            value: row.get("value"),
+            comment: row.get("comment"),
+        })
+        .collect())
 }
 
 async fn scanner_assets(
@@ -8420,6 +8494,17 @@ fn tls_certificate_asset_from_row(row: &Row) -> TlsCertificateAssetItem {
         activation_time: unix_ts_to_rfc3339(row.get("activation_time_unix")),
         expiration_time: unix_ts_to_rfc3339(row.get("expiration_time_unix")),
         last_seen: unix_ts_to_rfc3339(row.get("last_seen_unix")),
+        valid: row
+            .try_get::<_, Option<i32>>("valid_int")
+            .ok()
+            .flatten()
+            .map(boolean_int),
+        trust: row
+            .try_get::<_, Option<i32>>("trust_int")
+            .ok()
+            .flatten()
+            .map(boolean_int),
+        time_status: optional_row_string(row, "time_status"),
         source_host_count: row.get("source_host_count"),
         source_port_count: row.get("source_port_count"),
         source_count,
@@ -8444,6 +8529,7 @@ fn tls_certificate_source_from_row(row: &Row) -> TlsCertificateSourceItem {
             port: row
                 .get::<_, Option<String>>("location_port")
                 .unwrap_or_default(),
+            host_asset_id: row.get("host_asset_id"),
         }),
         origin: origin_uuid.map(|id| TlsCertificateSourceOrigin {
             id,
@@ -10257,6 +10343,41 @@ mod tests {
         assert!(!sql.contains("credentials"));
         assert!(!sql.contains("reports"));
         assert!(!sql.contains("results"));
+    }
+
+    #[test]
+    fn tls_certificate_user_tags_are_active_tls_certificate_tags_only() {
+        let sql = tls_certificate_user_tags_sql();
+        assert!(sql.contains("FROM tags t"));
+        assert!(sql.contains("JOIN tag_resources tr ON tr.tag = t.id"));
+        assert!(sql.contains("JOIN tls_certificates ON tls_certificates.id = tr.resource"));
+        assert!(sql.contains("lower(tls_certificates.uuid) = lower($1)"));
+        assert!(sql.contains("tr.resource_type = 'tls_certificate'"));
+        assert!(sql.contains("tr.resource_location = 0"));
+        assert!(sql.contains("coalesce(t.active, 0) = 1"));
+        assert!(!sql.contains("credentials"));
+        assert!(!sql.contains("reports"));
+        assert!(!sql.contains("results"));
+    }
+
+    #[test]
+    fn tls_certificate_detail_contract_excludes_certificate_bytes() {
+        let source = include_str!("main.rs");
+        let detail_source = source
+            .split_once("async fn tls_certificate_asset_detail")
+            .expect("TLS certificate detail handler must exist")
+            .1
+            .split_once("async fn scanner_assets")
+            .expect("TLS certificate detail handler must precede scanner assets")
+            .0;
+
+        assert!(detail_source.contains("valid_int"));
+        assert!(detail_source.contains("trust_int"));
+        assert!(detail_source.contains("time_status"));
+        assert!(detail_source.contains("host_asset_id"));
+        assert!(detail_source.contains("tls_certificate_user_tags"));
+        assert!(!detail_source.contains("c.certificate"));
+        assert!(!detail_source.contains("certificate_format"));
     }
 
     #[test]

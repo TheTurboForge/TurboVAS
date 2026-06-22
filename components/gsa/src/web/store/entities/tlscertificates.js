@@ -23,22 +23,6 @@ const {
 
 const canUseNativeApi = gmp => typeof gmp?.buildUrl === 'function';
 
-const mergeNativeInformation = (inherited, native) =>
-  Object.assign(Object.create(Object.getPrototypeOf(inherited)), inherited, {
-    name: native.name,
-    comment: native.comment,
-    creationTime: native.creationTime,
-    modificationTime: native.modificationTime,
-    subjectDn: native.subjectDn,
-    issuerDn: native.issuerDn,
-    serial: native.serial,
-    md5Fingerprint: native.md5Fingerprint,
-    sha256Fingerprint: native.sha256Fingerprint,
-    activationTime: native.activationTime,
-    expirationTime: native.expirationTime,
-    lastSeen: native.lastSeen,
-  });
-
 const nativeLoadEntities = gmp => filter => (dispatch, getState) => {
   if (!canUseNativeApi(gmp)) {
     return loadEntities(gmp)(filter)(dispatch, getState);
@@ -84,20 +68,9 @@ const nativeLoadEntity = gmp => id => (dispatch, getState) => {
 
   dispatch(entityLoadingActions.request(id));
 
-  return Promise.all([
-    gmp.tlscertificate.get({id}),
-    fetchNativeTlsCertificate(gmp, id),
-  ]).then(
-    ([inheritedResponse, nativeResponse]) =>
-      dispatch(
-        entityLoadingActions.success(
-          id,
-          mergeNativeInformation(
-            inheritedResponse.data,
-            nativeResponse.tlsCertificate,
-          ),
-        ),
-      ),
+  return fetchNativeTlsCertificate(gmp, id).then(
+    response =>
+      dispatch(entityLoadingActions.success(id, response.tlsCertificate)),
     error => dispatch(entityLoadingActions.error(id, error)),
   );
 };

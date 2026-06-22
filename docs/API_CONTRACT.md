@@ -231,10 +231,12 @@ Native TLS certificate asset rows include the `tls_certificates.uuid` identity,
 subject and issuer distinguished names, serial and fingerprints, activation,
 expiration, last-seen/source counts, in-use state, and timestamps from
 gvmd/PostgreSQL asset tables. The detail endpoint returns the same bounded
-metadata plus source provenance rows with source UUIDs, timestamps, TLS version
-metadata, locations, and origins. It intentionally excludes stored certificate
-bytes, export/delete behavior, and other asset writes until native write and
-file-transfer semantics are designed.
+metadata plus active User Tags, inherited-style validity/trust status, and
+source provenance rows with source UUIDs, timestamps, TLS version metadata,
+locations, resolved host asset IDs when available, and origins. It intentionally
+excludes stored certificate bytes, export/delete behavior, tag writes/actions,
+and other asset writes until native write and file-transfer semantics are
+designed.
 
 Native saved filter rows include filter identity, type, term, timestamps, and
 alert backlink references. Filter terms can reveal operator search logic,

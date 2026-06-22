@@ -622,8 +622,8 @@ paths:
       x-turbovas-maturity: live-read
       x-turbovas-replaces: tls-certificate-asset-detail-info-read
       x-turbovas-inherited-still-owns: tls-certificate-export-delete-and-rich-history
-      summary: Read one top-level TLS certificate asset
-      description: Read-only TLS certificate asset metadata and source provenance backed by gvmd/PostgreSQL certificate, source, location, and origin tables. Certificate bytes, export, delete, scanner-control, feed-control, and write behavior are intentionally excluded.
+      summary: Read one TLS certificate asset detail
+      description: Read-only TLS certificate asset metadata, active user tags, inherited-style validity/trust status, and source provenance backed by gvmd/PostgreSQL certificate, source, location, origin, and tag tables. Certificate bytes, export, delete, scanner-control, feed-control, and write behavior are intentionally excluded.
       parameters:
         - $ref: '#/components/parameters/TlsCertificateId'
       responses:
@@ -3036,6 +3036,11 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/TlsCertificateSource'
+            user_tags:
+              type: array
+              description: Active user tags attached directly to this TLS certificate asset. Write/tag actions remain inherited.
+              items:
+                $ref: '#/components/schemas/ReportUserTag'
     ScannerAssetCollection:
       type: object
       required: [page, items]
@@ -4087,6 +4092,16 @@ components:
         last_seen:
           type: string
           format: date-time
+        valid:
+          type: boolean
+          description: Inherited gvmd validity flag computed from activation and expiration time. Detail payload only.
+        trust:
+          type: boolean
+          description: Inherited gvmd trust flag. Detail payload only.
+        time_status:
+          type: string
+          description: Inherited gvmd time-status label. Detail payload only.
+          enum: [inactive, valid, expired, unknown]
         source_host_count:
           type: integer
         source_port_count:
@@ -4112,6 +4127,10 @@ components:
           type: string
         port:
           type: string
+        host_asset_id:
+          type: string
+          format: uuid
+          description: Host asset UUID resolved from the source report host identifier when available.
     TlsCertificateSourceOrigin:
       type: object
       required: [id, origin_type, origin_id, origin_data]
