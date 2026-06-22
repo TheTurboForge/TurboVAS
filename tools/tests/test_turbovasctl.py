@@ -2321,6 +2321,12 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(remaining["top_residuals"][0]["example_endpoint"], "/api/v1/reports")
         self.assertEqual(compact["findings"], [{"status": "pass", "check": "native-api-migration-matrix.status-only", "message": "Native API migration matrix passed; no non-pass findings."}])
 
+    def test_native_api_migration_matrix_compact_aliases_status_only(self):
+        args = turbovasctl.build_parser().parse_args(["--json", "native-api-migration-matrix", "--compact"])
+
+        self.assertTrue(args.compact)
+        self.assertFalse(args.status_only)
+
     def test_native_api_migration_matrix_remaining_surface_buckets_owner_tails(self):
         rows = [
             {"endpoint": "/api/v1/tasks", "x_turbovas_inherited_still_owns": "task-scan-control-writes-and-deletes"},
