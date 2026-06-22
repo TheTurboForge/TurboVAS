@@ -100,3 +100,99 @@ impl IntoResponse for ApiError {
         (status, Json(body)).into_response()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn api_error_variants_keep_stable_public_contract() {
+        let cases = [
+            (
+                ApiError::Unauthorized,
+                StatusCode::UNAUTHORIZED,
+                "unauthorized",
+                "bearer token",
+                &["secret", "password", "credential", "authorization"][..],
+            ),
+            (
+                ApiError::MethodNotAllowed,
+                StatusCode::METHOD_NOT_ALLOWED,
+                "method_not_allowed",
+                "GET",
+                &[],
+            ),
+            (
+                ApiError::RequestTooLarge,
+                StatusCode::PAYLOAD_TOO_LARGE,
+                "request_too_large",
+                "bounded read-only",
+                &[],
+            ),
+            (
+                ApiError::TooManyRequests,
+                StatusCode::TOO_MANY_REQUESTS,
+                "too_many_requests",
+                "maximum number",
+                &[],
+            ),
+            (
+                ApiError::BadRequest("bad input".to_string()),
+                StatusCode::BAD_REQUEST,
+                "bad_request",
+                "bad input",
+                &[],
+            ),
+            (
+                ApiError::NotFound,
+                StatusCode::NOT_FOUND,
+                "not_found",
+                "not found",
+                &[],
+            ),
+            (
+                ApiError::Database,
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "database_error",
+                "database query failed",
+                &[
+                    "secret",
+                    "token",
+                    "password",
+                    "credential",
+                    "connection string",
+                ][..],
+            ),
+            (
+                ApiError::Config,
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "configuration_error",
+                "not configured correctly",
+                &["secret", "token", "password", "credential", "environment"][..],
+            ),
+        ];
+
+        for (error, status, code, message_fragment, forbidden_fragments) in cases {
+            let public_message = error.public_message();
+            assert_eq!(error.status_code(), status, "{code} status");
+            assert_eq!(error.code(), code, "{code} code");
+            assert!(
+                public_message.contains(message_fragment),
+                "{code} message should contain {message_fragment:?}, got {public_message:?}"
+            );
+            let lower_message = public_message.to_ascii_lowercase();
+            for forbidden in forbidden_fragments {
+                assert!(
+                    !lower_message.contains(forbidden),
+                    "{code} message leaked forbidden fragment {forbidden:?}: {public_message:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn api_error_into_response_preserves_status_code() {
+        let response = ApiError::BadRequest("bad input".to_string()).into_response();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+}
