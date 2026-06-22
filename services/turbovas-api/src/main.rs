@@ -9604,6 +9604,32 @@ mod tests {
     }
 
     #[test]
+    fn scope_report_metrics_reads_persisted_snapshot_tables_and_not_live_results() {
+        let source = include_str!("main.rs");
+        let start = "async fn scope_report_metrics(";
+        let end = "\n}\n\nasync fn scope_report_retention_plan";
+        let body = source
+            .split_once(start)
+            .expect("scope_report_metrics handler must exist")
+            .1
+            .split_once(end)
+            .expect("scope_report_metrics handler must precede retention plan")
+            .0;
+        let upper_body = body.to_ascii_uppercase();
+
+        assert!(body.contains("coalesce(sr.metric_total_system_cvss_load, 0)"));
+        assert!(body.contains("coalesce(sr.metric_authenticated_scan_coverage, 0)"));
+        assert!(body.contains("SELECT count(*) FROM scope_report_vulnerability_metrics"));
+        assert!(body.contains("FROM scope_report_system_metrics"));
+        assert!(body.contains("FROM scope_report_vulnerability_metrics"));
+        assert!(body.contains("WHERE sr.uuid = $1 AND sr.scope_uuid = $2"));
+        assert!(body.contains("ORDER BY cvss_load DESC, host ASC"));
+        assert!(body.contains("ORDER BY cvss_load DESC, cvss_score DESC, nvt_name ASC"));
+        assert!(!upper_body.contains("JOIN RESULTS"));
+        assert!(!upper_body.contains("FROM RESULTS"));
+    }
+
+    #[test]
     fn scope_task_target_collection_contracts_define_sort_filter_and_tie_breakers() {
         let paths: Vec<&str> = SCOPE_TASK_TARGET_COLLECTION_CONTRACTS
             .iter()
