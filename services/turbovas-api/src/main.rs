@@ -576,6 +576,30 @@ struct TlsCertificateItem {
 }
 
 #[derive(Debug, Serialize)]
+struct ResultOverrideNvtReference {
+    id: String,
+    name: String,
+    #[serde(rename = "type")]
+    nvt_type: String,
+}
+
+#[derive(Debug, Serialize)]
+struct ResultOverrideItem {
+    id: String,
+    nvt: ResultOverrideNvtReference,
+    text: String,
+    text_excerpt: bool,
+    hosts: String,
+    port: String,
+    severity: Option<f64>,
+    new_severity: Option<f64>,
+    active: bool,
+    end_time: Option<String>,
+    created_at: Option<String>,
+    modified_at: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
 struct ResultItem {
     id: String,
     host: String,
@@ -624,6 +648,10 @@ struct ResultItem {
     task: Option<ReportReference>,
     source_report_id: String,
     raw_evidence_href: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    user_tags: Vec<ReportUserTag>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    overrides: Vec<ResultOverrideItem>,
 }
 
 #[derive(Serialize)]
@@ -5684,7 +5712,92 @@ async fn result_detail(
             ApiError::Database
         })?
         .ok_or(ApiError::NotFound)?;
-    Ok(Json(result_from_row(&row)))
+    let mut item = result_from_row(&row);
+    item.user_tags = result_user_tags(&client, &result_id).await?;
+    item.overrides = result_effective_overrides(&client, &result_id).await?;
+    Ok(Json(item))
+}
+
+async fn result_user_tags(
+    client: &tokio_postgres::Client,
+    result_id: &str,
+) -> Result<Vec<ReportUserTag>, ApiError> {
+    let rows = client
+        .query(
+            r#"SELECT t.uuid AS id,
+                      coalesce(t.name, '') AS name,
+                      coalesce(t.value, '') AS value,
+                      coalesce(t.comment, '') AS comment
+                 FROM tags t
+                 JOIN tag_resources tr ON tr.tag = t.id
+                 JOIN results r ON r.id = tr.resource
+                WHERE lower(r.uuid) = lower($1)
+                  AND tr.resource_type = 'result'
+                  AND tr.resource_location = 0
+                  AND coalesce(t.active, 0) = 1
+                ORDER BY t.name ASC, t.uuid ASC;"#,
+            &[&result_id],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "result user-tag query failed");
+            ApiError::Database
+        })?;
+    Ok(rows
+        .iter()
+        .map(|row| ReportUserTag {
+            id: row.get("id"),
+            name: row.get("name"),
+            value: row.get("value"),
+            comment: row.get("comment"),
+        })
+        .collect())
+}
+
+async fn result_effective_overrides(
+    client: &tokio_postgres::Client,
+    result_id: &str,
+) -> Result<Vec<ResultOverrideItem>, ApiError> {
+    let rows = client
+        .query(
+            r#"WITH matched AS (
+                 SELECT DISTINCT ON (o.id)
+                        o.uuid AS id,
+                        coalesce(o.nvt, '') AS nvt_id,
+                        CASE
+                          WHEN coalesce(o.nvt, '') LIKE 'CVE-%' THEN coalesce(o.nvt, '')
+                          ELSE coalesce(n.name, o.nvt, '')
+                        END AS nvt_name,
+                        CASE
+                          WHEN coalesce(o.nvt, '') LIKE 'CVE-%' THEN 'cve'
+                          ELSE 'nvt'
+                        END AS nvt_type,
+                        coalesce(o.text, '') AS text,
+                        coalesce(o.hosts, '') AS hosts,
+                        coalesce(o.port, '') AS port,
+                        o.severity::double precision AS severity,
+                        o.new_severity::double precision AS new_severity,
+                        coalesce(o.creation_time, 0)::bigint AS created_at_unix,
+                        coalesce(o.modification_time, 0)::bigint AS modified_at_unix,
+                        coalesce(o.end_time, 0)::bigint AS end_time_unix,
+                        CAST (((coalesce(o.end_time, 0) = 0) OR (coalesce(o.end_time, 0) >= m_now())) AS integer) AS active_int
+                   FROM result_overrides ro
+                   JOIN results r ON r.id = ro.result
+                   JOIN overrides o ON o.id = ro.override
+              LEFT JOIN nvts n ON n.oid = o.nvt
+                  WHERE lower(r.uuid) = lower($1)
+                  ORDER BY o.id, coalesce(o.modification_time, o.creation_time, 0) DESC, o.uuid ASC
+             )
+             SELECT * FROM matched
+              ORDER BY modified_at_unix DESC, created_at_unix DESC, id ASC;"#,
+            &[&result_id],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "result effective-override query failed");
+            ApiError::Database
+        })?;
+    Ok(rows.iter().map(result_override_from_row).collect())
 }
 
 async fn report_results(
@@ -9218,6 +9331,29 @@ fn result_from_row(row: &Row) -> ResultItem {
             optional_row_string(row, "task_name"),
         ),
         source_report_id,
+        user_tags: Vec::new(),
+        overrides: Vec::new(),
+    }
+}
+
+fn result_override_from_row(row: &Row) -> ResultOverrideItem {
+    ResultOverrideItem {
+        id: row.get("id"),
+        nvt: ResultOverrideNvtReference {
+            id: row.get("nvt_id"),
+            name: row.get("nvt_name"),
+            nvt_type: row.get("nvt_type"),
+        },
+        text: row.get("text"),
+        text_excerpt: false,
+        hosts: row.get("hosts"),
+        port: row.get("port"),
+        severity: row.get("severity"),
+        new_severity: row.get("new_severity"),
+        active: row.get::<_, i32>("active_int") != 0,
+        end_time: unix_ts_to_rfc3339(row.get("end_time_unix")),
+        created_at: unix_ts_to_rfc3339(row.get("created_at_unix")),
+        modified_at: unix_ts_to_rfc3339(row.get("modified_at_unix")),
     }
 }
 
@@ -10370,6 +10506,8 @@ mod tests {
         for expected in [
             "max_epss: Option<NvtEpssItem>",
             "max_severity: Option<NvtEpssItem>",
+            "user_tags: Vec<ReportUserTag>",
+            "overrides: Vec<ResultOverrideItem>",
         ] {
             assert!(result_payload.contains(expected));
         }
@@ -10389,7 +10527,26 @@ mod tests {
         }
         assert!(row_mapper.contains("max_epss: nvt_epss_from_row(row)"));
         assert!(row_mapper.contains("max_severity: nvt_max_severity_from_row(row)"));
-        for inherited_workflow in ["overrides", "user_tags", "export", "create_override"] {
+        assert!(result_sql_sources[1].contains("result_user_tags(&client, &result_id)"));
+        assert!(result_sql_sources[1].contains("result_effective_overrides(&client, &result_id)"));
+        assert!(result_sql_sources[1].contains("tr.resource_type = 'result'"));
+        assert!(result_sql_sources[1].contains("coalesce(t.active, 0) = 1"));
+        assert!(result_sql_sources[1].contains("FROM result_overrides ro"));
+        assert!(result_sql_sources[1].contains("JOIN overrides o ON o.id = ro.override"));
+        for list_source in [
+            result_sql_sources[0],
+            result_sql_sources[2],
+            result_sql_sources[3],
+        ] {
+            assert!(!list_source.contains("result_user_tags"));
+            assert!(!list_source.contains("result_effective_overrides"));
+        }
+        for inherited_workflow in [
+            "export",
+            "create_override",
+            "modify_override",
+            "delete_override",
+        ] {
             assert!(!result_sql_sources[1].contains(inherited_workflow));
         }
     }

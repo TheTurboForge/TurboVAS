@@ -53,10 +53,10 @@ paths:
       x-turbovas-direct: true
       x-turbovas-exposure: direct-read
       x-turbovas-maturity: live-read
-      x-turbovas-replaces: result-detail-metadata-read
-      x-turbovas-inherited-still-owns: result-overrides-tags-exports-and-actions
+      x-turbovas-replaces: result-detail-metadata-tags-and-overrides-read
+      x-turbovas-inherited-still-owns: result-exports-and-actions
       summary: Read one scan result metadata row
-      description: Read-only raw result detail backed by gvmd/PostgreSQL. Native detail includes result/NVT explanatory text and NVT-level EPSS context needed by the Information tab; inherited paths still own overrides, user tags, exports, actions, and create-override workflows until native parity is explicitly proven.
+      description: Read-only raw result detail backed by gvmd/PostgreSQL. Native detail includes result/NVT explanatory text, NVT-level EPSS context, active result user tags, and effective active override metadata for display. Inherited paths still own exports, actions, create-override, and override/tag mutation workflows.
       parameters:
         - $ref: '#/components/parameters/ResultId'
       responses:
@@ -3914,6 +3914,57 @@ components:
           format: uuid
         raw_evidence_href:
           type: string
+        user_tags:
+          type: array
+          description: Active user tags attached directly to this result. Tag mutation remains inherited.
+          items:
+            $ref: '#/components/schemas/ReportUserTag'
+        overrides:
+          type: array
+          description: Effective active override metadata for this result, resolved through gvmd's result_overrides view. Override mutation and create/export workflows remain inherited.
+          items:
+            $ref: '#/components/schemas/ResultOverride'
+    ResultOverride:
+      type: object
+      required: [id, nvt, text, text_excerpt, hosts, port, active]
+      properties:
+        id:
+          type: string
+          format: uuid
+        nvt:
+          type: object
+          required: [id, name, type]
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            type:
+              type: string
+              enum: [nvt, cve]
+        text:
+          type: string
+        text_excerpt:
+          type: boolean
+        hosts:
+          type: string
+        port:
+          type: string
+        severity:
+          type: number
+        new_severity:
+          type: number
+        active:
+          type: boolean
+        end_time:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        modified_at:
+          type: string
+          format: date-time
     Vulnerability:
       type: object
       required: [id, name, severity, qod, result_count, host_count]

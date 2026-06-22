@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2026 TurboVAS contributors
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -85,6 +86,27 @@ interface NativeReportUserTag {
   comment?: string;
 }
 
+interface NativeResultOverrideNvtPayload {
+  id?: string;
+  name?: string;
+  type?: string;
+}
+
+interface NativeResultOverridePayload {
+  id: string;
+  nvt?: NativeResultOverrideNvtPayload;
+  text?: string;
+  text_excerpt?: boolean;
+  hosts?: string;
+  port?: string;
+  severity?: number;
+  new_severity?: number;
+  active?: boolean;
+  end_time?: string;
+  created_at?: string;
+  modified_at?: string;
+}
+
 interface NativeReportSeverityCounts {
   critical: number;
   high: number;
@@ -165,6 +187,8 @@ interface NativeReportResultPayload {
   task?: NativeReportReference;
   source_report_id: string;
   raw_evidence_href: string;
+  user_tags?: NativeReportUserTag[];
+  overrides?: NativeResultOverridePayload[];
 }
 
 interface NativeReportResultsPayload {
@@ -687,6 +711,8 @@ export const nativeReportPortsQueryFromFilter = (
 const stringValue = (value: unknown): string =>
   typeof value === 'string' ? value : '';
 
+const yesNoValue = (value?: boolean): 0 | 1 => (value === true ? 1 : 0);
+
 const nativeSortFromFilter = (filter?: Filter): string => {
   const reverse = filter?.get('sort-reverse');
   const ascending = filter?.get('sort');
@@ -821,6 +847,37 @@ const nativeResultToModel = (item: NativeReportResultPayload): Result => {
     stringValue(item.description) || stringValue(item.description_excerpt);
   const maxEpss = nativeResultEpssFromPayload(item.max_epss);
   const maxSeverity = nativeResultEpssFromPayload(item.max_severity);
+  const userTags = {
+    tag: (item.user_tags ?? []).map(tag => ({
+      _id: stringValue(tag.id),
+      name: stringValue(tag.name),
+      value: stringValue(tag.value),
+      comment: stringValue(tag.comment),
+    })),
+  };
+  const overrides = {
+    override: (item.overrides ?? []).map(override => ({
+      _id: stringValue(override.id),
+      nvt: {
+        _oid: stringValue(override.nvt?.id),
+        name: stringValue(override.nvt?.name),
+        type: stringValue(override.nvt?.type),
+      },
+      text: {
+        __text: stringValue(override.text),
+        _excerpt: yesNoValue(override.text_excerpt),
+      },
+      text_excerpt: yesNoValue(override.text_excerpt),
+      hosts: stringValue(override.hosts),
+      port: stringValue(override.port),
+      severity: override.severity ?? undefined,
+      new_severity: override.new_severity ?? undefined,
+      active: yesNoValue(override.active ?? true),
+      end_time: stringValue(override.end_time),
+      creation_time: stringValue(override.created_at),
+      modification_time: stringValue(override.modified_at),
+    })),
+  };
   const element = {
     _id: stringValue(item.id),
     name: stringValue(item.name),
@@ -872,6 +929,8 @@ const nativeResultToModel = (item: NativeReportResultPayload): Result => {
     qod: {value: integerValue(item.qod)},
     scan_nvt_version: stringValue(item.scan_nvt_version),
     description,
+    user_tags: userTags,
+    overrides,
   };
   return Result.fromElement(
     element as unknown as Parameters<typeof Result.fromElement>[0],

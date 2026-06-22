@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2026 TurboVAS contributors
+ * Modified by TurboVAS contributors, 2026.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -141,6 +142,32 @@ describe('native API result list', () => {
         task: {id: 'task-1', name: 'LAN scan'},
         source_report_id: 'report-1',
         raw_evidence_href: `/result/${id}`,
+        user_tags: [
+          {
+            id: 'tag-1',
+            name: 'reviewed',
+            value: 'yes',
+            comment: 'Operator triage tag',
+          },
+        ],
+        overrides: [
+          {
+            id: 'override-1',
+            nvt: {
+              id: '1.3.6.1.4.1.25623.1.0.900001',
+              name: 'Example vulnerability',
+              type: 'nvt',
+            },
+            text: 'Temporary accepted risk',
+            text_excerpt: false,
+            hosts: '192.168.178.42',
+            port: '443/tcp',
+            severity: 7.5,
+            new_severity: -1,
+            active: true,
+            modified_at: '2026-06-18T21:00:00Z',
+          },
+        ],
       }),
       ok: true,
       status: 200,
@@ -198,6 +225,14 @@ describe('native API result list', () => {
     ).toEqual(9.8);
     expect(response.result.report?.id).toEqual('report-1');
     expect(response.result.task?.name).toEqual('LAN scan');
+    expect(response.result.userTags).toHaveLength(1);
+    expect(response.result.userTags[0].name).toEqual('reviewed');
+    expect(response.result.userTags[0].value).toEqual('yes');
+    expect(response.result.overrides).toHaveLength(1);
+    expect(response.result.overrides[0].id).toEqual('override-1');
+    expect(response.result.overrides[0].isActive()).toEqual(true);
+    expect(response.result.overrides[0].text).toEqual('Temporary accepted risk');
+    expect(response.result.overrides[0].newSeverity).toEqual(-1);
     expect(gmp.buildUrl).toHaveBeenCalledWith(`api/v1/results/${id}`, {
       token: 'test-token',
     });

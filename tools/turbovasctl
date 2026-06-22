@@ -376,6 +376,7 @@ OPENAPI_ALLOWED_REPLACES_VALUES = frozenset(
         "raw-report-tls-certificate-evidence-read",
         "report-config-metadata-detail-read",
         "report-config-metadata-list-read",
+        "result-detail-metadata-tags-and-overrides-read",
         "report-format-metadata-detail-read",
         "report-format-metadata-list-read",
         "result-detail-metadata-read",
@@ -430,6 +431,7 @@ OPENAPI_ALLOWED_INHERITED_STILL_OWNS_VALUES = frozenset(
         "report-config-export-writes-and-deletes",
         "report-format-import-export-verify-writes-and-deletes",
         "result-overrides-tags-exports-and-actions",
+        "result-exports-and-actions",
         "retention-mutations",
         "saved-filter-writes-and-alert-linkage",
         "scanner-control-credentials-writes-and-deletes",
@@ -723,9 +725,9 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-replaces": "result-list-read",
     },
     ("get", "/results/{result_id}"): {
-        "x-turbovas-inherited-still-owns": "result-overrides-tags-exports-and-actions",
+        "x-turbovas-inherited-still-owns": "result-exports-and-actions",
         "x-turbovas-maturity": "live-read",
-        "x-turbovas-replaces": "result-detail-metadata-read",
+        "x-turbovas-replaces": "result-detail-metadata-tags-and-overrides-read",
     },
     ("get", "/vulnerabilities"): {
         "x-turbovas-inherited-still-owns": "vulnerability-exports-and-actions",
