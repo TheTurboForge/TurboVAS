@@ -6,10 +6,8 @@ use std::{env, net::SocketAddr};
 
 use axum::{
     Json, Router,
-    extract::{Path, Query, Request, State},
-    http::{HeaderMap, StatusCode, header},
+    extract::{Path, Query, State},
     middleware,
-    response::IntoResponse,
     routing::get,
 };
 use serde::Serialize;
@@ -30,7 +28,6 @@ mod request_shapes;
 mod row_helpers;
 
 use app_state::{AppState, create_pool, healthz};
-use auth::*;
 use collections::*;
 use direct_api::{direct_api_config, require_direct_api_auth};
 use errors::ApiError;
@@ -38,8 +35,6 @@ use feeds::feeds;
 use formatters::*;
 use path_ids::*;
 use query::*;
-use request_ids::*;
-use request_shapes::*;
 use row_helpers::*;
 
 #[derive(Debug, Serialize)]
@@ -9014,7 +9009,15 @@ fn summarize_metrics(systems: &[MetricsSystem], vulnerability_count: i64) -> Met
 
 #[cfg(test)]
 mod tests {
-    use crate::direct_api::direct_api_v1_path_is_allowed;
+    use axum::{
+        extract::Request,
+        http::{HeaderMap, StatusCode, header},
+        response::IntoResponse,
+    };
+
+    use crate::{
+        auth::*, direct_api::direct_api_v1_path_is_allowed, request_ids::*, request_shapes::*,
+    };
 
     use super::*;
 
