@@ -76,37 +76,51 @@ pub(crate) async fn require_direct_api_auth(
     let path = direct_api_audit_path(request.uri()).to_string();
     let api_path = path.starts_with("/api/v1/") || path == "/api/v1";
     let authenticated_api_path = api_path && bearer_token_matches(request.headers(), &auth.token);
+    let mut audit_reason: Option<&'static str> = None;
 
     let mut response = if !api_path {
         next.run(request).await
     } else if authenticated_api_path {
         if !direct_api_v1_path_is_allowed(&path) {
+            audit_reason = Some("route_not_allowlisted");
             ApiError::NotFound.into_response()
         } else if request.method() == Method::GET {
             if direct_api_request_shape_is_allowed(&request) {
                 if let Some(_slot) = auth.try_acquire_request_slot() {
                     next.run(request).await
                 } else {
+                    audit_reason = Some("rate_limited");
                     ApiError::TooManyRequests.into_response()
                 }
             } else {
+                audit_reason = Some("request_shape_denied");
                 ApiError::RequestTooLarge.into_response()
             }
         } else {
+            audit_reason = Some("method_not_allowed");
             ApiError::MethodNotAllowed.into_response()
         }
     } else {
-        tracing::warn!(request_id = %request_id, %method, path = %path, "direct native API bearer authentication failed");
+        tracing::warn!(request_id = %request_id, %method, path = %path, reason = "unauthorized", "direct native API bearer authentication failed");
         ApiError::Unauthorized.into_response()
     };
 
     let status = response.status();
+    let audit_reason = audit_reason.unwrap_or_else(|| {
+        if status.is_server_error() {
+            "server_error"
+        } else if status.is_client_error() {
+            "handler_client_error"
+        } else {
+            "ok"
+        }
+    });
     if authenticated_api_path && status == StatusCode::TOO_MANY_REQUESTS {
-        tracing::warn!(request_id = %request_id, %method, path = %path, status = status.as_u16(), "direct native API request rejected by in-flight limit");
+        tracing::warn!(request_id = %request_id, %method, path = %path, status = status.as_u16(), reason = %audit_reason, "direct native API request rejected by in-flight limit");
     } else if authenticated_api_path && status.is_server_error() {
-        tracing::warn!(request_id = %request_id, %method, path = %path, status = status.as_u16(), "direct native API request completed with server error");
+        tracing::warn!(request_id = %request_id, %method, path = %path, status = status.as_u16(), reason = %audit_reason, "direct native API request completed with server error");
     } else if authenticated_api_path {
-        tracing::info!(request_id = %request_id, %method, path = %path, status = status.as_u16(), "direct native API request completed");
+        tracing::info!(request_id = %request_id, %method, path = %path, status = status.as_u16(), reason = %audit_reason, "direct native API request completed");
     }
     attach_request_id_header(&mut response, &request_id);
     response
@@ -279,6 +293,45 @@ mod tests {
                     && !lower.contains("token")
                     && !lower.contains("header"),
                 "direct API audit log fields must not include auth material: {line}"
+            );
+        }
+    }
+
+    #[test]
+    fn direct_api_audit_logs_include_structured_reason_field() {
+        let source = include_str!("direct_api.rs");
+        let audit_block = source
+            .split_once("pub(crate) async fn require_direct_api_auth")
+            .expect("direct API auth middleware must exist")
+            .1
+            .split_once("fn direct_api_audit_path")
+            .expect("audit path helper must follow auth middleware")
+            .0;
+        let tracing_lines = audit_block
+            .lines()
+            .filter(|line| line.contains("tracing::"))
+            .collect::<Vec<_>>();
+
+        assert!(tracing_lines.len() >= 4, "expected direct API audit logs");
+        for line in tracing_lines {
+            assert!(
+                line.contains("reason ="),
+                "direct API audit logs should include a structured reason field: {line}"
+            );
+        }
+        for reason in [
+            "route_not_allowlisted",
+            "method_not_allowed",
+            "request_shape_denied",
+            "rate_limited",
+            "handler_client_error",
+            "server_error",
+            "unauthorized",
+            "ok",
+        ] {
+            assert!(
+                audit_block.contains(reason),
+                "direct API audit reason {reason} should be present"
             );
         }
     }
