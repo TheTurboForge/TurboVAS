@@ -791,7 +791,7 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_technical_foundation_commands_are_registered(self):
         source = (Path(__file__).resolve().parents[1] / "turbovasctl").read_text(encoding="utf-8")
         justfile = (Path(__file__).resolve().parents[2] / "justfile").read_text(encoding="utf-8")
-        for command in ("native-tooling-state", "native-api-request", "native-api-migration-matrix", "native-api-client-contract", "rust-migration-state", "branding-state", "production-posture-check", "runtime-log-review", "runtime-data-state", "runtime-db-introspect", "runtime-performance-snapshot", "runtime-redis-state", "security-policy-check", "path-coupling-state", "runtime-native-api-smoke", "runtime-native-api-direct-smoke", "runtime-native-api-rebuild", "quality-gate", "quality-gate-state", "quality-gate-schedule"):
+        for command in ("native-tooling-state", "native-api-request", "native-api-migration-matrix", "native-api-client-contract", "rust-migration-state", "branding-state", "production-posture-check", "runtime-log-review", "runtime-data-state", "runtime-db-introspect", "runtime-performance-snapshot", "runtime-redis-state", "security-policy-check", "path-coupling-state", "runtime-native-api-smoke", "runtime-native-api-direct-smoke", "runtime-native-api-direct-bootstrap", "runtime-native-api-rebuild", "quality-gate", "quality-gate-state", "quality-gate-schedule"):
             with self.subTest(command=command):
                 self.assertIn(command, source)
                 self.assertIn(f"{command} *args:", justfile)
@@ -3471,6 +3471,52 @@ db2:keys=5,expires=0,avg_ttl=0
         checks = {item["check"]: item for item in result["findings"]}
         self.assertEqual(checks["native-api-direct-token.runtime-secret"]["details"]["token_value_reported"], False)
         self.assertIn("rerun runtime-native-api-direct-smoke", checks["native-api-direct-token.reload-required"]["message"])
+
+    def test_direct_native_api_bootstrap_creates_secret_without_reporting_value(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            root.mkdir()
+            with unittest.mock.patch.object(turbovasctl, "current_native_api_direct_published_bindings", return_value=()), unittest.mock.patch.object(turbovasctl, "running_service_env_value", return_value=None):
+                result = turbovasctl.command_runtime_native_api_direct_bootstrap(root)
+            token = turbovasctl.runtime_secret_path(root, turbovasctl.TURBOVAS_API_BEARER_TOKEN_SECRET).read_text(encoding="utf-8").strip()
+
+        rendered = json.dumps(result, sort_keys=True)
+        checks = {item["check"]: item for item in result["findings"]}
+        self.assertEqual(result["status"], "pass")
+        self.assertTrue(turbovasctl.direct_api_bearer_token_is_acceptable(token))
+        self.assertNotIn(token, rendered)
+        self.assertEqual(checks["native-api-direct-bootstrap.host-binding"]["status"], "pass")
+        self.assertEqual(checks["native-api-direct-bootstrap.token"]["details"]["token_value_reported"], False)
+        self.assertEqual(checks["production.native-api-direct.auth-boundary"]["status"], "pass")
+
+    def test_direct_native_api_bootstrap_fails_non_loopback_without_leaking_token(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            root.mkdir()
+            token = "0123456789abcdef0123456789abcdef"
+            original_host = turbovasctl.os.environ.get(turbovasctl.TURBOVAS_API_DIRECT_HOST_ENV)
+            original_token = turbovasctl.os.environ.get(turbovasctl.TURBOVAS_API_BEARER_TOKEN_ENV)
+            try:
+                turbovasctl.os.environ[turbovasctl.TURBOVAS_API_DIRECT_HOST_ENV] = "192.0.2.10"
+                turbovasctl.os.environ[turbovasctl.TURBOVAS_API_BEARER_TOKEN_ENV] = token
+                with unittest.mock.patch.object(turbovasctl, "current_native_api_direct_published_bindings", return_value=()), unittest.mock.patch.object(turbovasctl, "running_service_env_value", return_value=None):
+                    result = turbovasctl.command_runtime_native_api_direct_bootstrap(root)
+            finally:
+                if original_host is None:
+                    turbovasctl.os.environ.pop(turbovasctl.TURBOVAS_API_DIRECT_HOST_ENV, None)
+                else:
+                    turbovasctl.os.environ[turbovasctl.TURBOVAS_API_DIRECT_HOST_ENV] = original_host
+                if original_token is None:
+                    turbovasctl.os.environ.pop(turbovasctl.TURBOVAS_API_BEARER_TOKEN_ENV, None)
+                else:
+                    turbovasctl.os.environ[turbovasctl.TURBOVAS_API_BEARER_TOKEN_ENV] = original_token
+
+        rendered = json.dumps(result, sort_keys=True)
+        checks = {item["check"]: item for item in result["findings"]}
+        self.assertEqual(result["status"], "fail")
+        self.assertEqual(checks["native-api-direct-bootstrap.host-binding"]["status"], "fail")
+        self.assertEqual(checks["production.native-api-direct.configured-binding"]["status"], "fail")
+        self.assertNotIn(token, rendered)
 
     def test_env_values_have_nonempty_key_rejects_empty_compose_values(self):
         self.assertFalse(turbovasctl.env_values_have_nonempty_key([], "TOKEN"))

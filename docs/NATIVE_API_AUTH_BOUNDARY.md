@@ -92,6 +92,7 @@ Use these command surfaces:
 
 ```sh
 just runtime-native-api-smoke --json
+just runtime-native-api-direct-bootstrap --json
 just runtime-native-api-direct-smoke --json
 just runtime-native-api-direct-token --json
 just runtime-native-api-direct-token --json --rotate
@@ -99,6 +100,11 @@ just native-api-client-contract --json
 tools/turbovasctl native-api-request --direct --json --path '/api/v1/reports?page_size=1'
 tools/turbovasctl native-api-request --direct --json --request-id 'operator-check-1' --path '/api/v1/reports?page_size=1'
 ```
+
+`runtime-native-api-direct-bootstrap` creates the ignored development runtime
+secret if needed, verifies local direct host/port/bind shape, refuses wildcard or
+non-loopback host publication, and reports only token metadata. It does not start
+or expose the listener.
 
 `runtime-native-api-direct-token --rotate` rotates only the ignored development
 runtime bearer-token secret and never prints the token value. Restart

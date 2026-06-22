@@ -9088,6 +9088,67 @@ def command_runtime_native_api_direct_token(repo_root: Path, *, rotate: bool) ->
     return make_result("runtime-native-api-direct-token", repo_root, summary, findings)
 
 
+def command_runtime_native_api_direct_bootstrap(repo_root: Path) -> dict[str, Any]:
+    findings: list[dict[str, Any]] = []
+    env = native_api_direct_runtime_env(repo_root)
+    token = native_api_direct_bearer_token(repo_root, env)
+    token_source = "environment" if env.get(TURBOVAS_API_BEARER_TOKEN_ENV) else "runtime-secret-file"
+    secret_path = runtime_secret_path(repo_root, TURBOVAS_API_BEARER_TOKEN_SECRET)
+
+    findings.append(native_api_direct_config_shape_finding(env, check="native-api-direct-bootstrap.config-shape"))
+    host = native_api_direct_host(env)
+    if host_is_wildcard(host):
+        host_status = "fail"
+        host_message = "Direct native API bootstrap refuses wildcard host publication."
+    elif not host_is_loopback(host):
+        host_status = "fail"
+        host_message = "Direct native API bootstrap refuses non-loopback publication until production TLS/bootstrap/host-binding hardening exists."
+    else:
+        host_status = "pass"
+        host_message = "Direct native API bootstrap is loopback-bounded."
+    findings.append(
+        finding(
+            host_status,
+            "native-api-direct-bootstrap.host-binding",
+            host_message,
+            details={
+                "host": host,
+                "host_port": native_api_direct_port(env),
+                "host_binding": native_api_direct_port_binding(env),
+                "container_bind": env.get(TURBOVAS_API_DIRECT_BIND_ENV),
+            },
+        )
+    )
+
+    token_ok = direct_api_bearer_token_is_acceptable(token)
+    findings.append(
+        finding(
+            "pass" if token_ok else "fail",
+            "native-api-direct-bootstrap.token",
+            "Direct native API bootstrap has a bearer token that satisfies the local strength contract."
+            if token_ok
+            else "Direct native API bootstrap bearer token is missing, too short, or contains unsafe characters.",
+            str(secret_path) if token_source == "runtime-secret-file" else None,
+            {
+                "token_source": token_source,
+                "minimum_token_length": TURBOVAS_API_BEARER_TOKEN_MIN_LENGTH,
+                "runtime_secret": str(secret_path),
+                "token_value_reported": False,
+            },
+        )
+    )
+
+    findings.extend(direct_native_api_posture_findings(repo_root, env))
+    result = make_result("runtime-native-api-direct-bootstrap", repo_root, "Direct native API bootstrap guardrails checked.", findings)
+    result["details"] = {
+        "base_url": native_api_direct_base_url(env),
+        "direct_enabled": env.get(TURBOVAS_API_DIRECT_ENV) == "1",
+        "token_source": token_source,
+        "token_value_reported": False,
+    }
+    return result
+
+
 def command_runtime_native_api_direct_smoke(repo_root: Path) -> dict[str, Any]:
     artifact_dir = native_api_artifact_dir(repo_root)
     artifact_dir.mkdir(parents=True, exist_ok=True)
@@ -12101,6 +12162,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("runtime-app-smoke", parents=[common], help="run experimental application service smoke checks")
     subparsers.add_parser("runtime-native-api-smoke", parents=[common], help="verify the internal TurboVAS native API sidecar")
     subparsers.add_parser("runtime-native-api-direct-smoke", parents=[common], help="verify the opt-in direct bearer-auth native API listener")
+    subparsers.add_parser("runtime-native-api-direct-bootstrap", parents=[common], help="prepare and check opt-in direct native API bootstrap guardrails without starting the listener")
     direct_token = subparsers.add_parser("runtime-native-api-direct-token", parents=[common], help="inspect or rotate the opt-in direct native API runtime bearer token")
     direct_token.add_argument("--rotate", action="store_true", help="rotate the ignored runtime bearer token without printing it")
     subparsers.add_parser("runtime-native-api-rebuild", parents=[common], help="rebuild and restart only the internal TurboVAS native API sidecar")
@@ -12248,6 +12310,8 @@ def main(argv: list[str] | None = None) -> int:
         result = command_runtime_native_api_smoke(repo_root)
     elif args.command == "runtime-native-api-direct-smoke":
         result = command_runtime_native_api_direct_smoke(repo_root)
+    elif args.command == "runtime-native-api-direct-bootstrap":
+        result = command_runtime_native_api_direct_bootstrap(repo_root)
     elif args.command == "runtime-native-api-direct-token":
         result = command_runtime_native_api_direct_token(repo_root, rotate=args.rotate)
     elif args.command == "runtime-native-api-rebuild":

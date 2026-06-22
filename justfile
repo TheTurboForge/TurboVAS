@@ -206,6 +206,9 @@ runtime-native-api-smoke *args:
 runtime-native-api-direct-smoke *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-native-api-direct-smoke "$@"
 
+runtime-native-api-direct-bootstrap *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-native-api-direct-bootstrap "$@"
+
 runtime-native-api-direct-token *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl runtime-native-api-direct-token "$@"
 
