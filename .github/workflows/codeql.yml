@@ -40,6 +40,7 @@ jobs:
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
+          config-file: ./.github/codeql/codeql-config.yml
           queries: security-extended
 
       - name: Perform CodeQL analysis
@@ -69,6 +70,7 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           build-mode: none
+          config-file: ./.github/codeql/codeql-config.yml
           queries: security-extended
 
       - name: Perform CodeQL analysis

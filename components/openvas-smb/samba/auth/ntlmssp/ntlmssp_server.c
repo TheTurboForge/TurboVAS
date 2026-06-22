@@ -549,6 +549,8 @@ static NTSTATUS ntlmssp_server_postauth(struct gensec_security *gensec_security,
 			dump_data_pw("KEY_EXCH session key (enc):\n", 
 				     gensec_ntlmssp_state->encrypted_session_key.data, 
 				     gensec_ntlmssp_state->encrypted_session_key.length);
+			// codeql[cpp/weak-cryptographic-algorithm] RC4 key exchange is
+			// required for inherited NTLMSSP protocol compatibility.
 			arcfour_crypt(gensec_ntlmssp_state->encrypted_session_key.data, 
 				      session_key.data, 
 				      gensec_ntlmssp_state->encrypted_session_key.length);

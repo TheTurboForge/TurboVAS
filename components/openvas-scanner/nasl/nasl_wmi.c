@@ -66,8 +66,9 @@ check_alpha (char *val)
 static uint32_t
 stoi_uint32_t (char *s)
 {
-  uint32_t v;
-  sscanf (s, "%" PRIu32, &v);
+  uint32_t v = 0;
+  if (sscanf (s, "%" PRIu32, &v) != 1)
+    return 0;
   return v;
 }
 
@@ -77,8 +78,9 @@ stoi_uint32_t (char *s)
 static uint64_t
 stoi_uint64_t (char *s)
 {
-  uint64_t v;
-  sscanf (s, "%" PRIu64, &v);
+  uint64_t v = 0;
+  if (sscanf (s, "%" PRIu64, &v) != 1)
+    return 0;
   return v;
 }
 

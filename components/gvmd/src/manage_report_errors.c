@@ -73,6 +73,8 @@ manage_send_report_errors (report_t report,
   xml_dir_created = TRUE;
 
   xml_file = g_strdup_printf ("%s/report-errors.xml", xml_dir);
+  // codeql[cpp/world-writable-file-creation] xml_dir is a private mkdtemp
+  // directory used for transient report generation.
   stream = fopen (xml_file, "w");
   if (stream == NULL)
     {

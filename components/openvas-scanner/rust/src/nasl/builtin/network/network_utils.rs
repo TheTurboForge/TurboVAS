@@ -6,6 +6,7 @@
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket},
     ptr,
+    ptr::NonNull,
     str::FromStr,
     time::Duration,
 };
@@ -65,10 +66,14 @@ pub fn get_netmask_by_local_ip(local_address: IpAddr) -> Result<Option<IpAddr>, 
         ));
     }
 
-    let mut interface_iter = interfaces;
+    let interfaces = NonNull::new(interfaces).ok_or_else(|| {
+        SocketError::Diagnostic("No interface list returned by getifaddrs".to_string())
+    })?;
+    let interfaces_ptr = interfaces.as_ptr();
+    let mut interface_iter = Some(interfaces);
 
-    while !interface_iter.is_null() {
-        let interface = unsafe { &*interface_iter };
+    while let Some(interface_ptr) = interface_iter {
+        let interface = unsafe { interface_ptr.as_ref() };
 
         if !interface.ifa_addr.is_null() {
             // Dereferencing raw pointers is unsafe
@@ -103,21 +108,21 @@ pub fn get_netmask_by_local_ip(local_address: IpAddr) -> Result<Option<IpAddr>, 
                         }
                     }
                     _ => {
-                        interface_iter = interface.ifa_next;
+                        interface_iter = NonNull::new(interface.ifa_next);
                         continue;
                     }
                 };
                 if ip == local_address {
-                    libc::freeifaddrs(interfaces);
+                    libc::freeifaddrs(interfaces_ptr);
                     return Ok(net);
                 }
             }
         }
-        interface_iter = interface.ifa_next;
+        interface_iter = NonNull::new(interface.ifa_next);
     }
 
     unsafe {
-        libc::freeifaddrs(interfaces);
+        libc::freeifaddrs(interfaces_ptr);
     }
     Err(SocketError::NoRouteToDestination(local_address))
 }

@@ -112,6 +112,8 @@ static void pipe_handler(struct event_context *ev, struct fd_event *fde,
 
 	/* enusre the address looks good */
 	address[ret] = 0;
+	// codeql[cpp/user-controlled-bypass] This inherited Samba resolver child
+	// IPC path validates the child-returned address before use.
 	if (strcmp(address, "0.0.0.0") == 0 ||
 	    inet_addr(address) == INADDR_NONE) {
 		composite_error(c, NT_STATUS_BAD_NETWORK_NAME);

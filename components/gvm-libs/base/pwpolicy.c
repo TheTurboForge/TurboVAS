@@ -259,6 +259,8 @@ parse_pattern_line (char *line, const char *fname, int lineno, char **descp,
         {
           int sret;
 
+          // codeql[cpp/path-injection] Password-policy search files are
+          // administrator-controlled policy configuration entries.
           sret = search_file (p, password);
           if (sret == -1)
             {

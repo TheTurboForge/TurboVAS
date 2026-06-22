@@ -98,6 +98,8 @@ o_krb5_find_kdc (const OKrb5Credential *creds, char **kdc)
   // we don't know if we should free it or just override it.
   // aborting instead.
   GUARD_NULL (*kdc, result);
+  // codeql[cpp/path-injection] config_path is an intentional NASL/env
+  // Kerberos debug parameter; callers choose the krb5.conf path explicitly.
   if ((file = fopen ((char *) creds->config_path.data, "r")) == NULL)
     {
       result = O_KRB5_CONF_NOT_FOUND;
@@ -257,8 +259,12 @@ o_krb5_add_realm (const OKrb5Credential *creds, const char *kdc)
   int state, i;
   char *cp = (char *) creds->config_path.data;
 
+  // codeql[cpp/path-injection] config_path is an intentional NASL/env
+  // Kerberos debug parameter; callers choose the krb5.conf path explicitly.
   if ((file = fopen (cp, "r")) == NULL)
     {
+      // codeql[cpp/world-writable-file-creation] Kerberos config creation is
+      // driven by the explicit NASL/env config_path compatibility parameter.
       if ((file = fopen (cp, "w")) == NULL)
         {
           result = O_KRB5_CONF_NOT_CREATED;
@@ -269,6 +275,8 @@ o_krb5_add_realm (const OKrb5Credential *creds, const char *kdc)
       goto result;
     }
   snprintf (tmpfn, MAX_LINE_LENGTH, "%s.tmp", cp);
+  // codeql[cpp/world-writable-file-creation] The temporary file is paired
+  // with the explicit NASL/env Kerberos config_path compatibility parameter.
   if ((tmp = fopen (tmpfn, "w")) == NULL)
     {
       result = O_KRB5_TMP_CONF_NOT_CREATED;

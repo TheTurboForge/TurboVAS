@@ -12951,6 +12951,8 @@ print_report_xml_start (report_t report, task_t task,
       return -1;
     }
 
+  // codeql[cpp/world-writable-file-creation] xml_start lives under gvmd's
+  // transient report workspace; gvmd also sets a restrictive process umask.
   out = fopen (xml_start, "w");
 
   if (out == NULL)

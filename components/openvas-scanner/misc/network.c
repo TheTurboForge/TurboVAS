@@ -1286,6 +1286,8 @@ read_stream_connection_unbuffered (int fd, void *buf0, int min_len, int max_len)
           else
             {
               errno = 0;
+              // codeql[cpp/cleartext-transmission] This is the generic NASL
+              // socket receive primitive; protocol encryption is script-specific.
               ret = recv (realfd, buf + total, max_len - total, waitall);
               if (ret < 0)
                 if (errno != EINTR)
@@ -1484,6 +1486,8 @@ write_stream_connection4 (int fd, void *buf0, int n, int i_opt)
     case OPENVAS_ENCAPS_IP:
       for (count = 0; count < n;)
         {
+          // codeql[cpp/cleartext-transmission] This is the generic NASL socket
+          // send primitive; protocol encryption is script-specific.
           ret = send (fp->fd, buf + count, n - count, i_opt);
 
           if (ret <= 0)
@@ -2100,6 +2104,8 @@ recv_line (int soc, char *buf, size_t bufsiz)
             goto again;
           if (e > 0)
             {
+              // codeql[cpp/cleartext-transmission] This is the generic NASL
+              // socket receive primitive; protocol encryption is script-specific.
               n = recv (soc, buf + ret, 1, 0);
               switch (n)
                 {

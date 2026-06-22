@@ -54,13 +54,12 @@ Ensure (settings, init_settings_iterator_from_valid_file)
   settings_iterator_t iterator;
   int ret;
   gchar *config_file = "test_settings.conf";
-  FILE *file;
 
   // Create a temporary configuration file
-  file = fopen (config_file, "w");
-  assert_that (file, is_not_null);
-  fprintf (file, "key1=value1\nkey2=value2\nkey3=value3\n");
-  fclose (file);
+  assert_that (g_file_set_contents (config_file,
+                                    "key1=value1\nkey2=value2\nkey3=value3\n",
+                                    -1, NULL),
+               is_equal_to (TRUE));
 
   // Initialize iterator from file
   ret = init_settings_iterator_from_file (&iterator, config_file, "Misc");
@@ -76,15 +75,14 @@ Ensure (settings, settings_iterator_operations)
   settings_iterator_t iterator;
   int ret;
   gchar *config_file = "test_settings.conf";
-  FILE *file;
   const gchar *name;
   gchar *value;
 
   // Create a temporary configuration file
-  file = fopen (config_file, "w");
-  assert_that (file, is_not_null);
-  fprintf (file, "key1=value1\nkey2=value2\nkey3=value3\n");
-  fclose (file);
+  assert_that (g_file_set_contents (config_file,
+                                    "key1=value1\nkey2=value2\nkey3=value3\n",
+                                    -1, NULL),
+               is_equal_to (TRUE));
 
   // Initialize iterator from file
   ret = init_settings_iterator_from_file (&iterator, config_file, "Misc");
@@ -125,18 +123,17 @@ Ensure (settings, settings_group_handling)
   settings_iterator_t iterator;
   int ret;
   gchar *config_file = "test_group_settings.conf";
-  FILE *file;
   const gchar *name;
   gchar *value;
 
   // Create a temporary configuration file with multiple groups
-  file = fopen (config_file, "w");
-  assert_that (file, is_not_null);
-  fprintf (file, "[group1]\n"
-                 "key1=value1\nkey2=value2\n\n"
-                 "[group2]\n"
-                 "key3=value3\nkey4=value4\n");
-  fclose (file);
+  assert_that (g_file_set_contents (config_file,
+                                    "[group1]\n"
+                                    "key1=value1\nkey2=value2\n\n"
+                                    "[group2]\n"
+                                    "key3=value3\nkey4=value4\n",
+                                    -1, NULL),
+               is_equal_to (TRUE));
 
   // Initialize iterator from file for group1
   ret = init_settings_iterator_from_file (&iterator, config_file, "group1");

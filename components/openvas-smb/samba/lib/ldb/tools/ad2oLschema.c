@@ -602,9 +602,15 @@ static struct schema_conv process_convert(struct ldb_context *ldb, enum convert_
 		}
 	}
 	if (options->output) {
-		out = fopen(options->output, "w");
+		int out_fd = open(options->output, O_WRONLY|O_CREAT|O_TRUNC, 0600);
+		if (out_fd == -1) {
+			perror(options->output);
+			exit(1);
+		}
+		out = fdopen(out_fd, "w");
 		if (!out) {
 			perror(options->output);
+			close(out_fd);
 			exit(1);
 		}
 	}

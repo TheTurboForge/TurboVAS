@@ -375,9 +375,9 @@ static void move_rec(void)
 
 static int print_rec(struct tdb_context *the_tdb, TDB_DATA key, TDB_DATA dbuf, void *state)
 {
-	printf("\nkey %d bytes\n", key.dsize);
+	printf("\nkey %zu bytes\n", (size_t) key.dsize);
 	print_asc(key.dptr, key.dsize);
-	printf("\ndata %d bytes\n", dbuf.dsize);
+	printf("\ndata %zu bytes\n", (size_t) dbuf.dsize);
 	print_data(dbuf.dptr, dbuf.dsize);
 	return 0;
 }

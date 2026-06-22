@@ -16,7 +16,9 @@
 #define _GNU_SOURCE
 
 #include <errno.h>
+#include <fcntl.h>
 #include <sys/sem.h>
+#include <unistd.h>
 
 #include "ipc.h"
 #include "manage.h"
@@ -59,18 +61,18 @@ init_semaphore_set ()
 {
   // Ensure semaphore set file exists
   gchar *key_file_name = g_build_filename (GVM_STATE_DIR, "gvmd.sem", NULL);
-  FILE *key_file = fopen (key_file_name, "a");
+  int key_file = open (key_file_name, O_WRONLY | O_CREAT | O_APPEND, 0600);
   union semun sem_value;
   struct semid_ds sem_info;
 
-  if (key_file == NULL)
+  if (key_file == -1)
     {
       g_warning ("%s: error creating semaphore file %s: %s",
                  __func__, key_file_name, strerror (errno));
       g_free (key_file_name);
       return -1;
     }
-  fclose (key_file);
+  close (key_file);
   semaphore_set_key = ftok (key_file_name, 42);
   if (semaphore_set_key < 0)
     {

@@ -239,6 +239,8 @@ NTSTATUS ntlmssp_client_challenge(struct gensec_security *gensec_security,
 		encrypted_session_key = data_blob_talloc(gensec_ntlmssp_state, 
 							 client_session_key, sizeof(client_session_key));
 		dump_data_pw("KEY_EXCH session key:\n", encrypted_session_key.data, encrypted_session_key.length);
+		// codeql[cpp/weak-cryptographic-algorithm] RC4 key exchange is
+		// required for inherited NTLMSSP protocol compatibility.
 		arcfour_crypt(encrypted_session_key.data, session_key.data, encrypted_session_key.length);
 		dump_data_pw("KEY_EXCH session key (enc):\n", encrypted_session_key.data, encrypted_session_key.length);
 

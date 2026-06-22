@@ -106,6 +106,8 @@ static NTSTATUS ntlmssp_make_packet_signature(struct gensec_ntlmssp_state *gense
 		if (encrypt_sig && gensec_ntlmssp_state->neg_flags & NTLMSSP_NEGOTIATE_KEY_EXCH) {
 			switch (direction) {
 			case NTLMSSP_SEND:
+				// codeql[cpp/weak-cryptographic-algorithm] RC4 sealing is
+				// required for inherited NTLMSSP protocol compatibility.
 				arcfour_crypt_sbox(gensec_ntlmssp_state->crypt.ntlm2.send_seal_arcfour_state, digest, 8);
 				break;
 			case NTLMSSP_RECEIVE:

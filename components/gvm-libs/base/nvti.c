@@ -295,7 +295,7 @@ static time_t
 parse_nvt_timestamp (const gchar *str_time)
 {
   time_t epoch_time;
-  int offset;
+  int offset = 0;
   struct tm tm;
 
   if (strcmp ((char *) str_time, "") == 0)

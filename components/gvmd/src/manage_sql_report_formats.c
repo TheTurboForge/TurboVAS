@@ -48,13 +48,15 @@
  */
 #define G_LOG_DOMAIN "md manage"
 
-
+
+
 /* Non-SQL internals defined in manage_report_formats.c. */
 
 int
 sync_report_formats_with_feed (gboolean);
 
-
+
+
 /* Static headers. */
 
 static void
@@ -69,7 +71,8 @@ set_report_format_active (report_format_t, int);
 static int
 set_report_format_param (report_format_t, const char *, const char *);
 
-
+
+
 /* Helpers. */
 
 /**
@@ -114,7 +117,8 @@ get_trustedkeys_name ()
   return name;
 }
 
-
+
+
 /* Signature utils. */
 
 /**
@@ -335,7 +339,8 @@ find_signature (const gchar *location, const gchar *installer_filename,
   return -1;
 }
 
-
+
+
 /* Report formats. */
 
 /**
@@ -3883,6 +3888,8 @@ print_report_xml_end (gchar *xml_start, gchar *xml_full,
       return -1;
     }
 
+  // codeql[cpp/world-writable-file-creation] xml_full is a transient report
+  // workspace file copied from xml_start under gvmd's restrictive umask.
   out = fopen (xml_full, "a");
   if (out == NULL)
     {
@@ -4429,7 +4436,8 @@ delete_report_format_dirs_user (const gchar *user_id, iterator_t *rows)
   g_free (dir);
 }
 
-
+
+
 /* Feed report formats. */
 
 /**
@@ -4692,7 +4700,8 @@ migrate_predefined_report_formats ()
   return 0;
 }
 
-
+
+
 /* Startup. */
 
 /**

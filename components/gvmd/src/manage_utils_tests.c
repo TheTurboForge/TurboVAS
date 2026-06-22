@@ -48,7 +48,7 @@ get_next_time (time_t first, time_t now, int period, int offset)
 
   assert (offset > 0);
 
-  to_next = ((now - first) + offset * period - 1);
+  to_next = ((now - first) + ((time_t) offset * period) - 1);
   to_next -= to_next % period;
 
   return first + to_next;

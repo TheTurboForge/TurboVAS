@@ -136,14 +136,13 @@ Ensure (prefs, prefs_set_overwrites_existing_preference)
 Ensure (prefs, prefs_config_loads_from_file)
 {
   gchar *config_file = "test_prefs.conf";
-  FILE *file;
   const gchar *value;
 
   // Create a temporary configuration file
-  file = fopen (config_file, "w");
-  assert_that (file, is_not_null);
-  fprintf (file, "test_config_key=test_config_value\n");
-  fclose (file);
+  assert_that (g_file_set_contents (config_file,
+                                    "test_config_key=test_config_value\n",
+                                    -1, NULL),
+               is_equal_to (TRUE));
 
   // Load preferences from file
   prefs_config (config_file);

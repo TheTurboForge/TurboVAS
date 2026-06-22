@@ -54,6 +54,8 @@ static void creds_init_64bit(struct creds_CredentialState *creds,
 
 	ZERO_STRUCT(creds->session_key);
 
+	// codeql[cpp/weak-cryptographic-algorithm] DES-based credential derivation
+	// is required for inherited SMB/NTLM compatibility.
 	des_crypt128(creds->session_key, sum2, machine_password->hash);
 
 	des_crypt112(creds->client.data, client_challenge->data, creds->session_key, 1);

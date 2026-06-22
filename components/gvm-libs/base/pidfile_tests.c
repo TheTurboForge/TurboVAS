@@ -91,14 +91,11 @@ Ensure (pidfile, pidfile_remove_deletes_file_with_matching_pid)
   gchar *test_pidfile = "test_pidfile_remove.tmp";
   pid_t current_pid = getpid ();
   gchar *pid_content;
-  FILE *file;
 
   // Create a pidfile with current PID
   pid_content = g_strdup_printf ("%d\n", current_pid);
-  file = fopen (test_pidfile, "w");
-  assert_that (file, is_not_null);
-  fputs (pid_content, file);
-  fclose (file);
+  assert_that (g_file_set_contents (test_pidfile, pid_content, -1, NULL),
+               is_equal_to (TRUE));
 
   // Verify file exists
   assert_that (gvm_file_exists (test_pidfile), is_equal_to (1));
@@ -118,14 +115,11 @@ Ensure (pidfile, pidfile_remove_does_not_delete_file_with_different_pid)
   pid_t current_pid = getpid ();
   pid_t different_pid = current_pid + 1;
   gchar *pid_content;
-  FILE *file;
 
   // Create a pidfile with different PID
   pid_content = g_strdup_printf ("%d\n", different_pid);
-  file = fopen (test_pidfile, "w");
-  assert_that (file, is_not_null);
-  fputs (pid_content, file);
-  fclose (file);
+  assert_that (g_file_set_contents (test_pidfile, pid_content, -1, NULL),
+               is_equal_to (TRUE));
 
   // Verify file exists
   assert_that (gvm_file_exists (test_pidfile), is_equal_to (1));

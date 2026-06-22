@@ -17,6 +17,7 @@ use nasl_c_lib::krb5::{
 use nasl_function_proc_macro::nasl_function;
 use std::os;
 use std::os::raw::c_char;
+use std::ptr::NonNull;
 use std::sync::Mutex;
 use std::{ffi::CStr, sync::Arc};
 use thiserror::Error;
@@ -510,17 +511,17 @@ impl Krb5 {
         let mut session_key_slice: *mut OKrb5Slice = std::ptr::null_mut();
         self.last_okrb5_result =
             unsafe { o_krb5_gss_session_key_context(*cached_gss_context, &mut session_key_slice) };
-        if !session_key_slice.is_null() {
+        if let Some(session_key_slice) = NonNull::new(session_key_slice) {
             unsafe {
-                let slice = &*session_key_slice;
+                let slice = session_key_slice.as_ref();
                 if !slice.data.is_null() {
                     let bytes = std::slice::from_raw_parts(slice.data as *const u8, slice.len);
                     let session_key = String::from_utf8_lossy(bytes).into_owned();
                     libc::free(slice.data);
-                    libc::free(session_key_slice as *mut libc::c_void);
+                    libc::free(session_key_slice.as_ptr() as *mut libc::c_void);
                     return Some(session_key);
                 }
-                libc::free(session_key_slice as *mut libc::c_void);
+                libc::free(session_key_slice.as_ptr() as *mut libc::c_void);
             }
         }
         None

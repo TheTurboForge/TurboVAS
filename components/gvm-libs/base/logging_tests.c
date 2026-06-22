@@ -132,17 +132,17 @@ Ensure (logging, should_load_log_configuration)
   GSList *log_config_list;
 
   /* Create a temporary configuration file */
-  FILE *file = fopen (config_file, "w");
-  assert_that (file, is_not_null);
-  fprintf (file, "[*]\n"
-                 "prepend=%%t %%s %%p - \n"
-                 "separator=:\n"
-                 "prepend_time_format=%%Y-%%m-%%d %%H:%%M:%%S\n"
-                 "file=-\n"
-                 "level=debug\n"
-                 "syslog_facility=local0\n"
-                 "syslog_ident=test_ident\n");
-  fclose (file);
+  assert_that (g_file_set_contents (config_file,
+                                    "[*]\n"
+                                    "prepend=%%t %%s %%p - \n"
+                                    "separator=:\n"
+                                    "prepend_time_format=%%Y-%%m-%%d %%H:%%M:%%S\n"
+                                    "file=-\n"
+                                    "level=debug\n"
+                                    "syslog_facility=local0\n"
+                                    "syslog_ident=test_ident\n",
+                                    -1, NULL),
+               is_equal_to (TRUE));
 
   /* Load the configuration */
   log_config_list = load_log_configuration (config_file);
@@ -198,16 +198,15 @@ Ensure (logging, should_setup_log_handlers_with_default_handler)
   GSList *log_config_list;
 
   /* Create a temporary configuration file */
-  FILE *file = fopen (config_file, "w");
-  assert_that (file, is_not_null);
-  // fputs ("", file);
-  fprintf (file, "[*]\n"
-                 "prepend=%%t %%s %%p - \n"
-                 "separator=:\n"
-                 "prepend_time_format=%%Y-%%m-%%d %%H:%%M:%%S\n"
-                 "file=-\n"
-                 "level=debug\n");
-  fclose (file);
+  assert_that (g_file_set_contents (config_file,
+                                    "[*]\n"
+                                    "prepend=%%t %%s %%p - \n"
+                                    "separator=:\n"
+                                    "prepend_time_format=%%Y-%%m-%%d %%H:%%M:%%S\n"
+                                    "file=-\n"
+                                    "level=debug\n",
+                                    -1, NULL),
+               is_equal_to (TRUE));
 
   /* Load the configuration */
   log_config_list = load_log_configuration (config_file);
@@ -263,16 +262,15 @@ Ensure (logging, should_setup_log_handlers_with_domain_handler)
   GSList *log_config_list;
 
   /* Create a temporary configuration file */
-  FILE *file = fopen (config_file, "w");
-  assert_that (file, is_not_null);
-  // fputs ("", file);
-  fprintf (file, "[foo]\n"
-                 "prepend=%%t %%s %%p - \n"
-                 "separator=:\n"
-                 "prepend_time_format=%%Y-%%m-%%d %%H:%%M:%%S\n"
-                 "file=-\n"
-                 "level=debug\n");
-  fclose (file);
+  assert_that (g_file_set_contents (config_file,
+                                    "[foo]\n"
+                                    "prepend=%%t %%s %%p - \n"
+                                    "separator=:\n"
+                                    "prepend_time_format=%%Y-%%m-%%d %%H:%%M:%%S\n"
+                                    "file=-\n"
+                                    "level=debug\n",
+                                    -1, NULL),
+               is_equal_to (TRUE));
 
   /* Load the configuration */
   log_config_list = load_log_configuration (config_file);

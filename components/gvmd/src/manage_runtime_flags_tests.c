@@ -36,11 +36,8 @@ static char *
 write_test_config (const char *content)
 {
   char *path = g_strdup ("runtime_flags_test.conf");
-  FILE *f = fopen (path, "w");
 
-  assert_true (f != NULL);
-  fputs (content, f);
-  fclose (f);
+  assert_true (g_file_set_contents (path, content, -1, NULL));
 
   return path;
 }

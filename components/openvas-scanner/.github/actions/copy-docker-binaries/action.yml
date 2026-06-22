@@ -8,6 +8,16 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: validate architecture input
+      shell: bash
+      run: |
+        case "${{ inputs.arch }}" in
+          amd64|arm64) ;;
+          *)
+            echo "Unsupported architecture: ${{ inputs.arch }}" >&2
+            exit 1
+            ;;
+        esac
     - name: download rs binaries
       uses: actions/download-artifact@v5
       with:
@@ -16,7 +26,7 @@ runs:
         path: ./assets
     - run: mkdir -p .docker/install/usr/local
       shell: bash
-    - run: mv assets/linux/${{ inputs.arch }} .docker/install/usr/local/bin
+    - run: mv "assets/linux/${{ inputs.arch }}" .docker/install/usr/local/bin
       shell: bash
     - run: ls -las .docker/install/usr/local/bin
       shell: bash

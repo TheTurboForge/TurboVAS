@@ -621,6 +621,8 @@ void cli_credentials_guess(struct cli_credentials *cred)
 	}
 	
 	if (getenv("PASSWD_FILE")) {
+		// codeql[cpp/path-injection] PASSWD_FILE is an explicit inherited
+		// Samba environment interface for operator-selected credentials.
 		cli_credentials_parse_password_file(cred, getenv("PASSWD_FILE"), CRED_GUESS_FILE);
 	}
 	

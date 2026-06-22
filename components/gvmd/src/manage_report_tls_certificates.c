@@ -123,6 +123,8 @@ manage_send_report_tls_certificates (report_t report,
     }
 
   xml_file = g_strdup_printf ("%s/report-tls-certificates.xml", xml_dir);
+  // codeql[cpp/world-writable-file-creation] xml_dir is a private mkdtemp
+  // directory used for transient report generation.
   stream = fopen (xml_file, "w");
   if (stream == NULL)
     {

@@ -50,6 +50,8 @@ static void netsec_deal_with_seq_num(struct schannel_state *state,
 
 	hmac_md5(state->creds->session_key, zeros, sizeof(zeros), digest1);
 	hmac_md5(digest1, packet_digest, 8, sequence_key);
+	// codeql[cpp/weak-cryptographic-algorithm] RC4 sealing is required for
+	// inherited Netlogon/SCHANNEL protocol compatibility.
 	arcfour_crypt(seq_num, sequence_key, 8);
 
 	state->seq_num++;

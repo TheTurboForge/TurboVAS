@@ -258,7 +258,7 @@ struct ldb_control **parse_controls(void *mem_ctx, char **control_strings)
 			const char *p;
 			char attr[1024];
 			char ctxid[1024];
-			int crit, bc, ac, os, cc, ret;
+			int crit = 0, bc = 0, ac = 0, os = 0, cc = 0, ret;
 
 			attr[0] = '\0';
 			ctxid[0] = '\0';

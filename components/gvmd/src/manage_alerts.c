@@ -1303,6 +1303,8 @@ alert_script_exec (const char *alert_id, const char *command_args,
             || chown (report_dir, nobody->pw_uid, nobody->pw_gid)
             || chown (report_path, nobody->pw_uid, nobody->pw_gid)
             || chown (error_path, nobody->pw_uid, nobody->pw_gid)
+            // codeql[cpp/toctou-race-condition] extra_path is created as a
+            // private alert temporary file before dropping privileges.
             || (extra_path && chown (extra_path, nobody->pw_uid,
                                      nobody->pw_gid)))
           {

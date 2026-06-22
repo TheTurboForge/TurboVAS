@@ -115,6 +115,8 @@ manage_send_report_ports (report_t report,
   xml_dir_created = TRUE;
 
   xml_file = g_strdup_printf ("%s/report-ports.xml", xml_dir);
+  // codeql[cpp/world-writable-file-creation] xml_dir is a private mkdtemp
+  // directory used for transient report generation.
   stream = fopen (xml_file, "w");
   if (stream == NULL)
     {
