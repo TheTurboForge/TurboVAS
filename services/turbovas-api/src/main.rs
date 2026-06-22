@@ -10543,6 +10543,33 @@ mod tests {
     }
 
     #[test]
+    fn scope_report_retention_plan_remains_dry_run_read_only_preview() {
+        let source = include_str!("main.rs");
+        let body = source
+            .split_once("async fn scope_report_retention_plan(")
+            .expect("scope report retention plan handler must exist")
+            .1
+            .split_once("fn scope_report_retention_sources_sql")
+            .expect("retention plan handler must precede retention SQL helper")
+            .0;
+        let upper_body = body.to_ascii_uppercase();
+
+        assert!(body.contains("mode: \"dry_run_preview\".to_string()"));
+        assert!(body.contains("destructive_actions: false"));
+        assert!(body.contains("latest_completed_raw_report_retains_full_detail: true"));
+        assert!(body.contains("detail_compacted_field: \"detail_compacted\".to_string()"));
+        assert!(body.contains("aggregate_only_field: \"aggregate_only\".to_string()"));
+        assert!(body.contains("detail_compacted_count: 0"));
+        assert!(body.contains("aggregate_only_count: 0"));
+        for forbidden in ["INSERT", "UPDATE", "DELETE", "TRUNCATE", "DROP"] {
+            assert!(
+                !upper_body.contains(forbidden),
+                "retention preview handler must stay read-only and non-destructive"
+            );
+        }
+    }
+
+    #[test]
     fn scope_report_metrics_reads_persisted_snapshot_tables_and_not_live_results() {
         let source = include_str!("main.rs");
         let start = "async fn scope_report_metrics(";
