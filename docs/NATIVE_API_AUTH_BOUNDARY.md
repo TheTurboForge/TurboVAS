@@ -50,7 +50,9 @@ script/curl -> opt-in direct bearer listener -> turbovas-api -> PostgreSQL
 - Direct listener responses include `X-Request-Id`. A client may provide a
   bounded ASCII request ID for correlation; unsafe, empty, or oversized values
   are replaced with a generated `tv-...` ID. Auth failures and direct-listener
-  server-error responses log the request ID for diagnostics.
+  server-error responses log the request ID for diagnostics. Structured direct
+  audit-log fields must not include authorization headers or bearer-token
+  material.
 - The browser may keep using same-origin `gsad` paths while GSA migrations are
   in progress. That bridge is not the final scriptable API boundary.
 - Direct development access currently uses HTTP on an explicit development host
