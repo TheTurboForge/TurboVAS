@@ -3521,6 +3521,46 @@ db2:keys=5,expires=0,avg_ttl=0
         for needle in forbidden:
             self.assertNotIn(needle, text)
 
+    def test_github_codeql_workflow_is_least_privilege_source_only(self):
+        root = Path(__file__).resolve().parents[2]
+        workflow = root / ".github" / "workflows" / "codeql.yml"
+        self.assertTrue(workflow.is_file())
+        text = workflow.read_text(encoding="utf-8")
+        required = [
+            "SPDX-License-Identifier: GPL-3.0-or-later",
+            "push:",
+            "pull_request:",
+            "schedule:",
+            "workflow_dispatch:",
+            "actions: read",
+            "contents: read",
+            "security-events: write",
+            "actions/checkout@v5",
+            "persist-credentials: false",
+            "github/codeql-action/init@v4",
+            "github/codeql-action/analyze@v4",
+            "queries: security-extended",
+            "- actions",
+            "- javascript-typescript",
+            "- python",
+            "- c-cpp",
+            "- rust",
+            "build-mode: none",
+        ]
+        for needle in required:
+            self.assertIn(needle, text)
+        forbidden = [
+            "pull_request_target",
+            "secrets.",
+            "runtime-full-test-scan-start",
+            "feed-cache-sync",
+            "feed-copy-to-runtime",
+            "docker compose up",
+            "github/codeql-action/autobuild",
+        ]
+        for needle in forbidden:
+            self.assertNotIn(needle, text)
+
     def test_justfile_forwards_common_recipe_arguments(self):
         justfile = (Path(__file__).resolve().parents[2] / "justfile").read_text(encoding="utf-8")
         for recipe in (
