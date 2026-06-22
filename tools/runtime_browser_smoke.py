@@ -320,6 +320,19 @@ async function fetchNativeJsonWithBrowserToken(page, path) {
   }, path);
 }
 
+async function assertNativeApiInvalidSortProxy(page, spec) {
+  if (!spec.invalidSortPath) return;
+  const response = await fetchNativeJsonWithBrowserToken(page, spec.invalidSortPath);
+  const errorCode = response.body?.error?.code || null;
+  const ok = response.status === 400 && errorCode === 'bad_request';
+  add(
+    ok ? 'pass' : 'fail',
+    `${spec.label}.invalid-sort-native-api`,
+    ok ? 'Same-origin native API proxy rejects an invalid collection sort with JSON bad_request.' : 'Same-origin native API proxy did not reject an invalid collection sort correctly.',
+    { path: spec.invalidSortPath, status: response.status, error_code: errorCode, message: response.body?.error?.message || response.textSample },
+  );
+}
+
 async function assertTagResourceNameProxy(page) {
   const taskNames = await fetchNativeJsonWithBrowserToken(page, '/api/v1/tags/resource-names/task?page_size=2&sort=name');
   const taskItems = Array.isArray(taskNames.body?.items) ? taskNames.body.items : null;
@@ -383,7 +396,7 @@ function focusedRouteCatalog() {
   const specs = [
     { label: 'reports', path: '/reports', nativePath: '/api/v1/reports', nativeCheck: 'raw-report.list-native-api', nativePass: 'Raw-report list loaded through same-origin native API.', nativeFail: 'Raw-report list did not produce a successful same-origin native API response.', forbidden: [/Delta Report/i, /Import Report/i], aliases: ['raw-reports'] },
     { label: 'results', path: '/results', nativePath: '/api/v1/results', nativeCheck: 'result.list-native-api', nativePass: 'Top-level Results list loaded through same-origin native API.', nativeFail: 'Top-level Results list did not produce a successful same-origin native API response.' },
-    { label: 'vulnerabilities', path: '/vulnerabilities', nativePath: '/api/v1/vulnerabilities', nativeCheck: 'vulnerability.list-native-api', nativePass: 'Top-level Vulnerabilities list loaded through same-origin native API.', nativeFail: 'Top-level Vulnerabilities list did not produce a successful same-origin native API response.' },
+    { label: 'vulnerabilities', path: '/vulnerabilities', nativePath: '/api/v1/vulnerabilities', nativeCheck: 'vulnerability.list-native-api', nativePass: 'Top-level Vulnerabilities list loaded through same-origin native API.', nativeFail: 'Top-level Vulnerabilities list did not produce a successful same-origin native API response.', invalidSortPath: '/api/v1/vulnerabilities?page_size=1&sort=not_a_vulnerability_sort' },
     { label: 'cves', path: '/cves', nativePath: '/api/v1/cves', nativeCheck: 'cve.list-native-api', nativePass: 'Security Information CVE list loaded through same-origin native API.', nativeFail: 'Security Information CVE list did not produce a successful same-origin native API response.' },
     { label: 'cpes', path: '/cpes', nativePath: '/api/v1/cpes', nativeCheck: 'cpe.list-native-api', nativePass: 'Security Information CPE list loaded through same-origin native API.', nativeFail: 'Security Information CPE list did not produce a successful same-origin native API response.' },
     { label: 'nvts', path: '/nvts', nativePath: '/api/v1/nvts', nativeCheck: 'nvt.list-native-api', nativePass: 'Security Information NVT list loaded through same-origin native API.', nativeFail: 'Security Information NVT list did not produce a successful same-origin native API response.', aliases: ['nvt'] },
@@ -393,7 +406,7 @@ function focusedRouteCatalog() {
     { label: 'scanners', path: '/scanners', nativePath: '/api/v1/scanners', nativeCheck: 'scanner.list-native-api', nativePass: 'Top-level Scanners list loaded through same-origin native API.', nativeFail: 'Top-level Scanners list did not produce a successful same-origin native API response.' },
     { label: 'scan-configs', path: '/scan-configs', nativePath: '/api/v1/scan-configs', nativeCheck: 'scan-config.list-native-api', nativePass: 'Top-level Scan Configs list loaded through same-origin native API.', nativeFail: 'Top-level Scan Configs list did not produce a successful same-origin native API response.', aliases: ['scanconfigs'] },
     { label: 'filters', path: '/filters', nativePath: '/api/v1/filters', nativeCheck: 'filter.list-native-api', nativePass: 'Top-level Filters list loaded through same-origin native API.', nativeFail: 'Top-level Filters list did not produce a successful same-origin native API response.' },
-    { label: 'alerts', path: '/alerts', nativePath: null, aliases: ['alert'] },
+    { label: 'alerts', path: '/alerts', nativePath: null, aliases: ['alert'], invalidSortPath: '/api/v1/alerts?page_size=1&sort=not_an_alert_sort' },
     { label: 'tags', path: '/tags', nativePath: '/api/v1/tags', nativeCheck: 'tag.list-native-api', nativePass: 'Top-level Tags list loaded through same-origin native API.', nativeFail: 'Top-level Tags list did not produce a successful same-origin native API response.' },
     { label: 'overrides', path: '/overrides', nativePath: '/api/v1/overrides', nativeCheck: 'override.list-native-api', nativePass: 'Top-level Overrides list loaded through same-origin native API.', nativeFail: 'Top-level Overrides list did not produce a successful same-origin native API response.' },
     { label: 'port-lists', path: '/port-lists', nativePath: '/api/v1/port-lists', nativeCheck: 'port-list.list-native-api', nativePass: 'Top-level Port Lists loaded through same-origin native API.', nativeFail: 'Top-level Port Lists did not produce a successful same-origin native API response.' },
@@ -469,6 +482,7 @@ async function validateFocusedRoute(page, nativeApiResponses, spec) {
     if (spec.label === 'alerts') {
       await assertAlertMetadataProxy(page);
     }
+    await assertNativeApiInvalidSortProxy(page, spec);
     return;
   }
   const nativeResponse = await waitForNativeApiResponse(page, nativeApiResponses, new RegExp(`^${escapeRegExp(spec.nativePath)}$`));
@@ -481,6 +495,7 @@ async function validateFocusedRoute(page, nativeApiResponses, spec) {
   if (spec.label === 'tags') {
     await assertTagResourceNameProxy(page);
   }
+  await assertNativeApiInvalidSortProxy(page, spec);
 }
 
 async function runForBaseUrl(baseUrl) {
