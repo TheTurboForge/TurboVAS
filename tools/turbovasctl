@@ -18,13 +18,19 @@ import socket
 import subprocess
 import sys
 import time
-import tomllib
 import urllib.parse
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - exercised by monkeypatch in tests.
+    tomllib = None  # type: ignore[assignment]
+
+TOML_DECODE_ERROR = getattr(tomllib, "TOMLDecodeError", ValueError)
 
 
 STATUSES = ("pass", "warn", "fail")
@@ -7557,13 +7563,15 @@ def command_runtime_plan(repo_root: Path) -> dict[str, Any]:
 
 
 def load_security_sensitive_paths(repo_root: Path) -> tuple[dict[str, Any] | None, str | None]:
+    if tomllib is None:
+        return None, "Python 3.11 or newer is required for TOML-backed security policy checks."
     path = repo_root / SECURITY_SENSITIVE_PATHS_FILE
     try:
         with path.open("rb") as handle:
             return tomllib.load(handle), None
     except OSError as exc:
         return None, str(exc)
-    except tomllib.TOMLDecodeError as exc:
+    except TOML_DECODE_ERROR as exc:
         return None, str(exc)
 
 

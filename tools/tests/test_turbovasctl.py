@@ -1848,6 +1848,13 @@ class TurboVASCtlTests(unittest.TestCase):
         )
         self.assertLess(len(json.dumps(status_only)), len(json.dumps(full)))
 
+    def test_security_policy_toml_missing_dependency_is_graceful(self):
+        with unittest.mock.patch.object(turbovasctl, "tomllib", None):
+            payload, error = turbovasctl.load_security_sensitive_paths(Path("."))
+
+        self.assertIsNone(payload)
+        self.assertIn("Python 3.11", error)
+
     def test_native_api_migration_matrix_combines_inventory_and_openapi_metadata(self):
         root = Path(__file__).resolve().parents[2]
         result = turbovasctl.command_native_api_migration_matrix(root)
