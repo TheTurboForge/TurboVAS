@@ -9591,10 +9591,24 @@ mod tests {
         assert!(sql.contains("SELECT DISTINCT ON (task.target)"));
         assert!(sql.contains("reports.scan_run_status = 1"));
         assert!(sql.contains("ORDER BY task.target, coalesce(reports.end_time, reports.creation_time) DESC, reports.id DESC"));
+        assert!(sql.contains("SELECT srs.source_report, srs.source_report_uuid, srs.target,"));
+        assert!(sql.contains("FROM scope_report_sources srs"));
         assert!(sql.contains("(lc.source_report = srs.source_report) AS kept_as_latest"));
         assert!(sql.contains("WHERE srs.scope_report = $1"));
+        assert!(sql.contains("SELECT sr.source_report_uuid::text, sr.target_uuid::text"));
+        assert!(sql.contains("sr.task_uuid::text, coalesce(sr.task_name, '')::text AS task_name"));
         assert!(sql.contains("coalesce(sr.kept_as_latest, false) AS kept_as_latest"));
+        assert!(sql.contains("FROM source_rows sr"));
         assert!(sql.contains("LEFT JOIN results res ON res.report = sr.source_report"));
+        assert!(sql.contains(
+            "GROUP BY sr.source_report_uuid, sr.target_uuid, sr.target_name, sr.task_uuid,"
+        ));
+        assert!(
+            sql.find("FROM source_rows sr").unwrap()
+                < sql
+                    .find("LEFT JOIN results res ON res.report = sr.source_report")
+                    .unwrap()
+        );
         assert!(!upper_sql.contains("INSERT"));
         assert!(!upper_sql.contains("UPDATE"));
         assert!(!upper_sql.contains("DELETE"));
