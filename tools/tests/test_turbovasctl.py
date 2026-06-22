@@ -1566,7 +1566,6 @@ class TurboVASCtlTests(unittest.TestCase):
             "cpe-catalog-detail-read",
             "cpe-catalog-list-read",
             "cve-catalog-detail-epss-reference-read",
-            "cve-catalog-detail-read",
             "cve-catalog-list-read",
             "dfn-cert-advisory-catalog-detail-read",
             "dfn-cert-advisory-list-read",
@@ -1597,16 +1596,13 @@ class TurboVASCtlTests(unittest.TestCase):
             "report-config-metadata-list-read",
             "report-format-metadata-detail-read",
             "report-format-metadata-list-read",
-            "result-detail-metadata-read",
             "result-detail-metadata-tags-and-overrides-read",
             "result-list-and-effective-overrides-read",
-            "result-list-read",
             "saved-filter-metadata-detail-read",
             "saved-filter-metadata-list-read",
             "scan-config-family-summary-read",
             "scan-config-metadata-detail-info-tags-and-task-backlink-read",
             "scan-config-metadata-list-read",
-            "scanner-metadata-detail-info-read",
             "scanner-metadata-detail-info-tags-and-task-backlink-read",
             "scanner-metadata-list-read",
             "schedule-metadata-detail-read",
@@ -1668,6 +1664,13 @@ class TurboVASCtlTests(unittest.TestCase):
             "vulnerability-exports-and-actions",
         ]
         self.assertEqual(contract["allowed_replaces_values"], expected_replaces_values)
+        actual_replaces_values = sorted(
+            {
+                operation["x_turbovas_values"]["x-turbovas-replaces"]
+                for operation in turbovasctl.openapi_contract_operations(root)
+            }
+        )
+        self.assertEqual(contract["allowed_replaces_values"], actual_replaces_values)
         self.assertEqual(contract["allowed_inherited_still_owns_values"], expected_inherited_still_owns_values)
         self.assertEqual(contract["missing_exposure_operations"], [])
         self.assertEqual(contract["invalid_exposure_operations"], [])
