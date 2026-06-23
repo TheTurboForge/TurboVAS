@@ -3419,6 +3419,7 @@ class TurboVASCtlTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[2]
         openapi = (root / "api" / "openapi" / "turbovas-v1.yaml").read_text(encoding="utf-8")
         api_source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
+        tls_source = (root / "services" / "turbovas-api" / "src" / "tls_certificates.rs").read_text(encoding="utf-8")
         native_tooling = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
         tls_detail_source = api_source.split("async fn tls_certificate_asset_detail", 1)[1].split("async fn scanner_assets", 1)[0]
 
@@ -3426,7 +3427,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn('parse_uuid(&certificate_id)?;', api_source)
         self.assertIn('WHERE c.uuid = $1', tls_detail_source)
         self.assertIn('JOIN tls_certificate_sources src ON src.tls_certificate = c.id', tls_detail_source)
-        self.assertIn('TlsCertificateSourceItem', api_source)
+        self.assertIn('TlsCertificateSourceItem', tls_source)
         self.assertNotIn('c.certificate', tls_detail_source)
         self.assertIn('/tls-certificates/{certificate_id}:', openapi)
         self.assertIn("#/components/parameters/TlsCertificateId", openapi)
@@ -3440,7 +3441,7 @@ class TurboVASCtlTests(unittest.TestCase):
         openapi = (root / "api" / "openapi" / "turbovas-v1.yaml").read_text(encoding="utf-8")
         api_source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
         native_tooling = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
-        scanner_detail_source = api_source.split("async fn scanner_asset_detail", 1)[1].split("fn scan_config_asset_from_row", 1)[0]
+        scanner_detail_source = api_source.split("async fn scanner_asset_detail", 1)[1].split("async fn scan_config_assets", 1)[0]
 
         self.assertIn('/api/v1/scanners/:scanner_id', api_source)
         self.assertIn('let scanner_id = parse_uuid(&scanner_id)?.to_string();', api_source)
