@@ -1581,7 +1581,8 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("direct_api_contract", details)
         self.assertIn("browser_proxy_contract", details)
         self.assertIn("product_workflow_residue", details)
-        self.assertIn("candidate_for_removal_paths", details)
+        self.assertNotIn("candidate_for_removal_paths", details)
+        self.assertEqual(details["candidate_for_removal_path_count"], details["by_category"]["candidate_for_removal"]["count"])
         self.assertIn("candidate_for_removal_review", details)
         review = details["candidate_for_removal_review"]
         self.assertEqual(review["total"], details["by_category"]["candidate_for_removal"]["count"])
@@ -1591,6 +1592,9 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertGreater(review["buckets"]["scanner_or_task_control"]["count"], 0)
         self.assertGreater(review["buckets"]["export_or_report_generation"]["count"], 0)
         self.assertGreater(review["buckets"]["credential_or_account"]["count"], 0)
+        for bucket in review["buckets"].values():
+            self.assertNotIn("paths", bucket)
+            self.assertEqual(bucket["path_count"], bucket["count"])
         inventory_details = compact["findings"][0]["details"]
         self.assertNotIn("candidate_for_removal_paths", inventory_details)
         self.assertIn("candidate_for_removal_review", inventory_details)

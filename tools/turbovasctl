@@ -6081,6 +6081,26 @@ def summarize_native_tooling(items: list[dict[str, Any]], repo_root: Path | None
     }
 
 
+def compact_candidate_for_removal_review(review: dict[str, Any]) -> dict[str, Any]:
+    compact_buckets: dict[str, Any] = {}
+    for bucket, data in review.get("buckets", {}).items():
+        if not isinstance(data, dict):
+            continue
+        compact_bucket: dict[str, Any] = {
+            "count": data.get("count", 0),
+            "path_count": len(data.get("paths", [])) if isinstance(data.get("paths"), list) else 0,
+        }
+        if data.get("reason"):
+            compact_bucket["reason"] = data["reason"]
+        compact_buckets[bucket] = compact_bucket
+    return {
+        "total": review.get("total", 0),
+        "safe_removal_count": review.get("safe_removal_count", 0),
+        "blocked_or_review_count": review.get("blocked_or_review_count", 0),
+        "buckets": compact_buckets,
+    }
+
+
 def compact_native_tooling_summary(summary: dict[str, Any]) -> dict[str, Any]:
     endpoint_statuses: dict[str, int] = {}
     for endpoint in summary.get("implemented_native_endpoints", []):
@@ -6163,8 +6183,8 @@ def compact_native_tooling_summary(summary: dict[str, Any]) -> dict[str, Any]:
         "total_items": summary.get("total_items", 0),
         "by_category": by_category,
         "product_workflow_residue": product_residue,
-        "candidate_for_removal_paths": summary.get("by_category", {}).get("candidate_for_removal", {}).get("paths", []),
-        "candidate_for_removal_review": summary.get("candidate_for_removal_review", {}),
+        "candidate_for_removal_path_count": len(summary.get("by_category", {}).get("candidate_for_removal", {}).get("paths", [])),
+        "candidate_for_removal_review": compact_candidate_for_removal_review(summary.get("candidate_for_removal_review", {})),
         "unknown_paths": summary.get("by_category", {}).get("unknown", {}).get("paths", []),
         "implemented_native_endpoint_count": len(summary.get("implemented_native_endpoints", [])),
         "implemented_native_endpoints_by_status": endpoint_statuses,
