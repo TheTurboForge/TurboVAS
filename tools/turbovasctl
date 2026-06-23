@@ -1630,6 +1630,10 @@ def aggregate_status(findings: Iterable[dict[str, Any]]) -> str:
     return final
 
 
+def contract_drift_status(alignment_status: Any) -> str:
+    return "pass" if alignment_status == "pass" else "fail"
+
+
 def make_result(command: str, repo_root: Path, summary: str, findings: list[dict[str, Any]], artifacts: list[str] | None = None) -> dict[str, Any]:
     return {"status": aggregate_status(findings), "summary": summary, "findings": findings, "artifacts": artifacts or [], "metadata": metadata(repo_root, command)}
 
@@ -6866,7 +6870,7 @@ def command_native_api_migration_matrix(repo_root: Path, status_only: bool = Fal
             details=details["summary"],
         ),
         finding(
-            "warn" if row_drift else "pass",
+            "fail" if row_drift else "pass",
             "native-api-migration-matrix.coverage",
             "Native API migration matrix rows are present in both endpoint inventory and OpenAPI."
             if not row_drift
@@ -6879,7 +6883,7 @@ def command_native_api_migration_matrix(repo_root: Path, status_only: bool = Fal
             },
         ),
         finding(
-            "warn" if metadata_drift else "pass",
+            "fail" if metadata_drift else "pass",
             "native-api-migration-matrix.metadata",
             "Native API migration matrix rows have complete migration metadata and direct exposure markers."
             if not metadata_drift
@@ -6940,9 +6944,9 @@ def command_native_api_client_contract(repo_root: Path, status_only: bool = Fals
     ]
     non_get_direct = [openapi_operation_label(operation) for operation in direct_operations if operation.get("method") != "get"]
     direct_count = len(direct_operations)
-    openapi_status = "pass" if contract.get("alignment_status") == "pass" else "warn"
-    auth_status = "pass" if auth_contract.get("alignment_status") == "pass" else "warn"
-    direct_status = "pass" if direct_count > 0 and not non_get_direct else "warn"
+    openapi_status = contract_drift_status(contract.get("alignment_status"))
+    auth_status = contract_drift_status(auth_contract.get("alignment_status"))
+    direct_status = "pass" if direct_count > 0 and not non_get_direct else "fail"
     details = {
         "openapi_version": openapi_info_version(repo_root),
         "operation_count": contract.get("operation_count", 0),
@@ -7028,7 +7032,7 @@ def command_native_tooling_state(repo_root: Path, compact: bool = False, summary
     findings = [
         finding("pass", "native-tooling.inventory", f"Classified {len(items)} inherited tooling dependency surface(s).", details=finding_details),
         finding(
-            "pass" if direct_alignment_status == "pass" else "warn",
+            contract_drift_status(direct_alignment_status),
             "native-tooling.direct-api-contract",
             "Native API endpoint inventory is aligned with Rust routes, Rust direct allowlist, and OpenAPI direct markers."
             if direct_alignment_status == "pass"
@@ -7036,7 +7040,7 @@ def command_native_tooling_state(repo_root: Path, compact: bool = False, summary
             details=direct_finding_details,
         ),
         finding(
-            "pass" if browser_proxy_alignment_status == "pass" else "warn",
+            contract_drift_status(browser_proxy_alignment_status),
             "native-tooling.browser-proxy-contract",
             "Native API browser-proxied endpoint inventory is aligned with the gsad same-origin proxy allowlist."
             if browser_proxy_alignment_status == "pass"
@@ -7044,7 +7048,7 @@ def command_native_tooling_state(repo_root: Path, compact: bool = False, summary
             details=browser_proxy_finding_details,
         ),
         finding(
-            "pass" if openapi_alignment_status == "pass" else "warn",
+            contract_drift_status(openapi_alignment_status),
             "native-tooling.openapi-contract",
             "Native API OpenAPI operations have deterministic operation IDs, exposure/migration metadata, shared Error responses, and collection query contracts."
             if openapi_alignment_status == "pass"

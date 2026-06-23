@@ -1912,6 +1912,17 @@ class TurboVASCtlTests(unittest.TestCase):
             contract["rust_direct_allowlist_endpoints"],
         )
 
+    def test_native_tooling_state_fails_on_direct_contract_drift(self):
+        root = Path(__file__).resolve().parents[2]
+        drift = {"alignment_status": "warn", "missing_rust_routes": ["/api/v1/example"]}
+        with unittest.mock.patch.object(turbovasctl, "native_api_direct_contract_summary", return_value=drift):
+            result = turbovasctl.command_native_tooling_state(root, status_only=True)
+
+        findings = {item["check"]: item for item in result["findings"]}
+        self.assertEqual(result["status"], "fail")
+        self.assertEqual(findings["native-tooling.direct-api-contract"]["status"], "fail")
+        self.assertEqual(result["details"]["direct_api_contract"]["alignment_status"], "warn")
+
     def test_native_tooling_state_tracks_browser_proxy_contract_alignment(self):
         root = Path(__file__).resolve().parents[2]
         result = turbovasctl.command_native_tooling_state(root)
@@ -2282,6 +2293,26 @@ class TurboVASCtlTests(unittest.TestCase):
             ],
         )
         self.assertLess(len(json.dumps(status_only)), len(json.dumps(full)))
+
+    def test_native_api_client_contract_fails_on_openapi_drift(self):
+        root = Path(__file__).resolve().parents[2]
+        contract = {
+            "alignment_status": "warn",
+            "auth_contract": {"alignment_status": "pass"},
+            "operation_count": 0,
+            "missing_operation_ids": ["GET /example"],
+            "duplicate_operation_ids": [],
+            "operations_missing_error_responses": [],
+            "missing_error_schema_fields": [],
+        }
+        with unittest.mock.patch.object(turbovasctl, "native_api_openapi_contract_summary", return_value=contract), unittest.mock.patch.object(turbovasctl, "openapi_contract_operations", return_value=[]):
+            result = turbovasctl.command_native_api_client_contract(root, status_only=True)
+
+        findings = {item["check"]: item for item in result["findings"]}
+        self.assertEqual(result["status"], "fail")
+        self.assertEqual(findings["native-api-client-contract.openapi"]["status"], "fail")
+        self.assertEqual(findings["native-api-client-contract.direct-read"]["status"], "fail")
+        self.assertEqual(result["details"]["openapi_alignment_status"], "warn")
 
     def test_security_policy_toml_missing_dependency_is_graceful(self):
         with unittest.mock.patch.object(turbovasctl, "tomllib", None):
@@ -2654,6 +2685,30 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(remaining["bucket_counts"]["report_generation_or_retention"], 1)
         self.assertEqual(remaining["top_residuals"][0]["example_endpoint"], "/api/v1/reports")
         self.assertEqual(compact["findings"], [{"status": "pass", "check": "native-api-migration-matrix.status-only", "message": "Native API migration matrix passed; no non-pass findings."}])
+
+    def test_native_api_migration_matrix_fails_on_contract_drift(self):
+        root = Path(__file__).resolve().parents[2]
+        rows = [
+            {
+                "endpoint": "/api/v1/example",
+                "method": "get",
+                "inventory_endpoint": "/api/v1/example",
+                "openapi_path": None,
+                "direct_access": "scriptable_read",
+                "openapi_direct_marker": None,
+                "x_turbovas_exposure": None,
+                "x_turbovas_maturity": None,
+                "x_turbovas_replaces": None,
+                "x_turbovas_inherited_still_owns": None,
+            }
+        ]
+        with unittest.mock.patch.object(turbovasctl, "native_api_migration_matrix_rows", return_value=rows):
+            result = turbovasctl.command_native_api_migration_matrix(root, status_only=True)
+
+        findings = {item["check"]: item for item in result["findings"]}
+        self.assertEqual(result["status"], "fail")
+        self.assertEqual(findings["native-api-migration-matrix.coverage"]["status"], "fail")
+        self.assertEqual(findings["native-api-migration-matrix.metadata"]["status"], "fail")
 
     def test_native_api_migration_matrix_compact_aliases_status_only(self):
         args = turbovasctl.build_parser().parse_args(["--json", "native-api-migration-matrix", "--compact"])
