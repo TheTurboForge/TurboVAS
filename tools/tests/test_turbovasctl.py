@@ -2302,6 +2302,10 @@ class TurboVASCtlTests(unittest.TestCase):
                     "check": "production.default-credentials",
                     "message": "default password",
                     "path": "/home/user/TurboVAS-runtime/secrets/gvmd-admin-password",
+                    "details": {
+                        "token_path": "/tmp/native-api-token",
+                        "safe_count": 1,
+                    },
                 }
             ],
         }
@@ -2309,7 +2313,10 @@ class TurboVASCtlTests(unittest.TestCase):
         compact = turbovasctl.production_posture_status_only_result(result)
 
         self.assertEqual(compact["findings"][0]["path"], "[redacted]")
+        self.assertEqual(compact["findings"][0]["details"]["token_path"], "[redacted]")
+        self.assertEqual(compact["findings"][0]["details"]["safe_count"], 1)
         self.assertNotIn("gvmd-admin-password", json.dumps(compact))
+        self.assertNotIn("native-api-token", json.dumps(compact))
 
     def test_native_api_migration_matrix_combines_inventory_and_openapi_metadata(self):
         root = Path(__file__).resolve().parents[2]

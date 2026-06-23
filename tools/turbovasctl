@@ -6294,6 +6294,11 @@ def compact_license_status_finding(item: dict[str, Any]) -> dict[str, Any]:
 
 
 def production_posture_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
+    sensitive_parts = ("secret", "token", "password", "credential", "bearer")
+
+    def sensitive(value: object) -> bool:
+        return any(part in str(value).lower() for part in sensitive_parts)
+
     compact = dict(result)
     findings = result.get("findings", [])
     non_pass = []
@@ -6302,8 +6307,14 @@ def production_posture_status_only_result(result: dict[str, Any]) -> dict[str, A
             continue
         compact_item = compact_doctor_finding(item)
         path = compact_item.get("path")
-        if isinstance(path, str) and (path.startswith("/") or "secret" in path.lower()):
+        if isinstance(path, str) and (path.startswith("/") or sensitive(path)):
             compact_item["path"] = "[redacted]"
+        details = compact_item.get("details")
+        if isinstance(details, dict):
+            compact_item["details"] = {
+                key: "[redacted]" if sensitive(key) or sensitive(value) else value
+                for key, value in details.items()
+            }
         non_pass.append(compact_item)
     details = result.get("details", {}) if isinstance(result.get("details"), dict) else {}
     compact["details"] = {
