@@ -4073,6 +4073,59 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertIn("doctor_non_pass", source)
         self.assertIn("non_pass_findings", source)
 
+    def test_quality_gate_compact_step_keeps_non_pass_findings(self):
+        result = {
+            "status": "fail",
+            "summary": "contract drift",
+            "details": {"large": ["not copied"]},
+            "findings": [
+                {"status": "pass", "check": "one", "message": "ok"},
+                {"status": "fail", "check": "two", "message": "bad"},
+            ],
+        }
+
+        step = turbovasctl.quality_gate_compact_step(result)
+        quality_finding = turbovasctl.quality_gate_status_finding("quality.native-api-client-contract", result)
+
+        self.assertEqual(step["status"], "fail")
+        self.assertEqual(step["summary"], "contract drift")
+        self.assertEqual(step["non_pass_findings"], [{"status": "fail", "check": "two", "message": "bad"}])
+        self.assertNotIn("details", step)
+        self.assertEqual(quality_finding["status"], "fail")
+        self.assertEqual(quality_finding["details"]["non_pass_count"], 1)
+
+    def test_quality_gate_runs_native_api_contract_checks(self):
+        source = (Path(__file__).resolve().parents[1] / "turbovasctl").read_text(encoding="utf-8")
+        self.assertIn("quality.native-tooling-state", source)
+        self.assertIn("quality.native-api-client-contract", source)
+        self.assertIn("quality.native-api-migration-matrix", source)
+        self.assertIn("command_native_tooling_state(repo_root, status_only=True)", source)
+        self.assertIn("command_native_api_client_contract(repo_root, status_only=True)", source)
+        self.assertIn("command_native_api_migration_matrix(repo_root, status_only=True)", source)
+
+    def test_quality_gate_includes_native_api_contract_steps(self):
+        pass_result = {"status": "pass", "summary": "ok", "findings": []}
+        completed = subprocess.CompletedProcess(["unit"], 0, "ok\n", "")
+
+        with tempfile.TemporaryDirectory() as tmp, \
+             unittest.mock.patch.object(turbovasctl, "command_license_report", return_value=pass_result), \
+             unittest.mock.patch.object(turbovasctl, "command_doctor", return_value=pass_result), \
+             unittest.mock.patch.object(turbovasctl, "command_native_tooling_state", return_value=pass_result), \
+             unittest.mock.patch.object(turbovasctl, "command_native_api_client_contract", return_value=pass_result), \
+             unittest.mock.patch.object(turbovasctl, "command_native_api_migration_matrix", return_value=pass_result), \
+             unittest.mock.patch.object(turbovasctl, "run_command", return_value=completed):
+            result = turbovasctl.command_quality_gate(Path(tmp))
+
+        steps = result["details"]["steps"]
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(steps["native-tooling-state"]["status"], "pass")
+        self.assertEqual(steps["native-api-client-contract"]["status"], "pass")
+        self.assertEqual(steps["native-api-migration-matrix"]["status"], "pass")
+        checks = {item["check"] for item in result["findings"]}
+        self.assertIn("quality.native-tooling-state", checks)
+        self.assertIn("quality.native-api-client-contract", checks)
+        self.assertIn("quality.native-api-migration-matrix", checks)
+
     def test_gsa_and_runtime_manager_locks_are_registered(self):
         source = (Path(__file__).resolve().parents[1] / "turbovasctl").read_text(encoding="utf-8")
         self.assertIn("GSA_OPERATION_LOCK", source)

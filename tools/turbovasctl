@@ -13390,6 +13390,25 @@ def quality_gate_doctor_status(doctor_result: dict[str, Any]) -> tuple[str, str]
     return doctor_result.get("status", "fail"), doctor_result.get("summary", "Doctor status unavailable.")
 
 
+def quality_gate_compact_step(result: dict[str, Any]) -> dict[str, Any]:
+    non_pass = [item for item in result.get("findings", []) if item.get("status") != "pass"]
+    return {
+        "status": result.get("status", "fail"),
+        "summary": result.get("summary", "Status unavailable."),
+        "non_pass_findings": non_pass,
+    }
+
+
+def quality_gate_status_finding(check: str, result: dict[str, Any]) -> dict[str, Any]:
+    step = quality_gate_compact_step(result)
+    return finding(
+        step["status"],
+        check,
+        step["summary"],
+        details={"status": step["status"], "non_pass_count": len(step["non_pass_findings"])},
+    )
+
+
 def command_quality_gate(repo_root: Path, include_runtime: bool = False) -> dict[str, Any]:
     artifact_dir = quality_gate_artifact_dir(repo_root)
     artifact_dir.mkdir(parents=True, exist_ok=True)
@@ -13410,6 +13429,15 @@ def command_quality_gate(repo_root: Path, include_runtime: bool = False) -> dict
         "non_pass_findings": doctor_non_pass,
     }
     findings.append(finding(doctor_status, "quality.doctor", doctor_summary, details={"status": doctor_result["status"], "quality_status": doctor_status}))
+
+    native_contract_checks = (
+        ("native-tooling-state", "quality.native-tooling-state", command_native_tooling_state(repo_root, status_only=True)),
+        ("native-api-client-contract", "quality.native-api-client-contract", command_native_api_client_contract(repo_root, status_only=True)),
+        ("native-api-migration-matrix", "quality.native-api-migration-matrix", command_native_api_migration_matrix(repo_root, status_only=True)),
+    )
+    for step_name, check_name, check_result in native_contract_checks:
+        details["steps"][step_name] = quality_gate_compact_step(check_result)
+        findings.append(quality_gate_status_finding(check_name, check_result))
 
     unit_command = [sys.executable, "-m", "unittest", "tools.tests.test_turbovasctl"]
     unit = run_command(unit_command, repo_root, env=quality_gate_unit_env(repo_root), timeout=300)
