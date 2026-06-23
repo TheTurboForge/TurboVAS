@@ -1,5 +1,6 @@
 /* SPDX-FileCopyrightText: 2023 Greenbone AG
  * SPDX-FileCopyrightText: 2002-2004 Tenable Network Security
+ * TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
  *
  * SPDX-License-Identifier: GPL-2.0-only
  */
@@ -741,7 +742,7 @@ nasl_egrep (lex_ctxt *lexic)
   regmatch_t subs[NS];
   char *s, *t;
   int copt;
-  char *rets;
+  GString *rets;
   long int max_size = get_var_size_by_name (lexic, "string");
 
   if (pattern == NULL || string == NULL)
@@ -755,7 +756,7 @@ nasl_egrep (lex_ctxt *lexic)
   else
     copt = 0;
 
-  rets = g_malloc0 (max_size + 2);
+  rets = g_string_new (NULL);
   if (replace_nul)
     string = g_regex_escape_nul (string, max_size);
   else
@@ -777,7 +778,8 @@ nasl_egrep (lex_ctxt *lexic)
           {
             nasl_perror (
               lexic, "egrep() : regcomp() failed for pattern '%s'.\n", pattern);
-            g_free (rets);
+            g_string_free (rets, TRUE);
+            g_free (string);
             return NULL;
           }
 
@@ -788,8 +790,8 @@ nasl_egrep (lex_ctxt *lexic)
             if (rt != NULL)
               rt[0] = '\0';
 
-            strcat (rets, s);
-            strcat (rets, "\n");
+            g_string_append (rets, s);
+            g_string_append_c (rets, '\n');
             if (rt != NULL)
               rt[0] = '\n';
           }
@@ -817,9 +819,9 @@ nasl_egrep (lex_ctxt *lexic)
           break;
       }
 #ifdef I_WANT_MANY_DIRTY_ERROR_MESSAGES
-  if (rets[0] == '\0')
+  if (rets->len == 0)
     {
-      g_free (rets);
+      g_string_free (rets, TRUE);
       g_free (string);
       return FAKE_CELL;
     }
@@ -827,8 +829,8 @@ nasl_egrep (lex_ctxt *lexic)
   g_free (string);
 
   retc = alloc_typed_cell (CONST_DATA);
-  retc->size = strlen (rets);
-  retc->x.str_val = rets;
+  retc->size = rets->len;
+  retc->x.str_val = g_string_free (rets, FALSE);
 
   return retc;
 }

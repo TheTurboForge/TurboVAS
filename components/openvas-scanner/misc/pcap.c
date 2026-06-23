@@ -1,5 +1,6 @@
 /* SPDX-FileCopyrightText: 2023 Greenbone AG
  * SPDX-FileCopyrightText: 1999 Renaud Deraison
+ * TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
@@ -416,7 +417,6 @@ getinterfaces (int *howmany)
   int numinterfaces = 0;
   int sd;
   int len;
-  char *p;
   char buf[10240];
   struct ifconf ifc;
   struct ifreq *ifr;
@@ -451,21 +451,28 @@ getinterfaces (int *howmany)
   for (bufp = buf; bufp && *bufp && (bufp < (buf + ifc.ifc_len));
        bufp += sizeof (ifr->ifr_name) + len)
     {
+      char *alias, *name_end;
+      size_t if_name_len;
+
       ifr = (struct ifreq *) bufp;
       sin = (struct sockaddr_in *) &ifr->ifr_addr;
       memcpy (&(mydevs[numinterfaces].addr), (char *) &(sin->sin_addr),
               sizeof (struct in_addr));
-      /* In case it is a stinkin' alias */
-      if ((p = strchr (ifr->ifr_name, ':')))
-        *p = '\0';
 
+      if_name_len = sizeof (ifr->ifr_name);
+      name_end = memchr (ifr->ifr_name, '\0', if_name_len);
+      if (name_end != NULL)
+        if_name_len = name_end - ifr->ifr_name;
+
+      /* In case it is a stinkin' alias */
+      alias = memchr (ifr->ifr_name, ':', if_name_len);
+      if (alias != NULL)
+        if_name_len = alias - ifr->ifr_name;
+
+      if (if_name_len >= MAX_IFACE_NAME_LEN)
+        if_name_len = MAX_IFACE_NAME_LEN - 1;
       memset (mydevs[numinterfaces].name, '\0', MAX_IFACE_NAME_LEN);
-      if (strlen (ifr->ifr_name) < MAX_IFACE_NAME_LEN)
-        memcpy (mydevs[numinterfaces].name, ifr->ifr_name,
-                strlen (ifr->ifr_name));
-      else
-        memcpy (mydevs[numinterfaces].name, ifr->ifr_name,
-                MAX_IFACE_NAME_LEN - 1);
+      memcpy (mydevs[numinterfaces].name, ifr->ifr_name, if_name_len);
       numinterfaces++;
       if (numinterfaces == 1023)
         {
