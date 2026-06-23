@@ -76,15 +76,6 @@
  *     switches back to a default error description (pattern file name
  *     and line number).
  *
- *   #+search[:] FILENAME
- *
- *     This searches the file with name FILENAME for a match.  The
- *     comparison is case insensitive for all ASCII characters.  This
- *     is a simple linear search and stops at the first match.
- *     Comments are not allowed in that file.  A line in that file may
- *     not be longer than 255 characters.  An example for such a file
- *     is "/usr/share/dict/words".
- *
  *   #+username
  *
  *     This is used to perform checks on the name/password
@@ -150,64 +141,6 @@ is_keyword (char *string, const char *keyword)
 }
 
 /**
- * @brief Search a file for a matching line
- *
- * This is a case insensitive search for a password in a file.  The
- * file is assumed to be a simple LF delimited list of words.
- *
- * @param fname    Name of the file to search.
- * @param password Password to search for.
- *
- * @return -1 if the file could not be opened or a read error
- *         occurred, 0 if password was not found and 1 if password was found.
- */
-static int
-search_file (const char *fname, const char *password)
-{
-  FILE *fp;
-  int c;
-  char line[256];
-
-  fp = fopen (fname, "r");
-  if (!fp)
-    return -1;
-
-  while (fgets (line, DIM (line) - 1, fp))
-    {
-      size_t len;
-
-      len = strlen (line);
-      if (!len || line[len - 1] != '\n')
-        {
-          /* Incomplete last line or line too long.  Eat until end of
-             line. */
-          while ((c = getc (fp)) != EOF && c != '\n')
-            ;
-          continue;
-        }
-      line[--len] = 0; /* Chop the LF. */
-      if (len && line[len - 1] == '\r')
-        line[--len] = 0; /* Chop an optional CR. */
-      if (!len)
-        continue; /* Empty */
-      if (!g_ascii_strcasecmp (line, password))
-        {
-          fclose (fp);
-          return 1; /* Found.  */
-        }
-    }
-  if (ferror (fp))
-    {
-      int save_errno = errno;
-      fclose (fp);
-      errno = save_errno;
-      return -1; /* Read error.  */
-    }
-  fclose (fp);
-  return 0; /* Not found.  */
-}
-
-/**
  * @brief Parse one line of a pettern file
  *
  * @param line     A null terminated buffer with the content of the line.
@@ -258,23 +191,9 @@ parse_pattern_line (char *line, const char *fname, int lineno, char **descp,
         }
       else if ((p = is_keyword (line, "search")))
         {
-          int sret;
-
-          // codeql[cpp/path-injection] Password-policy search files are
-          // administrator-controlled policy configuration entries.
-          sret = search_file (p, password);
-          if (sret == -1)
-            {
-              g_warning ("error searching '%s' (requested at line %d): %s", p,
-                         lineno, g_strerror (errno));
-              ret = policy_checking_failed ();
-            }
-          else if (sret && *descp)
-            ret = g_strdup_printf ("Weak password (%s)", *descp);
-          else if (sret)
-            ret = g_strdup_printf ("Weak password (found in '%s')", p);
-          else
-            ret = NULL;
+          g_warning ("unsupported password-policy search directive at line %d: %s",
+                     lineno, p);
+          ret = policy_checking_failed ();
         }
       else if (is_keyword (line, "username"))
         {

@@ -17,13 +17,28 @@
 #include "manage_sql_report_hosts.h"
 #include "manage_sql_report_errors.h"
 
+#include <fcntl.h>
 #include <gvm/util/fileutils.h>
+#include <unistd.h>
 
 #undef G_LOG_DOMAIN
 /**
  * @brief GLib log domain.
  */
 #define G_LOG_DOMAIN "md manage"
+
+static FILE *
+fopen_private_write (const char *path)
+{
+  int fd = open (path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+  if (fd == -1)
+    return NULL;
+
+  FILE *stream = fdopen (fd, "w");
+  if (stream == NULL)
+    close (fd);
+  return stream;
+}
 
 /**
  * @brief Send report Errors XML to the client.
@@ -74,9 +89,7 @@ manage_send_report_errors (report_t report,
   xml_dir_created = TRUE;
 
   xml_file = g_strdup_printf ("%s/report-errors.xml", xml_dir);
-  // codeql[cpp/world-writable-file-creation] xml_dir is a private mkdtemp
-  // directory used for transient report generation.
-  stream = fopen (xml_file, "w");
+  stream = fopen_private_write (xml_file);
   if (stream == NULL)
     {
       g_warning ("%s: %s", __func__, strerror (errno));

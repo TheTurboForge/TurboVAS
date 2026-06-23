@@ -596,7 +596,6 @@ void cli_credentials_guess(struct cli_credentials *cred)
 {
 	char *p;
 	const char *passwd_fd;
-	const char *passwd_file;
 	char *endptr;
 	long fd_value;
 
@@ -631,13 +630,6 @@ void cli_credentials_guess(struct cli_credentials *cred)
 		} else {
 			fprintf(stderr, "Ignoring invalid PASSWD_FD value\n");
 		}
-	}
-	
-	passwd_file = getenv("PASSWD_FILE");
-	if (passwd_file) {
-		/* codeql[cpp/path-injection] PASSWD_FILE is an explicit inherited
-		 * Samba environment interface for operator-selected credentials. */
-		cli_credentials_parse_password_file(cred, passwd_file, CRED_GUESS_FILE);
 	}
 	
 	if (cli_credentials_get_kerberos_state(cred) != CRED_DONT_USE_KERBEROS) {

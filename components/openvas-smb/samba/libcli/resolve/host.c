@@ -95,6 +95,8 @@ static void pipe_handler(struct event_context *ev, struct fd_event *fde,
 	struct composite_context *c = talloc_get_type(private_data, struct composite_context);
 	struct host_state *state = talloc_get_type(c->private_data, struct host_state);
 	char address[128];
+	char canonical_address[INET_ADDRSTRLEN];
+	struct in_addr parsed_address;
 	int ret;
 
 	/* if we get any event from the child then we know that we
@@ -111,17 +113,17 @@ static void pipe_handler(struct event_context *ev, struct fd_event *fde,
 		return;
 	}
 
-	/* enusre the address looks good */
+	/* Ensure the address is a strict non-zero IPv4 literal from the resolver child. */
 	address[ret] = 0;
-	// codeql[cpp/user-controlled-bypass] This inherited Samba resolver child
-	// IPC path validates the child-returned address before use.
-	if (strcmp(address, "0.0.0.0") == 0 ||
-	    inet_addr(address) == INADDR_NONE) {
+	if (inet_pton(AF_INET, address, &parsed_address) != 1 ||
+	    parsed_address.s_addr == htonl(INADDR_ANY) ||
+	    inet_ntop(AF_INET, &parsed_address, canonical_address,
+	              sizeof(canonical_address)) == NULL) {
 		composite_error(c, NT_STATUS_BAD_NETWORK_NAME);
 		return;
 	}
 
-	state->reply_addr = talloc_strdup(state, address);
+	state->reply_addr = talloc_strdup(state, canonical_address);
 	if (composite_nomem(state->reply_addr, c)) return;
 
 	composite_done(c);

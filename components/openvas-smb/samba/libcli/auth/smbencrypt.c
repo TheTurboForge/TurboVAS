@@ -291,8 +291,8 @@ void SMBsesskeygen_lm_sess_key(const uint8_t lm_hash[16],
 	memcpy(partial_lm_hash, lm_hash, 8);    
 	memset(partial_lm_hash + 8, 0xbd, 6);
 
-	// codeql[cpp/weak-cryptographic-algorithm] Required for legacy
-	// SMB/LM session-key protocol compatibility.
+	// DES is required for legacy SMB/LM session-key compatibility.
+	// codeql[cpp/weak-cryptographic-algorithm]
 	des_crypt56(p24,   lm_resp, partial_lm_hash,     1);
 	des_crypt56(p24+8, lm_resp, partial_lm_hash + 7, 1);
 

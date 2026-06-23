@@ -75,6 +75,7 @@
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <glib/gstdio.h>
 #include <gnutls/x509.h>
 #include <malloc.h>
@@ -85,6 +86,7 @@
 #include <sys/wait.h>
 #include <sys/time.h>
 #include <time.h>
+#include <unistd.h>
 #include <grp.h>
 #include <gpgme.h>
 #include <stdlib.h>
@@ -118,6 +120,19 @@
  * @brief GLib log domain.
  */
 #define G_LOG_DOMAIN "md manage"
+
+static FILE *
+fopen_private_write (const char *path)
+{
+  int fd = open (path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+  if (fd == -1)
+    return NULL;
+
+  FILE *stream = fdopen (fd, "w");
+  if (stream == NULL)
+    close (fd);
+  return stream;
+}
 
 #ifdef DEBUG_FUNCTION_NAMES
 #include <dlfcn.h>
@@ -12951,9 +12966,7 @@ print_report_xml_start (report_t report, task_t task,
       return -1;
     }
 
-  // codeql[cpp/world-writable-file-creation] xml_start lives under gvmd's
-  // transient report workspace; gvmd also sets a restrictive process umask.
-  out = fopen (xml_start, "w");
+  out = fopen_private_write (xml_start);
 
   if (out == NULL)
     {

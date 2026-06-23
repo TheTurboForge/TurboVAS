@@ -25,6 +25,7 @@
 
 #include <cjson/cJSON.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <glib.h>
 #include <glib/gstdio.h>
 #include <grp.h>
@@ -34,6 +35,7 @@
 #include <pwd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -48,6 +50,19 @@
  * @brief GLib log domain.
  */
 #define G_LOG_DOMAIN "md manage"
+
+static FILE *
+fopen_private_append (const char *path)
+{
+  int fd = open (path, O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0600);
+  if (fd == -1)
+    return NULL;
+
+  FILE *stream = fdopen (fd, "a");
+  if (stream == NULL)
+    close (fd);
+  return stream;
+}
 
 
 
@@ -3888,10 +3903,13 @@ print_report_xml_end (gchar *xml_start, gchar *xml_full,
       g_warning ("%s: failed to copy xml_start file", __func__);
       return -1;
     }
+  if (chmod (xml_full, 0600))
+    {
+      g_warning ("%s: chmod failed: %s", __func__, strerror (errno));
+      return -1;
+    }
 
-  // codeql[cpp/world-writable-file-creation] xml_full is a transient report
-  // workspace file copied from xml_start under gvmd's restrictive umask.
-  out = fopen (xml_full, "a");
+  out = fopen_private_append (xml_full);
   if (out == NULL)
     {
       g_warning ("%s: fopen failed: %s",

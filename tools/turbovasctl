@@ -2924,25 +2924,31 @@ def read_or_create_runtime_secret(repo_root: Path, name: str, default: str | Non
     if path.is_file():
         return path.read_text(encoding="utf-8").strip(), False
     secret = default if default is not None else secrets.token_urlsafe(24)
-
-    # codeql[py/clear-text-storage-sensitive-data] Runtime secrets must be
-    # readable by local services; the ignored runtime secret file is created
-    # with owner-only permissions and redacted from command output.
-    path.write_text(secret + "\n", encoding="utf-8")
-    path.chmod(0o600)
+    write_private_text(path, secret + "\n")
     return secret, True
+
+
+def write_private_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_CLOEXEC", 0), 0o600)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            fd = -1
+            # Runtime/dev service secrets are stored only in ignored,
+            # owner-readable local runtime files for container consumption.
+            # codeql[py/clear-text-storage-sensitive-data]
+            stream.write(text)
+    finally:
+        if fd >= 0:
+            os.close(fd)
+    path.chmod(0o600)
 
 
 def write_runtime_secret(repo_root: Path, name: str, secret: str) -> Path:
     path = runtime_secret_path(repo_root, name)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(f".{path.name}.tmp")
-
-    # codeql[py/clear-text-storage-sensitive-data] Runtime secrets must be
-    # stored as local service-readable secret files. The temporary and final
-    # files are kept owner-only and are never tracked in git.
-    tmp.write_text(secret + "\n", encoding="utf-8")
-    tmp.chmod(0o600)
+    write_private_text(tmp, secret + "\n")
     tmp.replace(path)
     path.chmod(0o600)
     return path
@@ -8120,11 +8126,7 @@ def command_runtime_manager_init_unlocked(repo_root: Path) -> dict[str, Any]:
     if password != DEV_ADMIN_PASSWORD:
         password = DEV_ADMIN_PASSWORD
 
-        # codeql[py/clear-text-storage-sensitive-data] The development-only
-        # admin password is intentionally aligned in the ignored runtime secret
-        # file so local gvmd/bootstrap commands stay deterministic.
-        secret_path.write_text(password + "\n", encoding="utf-8")
-        secret_path.chmod(0o600)
+        write_private_text(secret_path, password + "\n")
         created = False
         findings.append(finding("pass", "runtime.admin-secret", "Development admin password was aligned to the local default in persistent runtime secrets.", str(secret_path)))
     else:

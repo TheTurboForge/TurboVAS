@@ -6,6 +6,7 @@
 #include "openvas-krb5.h"
 
 #include <ctype.h>
+#include <fcntl.h>
 #include <gssapi/gssapi.h>
 #include <gssapi/gssapi_krb5.h>
 #if __has_include(<krb5/krb5.h>)
@@ -18,6 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 #define GUARD_NULL(var, return_var)          \
   do                                         \
@@ -85,6 +87,39 @@ gss_OID_desc spnego_mech_oid_desc = {6, (void *) "\x2b\x06\x01\x05\x05\x02"};
 #define ARRAY_SIZE(a) (sizeof (a) / sizeof (a[0]))
 
 #define MAX_LINE_LENGTH 1024
+
+static bool
+is_safe_generated_config_path (const char *path)
+{
+  const char *prefix = "/tmp/krb5_";
+  const char *suffix = ".conf";
+  size_t path_len;
+  size_t suffix_len;
+
+  if (path == NULL || strncmp (path, prefix, strlen (prefix)) != 0)
+    return false;
+  if (strchr (path + strlen (prefix), '/') != NULL)
+    return false;
+
+  path_len = strlen (path);
+  suffix_len = strlen (suffix);
+  return path_len > strlen (prefix) + suffix_len
+         && strcmp (path + path_len - suffix_len, suffix) == 0;
+}
+
+static FILE *
+fopen_private_write (const char *path)
+{
+  int fd = open (path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+  if (fd == -1)
+    return NULL;
+
+  FILE *stream = fdopen (fd, "w");
+  if (stream == NULL)
+    close (fd);
+  return stream;
+}
+
 // Finds the kdc defined for the given realm.
 OKrb5ErrorCode
 o_krb5_find_kdc (const OKrb5Credential *creds, char **kdc)
@@ -99,8 +134,12 @@ o_krb5_find_kdc (const OKrb5Credential *creds, char **kdc)
   // we don't know if we should free it or just override it.
   // aborting instead.
   GUARD_NULL (*kdc, result);
-  // codeql[cpp/path-injection] config_path is an intentional NASL/env
-  // Kerberos debug parameter; callers choose the krb5.conf path explicitly.
+  if (!is_safe_generated_config_path ((char *) creds->config_path.data))
+    {
+      result = O_KRB5_CONF_NOT_FOUND;
+      goto result;
+    }
+
   if ((file = fopen ((char *) creds->config_path.data, "r")) == NULL)
     {
       result = O_KRB5_CONF_NOT_FOUND;
@@ -260,13 +299,15 @@ o_krb5_add_realm (const OKrb5Credential *creds, const char *kdc)
   int state, i;
   char *cp = (char *) creds->config_path.data;
 
-  // codeql[cpp/path-injection] config_path is an intentional NASL/env
-  // Kerberos debug parameter; callers choose the krb5.conf path explicitly.
+  if (!is_safe_generated_config_path (cp))
+    {
+      result = O_KRB5_CONF_NOT_CREATED;
+      goto result;
+    }
+
   if ((file = fopen (cp, "r")) == NULL)
     {
-      // codeql[cpp/world-writable-file-creation] Kerberos config creation is
-      // driven by the explicit NASL/env config_path compatibility parameter.
-      if ((file = fopen (cp, "w")) == NULL)
+      if ((file = fopen_private_write (cp)) == NULL)
         {
           result = O_KRB5_CONF_NOT_CREATED;
           goto result;
@@ -276,9 +317,7 @@ o_krb5_add_realm (const OKrb5Credential *creds, const char *kdc)
       goto result;
     }
   snprintf (tmpfn, MAX_LINE_LENGTH, "%s.tmp", cp);
-  // codeql[cpp/world-writable-file-creation] The temporary file is paired
-  // with the explicit NASL/env Kerberos config_path compatibility parameter.
-  if ((tmp = fopen (tmpfn, "w")) == NULL)
+  if ((tmp = fopen_private_write (tmpfn)) == NULL)
     {
       result = O_KRB5_TMP_CONF_NOT_CREATED;
       goto result;

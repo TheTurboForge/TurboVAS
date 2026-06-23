@@ -15,8 +15,8 @@
  * The nasl function has two optional parameter:
  * - realm: The realm for which the KDC should be returned. If the realm is not
  * defined, then the env parameter `KRB5_REALM` is used.
- * - config_path: The path to the krb5.conf file. If the path is not defined,
- * then the env parameter `KRB5_CONFIG` is used.
+ * - config_path: Optional scanner-owned krb5.conf path. TurboVAS only accepts
+ * generated /tmp/krb5_*.conf paths at the C boundary.
  *
  * This function should only be used for debug purposes.
  *
@@ -38,8 +38,8 @@ nasl_okrb5_find_kdc (lex_ctxt *lexic);
  * defined, then the env parameter `KRB5_REALM` is used.
  * - kdc: The realm for which the KDC should be returned. If the realm is not
  * defined, then the env parameter `KRB5_KDC` is used.
- * - config_path: The path to the krb5.conf file. If the path is not defined,
- * then the env parameter `KRB5_CONFIG` is used.
+ * - config_path: Optional scanner-owned krb5.conf path. TurboVAS only accepts
+ * generated /tmp/krb5_*.conf paths at the C boundary.
  *
  * This function should only be used for debug purposes.
  *

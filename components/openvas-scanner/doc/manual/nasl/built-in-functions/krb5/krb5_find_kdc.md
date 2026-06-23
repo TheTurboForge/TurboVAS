@@ -12,7 +12,7 @@
 
 ## DESCRIPTION
 
-This function opens the krb5.conf file (located either by environment variable KRB5_CONFIG or /etc/ktrb5.conf) and looks for an kdc entry for the given realm.
+This function opens the scanner-owned generated krb5.conf file and looks for a KDC entry for the given realm. TurboVAS rejects arbitrary caller-provided config paths at the C boundary.
 
 ## RETURN VALUE
 
