@@ -534,6 +534,14 @@ struct DfnCertAdvisoryItem {
 }
 
 #[derive(Debug, Serialize)]
+struct DfnCertAdvisoryDetail {
+    #[serde(flatten)]
+    item: DfnCertAdvisoryItem,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    user_tags: Vec<ReportUserTag>,
+}
+
+#[derive(Debug, Serialize)]
 struct CertBundAdvisoryItem {
     id: String,
     name: String,
@@ -546,6 +554,14 @@ struct CertBundAdvisoryItem {
     created_at: Option<String>,
     modified_at: Option<String>,
     updated_at: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct CertBundAdvisoryDetail {
+    #[serde(flatten)]
+    item: CertBundAdvisoryItem,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    user_tags: Vec<ReportUserTag>,
 }
 
 #[derive(Debug, Serialize)]
@@ -4737,7 +4753,7 @@ async fn dfn_cert_advisories(
 async fn dfn_cert_advisory_detail(
     State(state): State<AppState>,
     Path(advisory_id): Path<String>,
-) -> Result<Json<DfnCertAdvisoryItem>, ApiError> {
+) -> Result<Json<DfnCertAdvisoryDetail>, ApiError> {
     validate_advisory_id(&advisory_id)?;
     let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
     let row = client
@@ -4767,7 +4783,12 @@ async fn dfn_cert_advisory_detail(
             ApiError::Database
         })?
         .ok_or(ApiError::NotFound)?;
-    Ok(Json(dfn_cert_advisory_from_row(&row)))
+    let id: String = row.get("id");
+    let user_tags = catalog_user_tags(&client, "dfn_cert_adv", &id).await?;
+    Ok(Json(DfnCertAdvisoryDetail {
+        item: dfn_cert_advisory_from_row(&row),
+        user_tags,
+    }))
 }
 
 async fn cert_bund_advisories(
@@ -4831,7 +4852,7 @@ async fn cert_bund_advisories(
 async fn cert_bund_advisory_detail(
     State(state): State<AppState>,
     Path(advisory_id): Path<String>,
-) -> Result<Json<CertBundAdvisoryItem>, ApiError> {
+) -> Result<Json<CertBundAdvisoryDetail>, ApiError> {
     validate_advisory_id(&advisory_id)?;
     let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
     let row = client
@@ -4861,7 +4882,12 @@ async fn cert_bund_advisory_detail(
             ApiError::Database
         })?
         .ok_or(ApiError::NotFound)?;
-    Ok(Json(cert_bund_advisory_from_row(&row)))
+    let id: String = row.get("id");
+    let user_tags = catalog_user_tags(&client, "cert_bund_adv", &id).await?;
+    Ok(Json(CertBundAdvisoryDetail {
+        item: cert_bund_advisory_from_row(&row),
+        user_tags,
+    }))
 }
 
 async fn nvt_catalog(
@@ -10690,6 +10716,70 @@ mod tests {
         assert!(!sql.contains("credential"));
         assert!(!sql.contains("reports"));
         assert!(!sql.contains("results"));
+    }
+
+    #[test]
+    fn cert_advisory_detail_user_tags_use_resolved_uuid_only() {
+        let source = include_str!("main.rs");
+        let cert_bund_item_payload = source
+            .split_once("struct CertBundAdvisoryItem {")
+            .expect("CERT-Bund advisory payload must exist")
+            .1
+            .split_once("struct CertBundAdvisoryDetail")
+            .expect("CERT-Bund advisory payload must precede detail payload")
+            .0;
+        let dfn_cert_item_payload = source
+            .split_once("struct DfnCertAdvisoryItem {")
+            .expect("DFN-CERT advisory payload must exist")
+            .1
+            .split_once("struct DfnCertAdvisoryDetail")
+            .expect("DFN-CERT advisory payload must precede detail payload")
+            .0;
+        let cert_bund_detail_source = source
+            .split_once("async fn cert_bund_advisory_detail")
+            .expect("CERT-Bund detail handler must exist")
+            .1
+            .split_once("async fn nvt_catalog")
+            .expect("CERT-Bund detail handler must precede NVT catalog")
+            .0;
+        let dfn_cert_detail_source = source
+            .split_once("async fn dfn_cert_advisory_detail")
+            .expect("DFN-CERT detail handler must exist")
+            .1
+            .split_once("async fn cert_bund_advisories")
+            .expect("DFN-CERT detail handler must precede CERT-Bund list")
+            .0;
+        let cert_bund_list_source = source
+            .split_once("async fn cert_bund_advisories(")
+            .expect("CERT-Bund list handler must exist")
+            .1
+            .split_once("async fn cert_bund_advisory_detail")
+            .expect("CERT-Bund list handler must precede detail handler")
+            .0;
+        let dfn_cert_list_source = source
+            .split_once("async fn dfn_cert_advisories(")
+            .expect("DFN-CERT list handler must exist")
+            .1
+            .split_once("async fn dfn_cert_advisory_detail")
+            .expect("DFN-CERT list handler must precede detail handler")
+            .0;
+
+        assert!(!cert_bund_item_payload.contains("user_tags"));
+        assert!(!dfn_cert_item_payload.contains("user_tags"));
+        assert!(source.contains("struct CertBundAdvisoryDetail"));
+        assert!(source.contains("struct DfnCertAdvisoryDetail"));
+        assert!(cert_bund_detail_source.contains("let id: String = row.get(\"id\");"));
+        assert!(dfn_cert_detail_source.contains("let id: String = row.get(\"id\");"));
+        assert!(
+            cert_bund_detail_source
+                .contains("catalog_user_tags(&client, \"cert_bund_adv\", &id).await?")
+        );
+        assert!(
+            dfn_cert_detail_source
+                .contains("catalog_user_tags(&client, \"dfn_cert_adv\", &id).await?")
+        );
+        assert!(!cert_bund_list_source.contains("catalog_user_tags"));
+        assert!(!dfn_cert_list_source.contains("catalog_user_tags"));
     }
 
     #[test]

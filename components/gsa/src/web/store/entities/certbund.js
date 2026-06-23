@@ -35,6 +35,7 @@ const mergeNativeInformation = (inherited, native) =>
     severity: native.severity,
     summary: native.summary,
     title: native.title,
+    userTags: native.userTags,
   });
 
 const nativeLoadEntities = gmp => filter => (dispatch, getState) => {

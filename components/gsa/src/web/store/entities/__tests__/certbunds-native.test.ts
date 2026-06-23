@@ -106,6 +106,14 @@ describe('native API CERT-Bund advisory catalog', () => {
         created_at: '2026-06-18T20:00:00Z',
         modified_at: '2026-06-19T07:00:00Z',
         updated_at: '2026-06-19T07:00:00Z',
+        user_tags: [
+          {
+            id: '4f1d4875-0a24-48bf-8eda-b1cb256a92cf',
+            name: 'Native tag',
+            value: 'true',
+            comment: 'Native CERT-Bund tag',
+          },
+        ],
       }),
       ok: true,
       status: 200,
@@ -122,6 +130,9 @@ describe('native API CERT-Bund advisory catalog', () => {
     expect(advisory.summary).toEqual('Native summary.');
     expect(advisory.severity).toEqual(9.1);
     expect(advisory.cves).toEqual(['CVE-2026-10001']);
+    expect(advisory.userTags).toHaveLength(1);
+    expect(advisory.userTags[0].name).toEqual('Native tag');
+    expect(advisory.userTags[0].value).toEqual('true');
     expect(gmp.buildUrl).toHaveBeenCalledWith(
       'api/v1/cert-bund-advisories/CB-K14%2F0001',
       {token: 'test-token'},
@@ -165,6 +176,14 @@ describe('native API CERT-Bund advisory catalog', () => {
         cves: ['CVE-2026-10001', 'CVE-2026-10002'],
         created_at: '2026-06-18T20:00:00Z',
         modified_at: '2026-06-19T07:00:00Z',
+        user_tags: [
+          {
+            id: '4f1d4875-0a24-48bf-8eda-b1cb256a92cf',
+            name: 'Native tag',
+            value: 'true',
+            comment: 'Native CERT-Bund tag',
+          },
+        ],
       }),
       ok: true,
       status: 200,
@@ -212,6 +231,10 @@ describe('native API CERT-Bund advisory catalog', () => {
     );
     expect(advisory?.software).toEqual('Inherited product');
     expect(advisory?.isWritable()).toEqual(true);
-    expect(advisory?.userTags?.[0].name).toEqual('Retained tag');
+    expect(advisory?.userTags).toHaveLength(1);
+    expect(advisory?.userTags?.[0].id).toEqual('4f1d4875-0a24-48bf-8eda-b1cb256a92cf');
+    expect(advisory?.userTags?.[0].name).toEqual('Native tag');
+    expect(advisory?.userTags?.[0].value).toEqual('true');
+    expect(advisory?.userTags?.[0].comment).toEqual('Native CERT-Bund tag');
   });
 });

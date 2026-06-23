@@ -106,6 +106,14 @@ describe('native API DFN-CERT advisory catalog', () => {
         created_at: '2026-06-18T20:00:00Z',
         modified_at: '2026-06-19T07:00:00Z',
         updated_at: '2026-06-19T07:00:00Z',
+        user_tags: [
+          {
+            id: '36e88138-bc32-4641-ab07-5d94a924965f',
+            name: 'Native tag',
+            value: 'true',
+            comment: 'Native DFN-CERT tag',
+          },
+        ],
       }),
       ok: true,
       status: 200,
@@ -125,6 +133,9 @@ describe('native API DFN-CERT advisory catalog', () => {
     expect(advisory.summary).toEqual('Native summary.');
     expect(advisory.severity).toEqual(9.1);
     expect(advisory.cves).toEqual(['CVE-2026-10001']);
+    expect(advisory.userTags).toHaveLength(1);
+    expect(advisory.userTags[0].name).toEqual('Native tag');
+    expect(advisory.userTags[0].value).toEqual('true');
     expect(gmp.buildUrl).toHaveBeenCalledWith(
       'api/v1/dfn-cert-advisories/DFN-CERT-2026-001',
       {token: 'test-token'},
@@ -170,6 +181,14 @@ describe('native API DFN-CERT advisory catalog', () => {
         cves: ['CVE-2026-10001', 'CVE-2026-10002'],
         created_at: '2026-06-18T20:00:00Z',
         modified_at: '2026-06-19T07:00:00Z',
+        user_tags: [
+          {
+            id: '36e88138-bc32-4641-ab07-5d94a924965f',
+            name: 'Native tag',
+            value: 'true',
+            comment: 'Native DFN-CERT tag',
+          },
+        ],
       }),
       ok: true,
       status: 200,
@@ -216,6 +235,10 @@ describe('native API DFN-CERT advisory catalog', () => {
       'https://example.test/related-dfn',
     ]);
     expect(advisory?.isWritable()).toEqual(true);
-    expect(advisory?.userTags?.[0].name).toEqual('Retained tag');
+    expect(advisory?.userTags).toHaveLength(1);
+    expect(advisory?.userTags?.[0].id).toEqual('36e88138-bc32-4641-ab07-5d94a924965f');
+    expect(advisory?.userTags?.[0].name).toEqual('Native tag');
+    expect(advisory?.userTags?.[0].value).toEqual('true');
+    expect(advisory?.userTags?.[0].comment).toEqual('Native DFN-CERT tag');
   });
 });

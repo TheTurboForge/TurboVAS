@@ -38,6 +38,14 @@ interface NativeCertBundAdvisoryPayload {
   created_at?: string;
   modified_at?: string;
   updated_at?: string;
+  user_tags?: NativeUserTagPayload[];
+}
+
+interface NativeUserTagPayload {
+  id: string;
+  name: string;
+  value: string;
+  comment: string;
 }
 
 interface NativeCertBundAdvisoriesPayload {
@@ -123,6 +131,15 @@ const nativeCounts = (page: NativePage, length: number): CollectionCounts =>
     rows: page.page_size,
   });
 
+const nativeUserTagsElement = (tags: NativeUserTagPayload[] = []) => ({
+  tag: tags.map(tag => ({
+    _id: stringValue(tag.id),
+    name: stringValue(tag.name),
+    value: stringValue(tag.value),
+    comment: stringValue(tag.comment),
+  })),
+});
+
 const fetchNativeJson = async <T>(
   gmp: NativeApiGmp,
   path: string,
@@ -145,6 +162,7 @@ const fetchNativeJson = async <T>(
 
 const nativeCertBundAdvisoryToModel = (
   item: NativeCertBundAdvisoryPayload,
+  {detail = false}: {detail?: boolean} = {},
 ): CertBundAdv =>
   CertBundAdv.fromElement({
     _id: stringValue(item.id),
@@ -170,6 +188,7 @@ const nativeCertBundAdvisoryToModel = (
         },
       },
     },
+    user_tags: detail ? nativeUserTagsElement(item.user_tags ?? []) : undefined,
   });
 
 export const fetchNativeCertBundAdvisories = async (
@@ -194,7 +213,7 @@ export const fetchNativeCertBundAdvisories = async (
     sort: stringValue(payload.page?.sort),
     filter: stringValue(payload.page?.filter),
   };
-  const certbunds = (payload.items ?? []).map(nativeCertBundAdvisoryToModel);
+  const certbunds = (payload.items ?? []).map(item => nativeCertBundAdvisoryToModel(item));
   return {
     certbunds,
     counts: nativeCounts(page, certbunds.length),
@@ -212,6 +231,6 @@ export const fetchNativeCertBundAdvisory = async (
     {token: gmp.session.token},
   );
   return {
-    certbund: nativeCertBundAdvisoryToModel(payload),
+    certbund: nativeCertBundAdvisoryToModel(payload, {detail: true}),
   };
 };

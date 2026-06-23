@@ -38,6 +38,14 @@ interface NativeDfnCertAdvisoryPayload {
   created_at?: string;
   modified_at?: string;
   updated_at?: string;
+  user_tags?: NativeUserTagPayload[];
+}
+
+interface NativeUserTagPayload {
+  id: string;
+  name: string;
+  value: string;
+  comment: string;
 }
 
 interface NativeDfnCertAdvisoriesPayload {
@@ -123,6 +131,15 @@ const nativeCounts = (page: NativePage, length: number): CollectionCounts =>
     rows: page.page_size,
   });
 
+const nativeUserTagsElement = (tags: NativeUserTagPayload[] = []) => ({
+  tag: tags.map(tag => ({
+    _id: stringValue(tag.id),
+    name: stringValue(tag.name),
+    value: stringValue(tag.value),
+    comment: stringValue(tag.comment),
+  })),
+});
+
 const fetchNativeJson = async <T>(
   gmp: NativeApiGmp,
   path: string,
@@ -145,6 +162,7 @@ const fetchNativeJson = async <T>(
 
 const nativeDfnCertAdvisoryToModel = (
   item: NativeDfnCertAdvisoryPayload,
+  {detail = false}: {detail?: boolean} = {},
 ): DfnCertAdv =>
   DfnCertAdv.fromElement({
     _id: stringValue(item.id),
@@ -165,6 +183,7 @@ const nativeDfnCertAdvisoryToModel = (
         },
       },
     },
+    user_tags: detail ? nativeUserTagsElement(item.user_tags ?? []) : undefined,
   });
 
 export const fetchNativeDfnCertAdvisories = async (
@@ -189,7 +208,7 @@ export const fetchNativeDfnCertAdvisories = async (
     sort: stringValue(payload.page?.sort),
     filter: stringValue(payload.page?.filter),
   };
-  const dfncerts = (payload.items ?? []).map(nativeDfnCertAdvisoryToModel);
+  const dfncerts = (payload.items ?? []).map(item => nativeDfnCertAdvisoryToModel(item));
   return {
     dfncerts,
     counts: nativeCounts(page, dfncerts.length),
@@ -207,6 +226,6 @@ export const fetchNativeDfnCertAdvisory = async (
     {token: gmp.session.token},
   );
   return {
-    dfncert: nativeDfnCertAdvisoryToModel(payload),
+    dfncert: nativeDfnCertAdvisoryToModel(payload, {detail: true}),
   };
 };

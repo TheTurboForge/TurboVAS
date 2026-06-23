@@ -299,7 +299,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CertBundAdvisory'
+                $ref: '#/components/schemas/CertBundAdvisoryDetail'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -366,7 +366,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DfnCertAdvisory'
+                $ref: '#/components/schemas/DfnCertAdvisoryDetail'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -5265,6 +5265,15 @@ components:
         updated_at:
           type: string
           format: date-time
+    DfnCertAdvisoryDetail:
+      allOf:
+        - $ref: '#/components/schemas/DfnCertAdvisory'
+        - type: object
+          properties:
+            user_tags:
+              type: array
+              items:
+                $ref: '#/components/schemas/UserTag'
     CertBundAdvisory:
       type: object
       required: [id, name, cve_refs]
@@ -5297,6 +5306,15 @@ components:
         updated_at:
           type: string
           format: date-time
+    CertBundAdvisoryDetail:
+      allOf:
+        - $ref: '#/components/schemas/CertBundAdvisory'
+        - type: object
+          properties:
+            user_tags:
+              type: array
+              items:
+                $ref: '#/components/schemas/UserTag'
     NvtCatalogItem:
       type: object
       required: [id, oid, name, family, severity, qod, qod_type, solution_type, solution_method, solution, tags, cve_refs, cves, cert_refs, xrefs]
