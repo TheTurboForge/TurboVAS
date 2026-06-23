@@ -151,6 +151,9 @@ RUST_MIGRATION_FIRST_CANDIDATE = {
 CORE_C_CHAIN = ("gvm-libs", "openvas-smb", "openvas-scanner")
 C_SERVICES_CHAIN = ("gvm-libs", "openvas-smb", "openvas-scanner", "pg-gvm", "gvmd", "gsad")
 NATIVE_RUST_SERVICES = ("turbovas-api",)
+NATIVE_API_CRATE = Path("services/turbovas-api")
+NATIVE_API_CARGO_LOCK = NATIVE_API_CRATE / "Cargo.lock"
+NATIVE_API_CARGO_AUDIT_TIMEOUT_SECONDS = 120
 PYTHON_CHAIN = ("python-gvm", "gvm-tools", "greenbone-feed-sync", "ospd-openvas", "notus-scanner")
 BASELINE_CHAIN = (*C_SERVICES_CHAIN, "gsa", *PYTHON_CHAIN)
 RUNTIME_SERVICES = ("postgres", "redis-openvas", "mosquitto")
@@ -6297,6 +6300,25 @@ def production_posture_status_only_result(result: dict[str, Any]) -> dict[str, A
     return compact
 
 
+def native_api_cargo_audit_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
+    compact = dict(result)
+    findings = result.get("findings", [])
+    non_pass = [compact_doctor_finding(item) for item in findings if item.get("status") != "pass"]
+    details = result.get("details", {}) if isinstance(result.get("details"), dict) else {}
+    compact["details"] = {
+        "vulnerability_count": details.get("vulnerability_count", 0),
+        "warning_count": details.get("warning_count", 0),
+        "dependency_count": details.get("dependency_count", 0),
+        "advisory_count": details.get("advisory_count", 0),
+        "finding_count": len(findings),
+        "non_pass_count": len(non_pass),
+    }
+    compact["findings"] = non_pass or [
+        finding("pass", "native-api-cargo-audit.status-only", "Native API cargo audit passed; no non-pass findings.")
+    ]
+    return compact
+
+
 def license_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
     findings = result.get("findings", [])
     non_pass = [compact_license_status_finding(item) for item in findings if item.get("status") != "pass"]
@@ -7895,6 +7917,61 @@ def command_security_policy_check(repo_root: Path, status_only: bool = False) ->
     result["details"] = {"areas": area_summaries, "area_count": len(area_summaries)}
     if status_only:
         result = security_policy_status_only_result(result)
+    return result
+
+
+def command_native_api_cargo_audit(repo_root: Path, status_only: bool = False) -> dict[str, Any]:
+    findings: list[dict[str, Any]] = []
+    crate_dir = repo_root / NATIVE_API_CRATE
+    lockfile = repo_root / NATIVE_API_CARGO_LOCK
+    findings.append(finding("pass" if crate_dir.is_dir() else "fail", "native-api-cargo-audit.crate", "Native API crate exists." if crate_dir.is_dir() else "Native API crate is missing.", str(NATIVE_API_CRATE)))
+    findings.append(finding("pass" if lockfile.is_file() else "fail", "native-api-cargo-audit.lockfile", "Native API Cargo.lock exists." if lockfile.is_file() else "Native API Cargo.lock is missing.", str(NATIVE_API_CARGO_LOCK)))
+    if shutil.which("cargo-audit") is None:
+        findings.append(finding("warn", "native-api-cargo-audit.tool", "cargo-audit is not installed; native API dependency advisory check was skipped."))
+        result = make_result("native-api-cargo-audit", repo_root, "Native API cargo audit could not run because cargo-audit is unavailable.", findings, [str(NATIVE_API_CARGO_LOCK)])
+        if status_only:
+            result = native_api_cargo_audit_status_only_result(result)
+        return result
+    if not crate_dir.is_dir() or not lockfile.is_file():
+        result = make_result("native-api-cargo-audit", repo_root, "Native API cargo audit could not run because required files are missing.", findings, [str(NATIVE_API_CARGO_LOCK)])
+        if status_only:
+            result = native_api_cargo_audit_status_only_result(result)
+        return result
+
+    audit = run_command(["cargo", "audit", "--no-fetch", "--stale", "--json", "--quiet"], crate_dir, timeout=NATIVE_API_CARGO_AUDIT_TIMEOUT_SECONDS)
+    try:
+        payload = json.loads(audit.stdout)
+    except json.JSONDecodeError:
+        findings.append(finding("fail", "native-api-cargo-audit.parse", "cargo audit did not emit parseable JSON.", details={"returncode": audit.returncode, "output_tail": output_tail(audit.stdout, 40)}))
+        result = make_result("native-api-cargo-audit", repo_root, "Native API cargo audit failed before advisory results could be parsed.", findings, [str(NATIVE_API_CARGO_LOCK)])
+        if status_only:
+            result = native_api_cargo_audit_status_only_result(result)
+        return result
+
+    vulnerabilities = payload.get("vulnerabilities", {}) if isinstance(payload, dict) else {}
+    warnings = payload.get("warnings", {}) if isinstance(payload, dict) else {}
+    database = payload.get("database", {}) if isinstance(payload, dict) else {}
+    lockfile_payload = payload.get("lockfile", {}) if isinstance(payload, dict) else {}
+    vulnerability_count = int(vulnerabilities.get("count") or 0) if isinstance(vulnerabilities, dict) else 0
+    warning_count = sum(len(value) for value in warnings.values() if isinstance(value, list)) if isinstance(warnings, dict) else 0
+    advisory_count = int(database.get("advisory-count") or 0) if isinstance(database, dict) else 0
+    dependency_count = int(lockfile_payload.get("dependency-count") or 0) if isinstance(lockfile_payload, dict) else 0
+    findings.append(finding("pass", "native-api-cargo-audit.tool", "cargo-audit is installed and runnable."))
+    findings.append(finding("fail" if vulnerability_count else "pass", "native-api-cargo-audit.vulnerabilities", f"cargo audit reported {vulnerability_count} vulnerable native API dependency package(s).", str(NATIVE_API_CARGO_LOCK), {"vulnerability_count": vulnerability_count}))
+    findings.append(finding("warn" if warning_count else "pass", "native-api-cargo-audit.warnings", f"cargo audit reported {warning_count} warning item(s).", str(NATIVE_API_CARGO_LOCK), {"warning_count": warning_count}))
+    result = make_result("native-api-cargo-audit", repo_root, "Native API cargo audit completed.", findings, [str(NATIVE_API_CARGO_LOCK)])
+    result["details"] = {
+        "vulnerability_count": vulnerability_count,
+        "warning_count": warning_count,
+        "dependency_count": dependency_count,
+        "advisory_count": advisory_count,
+        "returncode": audit.returncode,
+    }
+    if audit.returncode != 0 and vulnerability_count == 0 and warning_count == 0:
+        result["findings"].append(finding("warn", "native-api-cargo-audit.exit-code", f"cargo audit exited {audit.returncode} without parsed vulnerabilities or warnings.", details={"output_tail": output_tail(audit.stdout, 40)}))
+        result["status"] = aggregate_status(result["findings"])
+    if status_only:
+        result = native_api_cargo_audit_status_only_result(result)
     return result
 
 
@@ -13195,6 +13272,8 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("runtime-redis-state", parents=[common], help="inspect Redis dependency and runtime boundary state")
     security_policy = subparsers.add_parser("security-policy-check", parents=[common], help="validate security-sensitive path policy scaffolding")
     security_policy.add_argument("--status-only", action="store_true", help="emit compact details and only non-pass findings for chat-safe security policy checks")
+    native_api_cargo_audit = subparsers.add_parser("native-api-cargo-audit", parents=[common], help="audit native API Rust dependencies for known advisories")
+    native_api_cargo_audit.add_argument("--status-only", action="store_true", help="emit compact advisory counts and only non-pass findings for chat-safe native API dependency checks")
     path_coupling = subparsers.add_parser("path-coupling-state", parents=[common], help="inspect absolute checkout/runtime path coupling")
     path_coupling.add_argument("--status-only", action="store_true", help="emit compact details and only non-pass findings for chat-safe path-coupling checks")
     subparsers.add_parser("runtime-app-up", parents=[common], help="start experimental application services")
@@ -13339,6 +13418,8 @@ def main(argv: list[str] | None = None) -> int:
         result = command_runtime_redis_state(repo_root)
     elif args.command == "security-policy-check":
         result = command_security_policy_check(repo_root, status_only=args.status_only)
+    elif args.command == "native-api-cargo-audit":
+        result = command_native_api_cargo_audit(repo_root, status_only=args.status_only)
     elif args.command == "path-coupling-state":
         result = command_path_coupling_state(repo_root, status_only=args.status_only)
     elif args.command == "runtime-app-up":

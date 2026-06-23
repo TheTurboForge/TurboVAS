@@ -197,6 +197,9 @@ runtime-redis-state *args:
 security-policy-check *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl security-policy-check "$@"
 
+native-api-cargo-audit *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl native-api-cargo-audit "$@"
+
 path-coupling-state *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl path-coupling-state "$@"
 

@@ -908,7 +908,7 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_technical_foundation_commands_are_registered(self):
         source = (Path(__file__).resolve().parents[1] / "turbovasctl").read_text(encoding="utf-8")
         justfile = (Path(__file__).resolve().parents[2] / "justfile").read_text(encoding="utf-8")
-        for command in ("native-tooling-state", "native-api-request", "native-api-migration-matrix", "native-api-client-contract", "rust-migration-state", "branding-state", "production-posture-check", "runtime-log-review", "runtime-data-state", "runtime-db-introspect", "runtime-performance-snapshot", "runtime-redis-state", "security-policy-check", "path-coupling-state", "runtime-native-api-smoke", "runtime-native-api-direct-smoke", "runtime-native-api-direct-bootstrap", "runtime-native-api-rebuild", "quality-gate", "quality-gate-state", "quality-gate-schedule"):
+        for command in ("native-tooling-state", "native-api-request", "native-api-migration-matrix", "native-api-client-contract", "native-api-cargo-audit", "rust-migration-state", "branding-state", "production-posture-check", "runtime-log-review", "runtime-data-state", "runtime-db-introspect", "runtime-performance-snapshot", "runtime-redis-state", "security-policy-check", "path-coupling-state", "runtime-native-api-smoke", "runtime-native-api-direct-smoke", "runtime-native-api-direct-bootstrap", "runtime-native-api-rebuild", "quality-gate", "quality-gate-state", "quality-gate-schedule"):
             with self.subTest(command=command):
                 self.assertIn(command, source)
                 self.assertIn(f"{command} *args:", justfile)
@@ -916,6 +916,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("def command_native_tooling_state", source)
         self.assertIn("def command_native_api_request", source)
         self.assertIn("def command_native_api_client_contract", source)
+        self.assertIn("def command_native_api_cargo_audit", source)
         self.assertIn("def command_rust_migration_state", source)
         self.assertIn("def command_branding_state", source)
         self.assertIn("def command_runtime_log_review", source)
@@ -981,7 +982,59 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("def command_quality_gate", source)
         self.assertIn("def command_quality_gate_state", source)
         self.assertIn("def command_quality_gate_schedule", source)
-        self.assertNotIn("Use: just native-api-request -- --json --path '/api/v1/...'", justfile)
+        self.assertNotIn("Use: just native-api-request -- --json --path '/api/v1/...';", justfile)
+
+    def test_native_api_cargo_audit_status_only_summarizes_clean_audit(self):
+        payload = {
+            "database": {"advisory-count": 123},
+            "lockfile": {"dependency-count": 4},
+            "vulnerabilities": {"count": 0, "list": []},
+            "warnings": {},
+        }
+        with tempfile.TemporaryDirectory() as tmp, \
+             unittest.mock.patch.object(turbovasctl.shutil, "which", return_value="/usr/bin/cargo-audit"), \
+             unittest.mock.patch.object(turbovasctl, "run_command", return_value=subprocess.CompletedProcess(["cargo", "audit", "--json"], 0, json.dumps(payload))):
+            root = Path(tmp)
+            crate = root / "services" / "turbovas-api"
+            crate.mkdir(parents=True)
+            (crate / "Cargo.lock").write_text("# lock\n", encoding="utf-8")
+            result = turbovasctl.command_native_api_cargo_audit(root, status_only=True)
+
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(result["details"]["vulnerability_count"], 0)
+        self.assertEqual(result["details"]["dependency_count"], 4)
+        self.assertEqual(result["findings"][0]["check"], "native-api-cargo-audit.status-only")
+
+    def test_native_api_cargo_audit_reports_vulnerabilities(self):
+        payload = {
+            "database": {"advisory-count": 123},
+            "lockfile": {"dependency-count": 4},
+            "vulnerabilities": {"count": 2, "list": [{}, {}]},
+            "warnings": {},
+        }
+        with tempfile.TemporaryDirectory() as tmp, \
+             unittest.mock.patch.object(turbovasctl.shutil, "which", return_value="/usr/bin/cargo-audit"), \
+             unittest.mock.patch.object(turbovasctl, "run_command", return_value=subprocess.CompletedProcess(["cargo", "audit", "--json"], 1, json.dumps(payload))):
+            root = Path(tmp)
+            crate = root / "services" / "turbovas-api"
+            crate.mkdir(parents=True)
+            (crate / "Cargo.lock").write_text("# lock\n", encoding="utf-8")
+            result = turbovasctl.command_native_api_cargo_audit(root, status_only=True)
+
+        self.assertEqual(result["status"], "fail")
+        self.assertEqual(result["details"]["vulnerability_count"], 2)
+        self.assertEqual(result["findings"][0]["check"], "native-api-cargo-audit.vulnerabilities")
+
+    def test_native_api_cargo_audit_warns_when_tool_missing(self):
+        with tempfile.TemporaryDirectory() as tmp, unittest.mock.patch.object(turbovasctl.shutil, "which", return_value=None):
+            root = Path(tmp)
+            crate = root / "services" / "turbovas-api"
+            crate.mkdir(parents=True)
+            (crate / "Cargo.lock").write_text("# lock\n", encoding="utf-8")
+            result = turbovasctl.command_native_api_cargo_audit(root, status_only=True)
+
+        self.assertEqual(result["status"], "warn")
+        self.assertEqual(result["findings"][0]["check"], "native-api-cargo-audit.tool")
 
     def test_quality_gate_state_status_only_omits_history(self):
         result = {
