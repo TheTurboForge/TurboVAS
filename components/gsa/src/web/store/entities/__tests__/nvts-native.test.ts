@@ -220,6 +220,14 @@ describe('native API NVT catalog', () => {
           tags: 'cvss_base_vector=AV:N/AC:L/Au:N/C:P/I:N/A:N',
           cves: ['CVE-2026-10001'],
           xrefs: ['url:https://example.test/advisory'],
+          user_tags: [
+            {
+              id: '4a281aca-c02b-4566-8247-6a16b144ecdf',
+              name: 'Native tag',
+              value: 'true',
+              comment: 'Native NVT tag',
+            },
+          ],
         }),
         ok: true,
         status: 200,
@@ -270,7 +278,11 @@ describe('native API NVT catalog', () => {
     expect(nvt?.preferences[0].name).toEqual('retained-pref');
     expect(nvt?.defaultTimeout).toEqual(300);
     expect(nvt?.timeout).toEqual(600);
-    expect(nvt?.userTags?.[0].name).toEqual('Retained tag');
+    expect(nvt?.userTags).toHaveLength(1);
+    expect(nvt?.userTags?.[0].id).toEqual('4a281aca-c02b-4566-8247-6a16b144ecdf');
+    expect(nvt?.userTags?.[0].name).toEqual('Native tag');
+    expect(nvt?.userTags?.[0].value).toEqual('true');
+    expect(nvt?.userTags?.[0].comment).toEqual('Native NVT tag');
     expect(nvt?.isWritable()).toEqual(true);
   });
 });

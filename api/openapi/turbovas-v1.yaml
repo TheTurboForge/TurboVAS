@@ -5369,6 +5369,10 @@ components:
               type: string
             detection:
               type: string
+            user_tags:
+              type: array
+              items:
+                $ref: '#/components/schemas/UserTag'
     NvtEpss:
       type: object
       required: [score, percentile, cve, severity]

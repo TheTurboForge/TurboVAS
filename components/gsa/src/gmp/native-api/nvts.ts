@@ -33,6 +33,13 @@ interface NativeNvtEpssPayload {
   severity?: number;
 }
 
+interface NativeUserTagPayload {
+  id: string;
+  name: string;
+  value: string;
+  comment: string;
+}
+
 interface NativeNvtPayload {
   id: string;
   oid?: string;
@@ -55,6 +62,7 @@ interface NativeNvtPayload {
   cves?: string[];
   cert_refs?: string[];
   xrefs?: string[];
+  user_tags?: NativeUserTagPayload[];
   max_epss?: NativeNvtEpssPayload;
   max_severity?: NativeNvtEpssPayload;
   created_at?: string;
@@ -163,6 +171,15 @@ const nativeCounts = (page: NativePage, length: number): CollectionCounts =>
     rows: page.page_size,
   });
 
+const nativeUserTagsElement = (tags: NativeUserTagPayload[] = []) => ({
+  tag: tags.map(tag => ({
+    _id: stringValue(tag.id),
+    name: stringValue(tag.name),
+    value: stringValue(tag.value),
+    comment: stringValue(tag.comment),
+  })),
+});
+
 const fetchNativeJson = async <T>(
   gmp: NativeApiGmp,
   path: string,
@@ -224,7 +241,10 @@ const detailTagsFromNative = (item: NativeNvtPayload): string => {
   return parts.join('|');
 };
 
-const nativeNvtToModel = (item: NativeNvtPayload): Nvt => {
+const nativeNvtToModel = (
+  item: NativeNvtPayload,
+  {detail = false}: {detail?: boolean} = {},
+): Nvt => {
   const oid = stringValue(item.oid || item.id);
   const cves = item.cves ?? [];
   const refs = [
@@ -266,6 +286,7 @@ const nativeNvtToModel = (item: NativeNvtPayload): Nvt => {
           }
         : undefined,
     },
+    user_tags: detail ? nativeUserTagsElement(item.user_tags ?? []) : undefined,
   });
 };
 
@@ -287,7 +308,7 @@ export const fetchNativeNvts = async (
     sort: stringValue(payload.page?.sort),
     filter: stringValue(payload.page?.filter),
   };
-  const nvts = (payload.items ?? []).map(nativeNvtToModel);
+  const nvts = (payload.items ?? []).map(item => nativeNvtToModel(item));
   return {
     nvts,
     counts: nativeCounts(page, nvts.length),
@@ -305,6 +326,6 @@ export const fetchNativeNvt = async (
     {token: gmp.session.token},
   );
   return {
-    nvt: nativeNvtToModel(payload),
+    nvt: nativeNvtToModel(payload, {detail: true}),
   };
 };

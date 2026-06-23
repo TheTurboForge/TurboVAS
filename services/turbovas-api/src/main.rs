@@ -592,6 +592,8 @@ struct NvtCatalogDetail {
     affected: String,
     impact: String,
     detection: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    user_tags: Vec<ReportUserTag>,
 }
 
 #[derive(Debug, Serialize)]
@@ -5057,7 +5059,8 @@ async fn nvt_catalog_detail(
             ApiError::Database
         })?
         .ok_or(ApiError::NotFound)?;
-    Ok(Json(nvt_catalog_detail_from_row(&row)))
+    let user_tags = catalog_user_tags(&client, "nvt", &nvt_id).await?;
+    Ok(Json(nvt_catalog_detail_from_row(&row, user_tags)))
 }
 
 async fn operating_system_assets(
@@ -9144,7 +9147,7 @@ fn nvt_catalog_from_row(row: &Row) -> NvtCatalogItem {
     }
 }
 
-fn nvt_catalog_detail_from_row(row: &Row) -> NvtCatalogDetail {
+fn nvt_catalog_detail_from_row(row: &Row, user_tags: Vec<ReportUserTag>) -> NvtCatalogDetail {
     NvtCatalogDetail {
         catalog: nvt_catalog_from_row(row),
         comment: row.get("comment"),
@@ -9153,6 +9156,7 @@ fn nvt_catalog_detail_from_row(row: &Row) -> NvtCatalogDetail {
         affected: row.get("affected"),
         impact: row.get("impact"),
         detection: row.get("detection"),
+        user_tags,
     }
 }
 
@@ -10635,6 +10639,47 @@ mod tests {
         assert!(cpe_detail_source.contains("catalog_user_tags(&client, \"cpe\", &cpe_id).await?"));
         assert!(!cve_list_source.contains("catalog_user_tags"));
         assert!(!cpe_list_source.contains("catalog_user_tags"));
+
+        let sql = catalog_user_tags_sql();
+        assert!(sql.contains("FROM tags t"));
+        assert!(sql.contains("JOIN tag_resources tr ON tr.tag = t.id"));
+        assert!(sql.contains("lower(tr.resource_uuid) = lower($1)"));
+        assert!(sql.contains("tr.resource_type = $2"));
+        assert!(sql.contains("coalesce(t.active, 0) = 1"));
+        assert!(!sql.contains("credential"));
+        assert!(!sql.contains("reports"));
+        assert!(!sql.contains("results"));
+    }
+
+    #[test]
+    fn nvt_detail_user_tags_are_detail_only_active_info_tags() {
+        let source = include_str!("main.rs");
+        let nvt_item_payload = source
+            .split_once("struct NvtCatalogItem {")
+            .expect("NVT catalog item payload must exist")
+            .1
+            .split_once("struct NvtCatalogDetail")
+            .expect("NVT catalog item payload must precede detail payload")
+            .0;
+        let nvt_detail_source = source
+            .split_once("async fn nvt_catalog_detail")
+            .expect("NVT catalog detail handler must exist")
+            .1
+            .split_once("async fn operating_system_assets")
+            .expect("NVT catalog detail handler must precede asset handlers")
+            .0;
+        let nvt_list_source = source
+            .split_once("async fn nvt_catalog(")
+            .expect("NVT catalog list handler must exist")
+            .1
+            .split_once("fn nvt_filter_parts")
+            .expect("NVT catalog list handler must precede filter helper")
+            .0;
+
+        assert!(!nvt_item_payload.contains("user_tags"));
+        assert!(source.contains("struct NvtCatalogDetail"));
+        assert!(nvt_detail_source.contains("catalog_user_tags(&client, \"nvt\", &nvt_id).await?"));
+        assert!(!nvt_list_source.contains("catalog_user_tags"));
 
         let sql = catalog_user_tags_sql();
         assert!(sql.contains("FROM tags t"));

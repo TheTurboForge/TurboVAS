@@ -40,6 +40,7 @@ const mergeNativeInformation = (inherited, native) =>
     certs: native.certs,
     cves: native.cves,
     epss: native.epss,
+    userTags: native.userTags,
     xrefs: native.xrefs,
   });
 
