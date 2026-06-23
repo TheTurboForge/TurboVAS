@@ -35,6 +35,7 @@ mod request_shapes;
 mod result_payloads;
 mod row_helpers;
 mod scan_configs;
+mod scanner_assets;
 mod schedules;
 mod tag_resource_helpers;
 mod tags;
@@ -59,6 +60,7 @@ use report_formats::*;
 use result_payloads::*;
 use row_helpers::*;
 use scan_configs::*;
+use scanner_assets::*;
 use schedules::*;
 use tag_resource_helpers::*;
 use tags::*;
@@ -611,45 +613,6 @@ struct TrashcanSummaryItem {
 struct TrashcanSummary {
     items: Vec<TrashcanSummaryItem>,
     total: i64,
-}
-
-#[derive(Serialize)]
-struct ScannerAssetCredential {
-    id: String,
-    name: String,
-}
-
-#[derive(Serialize)]
-struct ScannerAssetItem {
-    id: String,
-    name: String,
-    comment: String,
-    host: String,
-    port: i64,
-    scanner_type: i64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    credential: Option<ScannerAssetCredential>,
-    relay_host: Option<String>,
-    relay_port: i64,
-    created_at: Option<String>,
-    modified_at: Option<String>,
-}
-
-#[derive(Serialize)]
-struct ScannerTaskReference {
-    id: String,
-    name: String,
-    usage_type: String,
-}
-
-#[derive(Serialize)]
-struct ScannerAssetDetail {
-    #[serde(flatten)]
-    asset: ScannerAssetItem,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    tasks: Vec<ScannerTaskReference>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    user_tags: Vec<ReportUserTag>,
 }
 
 #[derive(Serialize)]
@@ -8229,27 +8192,6 @@ pub(crate) fn nvt_max_severity_from_row(row: &Row) -> Option<NvtEpssItem> {
     })
 }
 
-fn scanner_asset_from_row(row: &Row) -> ScannerAssetItem {
-    let credential_id: Option<String> = row.get("credential_id");
-    let credential_name: Option<String> = row.get("credential_name");
-    ScannerAssetItem {
-        id: row.get("id"),
-        name: row.get("name"),
-        comment: row.get("comment"),
-        host: row.get("host"),
-        port: row.get("port"),
-        scanner_type: row.get("scanner_type"),
-        credential: credential_id.map(|id| ScannerAssetCredential {
-            id,
-            name: credential_name.unwrap_or_default(),
-        }),
-        relay_host: row.get("relay_host"),
-        relay_port: row.get("relay_port"),
-        created_at: unix_ts_to_rfc3339(row.get("created_at_unix")),
-        modified_at: unix_ts_to_rfc3339(row.get("modified_at_unix")),
-    }
-}
-
 fn alert_asset_from_row(row: &Row) -> AlertAssetItem {
     let filter_id: Option<String> = row.get("filter_id");
     let filter = filter_id.map(|id| AlertReference {
@@ -9977,20 +9919,20 @@ mod tests {
 
     #[test]
     fn scanner_user_tags_are_detail_only_active_scanner_tags() {
-        let source = include_str!("main.rs");
+        let source = include_str!("scanner_assets.rs");
         let scanner_list_payload = source
-            .split_once("struct ScannerAssetItem {")
+            .split_once("pub(crate) struct ScannerAssetItem {")
             .expect("scanner list payload struct must exist")
             .1
-            .split_once("struct ScannerTaskReference")
+            .split_once("pub(crate) struct ScannerTaskReference")
             .expect("scanner list payload struct must precede detail references")
             .0;
         let scanner_detail_payload = source
-            .split_once("struct ScannerAssetDetail {")
+            .split_once("pub(crate) struct ScannerAssetDetail {")
             .expect("scanner detail payload struct must exist")
             .1
-            .split_once("struct ScanConfigOwner")
-            .expect("scanner detail payload struct must precede scan config owner")
+            .split_once("pub(crate) fn scanner_asset_from_row")
+            .expect("scanner detail payload struct must precede row mapper")
             .0;
 
         assert!(!scanner_list_payload.contains("user_tags"));
