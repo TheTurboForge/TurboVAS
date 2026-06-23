@@ -32,6 +32,7 @@ mod report_formats;
 mod request_ids;
 mod request_shapes;
 mod row_helpers;
+mod scan_configs;
 mod schedules;
 mod tag_resource_helpers;
 mod tags;
@@ -53,6 +54,7 @@ use query::*;
 use report_configs::*;
 use report_formats::*;
 use row_helpers::*;
+use scan_configs::*;
 use schedules::*;
 use tag_resource_helpers::*;
 use tags::*;
@@ -737,57 +739,6 @@ struct ScannerAssetDetail {
     asset: ScannerAssetItem,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     tasks: Vec<ScannerTaskReference>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    user_tags: Vec<ReportUserTag>,
-}
-
-#[derive(Serialize)]
-struct ScanConfigOwner {
-    name: String,
-}
-
-#[derive(Serialize)]
-struct ScanConfigTrendCount {
-    total: i64,
-    trend: i32,
-}
-
-#[derive(Serialize)]
-struct ScanConfigTaskReference {
-    id: String,
-    name: String,
-    usage_type: String,
-}
-
-#[derive(Serialize)]
-struct ScanConfigAssetItem {
-    id: String,
-    name: String,
-    comment: String,
-    owner: ScanConfigOwner,
-    family_count: i64,
-    families_growing: i32,
-    nvt_count: i64,
-    nvts_growing: i32,
-    families: ScanConfigTrendCount,
-    nvts: ScanConfigTrendCount,
-    predefined: bool,
-    deprecated: bool,
-    writable: bool,
-    in_use: bool,
-    orphan: bool,
-    trash: bool,
-    usage_type: String,
-    created_at: Option<String>,
-    modified_at: Option<String>,
-}
-
-#[derive(Serialize)]
-struct ScanConfigAssetDetail {
-    #[serde(flatten)]
-    asset: ScanConfigAssetItem,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    tasks: Vec<ScanConfigTaskReference>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     user_tags: Vec<ReportUserTag>,
 }
@@ -1888,43 +1839,6 @@ async fn scanner_user_tags(
             comment: row.get("comment"),
         })
         .collect())
-}
-
-fn scan_config_asset_from_row(row: &Row) -> ScanConfigAssetItem {
-    let family_count = row.get("family_count");
-    let families_growing = row.get("families_growing");
-    let nvt_count = row.get("nvt_count");
-    let nvts_growing = row.get("nvts_growing");
-
-    ScanConfigAssetItem {
-        id: row.get("id"),
-        name: row.get("name"),
-        comment: row.get("comment"),
-        owner: ScanConfigOwner {
-            name: row.get("owner_name"),
-        },
-        family_count,
-        families_growing,
-        nvt_count,
-        nvts_growing,
-        families: ScanConfigTrendCount {
-            total: family_count,
-            trend: families_growing,
-        },
-        nvts: ScanConfigTrendCount {
-            total: nvt_count,
-            trend: nvts_growing,
-        },
-        predefined: row.get::<_, i32>("predefined_int") != 0,
-        deprecated: row.get::<_, i32>("deprecated_int") != 0,
-        writable: row.get::<_, i32>("predefined_int") == 0,
-        in_use: row.get::<_, i32>("in_use_int") != 0,
-        orphan: false,
-        trash: false,
-        usage_type: row.get("usage_type"),
-        created_at: unix_ts_to_rfc3339(row.get("created_at_unix")),
-        modified_at: unix_ts_to_rfc3339(row.get("modified_at_unix")),
-    }
 }
 
 async fn scan_config_assets(
@@ -10336,8 +10250,8 @@ mod tests {
             .split_once("async fn scanner_asset_detail")
             .expect("scanner detail handler must exist")
             .1
-            .split_once("fn scan_config_asset_from_row")
-            .expect("scanner detail handler must precede scan config assets")
+            .split_once("async fn scan_config_assets")
+            .expect("scanner detail handler must precede scan config asset handler")
             .0;
 
         assert!(detail_source.contains("scanner_task_references"));
@@ -10353,20 +10267,20 @@ mod tests {
 
     #[test]
     fn scan_config_user_tags_are_detail_only_active_config_tags() {
-        let source = include_str!("main.rs");
+        let source = include_str!("scan_configs.rs");
         let scan_config_list_payload = source
-            .split_once("struct ScanConfigAssetItem {")
+            .split_once("pub(crate) struct ScanConfigAssetItem {")
             .expect("scan config list payload struct must exist")
             .1
-            .split_once("struct ScanConfigAssetDetail")
+            .split_once("pub(crate) struct ScanConfigAssetDetail")
             .expect("scan config list payload struct must precede detail payload")
             .0;
         let scan_config_detail_payload = source
-            .split_once("struct ScanConfigAssetDetail {")
+            .split_once("pub(crate) struct ScanConfigAssetDetail {")
             .expect("scan config detail payload struct must exist")
             .1
-            .split_once("struct FilterAlertReference")
-            .expect("scan config detail payload must precede filter structs")
+            .split_once("pub(crate) fn scan_config_asset_from_row")
+            .expect("scan config detail payload must precede row mapper")
             .0;
 
         assert!(!scan_config_list_payload.contains("user_tags"));
