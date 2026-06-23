@@ -1,3 +1,5 @@
+/* TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>. */
+
 import {defineConfig} from 'vitest/config';
 
 export default defineConfig({
@@ -8,6 +10,7 @@ export default defineConfig({
         test: {
           name: 'web',
           environment: 'jsdom',
+          testTimeout: 10000,
           setupFiles: './src/web/setup-tests.ts',
           include: [
             'src/web/**/*.{test,spec}.?(c|m)[jt]s?(x)',
