@@ -29,6 +29,7 @@ mod report_formats;
 mod request_ids;
 mod request_shapes;
 mod row_helpers;
+mod schedules;
 mod tag_resource_helpers;
 mod user_tags;
 
@@ -44,6 +45,7 @@ use query::*;
 use report_configs::*;
 use report_formats::*;
 use row_helpers::*;
+use schedules::*;
 use tag_resource_helpers::*;
 use user_tags::*;
 
@@ -756,35 +758,6 @@ struct OperatingSystemAssetItem {
     all_hosts: i64,
     created_at: Option<String>,
     modified_at: Option<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    user_tags: Vec<ReportUserTag>,
-}
-
-#[derive(Serialize)]
-struct ScheduleTaskReference {
-    id: String,
-    name: String,
-    usage_type: String,
-}
-
-#[derive(Serialize)]
-struct ScheduleAssetItem {
-    id: String,
-    name: String,
-    comment: String,
-    icalendar: String,
-    timezone: String,
-    timezone_abbrev: Option<String>,
-    task_count: i64,
-    tasks: Vec<ScheduleTaskReference>,
-    created_at: Option<String>,
-    modified_at: Option<String>,
-}
-
-#[derive(Serialize)]
-struct ScheduleAssetDetail {
-    #[serde(flatten)]
-    asset: ScheduleAssetItem,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     user_tags: Vec<ReportUserTag>,
 }
@@ -3562,10 +3535,10 @@ async fn schedule_asset_detail(
         .map(schedule_task_from_row)
         .collect();
     let user_tags = schedule_user_tags(&client, &schedule_id).await?;
-    Ok(Json(ScheduleAssetDetail {
-        asset: schedule_asset_from_row(&row, tasks),
+    Ok(Json(schedule_asset_detail_payload(
+        schedule_asset_from_row(&row, tasks),
         user_tags,
-    }))
+    )))
 }
 
 fn schedule_user_tags_sql() -> &'static str {
@@ -9090,29 +9063,6 @@ fn override_asset_from_row(row: &Row) -> OverrideAssetItem {
     }
 }
 
-fn schedule_task_from_row(row: &Row) -> ScheduleTaskReference {
-    ScheduleTaskReference {
-        id: row.get("id"),
-        name: row.get("name"),
-        usage_type: row.get("usage_type"),
-    }
-}
-
-fn schedule_asset_from_row(row: &Row, tasks: Vec<ScheduleTaskReference>) -> ScheduleAssetItem {
-    ScheduleAssetItem {
-        id: row.get("id"),
-        name: row.get("name"),
-        comment: row.get("comment"),
-        icalendar: row.get("icalendar"),
-        timezone: row.get("timezone"),
-        timezone_abbrev: None,
-        task_count: row.get("task_count"),
-        tasks,
-        created_at: unix_ts_to_rfc3339(row.get("created_at_unix")),
-        modified_at: unix_ts_to_rfc3339(row.get("modified_at_unix")),
-    }
-}
-
 fn tls_certificate_from_row(row: &Row) -> TlsCertificateItem {
     TlsCertificateItem {
         id: row.get(1),
@@ -10981,7 +10931,7 @@ mod tests {
 
     #[test]
     fn schedule_user_tags_are_detail_only_active_schedule_tags() {
-        let source = include_str!("main.rs");
+        let source = include_str!("schedules.rs");
         let schedule_list_payload = source
             .split_once("struct ScheduleAssetItem {")
             .expect("schedule list payload struct must exist")
@@ -10993,8 +10943,8 @@ mod tests {
             .split_once("struct ScheduleAssetDetail {")
             .expect("schedule detail payload struct must exist")
             .1
-            .split_once("struct TrashcanSummaryItem")
-            .expect("schedule detail payload must precede trashcan structs")
+            .split_once("pub(crate) fn schedule_task_from_row")
+            .expect("schedule detail payload must precede row mappers")
             .0;
 
         assert!(!schedule_list_payload.contains("user_tags"));
