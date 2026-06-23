@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2025 Greenbone AG
 //
+// TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
 // SPDX-License-Identifier: GPL-2.0-or-later WITH x11vnc-openssl-exception
 
 #include "nasl_krb5.h"
@@ -116,16 +117,11 @@ build_krb5_credential (lex_ctxt *lexic)
       generated_ccache_path = strdup (default_ccache_path);
     }
 
-  SET_SLICE_FROM_LEX_OR_ENV (lexic, credential.config_path, "config_path",
-                             "KRB5_CONFIG");
-  if (credential.config_path.len == 0)
-    {
-      char default_config_path[256];
-      snprintf (default_config_path, sizeof (default_config_path),
-                "/tmp/krb5_%s.conf", ip_str);
-      setenv ("KRB5_CONFIG", default_config_path, 1);
-      okrb5_set_slice_from_str (credential.config_path, default_config_path);
-    }
+  char default_config_path[256];
+  snprintf (default_config_path, sizeof (default_config_path), "/tmp/krb5_%s.conf",
+            ip_str);
+  setenv ("KRB5_CONFIG", default_config_path, 1);
+  okrb5_set_slice_from_str (credential.config_path, default_config_path);
 
   // Store path for cleanup
   if (generated_config_path != NULL)
@@ -184,8 +180,8 @@ build_krb5_credential (lex_ctxt *lexic)
  * The nasl function has two optional parameter:
  * - realm: The realm for which the KDC should be returned. If the realm is not
  * defined, then the env parameter `KRB5_REALM` is used.
- * - config_path: Optional scanner-owned krb5.conf path. TurboVAS only accepts
- * generated /tmp/krb5_*.conf paths at the C boundary.
+ * - config_path: ignored by TurboVAS; the scanner generates and owns the
+ * /tmp/krb5_*.conf path.
  *
  * This function should only be used for debug purposes.
  *

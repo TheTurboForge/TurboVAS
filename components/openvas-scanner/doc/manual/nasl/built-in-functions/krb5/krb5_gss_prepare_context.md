@@ -1,3 +1,5 @@
+<!-- TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>. -->
+
 # krb5_gss_prepare_context
 
 ## NAME
@@ -6,9 +8,9 @@
 
 ## SYNOPSIS
 
-*int* **krb5_gss_prepare_context**(config_path: str, realm: str, kdc: str, host: str, service: str, user: str, password: str);
+*int* **krb5_gss_prepare_context**(realm: str, kdc: str, host: str, service: str, user: str, password: str);
 
-The config_path argument is optional and can be omitted. TurboVAS generates and uses a scanner-owned `/tmp/krb5_*.conf` path by default; arbitrary caller-provided config paths are rejected at the C boundary. The other arguments are required.
+TurboVAS generates and uses a scanner-owned `/tmp/krb5_*.conf` path. Caller-provided `config_path` and `KRB5_CONFIG` values are ignored. The listed arguments are required.
 
 - realm - The realm of the domain.
 - kdc - The KDC server to use. Can be a comma separated list of servers. The first server in the list is the primary server.

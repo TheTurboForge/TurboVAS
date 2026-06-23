@@ -110,11 +110,32 @@ is_safe_generated_config_path (const char *path)
 static FILE *
 fopen_private_write (const char *path)
 {
-  int fd = open (path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+  int flags = O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC;
+#ifdef O_NOFOLLOW
+  flags |= O_NOFOLLOW;
+#endif
+  int fd = open (path, flags, 0600);
   if (fd == -1)
     return NULL;
 
   FILE *stream = fdopen (fd, "w");
+  if (stream == NULL)
+    close (fd);
+  return stream;
+}
+
+static FILE *
+fopen_private_read (const char *path)
+{
+  int flags = O_RDONLY | O_CLOEXEC;
+#ifdef O_NOFOLLOW
+  flags |= O_NOFOLLOW;
+#endif
+  int fd = open (path, flags);
+  if (fd == -1)
+    return NULL;
+
+  FILE *stream = fdopen (fd, "r");
   if (stream == NULL)
     close (fd);
   return stream;
@@ -140,7 +161,7 @@ o_krb5_find_kdc (const OKrb5Credential *creds, char **kdc)
       goto result;
     }
 
-  if ((file = fopen ((char *) creds->config_path.data, "r")) == NULL)
+  if ((file = fopen_private_read ((char *) creds->config_path.data)) == NULL)
     {
       result = O_KRB5_CONF_NOT_FOUND;
       goto result;
@@ -305,7 +326,7 @@ o_krb5_add_realm (const OKrb5Credential *creds, const char *kdc)
       goto result;
     }
 
-  if ((file = fopen (cp, "r")) == NULL)
+  if ((file = fopen_private_read (cp)) == NULL)
     {
       if ((file = fopen_private_write (cp)) == NULL)
         {
@@ -331,7 +352,7 @@ o_krb5_add_realm (const OKrb5Credential *creds, const char *kdc)
           SKIP_WS (line, MAX_LINE_LENGTH, 0, i);
           if (IS_STR_EQUAL (line, MAX_LINE_LENGTH, i, "[realms]", 8) == 1)
             {
-              o_krb5_write_realm (file, creds, kdc);
+              o_krb5_write_realm (tmp, creds, kdc);
 
               state = 1;
             }

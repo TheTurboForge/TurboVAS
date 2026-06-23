@@ -1,3 +1,5 @@
+<!-- TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>. -->
+
 # krb5_find_kdc
 
 ## NAME
@@ -12,7 +14,7 @@
 
 ## DESCRIPTION
 
-This function opens the scanner-owned generated krb5.conf file and looks for a KDC entry for the given realm. TurboVAS rejects arbitrary caller-provided config paths at the C boundary.
+This function opens the scanner-owned generated krb5.conf file and looks for a KDC entry for the given realm. TurboVAS ignores caller-provided `config_path` and `KRB5_CONFIG` values.
 
 ## RETURN VALUE
 
