@@ -94,6 +94,14 @@ describe('native API port lists', () => {
             name: 'Authorized LAN target',
           },
         ],
+        user_tags: [
+          {
+            id: '8afbe92e-f808-447c-9399-1492f3f9ef3f',
+            name: 'Native tag',
+            value: 'true',
+            comment: 'Native port list tag',
+          },
+        ],
       }),
       ok: true,
       status: 200,
@@ -114,5 +122,10 @@ describe('native API port lists', () => {
     expect(portList.targets).toHaveLength(1);
     expect(portList.targets[0].id).toEqual('6b0caa76-6dd0-4e58-aa69-e2974cf85944');
     expect(portList.targets[0].name).toEqual('Authorized LAN target');
+    expect(portList.userTags).toHaveLength(1);
+    expect(portList.userTags[0].id).toEqual('8afbe92e-f808-447c-9399-1492f3f9ef3f');
+    expect(portList.userTags[0].name).toEqual('Native tag');
+    expect(portList.userTags[0].value).toEqual('true');
+    expect(portList.userTags[0].comment).toEqual('Native port list tag');
   });
 });

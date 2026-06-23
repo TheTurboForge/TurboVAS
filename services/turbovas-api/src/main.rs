@@ -1151,6 +1151,14 @@ struct PortListAssetItem {
 }
 
 #[derive(Serialize)]
+struct PortListAssetDetail {
+    #[serde(flatten)]
+    asset: PortListAssetItem,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    user_tags: Vec<ReportUserTag>,
+}
+
+#[derive(Serialize)]
 struct HostIdentifierItem {
     id: String,
     name: String,
@@ -3416,7 +3424,7 @@ async fn port_list_assets(
 async fn port_list_asset_detail(
     State(state): State<AppState>,
     Path(port_list_id): Path<String>,
-) -> Result<Json<PortListAssetItem>, ApiError> {
+) -> Result<Json<PortListAssetDetail>, ApiError> {
     parse_uuid(&port_list_id)?;
     let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
     let row = client
@@ -3495,7 +3503,48 @@ async fn port_list_asset_detail(
         .iter()
         .map(port_list_target_from_row)
         .collect();
-    Ok(Json(port_list_asset_from_row(&row, ranges, targets)))
+    let user_tags = port_list_user_tags(&client, &port_list_id).await?;
+    Ok(Json(PortListAssetDetail {
+        asset: port_list_asset_from_row(&row, ranges, targets),
+        user_tags,
+    }))
+}
+
+fn port_list_user_tags_sql() -> &'static str {
+    r#"SELECT t.uuid AS id,
+              coalesce(t.name, '') AS name,
+              coalesce(t.value, '') AS value,
+              coalesce(t.comment, '') AS comment
+         FROM tags t
+         JOIN tag_resources tr ON tr.tag = t.id
+         JOIN port_lists pl ON pl.id = tr.resource
+        WHERE lower(pl.uuid) = lower($1)
+          AND tr.resource_type = 'port_list'
+          AND tr.resource_location = 0
+          AND coalesce(t.active, 0) = 1
+        ORDER BY t.name ASC, t.uuid ASC;"#
+}
+
+async fn port_list_user_tags(
+    client: &tokio_postgres::Client,
+    port_list_id: &str,
+) -> Result<Vec<ReportUserTag>, ApiError> {
+    let rows = client
+        .query(port_list_user_tags_sql(), &[&port_list_id])
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "port list user-tag query failed");
+            ApiError::Database
+        })?;
+    Ok(rows
+        .iter()
+        .map(|row| ReportUserTag {
+            id: row.get("id"),
+            name: row.get("name"),
+            value: row.get("value"),
+            comment: row.get("comment"),
+        })
+        .collect())
 }
 
 async fn schedule_assets(
@@ -11194,6 +11243,40 @@ mod tests {
         assert!(sql.contains("JOIN schedules s ON s.id = tr.resource"));
         assert!(sql.contains("lower(s.uuid) = lower($1)"));
         assert!(sql.contains("tr.resource_type = 'schedule'"));
+        assert!(sql.contains("tr.resource_location = 0"));
+        assert!(sql.contains("coalesce(t.active, 0) = 1"));
+        assert!(!sql.contains("credential"));
+        assert!(!sql.contains("reports"));
+        assert!(!sql.contains("results"));
+    }
+
+    #[test]
+    fn port_list_user_tags_are_detail_only_active_port_list_tags() {
+        let source = include_str!("main.rs");
+        let port_list_payload = source
+            .split_once("struct PortListAssetItem {")
+            .expect("port list payload struct must exist")
+            .1
+            .split_once("struct PortListAssetDetail")
+            .expect("port list payload struct must precede detail payload")
+            .0;
+        let port_list_detail_payload = source
+            .split_once("struct PortListAssetDetail {")
+            .expect("port list detail payload struct must exist")
+            .1
+            .split_once("struct HostIdentifierItem")
+            .expect("port list detail payload must precede host structs")
+            .0;
+
+        assert!(!port_list_payload.contains("user_tags"));
+        assert!(port_list_detail_payload.contains("user_tags: Vec<ReportUserTag>"));
+
+        let sql = port_list_user_tags_sql();
+        assert!(sql.contains("FROM tags t"));
+        assert!(sql.contains("JOIN tag_resources tr ON tr.tag = t.id"));
+        assert!(sql.contains("JOIN port_lists pl ON pl.id = tr.resource"));
+        assert!(sql.contains("lower(pl.uuid) = lower($1)"));
+        assert!(sql.contains("tr.resource_type = 'port_list'"));
         assert!(sql.contains("tr.resource_location = 0"));
         assert!(sql.contains("coalesce(t.active, 0) = 1"));
         assert!(!sql.contains("credential"));

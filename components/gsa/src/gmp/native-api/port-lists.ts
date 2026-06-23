@@ -46,6 +46,13 @@ interface NativePortListTargetPayload {
   name: string;
 }
 
+interface NativeUserTagPayload {
+  id: string;
+  name: string;
+  value: string;
+  comment: string;
+}
+
 interface NativePortListPayload {
   id: string;
   name: string;
@@ -53,6 +60,7 @@ interface NativePortListPayload {
   port_count?: NativePortCountPayload;
   port_ranges?: NativePortRangePayload[];
   targets?: NativePortListTargetPayload[];
+  user_tags?: NativeUserTagPayload[];
   predefined?: boolean;
   deprecated?: boolean;
   created_at?: string;
@@ -133,6 +141,15 @@ const nativeCounts = (page: NativePage, length: number): CollectionCounts =>
     rows: page.page_size,
   });
 
+const nativeUserTagsElement = (tags: NativeUserTagPayload[] = []) => ({
+  tag: tags.map(tag => ({
+    _id: stringValue(tag.id),
+    name: stringValue(tag.name),
+    value: stringValue(tag.value),
+    comment: stringValue(tag.comment),
+  })),
+});
+
 const fetchNativeJson = async <T>(
   gmp: NativeApiGmp,
   path: string,
@@ -153,7 +170,10 @@ const fetchNativeJson = async <T>(
   return (await response.json()) as T;
 };
 
-const nativePortListToModel = (item: NativePortListPayload): PortList =>
+const nativePortListToModel = (
+  item: NativePortListPayload,
+  {detail = false}: {detail?: boolean} = {},
+): PortList =>
   PortList.fromElement({
     _id: stringValue(item.id),
     name: stringValue(item.name),
@@ -183,6 +203,7 @@ const nativePortListToModel = (item: NativePortListPayload): PortList =>
         name: stringValue(target.name),
       })),
     },
+    user_tags: detail ? nativeUserTagsElement(item.user_tags ?? []) : undefined,
   });
 
 export const fetchNativePortLists = async (
@@ -207,7 +228,7 @@ export const fetchNativePortLists = async (
     sort: stringValue(payload.page?.sort),
     filter: stringValue(payload.page?.filter),
   };
-  const portLists = (payload.items ?? []).map(nativePortListToModel);
+  const portLists = (payload.items ?? []).map(item => nativePortListToModel(item));
   return {
     portLists,
     counts: nativeCounts(page, portLists.length),
@@ -224,5 +245,5 @@ export const fetchNativePortList = async (
     `api/v1/port-lists/${encodeURIComponent(id)}`,
     {token: gmp.session.token},
   );
-  return nativePortListToModel(payload);
+  return nativePortListToModel(payload, {detail: true});
 };

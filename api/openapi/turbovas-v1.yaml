@@ -1141,7 +1141,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PortListAsset'
+                $ref: '#/components/schemas/PortListAssetDetail'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -4750,6 +4750,15 @@ components:
         modified_at:
           type: string
           format: date-time
+    PortListAssetDetail:
+      allOf:
+        - $ref: '#/components/schemas/PortListAsset'
+        - type: object
+          properties:
+            user_tags:
+              type: array
+              items:
+                $ref: '#/components/schemas/UserTag'
     ScheduleTaskReference:
       type: object
       required: [id, name, usage_type]
