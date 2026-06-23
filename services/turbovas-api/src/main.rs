@@ -27,6 +27,7 @@ mod request_ids;
 mod request_shapes;
 mod row_helpers;
 mod tag_resource_helpers;
+mod user_tags;
 
 use app_state::{AppState, create_pool, healthz};
 use collections::*;
@@ -38,6 +39,7 @@ use path_ids::*;
 use query::*;
 use row_helpers::*;
 use tag_resource_helpers::*;
+use user_tags::*;
 
 #[derive(Debug, Serialize)]
 struct ScopeSummary {
@@ -64,14 +66,6 @@ struct ReportSeverityCounts {
 #[derive(Debug, Serialize)]
 struct ReportOwner {
     name: String,
-}
-
-#[derive(Debug, Serialize)]
-struct ReportUserTag {
-    id: String,
-    name: String,
-    value: String,
-    comment: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -4585,42 +4579,6 @@ async fn cve_catalog_detail(
     item.nvt_refs = cve_nvt_refs(&client, &cve_id).await?;
     let user_tags = catalog_user_tags(&client, "cve", &cve_id).await?;
     Ok(Json(CatalogCveDetail { item, user_tags }))
-}
-
-fn catalog_user_tags_sql() -> &'static str {
-    r#"SELECT t.uuid AS id,
-              coalesce(t.name, '') AS name,
-              coalesce(t.value, '') AS value,
-              coalesce(t.comment, '') AS comment
-         FROM tags t
-         JOIN tag_resources tr ON tr.tag = t.id
-        WHERE lower(tr.resource_uuid) = lower($1)
-          AND tr.resource_type = $2
-          AND coalesce(t.active, 0) = 1
-        ORDER BY t.name ASC, t.uuid ASC;"#
-}
-
-async fn catalog_user_tags(
-    client: &tokio_postgres::Client,
-    resource_type: &str,
-    resource_id: &str,
-) -> Result<Vec<ReportUserTag>, ApiError> {
-    let rows = client
-        .query(catalog_user_tags_sql(), &[&resource_id, &resource_type])
-        .await
-        .map_err(|error| {
-            tracing::warn!(%error, resource_type, "catalog user-tag query failed");
-            ApiError::Database
-        })?;
-    Ok(rows
-        .iter()
-        .map(|row| ReportUserTag {
-            id: row.get("id"),
-            name: row.get("name"),
-            value: row.get("value"),
-            comment: row.get("comment"),
-        })
-        .collect())
 }
 
 async fn cve_cert_refs(
