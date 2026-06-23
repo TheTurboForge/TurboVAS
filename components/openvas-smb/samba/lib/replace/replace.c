@@ -1,6 +1,7 @@
 /*
  * SPDX-FileCopyrightText: Andrew Tridgell 1992-1998
  * SPDX-License-Identifier: GPL-2.0-or-later
+ * TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
  */
 
 /* 
@@ -112,7 +113,7 @@ Corrections by richard.kettlewell@kewill.com
 #define  YEAR    365*DAY
 time_t rep_mktime(struct tm *t)
 {
-  struct tm       *u;
+  struct tm       u;
   time_t  epoch = 0;
   int n;
   int             mon [] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 },
@@ -142,16 +143,16 @@ time_t rep_mktime(struct tm *t)
   epoch += (t->tm_mday - 1) * DAY;
   epoch += t->tm_hour * HOUR + t->tm_min * MINUTE + t->tm_sec;
   
-  if((u = localtime(&epoch)) != NULL) {
-    t->tm_sec = u->tm_sec;
-    t->tm_min = u->tm_min;
-    t->tm_hour = u->tm_hour;
-    t->tm_mday = u->tm_mday;
-    t->tm_mon = u->tm_mon;
-    t->tm_year = u->tm_year;
-    t->tm_wday = u->tm_wday;
-    t->tm_yday = u->tm_yday;
-    t->tm_isdst = u->tm_isdst;
+  if(localtime_r(&epoch, &u) != NULL) {
+    t->tm_sec = u.tm_sec;
+    t->tm_min = u.tm_min;
+    t->tm_hour = u.tm_hour;
+    t->tm_mday = u.tm_mday;
+    t->tm_mon = u.tm_mon;
+    t->tm_year = u.tm_year;
+    t->tm_wday = u.tm_wday;
+    t->tm_yday = u.tm_yday;
+    t->tm_isdst = u.tm_isdst;
   }
 
   return(epoch);

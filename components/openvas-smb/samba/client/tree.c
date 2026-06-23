@@ -3,6 +3,7 @@
  * SPDX-FileCopyrightText: Richard Sharpe 2001
  * SPDX-FileCopyrightText: Andrew Tridgell 1998
  * SPDX-License-Identifier: GPL-2.0-or-later
+ * TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
  */
 
 /* 
@@ -31,6 +32,8 @@
 
 #include <stdio.h>
 #include <errno.h>
+#include <string.h>
+#include <time.h>
 #include <gtk/gtk.h>
 #include "libsmbclient.h"
 
@@ -78,6 +81,28 @@ void error_message(gchar *message) {
 
 static char path_string[1024];
 
+static void append_path_component(char *path, size_t path_size,
+                                  const char *component)
+{
+  size_t used;
+  int ret;
+
+  if (path_size == 0) {
+    return;
+  }
+
+  used = strlen(path);
+  if (used >= path_size) {
+    path[path_size - 1] = '\0';
+    return;
+  }
+
+  ret = snprintf(path + used, path_size - used, "/%s", component);
+  if (ret < 0 || (size_t)ret >= path_size - used) {
+    path[path_size - 1] = '\0';
+  }
+}
+
 char *get_path(GtkWidget *item)
 {
   GtkWidget *p = item;
@@ -123,8 +148,7 @@ char *get_path(GtkWidget *item)
 
   for (j = i - 1; j >= 0; j--) {
 
-    strncat(path_string, "/", sizeof(path_string) - strlen(path_string));
-    strncat(path_string, comps[j], sizeof(path_string) - strlen(path_string));
+    append_path_component(path_string, sizeof(path_string), comps[j]);
 
   }
   
@@ -201,6 +225,7 @@ static void cb_select_child (GtkWidget *root_tree, GtkWidget *child,
     while (err > 0) {
       gchar col1[128], col2[128], col3[128], col4[128];
       gchar *rowdata[4] = {col1, col2, col3, col4};
+      char timebuf[26];
 
       dirlen = dirp->dirlen;
 
@@ -248,9 +273,8 @@ static void cb_select_child (GtkWidget *root_tree, GtkWidget *child,
 
 	if (!ISDOT(dirp->name) && !ISDOTDOT(dirp->name)) {
 
-	  strncpy(path1, path, sizeof(path1));
-	  strncat(path1, "/", sizeof(path) - strlen(path));
-	  strncat(path1, dirp->name, sizeof(path) - strlen(path));
+	  snprintf(path1, sizeof(path1), "%s", path);
+	  append_path_component(path1, sizeof(path1), dirp->name);
 
 	  if (smbc_stat(path1, &st1) < 0) {
 	    
@@ -285,7 +309,9 @@ static void cb_select_child (GtkWidget *root_tree, GtkWidget *child,
 		     (st1.st_mode&S_IXOTH?'x':'-'),
 		     st1.st_mode); 
 	    snprintf(col3, sizeof(col3), "%u", st1.st_size);
-	    snprintf(col4, sizeof(col4), "%s", ctime(&st1.st_mtime));
+	    if (ctime_r(&st1.st_mtime, timebuf) != NULL) {
+	      snprintf(col4, sizeof(col4), "%s", timebuf);
+	    }
 	  }
 	}
 
