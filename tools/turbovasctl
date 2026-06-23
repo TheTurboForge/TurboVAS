@@ -6296,7 +6296,15 @@ def compact_license_status_finding(item: dict[str, Any]) -> dict[str, Any]:
 def production_posture_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
     compact = dict(result)
     findings = result.get("findings", [])
-    non_pass = [compact_doctor_finding(item) for item in findings if item.get("status") != "pass"]
+    non_pass = []
+    for item in findings:
+        if item.get("status") == "pass":
+            continue
+        compact_item = compact_doctor_finding(item)
+        path = compact_item.get("path")
+        if isinstance(path, str) and (path.startswith("/") or "secret" in path.lower()):
+            compact_item["path"] = "[redacted]"
+        non_pass.append(compact_item)
     details = result.get("details", {}) if isinstance(result.get("details"), dict) else {}
     compact["details"] = {
         "finding_count": len(findings),

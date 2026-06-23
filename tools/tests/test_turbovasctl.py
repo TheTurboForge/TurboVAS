@@ -2291,6 +2291,26 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(compact["findings"][0]["check"], "production.tls")
         self.assertEqual(compact["findings"][0]["details"]["cert_files"], {"type": "list", "count": 2})
 
+    def test_production_posture_status_only_redacts_sensitive_paths(self):
+        result = {
+            "status": "fail",
+            "summary": "Production posture checklist completed.",
+            "details": {"public_release_license_gate": {"status": "pass", "summary": "ok"}},
+            "findings": [
+                {
+                    "status": "fail",
+                    "check": "production.default-credentials",
+                    "message": "default password",
+                    "path": "/home/user/TurboVAS-runtime/secrets/gvmd-admin-password",
+                }
+            ],
+        }
+
+        compact = turbovasctl.production_posture_status_only_result(result)
+
+        self.assertEqual(compact["findings"][0]["path"], "[redacted]")
+        self.assertNotIn("gvmd-admin-password", json.dumps(compact))
+
     def test_native_api_migration_matrix_combines_inventory_and_openapi_metadata(self):
         root = Path(__file__).resolve().parents[2]
         result = turbovasctl.command_native_api_migration_matrix(root)
