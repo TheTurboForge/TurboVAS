@@ -908,7 +908,7 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_technical_foundation_commands_are_registered(self):
         source = (Path(__file__).resolve().parents[1] / "turbovasctl").read_text(encoding="utf-8")
         justfile = (Path(__file__).resolve().parents[2] / "justfile").read_text(encoding="utf-8")
-        for command in ("native-tooling-state", "native-api-request", "native-api-migration-matrix", "native-api-client-contract", "native-api-cargo-audit", "gsa-npm-audit", "rust-migration-state", "branding-state", "production-posture-check", "runtime-log-review", "runtime-data-state", "runtime-db-introspect", "runtime-performance-snapshot", "runtime-redis-state", "security-policy-check", "path-coupling-state", "runtime-native-api-smoke", "runtime-native-api-direct-smoke", "runtime-native-api-direct-bootstrap", "runtime-native-api-rebuild", "quality-gate", "quality-gate-state", "quality-gate-schedule"):
+        for command in ("native-tooling-state", "native-api-request", "native-api-migration-matrix", "native-api-client-contract", "native-api-cargo-audit", "gsa-npm-audit", "osv-lockfile-audit", "rust-migration-state", "branding-state", "production-posture-check", "runtime-log-review", "runtime-data-state", "runtime-db-introspect", "runtime-performance-snapshot", "runtime-redis-state", "security-policy-check", "path-coupling-state", "runtime-native-api-smoke", "runtime-native-api-direct-smoke", "runtime-native-api-direct-bootstrap", "runtime-native-api-rebuild", "quality-gate", "quality-gate-state", "quality-gate-schedule"):
             with self.subTest(command=command):
                 self.assertIn(command, source)
                 self.assertIn(f"{command} *args:", justfile)
@@ -918,6 +918,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("def command_native_api_client_contract", source)
         self.assertIn("def command_native_api_cargo_audit", source)
         self.assertIn("def command_gsa_npm_audit", source)
+        self.assertIn("def command_osv_lockfile_audit", source)
         self.assertIn("def command_rust_migration_state", source)
         self.assertIn("def command_branding_state", source)
         self.assertIn("def command_runtime_log_review", source)
@@ -1089,6 +1090,82 @@ class TurboVASCtlTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "warn")
         self.assertEqual(result["findings"][0]["check"], "gsa-npm-audit.tool")
+
+    def test_osv_lockfile_audit_warns_for_low_vulnerabilities(self):
+        payload = {
+            "results": [
+                {
+                    "source": {"path": "/repo/TurboVAS/components/python-gvm/uv.lock"},
+                    "packages": [
+                        {
+                            "package": {"ecosystem": "PyPI", "name": "paramiko", "version": "4.0.0"},
+                            "vulnerabilities": [
+                                {"id": "GHSA-r374-rxx8-8654", "database_specific": {"severity": "LOW"}}
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
+        with tempfile.TemporaryDirectory() as tmp, \
+             unittest.mock.patch.object(turbovasctl.shutil, "which", return_value="/usr/local/bin/osv-scanner"), \
+             unittest.mock.patch.object(turbovasctl, "run_command", return_value=subprocess.CompletedProcess(["osv-scanner"], 1, json.dumps(payload))):
+            root = Path(tmp)
+            for lockfile in turbovasctl.OSV_LOCKFILES:
+                path = root / lockfile
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("# lock\n", encoding="utf-8")
+            result = turbovasctl.command_osv_lockfile_audit(root, status_only=True)
+
+        self.assertEqual(result["status"], "warn")
+        self.assertEqual(result["details"]["vulnerability_count"], 1)
+        self.assertEqual(result["details"]["high_or_critical_count"], 0)
+        self.assertEqual(result["findings"][0]["check"], "osv-lockfile-audit.vulnerabilities")
+        self.assertEqual(result["findings"][0]["top_findings"][0]["package"], "paramiko")
+        self.assertEqual(result["findings"][0]["top_findings"][0]["path"], "components/python-gvm/uv.lock")
+
+    def test_osv_lockfile_audit_fails_for_high_vulnerabilities(self):
+        payload = {
+            "results": [
+                {
+                    "source": {"path": "/repo/TurboVAS/components/gsa/package-lock.json"},
+                    "packages": [
+                        {
+                            "package": {"ecosystem": "npm", "name": "example", "version": "1.0.0"},
+                            "vulnerabilities": [
+                                {"id": "GHSA-high", "database_specific": {"severity": "HIGH"}}
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
+        with tempfile.TemporaryDirectory() as tmp, \
+             unittest.mock.patch.object(turbovasctl.shutil, "which", return_value="/usr/local/bin/osv-scanner"), \
+             unittest.mock.patch.object(turbovasctl, "run_command", return_value=subprocess.CompletedProcess(["osv-scanner"], 1, json.dumps(payload))):
+            root = Path(tmp)
+            for lockfile in turbovasctl.OSV_LOCKFILES:
+                path = root / lockfile
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("# lock\n", encoding="utf-8")
+            result = turbovasctl.command_osv_lockfile_audit(root, status_only=True)
+
+        self.assertEqual(result["status"], "fail")
+        self.assertEqual(result["details"]["high_or_critical_count"], 1)
+        self.assertEqual(result["findings"][0]["check"], "osv-lockfile-audit.high-critical")
+        self.assertEqual(result["findings"][0]["top_findings"][0]["advisory"], "GHSA-high")
+
+    def test_osv_lockfile_audit_warns_when_tool_missing(self):
+        with tempfile.TemporaryDirectory() as tmp, unittest.mock.patch.object(turbovasctl.shutil, "which", return_value=None):
+            root = Path(tmp)
+            for lockfile in turbovasctl.OSV_LOCKFILES:
+                path = root / lockfile
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("# lock\n", encoding="utf-8")
+            result = turbovasctl.command_osv_lockfile_audit(root, status_only=True)
+
+        self.assertEqual(result["status"], "warn")
+        self.assertEqual(result["findings"][0]["check"], "osv-lockfile-audit.tool")
 
     def test_quality_gate_state_status_only_omits_history(self):
         result = {

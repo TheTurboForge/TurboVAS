@@ -157,6 +157,14 @@ NATIVE_API_CARGO_AUDIT_TIMEOUT_SECONDS = 120
 GSA_COMPONENT = Path("components/gsa")
 GSA_PACKAGE_LOCK = GSA_COMPONENT / "package-lock.json"
 GSA_NPM_AUDIT_TIMEOUT_SECONDS = 120
+OSV_SCANNER_TIMEOUT_SECONDS = 120
+OSV_LOCKFILES = (
+    NATIVE_API_CARGO_LOCK,
+    GSA_PACKAGE_LOCK,
+    Path("components/python-gvm/uv.lock"),
+    Path("components/gvm-tools/uv.lock"),
+)
+OSV_HIGH_SEVERITIES = {"high", "critical"}
 PYTHON_CHAIN = ("python-gvm", "gvm-tools", "greenbone-feed-sync", "ospd-openvas", "notus-scanner")
 BASELINE_CHAIN = (*C_SERVICES_CHAIN, "gsa", *PYTHON_CHAIN)
 RUNTIME_SERVICES = ("postgres", "redis-openvas", "mosquitto")
@@ -6341,6 +6349,30 @@ def native_api_cargo_audit_status_only_result(result: dict[str, Any]) -> dict[st
     return compact
 
 
+def osv_lockfile_audit_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
+    compact = dict(result)
+    findings = result.get("findings", [])
+    non_pass = [compact_doctor_finding(item) for item in findings if item.get("status") != "pass"]
+    details = result.get("details", {}) if isinstance(result.get("details"), dict) else {}
+    top_findings = details.get("top_findings") if isinstance(details.get("top_findings"), list) else []
+    if top_findings:
+        for item in non_pass:
+            if item.get("check") in {"osv-lockfile-audit.vulnerabilities", "osv-lockfile-audit.high-critical"}:
+                item["top_findings"] = top_findings[:5]
+    compact["details"] = {
+        "lockfile_count": details.get("lockfile_count", 0),
+        "vulnerable_package_count": details.get("vulnerable_package_count", 0),
+        "vulnerability_count": details.get("vulnerability_count", 0),
+        "high_or_critical_count": details.get("high_or_critical_count", 0),
+        "finding_count": len(findings),
+        "non_pass_count": len(non_pass),
+    }
+    compact["findings"] = non_pass or [
+        finding("pass", "osv-lockfile-audit.status-only", "OSV lockfile audit passed; no non-pass findings.")
+    ]
+    return compact
+
+
 def license_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
     findings = result.get("findings", [])
     non_pass = [compact_license_status_finding(item) for item in findings if item.get("status") != "pass"]
@@ -8058,6 +8090,148 @@ def command_gsa_npm_audit(repo_root: Path, status_only: bool = False) -> dict[st
         result["status"] = aggregate_status(result["findings"])
     if status_only:
         result = gsa_npm_audit_status_only_result(result)
+    return result
+
+
+def osv_severity(vulnerability: dict[str, Any]) -> str:
+    database_specific = vulnerability.get("database_specific") if isinstance(vulnerability.get("database_specific"), dict) else {}
+    severity = database_specific.get("severity")
+    if isinstance(severity, str) and severity.strip():
+        return severity.strip().lower()
+    severity_rows = vulnerability.get("severity")
+    if isinstance(severity_rows, list):
+        for row in severity_rows:
+            if isinstance(row, dict):
+                score = row.get("score")
+                if isinstance(score, str) and score.strip():
+                    return score.strip().lower()
+    return "unknown"
+
+
+def compact_osv_source_path(path: str, repo_root: Path) -> str:
+    if not path:
+        return ""
+    try:
+        source_path = Path(path)
+        if source_path.is_absolute():
+            return str(source_path.resolve().relative_to(repo_root.resolve()))
+    except (OSError, ValueError):
+        marker = "/TurboVAS/"
+        if marker in path:
+            return path.split(marker, 1)[1]
+        return Path(path).name
+    return path
+
+
+def summarize_osv_payload(payload: dict[str, Any], repo_root: Path) -> dict[str, Any]:
+    results = payload.get("results", []) if isinstance(payload, dict) else []
+    if not isinstance(results, list):
+        results = []
+    vulnerable_package_count = 0
+    vulnerability_count = 0
+    high_or_critical_count = 0
+    top_findings: list[dict[str, Any]] = []
+    for result in results:
+        if not isinstance(result, dict):
+            continue
+        source = result.get("source") if isinstance(result.get("source"), dict) else {}
+        path = compact_osv_source_path(str(source.get("path") or ""), repo_root)
+        packages = result.get("packages", [])
+        if not isinstance(packages, list):
+            continue
+        for package_row in packages:
+            if not isinstance(package_row, dict):
+                continue
+            vulnerabilities = package_row.get("vulnerabilities", [])
+            if not isinstance(vulnerabilities, list) or not vulnerabilities:
+                continue
+            package = package_row.get("package") if isinstance(package_row.get("package"), dict) else {}
+            vulnerable_package_count += 1
+            ecosystem = str(package.get("ecosystem") or "unknown")
+            name = str(package.get("name") or "unknown")
+            version = str(package.get("version") or "")
+            for vulnerability in vulnerabilities:
+                if not isinstance(vulnerability, dict):
+                    continue
+                vulnerability_count += 1
+                severity = osv_severity(vulnerability)
+                if severity in OSV_HIGH_SEVERITIES:
+                    high_or_critical_count += 1
+                if len(top_findings) < 5:
+                    top_findings.append(
+                        {
+                            "status": "fail" if severity in OSV_HIGH_SEVERITIES else "warn",
+                            "check": "osv-lockfile-audit.vulnerability",
+                            "package": name,
+                            "ecosystem": ecosystem,
+                            "version": version,
+                            "severity": severity,
+                            "advisory": str(vulnerability.get("id") or "unknown"),
+                            "path": path,
+                        }
+                    )
+    return {
+        "vulnerable_package_count": vulnerable_package_count,
+        "vulnerability_count": vulnerability_count,
+        "high_or_critical_count": high_or_critical_count,
+        "top_findings": top_findings,
+    }
+
+
+def command_osv_lockfile_audit(repo_root: Path, status_only: bool = False) -> dict[str, Any]:
+    findings: list[dict[str, Any]] = []
+    artifacts = [str(path) for path in OSV_LOCKFILES]
+    missing = [str(path) for path in OSV_LOCKFILES if not (repo_root / path).is_file()]
+    findings.append(finding("pass" if not missing else "fail", "osv-lockfile-audit.lockfiles", "Expected lockfiles exist." if not missing else "One or more expected lockfiles are missing.", details={"missing": missing, "lockfile_count": len(OSV_LOCKFILES)}))
+    if shutil.which("osv-scanner") is None:
+        findings.append(finding("warn", "osv-lockfile-audit.tool", "osv-scanner is not installed; OSV lockfile audit was skipped."))
+        result = make_result("osv-lockfile-audit", repo_root, "OSV lockfile audit could not run because osv-scanner is unavailable.", findings, artifacts)
+        if status_only:
+            result = osv_lockfile_audit_status_only_result(result)
+        return result
+    if missing:
+        result = make_result("osv-lockfile-audit", repo_root, "OSV lockfile audit could not run because required lockfiles are missing.", findings, artifacts)
+        if status_only:
+            result = osv_lockfile_audit_status_only_result(result)
+        return result
+
+    command = ["osv-scanner", "scan", "source", "--format", "json", "--verbosity", "error"]
+    for lockfile in OSV_LOCKFILES:
+        command.extend(["--lockfile", str(lockfile)])
+    audit = run_command(command, repo_root, timeout=OSV_SCANNER_TIMEOUT_SECONDS)
+    try:
+        payload = json.loads(audit.stdout)
+    except json.JSONDecodeError:
+        findings.append(finding("fail", "osv-lockfile-audit.parse", "osv-scanner did not emit parseable JSON.", details={"returncode": audit.returncode, "output_tail": output_tail(audit.stdout, 40)}))
+        result = make_result("osv-lockfile-audit", repo_root, "OSV lockfile audit failed before results could be parsed.", findings, artifacts)
+        if status_only:
+            result = osv_lockfile_audit_status_only_result(result)
+        return result
+
+    summary = summarize_osv_payload(payload, repo_root)
+    vulnerability_count = int(summary["vulnerability_count"])
+    high_or_critical_count = int(summary["high_or_critical_count"])
+    vulnerable_package_count = int(summary["vulnerable_package_count"])
+    findings.append(finding("pass", "osv-lockfile-audit.tool", "osv-scanner is installed and runnable."))
+    findings.append(finding("fail" if high_or_critical_count else "pass", "osv-lockfile-audit.high-critical", f"OSV reported {high_or_critical_count} high/critical lockfile vulnerabilit(y/ies).", details={"high_or_critical_count": high_or_critical_count}))
+    if vulnerability_count and not high_or_critical_count:
+        findings.append(finding("warn", "osv-lockfile-audit.vulnerabilities", f"OSV reported {vulnerability_count} lower-severity lockfile vulnerabilit(y/ies).", details={"vulnerability_count": vulnerability_count, "top_findings": summary["top_findings"]}))
+    else:
+        findings.append(finding("pass", "osv-lockfile-audit.vulnerabilities", f"OSV reported {vulnerability_count} total lockfile vulnerabilit(y/ies).", details={"vulnerability_count": vulnerability_count}))
+    result = make_result("osv-lockfile-audit", repo_root, "OSV lockfile audit completed.", findings, artifacts)
+    result["details"] = {
+        "lockfile_count": len(OSV_LOCKFILES),
+        "vulnerable_package_count": vulnerable_package_count,
+        "vulnerability_count": vulnerability_count,
+        "high_or_critical_count": high_or_critical_count,
+        "returncode": audit.returncode,
+        "top_findings": summary["top_findings"],
+    }
+    if audit.returncode != 0 and vulnerability_count == 0:
+        result["findings"].append(finding("warn", "osv-lockfile-audit.exit-code", f"osv-scanner exited {audit.returncode} without parsed vulnerabilities.", details={"output_tail": output_tail(audit.stdout, 40)}))
+        result["status"] = aggregate_status(result["findings"])
+    if status_only:
+        result = osv_lockfile_audit_status_only_result(result)
     return result
 
 
@@ -13362,6 +13536,8 @@ def build_parser() -> argparse.ArgumentParser:
     native_api_cargo_audit.add_argument("--status-only", action="store_true", help="emit compact advisory counts and only non-pass findings for chat-safe native API dependency checks")
     gsa_npm_audit = subparsers.add_parser("gsa-npm-audit", parents=[common], help="audit GSA npm dependencies for high/critical advisories")
     gsa_npm_audit.add_argument("--status-only", action="store_true", help="emit compact vulnerability counts and only non-pass findings for chat-safe GSA dependency checks")
+    osv_lockfile_audit = subparsers.add_parser("osv-lockfile-audit", parents=[common], help="audit selected lockfiles with OSV Scanner")
+    osv_lockfile_audit.add_argument("--status-only", action="store_true", help="emit compact vulnerability counts and only non-pass findings for chat-safe OSV checks")
     path_coupling = subparsers.add_parser("path-coupling-state", parents=[common], help="inspect absolute checkout/runtime path coupling")
     path_coupling.add_argument("--status-only", action="store_true", help="emit compact details and only non-pass findings for chat-safe path-coupling checks")
     subparsers.add_parser("runtime-app-up", parents=[common], help="start experimental application services")
@@ -13510,6 +13686,8 @@ def main(argv: list[str] | None = None) -> int:
         result = command_native_api_cargo_audit(repo_root, status_only=args.status_only)
     elif args.command == "gsa-npm-audit":
         result = command_gsa_npm_audit(repo_root, status_only=args.status_only)
+    elif args.command == "osv-lockfile-audit":
+        result = command_osv_lockfile_audit(repo_root, status_only=args.status_only)
     elif args.command == "path-coupling-state":
         result = command_path_coupling_state(repo_root, status_only=args.status_only)
     elif args.command == "runtime-app-up":

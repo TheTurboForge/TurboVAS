@@ -203,6 +203,9 @@ native-api-cargo-audit *args:
 gsa-npm-audit *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl gsa-npm-audit "$@"
 
+osv-lockfile-audit *args:
+    @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl osv-lockfile-audit "$@"
+
 path-coupling-state *args:
     @set -- {{args}}; if [ "${1:-}" = "--" ]; then shift; fi; tools/turbovasctl path-coupling-state "$@"
 
