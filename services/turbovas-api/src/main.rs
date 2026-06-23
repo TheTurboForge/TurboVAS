@@ -32,6 +32,7 @@ mod request_shapes;
 mod row_helpers;
 mod schedules;
 mod tag_resource_helpers;
+mod tags;
 mod user_tags;
 
 use app_state::{AppState, create_pool, healthz};
@@ -49,6 +50,7 @@ use report_formats::*;
 use row_helpers::*;
 use schedules::*;
 use tag_resource_helpers::*;
+use tags::*;
 use user_tags::*;
 
 #[derive(Debug, Serialize)]
@@ -903,60 +905,6 @@ struct AlertAssetItem {
     tasks: Vec<AlertReference>,
     created_at: Option<String>,
     modified_at: Option<String>,
-}
-
-#[derive(Serialize)]
-struct TagOwner {
-    name: String,
-}
-
-#[derive(Serialize)]
-struct TagResourceCount {
-    total: i64,
-}
-
-#[derive(Serialize)]
-struct TagResourcesSummary {
-    #[serde(rename = "type")]
-    resource_type: String,
-    count: TagResourceCount,
-}
-
-#[derive(Serialize)]
-struct TagAssetItem {
-    id: String,
-    name: String,
-    comment: String,
-    owner: TagOwner,
-    resource_type: String,
-    resource_count: i64,
-    resources: TagResourcesSummary,
-    active: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    value: Option<String>,
-    writable: bool,
-    in_use: bool,
-    orphan: bool,
-    trash: bool,
-    permissions: Vec<String>,
-    created_at: Option<String>,
-    modified_at: Option<String>,
-}
-
-#[derive(Serialize)]
-struct TagResourceItem {
-    id: String,
-    #[serde(rename = "type")]
-    resource_type: String,
-    name: String,
-}
-
-#[derive(Serialize)]
-struct TagResourceCollection {
-    tag_id: String,
-    resource_type: String,
-    page: PageInfo,
-    items: Vec<TagResourceItem>,
 }
 
 #[derive(Serialize)]
@@ -8920,55 +8868,6 @@ fn alert_asset_from_row(row: &Row) -> AlertAssetItem {
         tasks: Vec::new(),
         created_at: unix_ts_to_rfc3339(row.get("created_at_unix")),
         modified_at: unix_ts_to_rfc3339(row.get("modified_at_unix")),
-    }
-}
-
-fn tag_asset_from_row(row: &Row) -> TagAssetItem {
-    let resource_type: String = row.get("resource_type");
-    let resource_count: i64 = row.get("resource_count");
-    let raw_value: String = row.get("value");
-    let value = if raw_value.trim().is_empty() {
-        None
-    } else {
-        Some(raw_value)
-    };
-    TagAssetItem {
-        id: row.get("id"),
-        name: row.get("name"),
-        comment: row.get("comment"),
-        owner: TagOwner {
-            name: row.get("owner_name"),
-        },
-        resource_type: resource_type.clone(),
-        resource_count,
-        resources: TagResourcesSummary {
-            resource_type,
-            count: TagResourceCount {
-                total: resource_count,
-            },
-        },
-        active: row.get::<_, i32>("active_int") != 0,
-        value,
-        writable: true,
-        in_use: false,
-        orphan: false,
-        trash: false,
-        permissions: vec![
-            "get_tags".to_string(),
-            "modify_tag".to_string(),
-            "delete_tag".to_string(),
-            "create_tag".to_string(),
-        ],
-        created_at: unix_ts_to_rfc3339(row.get("created_at_unix")),
-        modified_at: unix_ts_to_rfc3339(row.get("modified_at_unix")),
-    }
-}
-
-fn tag_resource_from_row(row: &Row) -> TagResourceItem {
-    TagResourceItem {
-        id: row.get("id"),
-        resource_type: row.get("resource_type"),
-        name: row.get("name"),
     }
 }
 
