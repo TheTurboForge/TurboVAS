@@ -1241,10 +1241,29 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(turbovasctl.path_coupling_category("docs/README.md"), "documentation")
         self.assertEqual(turbovasctl.path_coupling_category("docker/runtime/README.md"), "documentation")
         self.assertEqual(turbovasctl.path_coupling_category("compose/dev.yaml"), "runtime_tooling")
+        self.assertEqual(turbovasctl.path_coupling_category("tools/tests/test_turbovasctl.py"), "diagnostic_tooling")
         markers = turbovasctl.path_coupling_markers("/home/turboforge/Projects/TurboVAS build/prefix /runtime/state")
         self.assertIn("dev_checkout_path", markers)
         self.assertIn("build_prefix_path", markers)
         self.assertIn("container_runtime_path", markers)
+
+    def test_path_coupling_warns_only_for_runtime_or_product_dev_checkout_markers(self):
+        summary = turbovasctl.summarize_path_coupling(
+            [
+                {
+                    "path": "tools/turbovasctl",
+                    "category": "runtime_tooling",
+                    "markers": ["dev_checkout_path"],
+                },
+                {
+                    "path": "tools/tests/test_turbovasctl.py",
+                    "category": "diagnostic_tooling",
+                    "markers": ["dev_checkout_path"],
+                },
+            ]
+        )
+
+        self.assertEqual(summary["non_documentation_dev_checkout_paths"], ["tools/turbovasctl"])
 
     def test_path_coupling_status_only_is_chat_safe(self):
         root = Path(__file__).resolve().parents[2]
