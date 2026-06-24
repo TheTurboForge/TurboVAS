@@ -1753,11 +1753,15 @@ class TurboVASCtlTests(unittest.TestCase):
             {
                 "total_items",
                 "implemented_native_endpoint_count",
+                "candidate_for_removal_review",
                 "direct_api_contract",
                 "browser_proxy_contract",
                 "openapi_contract",
             },
         )
+        self.assertEqual(status_only["details"]["candidate_for_removal_review"]["safe_removal_count"], 0)
+        self.assertIn("bucket_counts", status_only["details"]["candidate_for_removal_review"])
+        self.assertNotIn("paths", json.dumps(status_only["details"]["candidate_for_removal_review"]))
         self.assertIn("direct_api_contract", status_only["details"])
         self.assertEqual(
             set(status_only["details"]["direct_api_contract"]),

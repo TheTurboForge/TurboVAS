@@ -6227,6 +6227,7 @@ def native_tooling_status_only_details(summary: dict[str, Any]) -> dict[str, Any
     return {
         "total_items": compact["total_items"],
         "implemented_native_endpoint_count": compact["implemented_native_endpoint_count"],
+        "candidate_for_removal_review": compact["candidate_for_removal_review"],
         "direct_api_contract": {
             "alignment_status": direct_contract.get("alignment_status", "unknown"),
             "rust_route_count": direct_contract.get("rust_route_count", 0),
