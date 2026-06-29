@@ -81,7 +81,6 @@ use scan_configs::*;
 use scanner_assets::*;
 use schedules::*;
 use scope_payloads::*;
-use tag_resource_helpers::*;
 use tags::*;
 use task_targets::{TargetItem, TaskItem, target_from_row, task_from_row};
 use tls_certificates::*;
@@ -1366,201 +1365,6 @@ async fn scan_config_asset_families(
         scan_config_id,
         &rows,
     )))
-}
-
-async fn tag_assets(
-    State(state): State<AppState>,
-    ApiQuery(query): ApiQuery<CollectionQuery>,
-) -> Result<Json<Collection<TagAssetItem>>, ApiError> {
-    let active_filter = query.active.clone().unwrap_or_default();
-    let resource_type_filter = query.resource_type.clone().unwrap_or_default();
-    let value_filter = query.value.clone().unwrap_or_default();
-    let params = normalize_collection_query(query, TAG_DEFAULT_SORT)?;
-    let sort_sql = sort_clause(&params.sort, TAG_SORT_FIELDS)?;
-    let sql = format!(
-        r#"WITH tag_rows AS (
-             SELECT t.uuid AS id,
-                    coalesce(t.name, '') AS name,
-                    coalesce(t.comment, '') AS comment,
-                    coalesce(u.name, '') AS owner_name,
-                    coalesce(t.resource_type, '') AS resource_type,
-                    coalesce(tag_resources_count(t.id, t.resource_type), 0)::bigint AS resource_count,
-                    coalesce(t.active, 0)::integer AS active_int,
-                    coalesce(t.value, '') AS value,
-                    coalesce(t.creation_time, 0)::bigint AS created_at_unix,
-                    coalesce(t.modification_time, 0)::bigint AS modified_at_unix
-               FROM tags t
-          LEFT JOIN users u ON u.id = t.owner
-         ),
-         filtered AS (
-             SELECT * FROM tag_rows
-              WHERE ($1 = ''
-                     OR lower(id) LIKE '%' || lower($1) || '%'
-                     OR lower(name) LIKE '%' || lower($1) || '%'
-                     OR lower(comment) LIKE '%' || lower($1) || '%'
-                     OR lower(owner_name) LIKE '%' || lower($1) || '%'
-                     OR lower(resource_type) LIKE '%' || lower($1) || '%'
-                     OR lower(value) LIKE '%' || lower($1) || '%')
-                AND ($4 = ''
-                     OR ($4 = '1' AND active_int = 1)
-                     OR ($4 = '0' AND active_int = 0))
-                AND ($5 = '' OR lower(resource_type) = lower($5))
-                AND ($6 = '' OR lower(value) LIKE '%' || lower($6) || '%')
-         )
-         SELECT count(*) OVER()::bigint AS total, * FROM filtered
-          ORDER BY {sort_sql}, name ASC, id ASC LIMIT $2 OFFSET $3;"#,
-    );
-    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
-    let rows = client
-        .query(
-            &sql,
-            &[
-                &params.filter,
-                &params.page_size,
-                &params.offset,
-                &active_filter,
-                &resource_type_filter,
-                &value_filter,
-            ],
-        )
-        .await
-        .map_err(|error| {
-            tracing::warn!(%error, "tag asset list query failed");
-            ApiError::Database
-        })?;
-    let total = rows
-        .first()
-        .map(|row| row.get::<_, i64>("total"))
-        .unwrap_or(0);
-    let items = rows.iter().map(tag_asset_from_row).collect();
-    Ok(Json(Collection {
-        page: params.page_info(total),
-        items,
-    }))
-}
-
-async fn tag_asset_detail(
-    State(state): State<AppState>,
-    Path(tag_id): Path<String>,
-) -> Result<Json<TagAssetItem>, ApiError> {
-    parse_uuid(&tag_id)?;
-    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
-    let row = client
-        .query_opt(
-            r#"SELECT t.uuid AS id,
-                      coalesce(t.name, '') AS name,
-                      coalesce(t.comment, '') AS comment,
-                      coalesce(u.name, '') AS owner_name,
-                      coalesce(t.resource_type, '') AS resource_type,
-                      coalesce(tag_resources_count(t.id, t.resource_type), 0)::bigint AS resource_count,
-                      coalesce(t.active, 0)::integer AS active_int,
-                      coalesce(t.value, '') AS value,
-                      coalesce(t.creation_time, 0)::bigint AS created_at_unix,
-                      coalesce(t.modification_time, 0)::bigint AS modified_at_unix
-                 FROM tags t
-            LEFT JOIN users u ON u.id = t.owner
-                WHERE t.uuid = $1
-                LIMIT 1;"#,
-            &[&tag_id],
-        )
-        .await
-        .map_err(|error| {
-            tracing::warn!(%error, "tag asset detail query failed");
-            ApiError::Database
-        })?
-        .ok_or(ApiError::NotFound)?;
-    Ok(Json(tag_asset_from_row(&row)))
-}
-
-async fn tag_asset_resources(
-    State(state): State<AppState>,
-    Path(tag_id): Path<String>,
-    ApiQuery(query): ApiQuery<CollectionQuery>,
-) -> Result<Json<TagResourceCollection>, ApiError> {
-    let tag_id = parse_uuid(&tag_id)?.to_string();
-    let params = normalize_collection_query(query, TAG_RESOURCE_DEFAULT_SORT)?;
-    let sort_sql = sort_clause(&params.sort, TAG_RESOURCE_SORT_FIELDS)?;
-    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
-    let tag_row = client
-        .query_opt(
-            r#"SELECT id, uuid, coalesce(resource_type, '') AS resource_type
-                 FROM tags
-                WHERE uuid = $1
-                LIMIT 1;"#,
-            &[&tag_id],
-        )
-        .await
-        .map_err(|error| {
-            tracing::warn!(%error, "tag lookup for resource expansion failed");
-            ApiError::Database
-        })?
-        .ok_or(ApiError::NotFound)?;
-    let tag_internal_id: i32 = tag_row.get("id");
-    let resource_type = normalize_tag_resource_type(tag_row.get("resource_type"));
-    let sql = tag_resource_collection_sql(&resource_type, &sort_sql)?;
-    let rows = client
-        .query(
-            &sql,
-            &[
-                &tag_internal_id,
-                &params.filter,
-                &params.page_size,
-                &params.offset,
-            ],
-        )
-        .await
-        .map_err(|error| {
-            tracing::warn!(%error, %resource_type, "tag resource query failed");
-            ApiError::Database
-        })?;
-    let total = rows
-        .first()
-        .map(|row| row.get::<_, i64>("total"))
-        .unwrap_or(0);
-    let items = rows.iter().map(tag_resource_from_row).collect();
-    Ok(Json(TagResourceCollection {
-        tag_id,
-        resource_type,
-        page: params.page_info(total),
-        items,
-    }))
-}
-
-async fn tag_resource_names(
-    State(state): State<AppState>,
-    Path(resource_type): Path<String>,
-    ApiQuery(query): ApiQuery<CollectionQuery>,
-) -> Result<Json<Collection<TagResourceItem>>, ApiError> {
-    let resource_type = normalize_tag_resource_type(resource_type);
-    let params = normalize_collection_query(query, TAG_RESOURCE_DEFAULT_SORT)?;
-    if params.page_size > TAG_RESOURCE_NAME_MAX_PAGE_SIZE {
-        return Err(ApiError::BadRequest(format!(
-            "page_size must be between 1 and {TAG_RESOURCE_NAME_MAX_PAGE_SIZE}"
-        )));
-    }
-    let sort_sql = sort_clause(&params.sort, TAG_RESOURCE_SORT_FIELDS)?;
-    let (filter, exact_id_filter) = tag_resource_name_filter(&params.filter);
-    let sql = tag_resource_name_collection_sql(&resource_type, &sort_sql)?;
-    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
-    let rows = client
-        .query(
-            &sql,
-            &[&filter, &exact_id_filter, &params.page_size, &params.offset],
-        )
-        .await
-        .map_err(|error| {
-            tracing::warn!(%error, %resource_type, "tag resource-name query failed");
-            ApiError::Database
-        })?;
-    let total = rows
-        .first()
-        .map(|row| row.get::<_, i64>("total"))
-        .unwrap_or(0);
-    let items = rows.iter().map(tag_resource_from_row).collect();
-    Ok(Json(Collection {
-        page: params.page_info(total),
-        items,
-    }))
 }
 
 async fn trashcan_summary(
@@ -6703,6 +6507,7 @@ mod tests {
             include_str!("report_configs.rs"),
             include_str!("report_formats.rs"),
             include_str!("schedules.rs"),
+            include_str!("tags.rs"),
             include_str!("report_evidence_handlers.rs"),
         ]
         .join("\n");
