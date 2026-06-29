@@ -4,6 +4,7 @@
 
 use axum::{
     Router,
+    extract::DefaultBodyLimit,
     routing::{delete, get, patch, post},
 };
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
@@ -73,6 +74,7 @@ use report_configs::*;
 use report_evidence_handlers::*;
 use report_formats::*;
 use report_payloads::*;
+use request_shapes::MAX_DIRECT_API_WRITE_BODY_BYTES;
 use result_payloads::*;
 use runtime::{DirectApiListener, serve_api};
 use scan_configs::*;
@@ -274,7 +276,7 @@ fn direct_native_api_router(
     router: Router<AppState>,
     write_control_enabled: bool,
 ) -> Router<AppState> {
-    if write_control_enabled {
+    let router = if write_control_enabled {
         router
             .route("/api/v1/scopes", post(create_scope))
             .route("/api/v1/scopes/:scope_id", patch(patch_scope))
@@ -284,7 +286,11 @@ fn direct_native_api_router(
             .route("/api/v1/tags/:tag_id", delete(delete_tag))
     } else {
         router
-    }
+    };
+
+    router.layer(DefaultBodyLimit::max(
+        MAX_DIRECT_API_WRITE_BODY_BYTES as usize,
+    ))
 }
 
 #[cfg(test)]
@@ -1620,6 +1626,14 @@ mod tests {
             .split_once("\n}\n\n#[cfg(test)]")
             .expect("direct API router must end before tests")
             .0
+    }
+
+    #[test]
+    fn direct_api_router_applies_body_limit_to_extractors() {
+        let source = include_str!("main.rs");
+        let direct_routes = direct_api_route_registration_block(source);
+        assert!(direct_routes.contains("DefaultBodyLimit::max("));
+        assert!(direct_routes.contains("MAX_DIRECT_API_WRITE_BODY_BYTES as usize"));
     }
 
     fn registered_routes(routes: &str) -> Vec<RegisteredRoute<'_>> {
