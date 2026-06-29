@@ -1664,7 +1664,13 @@ mod tests {
                 segment
                     .strip_prefix(':')
                     .or_else(|| segment.strip_prefix('*'))
-                    .map(|name| format!("sample-{name}"))
+                    .map(|name| {
+                        if name.ends_with("_id") {
+                            "12345678-1234-1234-1234-123456789abc".to_string()
+                        } else {
+                            format!("sample-{name}")
+                        }
+                    })
                     .unwrap_or_else(|| segment.to_string())
             })
             .collect::<Vec<_>>()
@@ -2444,12 +2450,12 @@ mod tests {
         ));
         assert!(direct_api_v1_method_is_allowed(
             &axum::http::Method::PATCH,
-            "/api/v1/scopes/scope-id",
+            "/api/v1/scopes/12345678-1234-1234-1234-123456789abc",
             true
         ));
         assert!(direct_api_v1_method_is_allowed(
             &axum::http::Method::DELETE,
-            "/api/v1/scopes/scope-id",
+            "/api/v1/scopes/12345678-1234-1234-1234-123456789abc",
             true
         ));
         assert!(!direct_api_v1_method_is_allowed(
@@ -2486,6 +2492,16 @@ mod tests {
         assert!(!direct_api_v1_method_is_allowed(
             &axum::http::Method::PATCH,
             "/api/v1/scopes/../",
+            true
+        ));
+        assert!(!direct_api_v1_method_is_allowed(
+            &axum::http::Method::PATCH,
+            "/api/v1/scopes/not-a-uuid",
+            true
+        ));
+        assert!(!direct_api_v1_method_is_allowed(
+            &axum::http::Method::DELETE,
+            "/api/v1/tags/not-a-uuid",
             true
         ));
     }
