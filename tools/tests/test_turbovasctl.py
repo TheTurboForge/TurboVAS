@@ -1905,6 +1905,7 @@ class TurboVASCtlTests(unittest.TestCase):
                 "direct_write_control_operation_count",
                 "missing_write_control_metadata_count",
                 "invalid_write_control_metadata_count",
+                "invalid_write_control_path_parameter_count",
             },
         )
         self.assertEqual(status_only["details"]["openapi_contract"]["missing_operation_id_count"], 0)
@@ -1935,6 +1936,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(status_only["details"]["openapi_contract"]["direct_write_control_operation_count"], 6)
         self.assertEqual(status_only["details"]["openapi_contract"]["missing_write_control_metadata_count"], 0)
         self.assertEqual(status_only["details"]["openapi_contract"]["invalid_write_control_metadata_count"], 0)
+        self.assertEqual(status_only["details"]["openapi_contract"]["invalid_write_control_path_parameter_count"], 0)
         self.assertEqual(
             status_only["findings"],
             [
@@ -2482,6 +2484,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(status_only["details"]["missing_error_schema_field_count"], 0)
         self.assertEqual(status_only["details"]["missing_write_control_metadata_count"], 0)
         self.assertEqual(status_only["details"]["invalid_write_control_metadata_count"], 0)
+        self.assertEqual(status_only["details"]["invalid_write_control_path_parameter_count"], 0)
         self.assertEqual(status_only["details"]["missing_server_count"], 0)
         self.assertEqual(status_only["details"]["missing_security_scheme_count"], 0)
         self.assertNotIn("servers", status_only["details"])
@@ -3380,6 +3383,62 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(invalid[("PATCH /bad-write", "x-turbovas-side-effect")]["actual"], "mystery")
         self.assertEqual(invalid[("GET /bad-get-body", "method")]["actual"], "get")
         self.assertEqual(invalid[("GET /bad-get-body", "x-turbovas-exposure")]["actual"], "direct-write")
+
+    def test_openapi_contract_checks_direct_write_uuid_path_parameters(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            openapi = root / "api" / "openapi" / "turbovas-v1.yaml"
+            openapi.parent.mkdir(parents=True)
+            openapi.write_text(
+                "openapi: 3.1.0\n"
+                "paths:\n"
+                "  /future-tags/{tag_id}:\n"
+                "    patch:\n"
+                "      summary: Patch future tag\n"
+                "      operationId: patchFutureTagsByTagId\n"
+                "      x-turbovas-direct: true\n"
+                "      x-turbovas-exposure: direct-write\n"
+                "      x-turbovas-maturity: live-write\n"
+                "      x-turbovas-replaces: tag-metadata-write\n"
+                "      x-turbovas-inherited-still-owns: tag-write-control\n"
+                "      x-turbovas-operator-identity: direct-token-operator\n"
+                "      x-turbovas-owner-semantics: preserve-existing-owner\n"
+                "      x-turbovas-safety-contract: write-control-v1\n"
+                "      x-turbovas-side-effect: metadata-write\n"
+                "      parameters:\n"
+                "        - $ref: '#/components/parameters/TagId'\n"
+                "      requestBody:\n"
+                "        required: true\n"
+                "      responses:\n"
+                "        '200':\n"
+                "          description: Future\n"
+                "components:\n"
+                "  parameters:\n"
+                "    TagId:\n"
+                "      name: tag_id\n"
+                "      in: path\n"
+                "      required: true\n"
+                "      schema:\n"
+                "        type: string\n"
+                "        format: slug\n",
+                encoding="utf-8",
+            )
+            operations = turbovasctl.openapi_contract_operations(root)
+            parameters = turbovasctl.openapi_parameter_components(root)
+            write_control = turbovasctl.openapi_write_control_contract_summary(operations, parameters)
+
+        self.assertEqual(write_control["alignment_status"], "warn")
+        self.assertEqual(
+            write_control["invalid_write_control_path_parameters"],
+            [
+                {
+                    "operation": "PATCH /future-tags/{tag_id}",
+                    "field": "components.parameters.TagId.format",
+                    "actual": "slug",
+                    "expected": "uuid",
+                }
+            ],
+        )
 
     def test_native_tooling_state_reports_openapi_collection_query_contract_drift(self):
         with tempfile.TemporaryDirectory() as tmp:

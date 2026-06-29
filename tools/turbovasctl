@@ -5059,6 +5059,43 @@ def openapi_contract_operations(repo_root: Path | None) -> list[dict[str, Any]]:
     return operations
 
 
+def openapi_parameter_components(repo_root: Path | None) -> dict[str, dict[str, str]]:
+    lines = openapi_contract_lines(repo_root)
+    parameters: dict[str, dict[str, str]] = {}
+    in_parameters = False
+    current_name: str | None = None
+
+    for line in lines:
+        if line == "  parameters:":
+            in_parameters = True
+            current_name = None
+            continue
+        if not in_parameters:
+            continue
+        if line.startswith("  ") and not line.startswith("    "):
+            break
+
+        parameter_match = re.match(r"^    ([A-Za-z0-9]+):$", line)
+        if parameter_match:
+            current_name = parameter_match.group(1)
+            parameters[current_name] = {}
+            continue
+        if current_name is None:
+            continue
+        for field, pattern in {
+            "name": r"^      name:\s*([^#\s]+)",
+            "in": r"^      in:\s*([^#\s]+)",
+            "required": r"^      required:\s*([^#\s]+)",
+            "type": r"^        type:\s*([^#\s]+)",
+            "format": r"^        format:\s*([^#\s]+)",
+        }.items():
+            field_match = re.match(pattern, line)
+            if field_match:
+                parameters[current_name][field] = openapi_scalar_value(field_match.group(1)) or ""
+
+    return parameters
+
+
 def openapi_scalar_value(value: str | None) -> str | None:
     if value is None:
         return None
@@ -5068,13 +5105,26 @@ def openapi_scalar_value(value: str | None) -> str | None:
     return value or None
 
 
-def openapi_write_control_contract_summary(operations: list[dict[str, Any]]) -> dict[str, Any]:
+def openapi_path_placeholders(path: str) -> list[str]:
+    return re.findall(r"\{([^{}]+)\}", path)
+
+
+def openapi_parameter_ref_for_placeholder(placeholder: str) -> str:
+    return "".join(part[:1].upper() + part[1:] for part in placeholder.split("_") if part)
+
+
+def openapi_write_control_contract_summary(
+    operations: list[dict[str, Any]],
+    parameter_components: dict[str, dict[str, str]] | None = None,
+) -> dict[str, Any]:
     write_control_operations: list[str] = []
     direct_write_control_operations: list[str] = []
     request_body_operations: list[str] = []
     get_request_body_operations: list[str] = []
     missing_metadata: list[dict[str, Any]] = []
     invalid_metadata: list[dict[str, Any]] = []
+    invalid_path_parameters: list[dict[str, Any]] = []
+    parameter_components = parameter_components or {}
 
     for item in operations:
         method = str(item.get("method", ""))
@@ -5104,6 +5154,38 @@ def openapi_write_control_contract_summary(operations: list[dict[str, Any]]) -> 
         write_control_operations.append(label)
         if has_direct_marker:
             direct_write_control_operations.append(label)
+            for placeholder in openapi_path_placeholders(str(item.get("path", ""))):
+                expected_ref = openapi_parameter_ref_for_placeholder(placeholder)
+                parameters = item.get("parameters", [])
+                component = parameter_components.get(expected_ref, {})
+                if expected_ref not in parameters:
+                    invalid_path_parameters.append(
+                        {
+                            "operation": label,
+                            "field": "parameters",
+                            "placeholder": placeholder,
+                            "actual": sorted(parameters) if isinstance(parameters, list) else parameters,
+                            "expected": expected_ref,
+                        }
+                    )
+                    continue
+                for field, expected in {
+                    "name": placeholder,
+                    "in": "path",
+                    "required": "true",
+                    "type": "string",
+                    "format": "uuid",
+                }.items():
+                    actual = component.get(field)
+                    if actual != expected:
+                        invalid_path_parameters.append(
+                            {
+                                "operation": label,
+                                "field": f"components.parameters.{expected_ref}.{field}",
+                                "actual": actual,
+                                "expected": expected,
+                            }
+                        )
         for field in sorted(OPENAPI_WRITE_CONTROL_REQUIRED_FIELDS - fields):
             missing_metadata.append({"operation": label, "field": field})
         for field, allowed in {
@@ -5149,7 +5231,7 @@ def openapi_write_control_contract_summary(operations: list[dict[str, Any]]) -> 
                 }
             )
 
-    drift = missing_metadata or invalid_metadata or get_request_body_operations
+    drift = missing_metadata or invalid_metadata or invalid_path_parameters or get_request_body_operations
     return {
         "alignment_status": "pass" if not drift else "warn",
         "write_control_operations": write_control_operations,
@@ -5158,6 +5240,7 @@ def openapi_write_control_contract_summary(operations: list[dict[str, Any]]) -> 
         "get_request_body_operations": get_request_body_operations,
         "missing_write_control_metadata": missing_metadata,
         "invalid_write_control_metadata": invalid_metadata,
+        "invalid_write_control_path_parameters": invalid_path_parameters,
         "allowed_safety_contract_values": sorted(OPENAPI_ALLOWED_SAFETY_CONTRACT_VALUES),
         "allowed_operator_identity_values": sorted(OPENAPI_ALLOWED_OPERATOR_IDENTITY_VALUES),
         "allowed_owner_semantics_values": sorted(OPENAPI_ALLOWED_OWNER_SEMANTICS_VALUES),
@@ -5542,7 +5625,10 @@ def native_api_openapi_contract_summary(repo_root: Path | None) -> dict[str, Any
     duplicate_ids = sorted({operation_id for operation_id in operation_ids if operation_ids.count(operation_id) > 1})
     missing_operation_ids = [openapi_operation_label(item) for item in operations if not item.get("operation_id")]
     missing_operation_summaries = [openapi_operation_label(item) for item in operations if not item.get("summary")]
-    write_control_contract = openapi_write_control_contract_summary(operations)
+    write_control_contract = openapi_write_control_contract_summary(
+        operations,
+        openapi_parameter_components(repo_root),
+    )
     operations_with_request_bodies = write_control_contract["request_body_operations"]
     nondeterministic_operation_ids = [
         {
@@ -6697,6 +6783,7 @@ def compact_native_tooling_summary(summary: dict[str, Any]) -> dict[str, Any]:
         "direct_write_control_operation_count": len(openapi_contract.get("write_control_contract", {}).get("direct_write_control_operations", [])) if isinstance(openapi_contract.get("write_control_contract", {}), dict) else 0,
         "missing_write_control_metadata_count": len(openapi_contract.get("write_control_contract", {}).get("missing_write_control_metadata", [])) if isinstance(openapi_contract.get("write_control_contract", {}), dict) else 0,
         "invalid_write_control_metadata_count": len(openapi_contract.get("write_control_contract", {}).get("invalid_write_control_metadata", [])) if isinstance(openapi_contract.get("write_control_contract", {}), dict) else 0,
+        "invalid_write_control_path_parameter_count": len(openapi_contract.get("write_control_contract", {}).get("invalid_write_control_path_parameters", [])) if isinstance(openapi_contract.get("write_control_contract", {}), dict) else 0,
     }
     return {
         "total_items": summary.get("total_items", 0),
@@ -6814,6 +6901,7 @@ def native_tooling_status_only_details(summary: dict[str, Any]) -> dict[str, Any
             "direct_write_control_operation_count": openapi_contract.get("direct_write_control_operation_count", 0),
             "missing_write_control_metadata_count": openapi_contract.get("missing_write_control_metadata_count", 0),
             "invalid_write_control_metadata_count": openapi_contract.get("invalid_write_control_metadata_count", 0),
+            "invalid_write_control_path_parameter_count": openapi_contract.get("invalid_write_control_path_parameter_count", 0),
         },
     }
 
@@ -7508,6 +7596,7 @@ def native_api_client_contract_status_only_result(result: dict[str, Any]) -> dic
         "missing_error_schema_field_count": details.get("missing_error_schema_field_count", 0),
         "missing_write_control_metadata_count": details.get("missing_write_control_metadata_count", 0),
         "invalid_write_control_metadata_count": details.get("invalid_write_control_metadata_count", 0),
+        "invalid_write_control_path_parameter_count": details.get("invalid_write_control_path_parameter_count", 0),
         "missing_server_count": details.get("missing_server_count", 0),
         "missing_security_scheme_count": details.get("missing_security_scheme_count", 0),
     }
@@ -7570,6 +7659,7 @@ def command_native_api_client_contract(repo_root: Path, status_only: bool = Fals
         "missing_error_schema_field_count": len(contract.get("missing_error_schema_fields", [])),
         "missing_write_control_metadata_count": len(write_control_contract.get("missing_write_control_metadata", [])),
         "invalid_write_control_metadata_count": len(write_control_contract.get("invalid_write_control_metadata", [])),
+        "invalid_write_control_path_parameter_count": len(write_control_contract.get("invalid_write_control_path_parameters", [])),
         "missing_server_count": len(auth_contract.get("missing_servers", [])),
         "missing_security_scheme_count": len(auth_contract.get("missing_security_schemes", [])),
     }
@@ -7620,6 +7710,7 @@ def command_native_api_client_contract(repo_root: Path, status_only: bool = Fals
                 "direct_write_control_operation_count": details["direct_write_control_operation_count"],
                 "missing_write_control_metadata_count": details["missing_write_control_metadata_count"],
                 "invalid_write_control_metadata_count": details["invalid_write_control_metadata_count"],
+                "invalid_write_control_path_parameter_count": details["invalid_write_control_path_parameter_count"],
                 "get_request_body_count": details["get_request_body_count"],
             },
         ),
