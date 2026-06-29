@@ -44,6 +44,7 @@ mod tag_resource_helpers;
 mod tags;
 mod task_targets;
 mod tls_certificates;
+mod trashcan;
 mod user_tags;
 
 use alerts::{AlertAssetItem, AlertReference, alert_asset_from_row};
@@ -73,6 +74,7 @@ use tag_resource_helpers::*;
 use tags::*;
 use task_targets::{TargetItem, TaskItem, target_from_row, task_from_row};
 use tls_certificates::*;
+use trashcan::{TrashcanSummary, trashcan_summary_from_rows};
 use user_tags::*;
 
 #[derive(Debug, Serialize)]
@@ -521,19 +523,6 @@ struct VulnerabilityItem {
     solution_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     solution: Option<String>,
-}
-
-#[derive(Serialize)]
-struct TrashcanSummaryItem {
-    resource_type: String,
-    title: String,
-    count: i64,
-}
-
-#[derive(Serialize)]
-struct TrashcanSummary {
-    items: Vec<TrashcanSummaryItem>,
-    total: i64,
 }
 
 #[derive(Debug, Serialize)]
@@ -3227,16 +3216,7 @@ async fn trashcan_summary(
             tracing::warn!(%error, "trashcan summary query failed");
             ApiError::Database
         })?;
-    let items: Vec<TrashcanSummaryItem> = rows
-        .iter()
-        .map(|row| TrashcanSummaryItem {
-            resource_type: row.get("resource_type"),
-            title: row.get("title"),
-            count: row.get("item_count"),
-        })
-        .collect();
-    let total = items.iter().map(|item| item.count).sum();
-    Ok(Json(TrashcanSummary { items, total }))
+    Ok(Json(trashcan_summary_from_rows(&rows)))
 }
 
 async fn vulnerabilities(
