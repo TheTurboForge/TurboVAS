@@ -7444,6 +7444,39 @@ def native_api_migration_matrix_contract_summary(rows: list[dict[str, Any]]) -> 
     }
 
 
+def native_api_migration_matrix_filter_rows(rows: list[dict[str, Any]], focus: str | None = None) -> list[dict[str, Any]]:
+    if not focus:
+        return rows
+    terms = [term.strip().lower() for term in focus.split(",") if term.strip()]
+    if not terms:
+        return rows
+
+    def searchable_text(row: dict[str, Any]) -> str:
+        values: list[str] = []
+        for key in (
+            "endpoint",
+            "method",
+            "status",
+            "browser_access",
+            "direct_access",
+            "operation_id",
+            "openapi_path",
+            "x_turbovas_exposure",
+            "x_turbovas_maturity",
+            "x_turbovas_replaces",
+            "x_turbovas_inherited_still_owns",
+        ):
+            value = row.get(key)
+            if value is not None:
+                values.append(str(value))
+        candidates = row.get("replacement_candidates")
+        if isinstance(candidates, list):
+            values.extend(str(candidate) for candidate in candidates)
+        return "\n".join(values).lower()
+
+    return [row for row in rows if any(term in searchable_text(row) for term in terms)]
+
+
 def openapi_operation_is_pending_write_control(operation: dict[str, Any] | None) -> bool:
     if not isinstance(operation, dict):
         return False
@@ -7506,6 +7539,8 @@ def native_api_migration_matrix_status_only_result(result: dict[str, Any]) -> di
         "contract": details.get("contract", {}),
         "remaining_inherited_surface": native_api_migration_matrix_remaining_surface(rows),
     }
+    if details.get("focus"):
+        compact["details"]["focus"] = details["focus"]
     compact["findings"] = non_pass or [
         finding(
             "pass",
@@ -7516,11 +7551,13 @@ def native_api_migration_matrix_status_only_result(result: dict[str, Any]) -> di
     return compact
 
 
-def command_native_api_migration_matrix(repo_root: Path, status_only: bool = False) -> dict[str, Any]:
-    rows = native_api_migration_matrix_rows(repo_root)
+def command_native_api_migration_matrix(repo_root: Path, status_only: bool = False, focus: str | None = None) -> dict[str, Any]:
+    rows = native_api_migration_matrix_filter_rows(native_api_migration_matrix_rows(repo_root), focus)
     contract = native_api_migration_matrix_contract_summary(rows)
     summary = native_api_migration_matrix_summary(rows)
     details = {"summary": summary, "contract": contract, "items": rows}
+    if focus:
+        details["focus"] = focus
     row_drift = contract["rows_missing_openapi"] or contract["rows_missing_inventory"]
     metadata_drift = (
         contract["rows_missing_migration_metadata"]
@@ -14867,6 +14904,7 @@ def build_parser() -> argparse.ArgumentParser:
     migration_matrix = subparsers.add_parser("native-api-migration-matrix", parents=[common], help="show native API migration metadata by endpoint")
     migration_matrix.add_argument("--compact", action="store_true", help="alias for --status-only; emit compact planning details and only non-pass findings")
     migration_matrix.add_argument("--status-only", action="store_true", help="emit summary/contract details and only non-pass findings for chat-safe API planning")
+    migration_matrix.add_argument("--focus", help="comma-separated terms used to keep only matching migration rows")
     native_api_client_contract = subparsers.add_parser("native-api-client-contract", parents=[common], help="check the generated-client native API contract surface")
     native_api_client_contract.add_argument("--status-only", action="store_true", help="emit compact details and only non-pass findings for chat-safe generated-client checks")
     subparsers.add_parser("rust-migration-state", parents=[common], help="inspect Rust migration tooling and first C-to-Rust dry-run candidate")
@@ -15010,7 +15048,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "native-tooling-state":
         result = command_native_tooling_state(repo_root, compact=args.compact, summary_only=args.summary, status_only=args.status_only)
     elif args.command == "native-api-migration-matrix":
-        result = command_native_api_migration_matrix(repo_root, status_only=args.status_only or args.compact)
+        result = command_native_api_migration_matrix(repo_root, status_only=args.status_only or args.compact, focus=args.focus)
     elif args.command == "native-api-client-contract":
         result = command_native_api_client_contract(repo_root, status_only=args.status_only)
     elif args.command == "rust-migration-state":
