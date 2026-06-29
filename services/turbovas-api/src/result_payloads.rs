@@ -6,10 +6,9 @@ use serde::Serialize;
 use tokio_postgres::Row;
 
 use crate::{
-    ReportReference,
     formatters::unix_ts_to_rfc3339,
     nvt_payloads::{NvtEpssItem, nvt_epss_from_row, nvt_max_severity_from_row},
-    report_reference,
+    report_payloads::{ReportReference, report_reference},
     row_helpers::{optional_row_string, optional_row_strings},
     user_tags::ReportUserTag,
 };
