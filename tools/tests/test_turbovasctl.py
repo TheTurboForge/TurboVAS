@@ -6471,6 +6471,58 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertTrue(any("information_schema.columns" in sql for sql in calls))
         self.assertFalse(any(";" in sql.rstrip(";") for sql in calls))
 
+    def test_runtime_db_introspect_status_only_is_chat_safe(self):
+        original_psql = turbovasctl.psql
+        original_running = turbovasctl.container_running
+
+        def fake_psql(_root, sql, database=None):
+            if "current_database()" in sql:
+                return turbovasctl.subprocess.CompletedProcess([], 0, "turbovas|turbovas|turbovas\n", "")
+            if "database_version" in sql:
+                return turbovasctl.subprocess.CompletedProcess([], 0, "283\n", "")
+            if "information_schema.schemata" in sql:
+                return turbovasctl.subprocess.CompletedProcess([], 0, "cert\npublic\n", "")
+            if "information_schema.tables" in sql:
+                rows = "\n".join(f"{schema}.{table}|t" for schema, table in turbovasctl.DB_INTROSPECT_TABLES)
+                return turbovasctl.subprocess.CompletedProcess([], 0, rows + "\n", "")
+            if "information_schema.columns" in sql:
+                rows = "\n".join(f"{schema}.{table}.{column}|t" for schema, table, column in turbovasctl.DB_INTROSPECT_COLUMNS)
+                return turbovasctl.subprocess.CompletedProcess([], 0, rows + "\n", "")
+            if "SELECT count(*)" in sql:
+                return turbovasctl.subprocess.CompletedProcess([], 0, "7\n", "")
+            return turbovasctl.subprocess.CompletedProcess([], 1, "unexpected\n", "")
+
+        try:
+            turbovasctl.psql = fake_psql
+            turbovasctl.container_running = lambda _root, service: service == "postgres"
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp) / "TurboVAS"
+                root.mkdir()
+                full = turbovasctl.command_runtime_db_introspect(root)
+                compact = turbovasctl.command_runtime_db_introspect(root, status_only=True)
+        finally:
+            turbovasctl.psql = original_psql
+            turbovasctl.container_running = original_running
+
+        self.assertEqual(compact["status"], "pass")
+        self.assertEqual(compact["details"]["manager_database_version"], "283")
+        self.assertEqual(compact["details"]["table_count"], len(turbovasctl.DB_INTROSPECT_TABLES))
+        self.assertEqual(compact["details"]["column_count"], len(turbovasctl.DB_INTROSPECT_COLUMNS))
+        self.assertEqual(compact["details"]["non_pass_count"], 0)
+        self.assertEqual(compact["findings"][0]["check"], "runtime-db-introspect.status-only")
+        self.assertLess(len(json.dumps(compact)), len(json.dumps(full)))
+
+    def test_runtime_db_introspect_status_only_keeps_postgres_warning(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            root.mkdir()
+            with unittest.mock.patch.object(turbovasctl, "container_running", return_value=False):
+                compact = turbovasctl.command_runtime_db_introspect(root, status_only=True)
+
+        self.assertEqual(compact["status"], "warn")
+        self.assertEqual(compact["details"]["non_pass_count"], 1)
+        self.assertEqual(compact["findings"][0]["check"], "db-introspect.postgres")
+
     def test_gmp_smoke_parse_version_accepts_text_and_element(self):
         self.assertEqual(runtime_gmp_smoke.parse_version("<get_version_response><version>22.7</version></get_version_response>"), "22.7")
         element = ET.fromstring("<get_version_response><version>22.8</version></get_version_response>")

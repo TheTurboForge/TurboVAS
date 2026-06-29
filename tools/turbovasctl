@@ -14209,13 +14209,46 @@ def command_runtime_data_state(repo_root: Path) -> dict[str, Any]:
     return result
 
 
-def command_runtime_db_introspect(repo_root: Path) -> dict[str, Any]:
+def runtime_db_introspect_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
+    compact = dict(result)
+    findings = result.get("findings", [])
+    non_pass = [compact_doctor_finding(item) for item in findings if item.get("status") != "pass"]
+    details = result.get("details", {}) if isinstance(result.get("details"), dict) else {}
+    database = details.get("database", {}) if isinstance(details.get("database"), dict) else {}
+    schemas = details.get("schemas", {}) if isinstance(details.get("schemas"), dict) else {}
+    tables = details.get("tables", {}) if isinstance(details.get("tables"), dict) else {}
+    columns = details.get("columns", {}) if isinstance(details.get("columns"), dict) else {}
+    compact["details"] = {
+        "database_name": database.get("name"),
+        "manager_database_version": database.get("manager_database_version"),
+        "schema_count": len(schemas),
+        "missing_schema_count": sum(1 for item in schemas.values() if isinstance(item, dict) and not item.get("exists")),
+        "table_count": len(tables),
+        "existing_table_count": sum(1 for item in tables.values() if isinstance(item, dict) and item.get("exists")),
+        "column_count": len(columns),
+        "existing_column_count": sum(1 for item in columns.values() if isinstance(item, dict) and item.get("exists")),
+        "finding_count": len(findings),
+        "non_pass_count": len(non_pass),
+    }
+    compact["findings"] = non_pass or [
+        finding(
+            "pass",
+            "runtime-db-introspect.status-only",
+            "Runtime database introspection passed; no non-pass findings.",
+        )
+    ]
+    return compact
+
+
+def command_runtime_db_introspect(repo_root: Path, status_only: bool = False) -> dict[str, Any]:
     findings: list[dict[str, Any]] = []
     details: dict[str, Any] = {"database": {}, "schemas": {}, "tables": {}, "columns": {}}
     if not container_running(repo_root, "postgres"):
         findings.append(finding("warn", "db-introspect.postgres", "Postgres is not running; database introspection is unavailable."))
         result = make_result("runtime-db-introspect", repo_root, "Runtime database introspection could not inspect Postgres.", findings)
         result["details"] = details
+        if status_only:
+            result = runtime_db_introspect_status_only_result(result)
         return result
 
     identity = psql(repo_root, "SELECT current_database() || '|' || current_user || '|' || session_user;")
@@ -14258,6 +14291,8 @@ def command_runtime_db_introspect(repo_root: Path) -> dict[str, Any]:
 
     result = make_result("runtime-db-introspect", repo_root, "Runtime database introspection completed.", findings)
     result["details"] = details
+    if status_only:
+        result = runtime_db_introspect_status_only_result(result)
     return result
 
 
@@ -14802,7 +14837,8 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("runtime-smoke", parents=[common], help="run runtime infrastructure smoke checks")
     subparsers.add_parser("runtime-log-review", parents=[common], help="review recent full-stack runtime logs")
     subparsers.add_parser("runtime-data-state", parents=[common], help="inspect database-centered runtime data state")
-    subparsers.add_parser("runtime-db-introspect", parents=[common], help="inspect fixed read-only database catalog facts")
+    db_introspect = subparsers.add_parser("runtime-db-introspect", parents=[common], help="inspect fixed read-only database catalog facts")
+    db_introspect.add_argument("--status-only", action="store_true", help="emit compact catalog counts and only non-pass findings for chat-safe DB scouting")
     subparsers.add_parser("runtime-performance-snapshot", parents=[common], help="capture a lightweight runtime performance snapshot")
     subparsers.add_parser("runtime-redis-state", parents=[common], help="inspect Redis dependency and runtime boundary state")
     security_policy = subparsers.add_parser("security-policy-check", parents=[common], help="validate security-sensitive path policy scaffolding")
@@ -14964,7 +15000,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "runtime-data-state":
         result = command_runtime_data_state(repo_root)
     elif args.command == "runtime-db-introspect":
-        result = command_runtime_db_introspect(repo_root)
+        result = command_runtime_db_introspect(repo_root, status_only=args.status_only)
     elif args.command == "runtime-performance-snapshot":
         result = command_runtime_performance_snapshot(repo_root)
     elif args.command == "runtime-redis-state":
