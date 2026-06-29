@@ -89,11 +89,13 @@ separate TLS/bootstrap/host-binding posture tracked outside this v1 read API.
   `GET` requests under `/api/v1` by default. With direct write-control enabled
   and operator identity verified, it additionally accepts only
   `POST /scopes`, `PATCH /scopes/{scope_id}`, and
-  `DELETE /scopes/{scope_id}` for scope metadata/membership writes, plus
+  `DELETE /scopes/{scope_id}` for scope metadata/membership writes;
   `POST /tags`, `PATCH /tags/{tag_id}`, and `DELETE /tags/{tag_id}` for tag
-  metadata writes. Tag delete is limited to unassigned tags; tag resource
-  assignment/filter actions, assigned-resource delete/trash behavior, clone/copy,
-  and export remain inherited. Other valid-token non-GET requests return JSON
+  metadata writes; and `POST /tags/{tag_id}/resources` for explicit add/remove
+  of UUID resource assignments for the tag's existing native-safe active-table
+  resource type. Tag delete is limited to unassigned tags; security-information
+  tag assignment, filter/bulk actions, trash behavior, clone/copy, and export
+  remain inherited. Other valid-token non-GET requests return JSON
   `405 method_not_allowed`.
 - Direct v1 browser boundary: direct responses do not emit browser CORS access
   headers. Browser product reads continue through the same-origin `gsad` path
@@ -125,9 +127,9 @@ separate TLS/bootstrap/host-binding posture tracked outside this v1 read API.
   `x-turbovas-exposure: direct-read` or `internal-only`, plus compact enforced
   migration metadata: `x-turbovas-maturity` (`live-read` or `preview-read`),
   `x-turbovas-replaces` (`feed-status-read`, `tag-resource-name-read`,
-  `nvt-catalog-detail-read`, or `none`), and
+  `tag-active-resource-assignment-write`, `nvt-catalog-detail-read`, or `none`), and
   `x-turbovas-inherited-still-owns` (`feed-sync-import-control`,
-  `tag-resource-actions-clone-export-trash`, `nvt-rich-detail`, or
+  `tag-security-info-filter-actions-clone-export-trash`, `nvt-rich-detail`, or
   `retention-mutations`).
   `native-tooling-state` reports missing, invalid, or mismatched seed metadata
   as `native-tooling.openapi-contract` drift. Extend this enforced seed before

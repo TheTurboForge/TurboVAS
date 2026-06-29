@@ -28,9 +28,10 @@ operation must declare these OpenAPI fields before implementation:
   `preserve-existing-owner`, `single-admin-owner`, `no-owner-state`, or
   `not-applicable-preview`.
 - `x-turbovas-safety-contract`: currently `write-control-v1`.
-- `x-turbovas-side-effect`: one of `metadata-write`, `scanner-control`,
-  `feed-control`, `credential-secret-control`, `account-auth-control`,
-  `destructive-mutation`, `report-generation`, or `export-generation`.
+- `x-turbovas-side-effect`: one of `metadata-write`, `metadata-delete`,
+  `resource-assignment-write`, `scanner-control`, `feed-control`,
+  `credential-secret-control`, `account-auth-control`, `destructive-mutation`,
+  `report-generation`, or `export-generation`.
 
 For each write/control slice, characterize inherited behavior first, then define
 authorization, validation and rejection paths, idempotency or rollback semantics,
@@ -57,9 +58,10 @@ Before any scope write route is implemented, the contract must state:
 `generate_scope_report` remains a separate report-generation workflow. It must
 not be folded into the first scope metadata-write slice.
 
-## Second Candidate: Tag Metadata Only
+## Second Candidate: Tag Metadata And Explicit Active-Resource Assignment
 
-The next approved direct write-control slice is tag metadata create/update only:
+The next approved direct write-control slice is tag metadata plus explicit
+native-safe active-resource assignment:
 
 - `POST /api/v1/tags` creates tag metadata for a supported resource type without
   assigning resources.
@@ -67,13 +69,18 @@ The next approved direct write-control slice is tag metadata create/update only:
   state.
 - `DELETE /api/v1/tags/{tag_id}` deletes only tags with zero assigned
   resources.
-- Resource assignment filters, add/set/remove actions, resource-type patching,
-  clone/copy, export, assigned-resource delete, and trash behavior remain
-  inherited until those semantics receive a separate contract.
+- `POST /api/v1/tags/{tag_id}/resources` adds or removes explicit UUID resource
+  assignments for the tag's existing resource type, only for native-safe
+  active-table resource types.
+- Filter-based bulk assignment, set/replace semantics, security-information
+  resource mutation, resource-type patching, clone/copy, export, trash behavior,
+  credentials, users, reports, and results remain inherited until those
+  semantics receive a separate contract.
 
 This slice is intentionally not full inherited `create_tag`/`modify_tag` parity;
-it is a bounded metadata write surface that does not touch `tag_resources` and
-rejects deletion while a tag still has assigned resources.
+it is a bounded metadata and explicit active-resource assignment surface that
+does not accept filter terms or opaque GMP/XML mutation semantics and rejects
+deletion while a tag still has assigned resources.
 
 ### First-Slice Scope Write Semantics
 

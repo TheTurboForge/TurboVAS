@@ -171,6 +171,45 @@ pub(crate) fn tag_resource_type_is_supported(resource_type: &str) -> bool {
     tag_resource_sql_spec(resource_type).is_ok()
 }
 
+pub(crate) fn tag_resource_direct_write_type_is_supported(resource_type: &str) -> bool {
+    matches!(
+        resource_type,
+        "config"
+            | "host"
+            | "os"
+            | "port_list"
+            | "report_config"
+            | "report_format"
+            | "scanner"
+            | "schedule"
+            | "target"
+            | "task"
+            | "tls_certificate"
+    )
+}
+
+pub(crate) fn tag_resource_active_lookup_sql(resource_type: &str) -> Result<String, ApiError> {
+    if !tag_resource_direct_write_type_is_supported(resource_type) {
+        return Err(ApiError::BadRequest(format!(
+            "unsupported direct tag resource write type: {resource_type}"
+        )));
+    }
+    let spec = tag_resource_sql_spec(resource_type)?;
+    let extra_where = if spec.extra_where.is_empty() {
+        String::new()
+    } else {
+        format!("\n        AND {}", spec.extra_where)
+    };
+
+    Ok(format!(
+        r#"SELECT r.id::integer, r.uuid::text
+             FROM {table} r
+            WHERE lower(r.uuid) = lower($1){extra_where}
+            LIMIT 1;"#,
+        table = spec.table,
+    ))
+}
+
 pub(crate) fn tag_resource_collection_sql(
     resource_type: &str,
     sort_sql: &str,
@@ -291,6 +330,21 @@ mod tests {
         assert!(tag_resource_collection_sql("credential", &sort_sql).is_err());
         assert!(tag_resource_collection_sql("report", &sort_sql).is_err());
         assert!(tag_resource_collection_sql("result", &sort_sql).is_err());
+    }
+
+    #[test]
+    fn tag_resource_direct_write_lookup_is_uuid_active_table_only() {
+        let target_sql = tag_resource_active_lookup_sql("target").unwrap();
+        assert!(target_sql.contains("FROM targets r"));
+        assert!(target_sql.contains("lower(r.uuid) = lower($1)"));
+
+        let task_sql = tag_resource_active_lookup_sql("task").unwrap();
+        assert!(task_sql.contains("coalesce(r.usage_type, 'scan') = 'scan'"));
+        assert!(task_sql.contains("coalesce(r.hidden, 0) = 0"));
+
+        assert!(tag_resource_active_lookup_sql("cve").is_err());
+        assert!(tag_resource_active_lookup_sql("alert").is_err());
+        assert!(tag_resource_active_lookup_sql("credential").is_err());
     }
 
     #[test]

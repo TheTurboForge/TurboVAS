@@ -83,7 +83,7 @@ use schedules::*;
 use scope_payloads::*;
 use scope_report_handlers::*;
 use scope_writes::{create_scope, delete_scope, patch_scope};
-use tag_writes::{create_tag, delete_tag, patch_tag};
+use tag_writes::{create_tag, delete_tag, patch_tag, update_tag_resources};
 use tags::*;
 use task_targets::*;
 use tls_certificates::*;
@@ -284,6 +284,7 @@ fn direct_native_api_router(
             .route("/api/v1/tags", post(create_tag))
             .route("/api/v1/tags/:tag_id", patch(patch_tag))
             .route("/api/v1/tags/:tag_id", delete(delete_tag))
+            .route("/api/v1/tags/:tag_id/resources", post(update_tag_resources))
     } else {
         router
     };
@@ -359,6 +360,11 @@ mod tests {
         NativeWriteRouteContract {
             method: "delete",
             path: "/api/v1/tags/:tag_id",
+            safety_contract: "write-control-v1",
+        },
+        NativeWriteRouteContract {
+            method: "post",
+            path: "/api/v1/tags/:tag_id/resources",
             safety_contract: "write-control-v1",
         },
     ];

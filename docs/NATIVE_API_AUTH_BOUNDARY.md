@@ -93,11 +93,13 @@ script/curl -> opt-in direct bearer listener -> turbovas-api -> PostgreSQL
   tokens through container environment variables.
 - Keep direct v1 write-control limited to explicitly reviewed routes. Scanner
   control, credentials, feed sync, feed import/update/download/mirroring,
-  account management, target/task writes, alert delivery, tag resource
-  assignment, assigned-resource delete/trash, and destructive mutations stay
-  inherited until native write/control designs are separately reviewed. Read-only feed
-  inventory metadata at `/api/v1/feeds` is allowed only as a classified
-  scriptable read endpoint.
+  account management, target/task writes, alert delivery, security-information
+  tag assignment, filter/bulk tag actions, trash, clone/copy, export, and
+  destructive mutations stay inherited until native write/control designs are
+  separately reviewed. Explicit tag add/remove for UUID resources on the tag's
+  existing native-safe active-table resource type is allowed only through the
+  direct write-control route. Read-only feed inventory metadata at
+  `/api/v1/feeds` is allowed only as a classified scriptable read endpoint.
 - Read-only tag-dialog resource-name lookups, including alert, are also
   allowlisted scriptable reads. They expose only id/type/name lookup data;
   alert delivery, method/event/condition payloads, and alert mutations remain
@@ -175,9 +177,10 @@ internal-only endpoint denial for the retention preview when a scope report is
 available, plus continued internal native API smoke. Malformed HTTP framing can
 be rejected by the HTTP parser before native middleware; the smoke records that
 layer explicitly.
-The write-control smoke also proves that direct DELETE requests reject bodies
-and direct non-GET requests reject query strings before mutation, because
-current direct write-control contracts do not consume those shapes.
+The write-control smoke also proves that direct DELETE requests reject bodies,
+direct non-GET requests reject query strings before mutation, and explicit tag
+resource add/remove can round-trip without residue for a native-safe active-table
+resource fixture.
 `native-api-request --request-id` sends a safe `X-Request-Id` value for
 correlation; it is not an authentication or audit identity.
 Direct listener host/port env is locally shape-checked as part of the direct

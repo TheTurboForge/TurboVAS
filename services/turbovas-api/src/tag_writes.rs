@@ -8,6 +8,7 @@ use axum::{
     http::{HeaderMap, HeaderValue, StatusCode, header},
 };
 use serde::Deserialize;
+use std::collections::BTreeSet;
 use tokio_postgres::{Row, Transaction, types::ToSql};
 
 use crate::{
@@ -15,11 +16,15 @@ use crate::{
     auth::DirectApiOperator,
     errors::ApiError,
     path_ids::parse_uuid,
-    tag_resource_helpers::tag_resource_type_is_supported,
+    tag_resource_helpers::{
+        tag_resource_active_lookup_sql, tag_resource_direct_write_type_is_supported,
+        tag_resource_type_is_supported,
+    },
     tags::{TagAssetItem, tag_asset_from_row},
 };
 
 const MAX_TAG_TEXT_BYTES: usize = 4096;
+const MAX_TAG_RESOURCE_WRITE_IDS: usize = 100;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -47,6 +52,20 @@ pub(crate) struct TagPatchRequest {
     active: Option<bool>,
 }
 
+#[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum TagResourceUpdateAction {
+    Add,
+    Remove,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct TagResourceUpdateRequest {
+    action: TagResourceUpdateAction,
+    resource_ids: Vec<String>,
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct ValidatedTagCreate {
     pub(crate) name: String,
@@ -64,6 +83,12 @@ pub(crate) struct ValidatedTagPatch {
     pub(crate) active: Option<bool>,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct ValidatedTagResourceUpdate {
+    pub(crate) action: TagResourceUpdateAction,
+    pub(crate) resource_ids: Vec<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TagWriteRecord {
     pub(crate) internal_id: i32,
@@ -74,7 +99,14 @@ pub(crate) struct TagWriteRecord {
 struct TagWriteState {
     internal_id: i32,
     uuid: String,
+    resource_type: String,
     resource_count: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct TagResourceWriteRecord {
+    internal_id: i32,
+    uuid: String,
 }
 
 #[cfg(test)]
@@ -83,6 +115,7 @@ pub(crate) enum TagWriteOperation {
     CreateMetadata,
     PatchMetadata,
     DeleteMetadata,
+    UpdateResourceAssignments,
 }
 
 #[cfg(test)]
@@ -92,9 +125,13 @@ pub(crate) enum TagWriteStep {
     VerifyResourceTypeSupported,
     VerifyTagExists,
     VerifyTagUnassigned,
+    VerifyResourceExists,
     InsertMetadata,
     UpdateMetadata,
     DeleteMetadata,
+    InsertResourceAssignment,
+    DeleteResourceAssignment,
+    TouchMetadata,
 }
 
 #[cfg(test)]
@@ -173,8 +210,60 @@ pub(crate) async fn delete_tag(
     Ok(StatusCode::NO_CONTENT)
 }
 
+pub(crate) async fn update_tag_resources(
+    State(state): State<AppState>,
+    Path(tag_id): Path<String>,
+    operator: Option<Extension<DirectApiOperator>>,
+    Json(request): Json<TagResourceUpdateRequest>,
+) -> Result<Json<TagAssetItem>, ApiError> {
+    let operator = require_tag_write_operator(operator)?;
+    let request = validate_tag_resource_update_request(request)?;
+    let mut client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let tx = client
+        .transaction()
+        .await
+        .map_err(|error| map_tag_write_db_error(error, "begin tag resource transaction"))?;
+    resolve_tag_write_operator_owner(&tx, &operator).await?;
+    let state = load_tag_write_state(&tx, &tag_id).await?;
+    ensure_tag_resource_direct_write_type_is_supported(&state.resource_type)?;
+    execute_tag_resource_update_transaction(&tx, &state, &request).await?;
+    tx.commit()
+        .await
+        .map_err(|error| map_tag_write_db_error(error, "commit tag resource transaction"))?;
+
+    Ok(Json(load_tag_write_detail(&client, &state.uuid).await?))
+}
+
 fn default_tag_active() -> bool {
     true
+}
+
+pub(crate) fn validate_tag_resource_update_request(
+    request: TagResourceUpdateRequest,
+) -> Result<ValidatedTagResourceUpdate, ApiError> {
+    if request.resource_ids.is_empty() {
+        return Err(ApiError::BadRequest(
+            "resource_ids must contain at least one resource id".to_string(),
+        ));
+    }
+
+    if request.resource_ids.len() > MAX_TAG_RESOURCE_WRITE_IDS {
+        return Err(ApiError::BadRequest(format!(
+            "resource_ids must contain at most {MAX_TAG_RESOURCE_WRITE_IDS} ids"
+        )));
+    }
+    let mut seen = BTreeSet::new();
+    let mut resource_ids = Vec::new();
+    for resource_id in request.resource_ids {
+        let parsed = parse_uuid(&resource_id)?.to_string();
+        if seen.insert(parsed.clone()) {
+            resource_ids.push(parsed);
+        }
+    }
+    Ok(ValidatedTagResourceUpdate {
+        action: request.action,
+        resource_ids,
+    })
 }
 
 fn require_tag_write_operator(
@@ -218,6 +307,26 @@ pub(crate) fn validate_tag_patch_request(
         ))
     } else {
         Ok(validated)
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn tag_resource_update_transaction_plan(
+    request: &ValidatedTagResourceUpdate,
+) -> TagWriteTransactionPlan {
+    TagWriteTransactionPlan {
+        operation: TagWriteOperation::UpdateResourceAssignments,
+        steps: vec![
+            TagWriteStep::ResolveOperatorOwner,
+            TagWriteStep::VerifyTagExists,
+            TagWriteStep::VerifyResourceTypeSupported,
+            TagWriteStep::VerifyResourceExists,
+            match request.action {
+                TagResourceUpdateAction::Add => TagWriteStep::InsertResourceAssignment,
+                TagResourceUpdateAction::Remove => TagWriteStep::DeleteResourceAssignment,
+            },
+            TagWriteStep::TouchMetadata,
+        ],
     }
 }
 
@@ -279,6 +388,52 @@ pub(crate) async fn execute_tag_create_transaction(
         "insert tag metadata",
     )
     .await
+}
+
+async fn execute_tag_resource_update_transaction(
+    tx: &Transaction<'_>,
+    state: &TagWriteState,
+    request: &ValidatedTagResourceUpdate,
+) -> Result<(), ApiError> {
+    for resource_id in &request.resource_ids {
+        let resource =
+            resolve_tag_resource_write_record(tx, &state.resource_type, resource_id).await?;
+        match request.action {
+            TagResourceUpdateAction::Add => {
+                tx.execute(
+                    tag_resource_insert_sql(),
+                    &[
+                        &state.internal_id,
+                        &state.resource_type,
+                        &resource.internal_id,
+                        &resource.uuid,
+                    ],
+                )
+                .await
+                .map_err(|error| map_tag_write_db_error(error, "insert tag resource"))?;
+            }
+            TagResourceUpdateAction::Remove => {
+                let deleted = tx
+                    .execute(
+                        tag_resource_delete_sql(),
+                        &[
+                            &state.internal_id,
+                            &state.resource_type,
+                            &resource.internal_id,
+                        ],
+                    )
+                    .await
+                    .map_err(|error| map_tag_write_db_error(error, "delete tag resource"))?;
+                if deleted == 0 {
+                    return Err(ApiError::NotFound);
+                }
+            }
+        }
+    }
+    tx.execute(tag_touch_metadata_sql(), &[&state.internal_id])
+        .await
+        .map_err(|error| map_tag_write_db_error(error, "touch tag metadata"))?;
+    Ok(())
 }
 
 pub(crate) async fn execute_tag_delete_transaction(
@@ -355,23 +510,58 @@ where
     Ok(tag_asset_from_row(&row))
 }
 
-async fn load_unassigned_tag_write_state(
+async fn load_tag_write_state(
     tx: &Transaction<'_>,
     tag_id: &str,
 ) -> Result<TagWriteState, ApiError> {
     let tag_id = parse_uuid(tag_id)?.to_string();
     let row = tx
-        .query_opt(tag_write_unassigned_state_sql(), &[&tag_id])
+        .query_opt(tag_write_state_sql(), &[&tag_id])
         .await
         .map_err(|error| map_tag_write_db_error(error, "load tag write state"))?
         .ok_or(ApiError::NotFound)?;
-    let state = TagWriteState {
+    Ok(TagWriteState {
         internal_id: row.get(0),
         uuid: row.get(1),
-        resource_count: row.get(2),
-    };
+        resource_type: row.get(2),
+        resource_count: row.get(3),
+    })
+}
+
+async fn load_unassigned_tag_write_state(
+    tx: &Transaction<'_>,
+    tag_id: &str,
+) -> Result<TagWriteState, ApiError> {
+    let state = load_tag_write_state(tx, tag_id).await?;
     ensure_tag_is_unassigned(state.resource_count)?;
     Ok(state)
+}
+
+async fn resolve_tag_resource_write_record(
+    tx: &Transaction<'_>,
+    resource_type: &str,
+    resource_id: &str,
+) -> Result<TagResourceWriteRecord, ApiError> {
+    let resource_id = parse_uuid(resource_id)?.to_string();
+    let sql = tag_resource_active_lookup_sql(resource_type)?;
+    tx.query_opt(&sql, &[&resource_id])
+        .await
+        .map_err(|error| map_tag_write_db_error(error, "resolve tag resource"))?
+        .map(|row| TagResourceWriteRecord {
+            internal_id: row.get(0),
+            uuid: row.get(1),
+        })
+        .ok_or(ApiError::NotFound)
+}
+
+fn ensure_tag_resource_direct_write_type_is_supported(resource_type: &str) -> Result<(), ApiError> {
+    if tag_resource_direct_write_type_is_supported(resource_type) {
+        Ok(())
+    } else {
+        Err(ApiError::BadRequest(format!(
+            "tag resource type {resource_type} is not supported by direct resource writes"
+        )))
+    }
 }
 
 fn ensure_tag_is_unassigned(resource_count: i64) -> Result<(), ApiError> {
@@ -484,12 +674,42 @@ pub(crate) fn tag_update_metadata_sql() -> &'static str {
       RETURNING id::integer, uuid::text;"
 }
 
+#[cfg(test)]
 pub(crate) fn tag_write_unassigned_state_sql() -> &'static str {
+    tag_write_state_sql()
+}
+
+pub(crate) fn tag_write_state_sql() -> &'static str {
     "SELECT id::integer,
             uuid::text,
+            coalesce(resource_type, '')::text,
             coalesce(tag_resources_count(id, resource_type), 0)::bigint AS resource_count
        FROM tags
       WHERE uuid = $1;"
+}
+
+pub(crate) fn tag_resource_insert_sql() -> &'static str {
+    "INSERT INTO tag_resources (tag, resource_type, resource, resource_uuid, resource_location)
+     SELECT $1, $2, $3, $4, 0
+      WHERE NOT EXISTS (
+            SELECT 1 FROM tag_resources
+             WHERE tag = $1
+               AND resource_type = $2
+               AND resource = $3
+               AND resource_location = 0
+      );"
+}
+
+pub(crate) fn tag_resource_delete_sql() -> &'static str {
+    "DELETE FROM tag_resources
+      WHERE tag = $1
+        AND resource_type = $2
+        AND resource = $3
+        AND resource_location = 0;"
+}
+
+pub(crate) fn tag_touch_metadata_sql() -> &'static str {
+    "UPDATE tags SET modification_time = m_now() WHERE id = $1;"
 }
 
 pub(crate) fn tag_delete_metadata_sql() -> &'static str {
@@ -614,6 +834,61 @@ mod tests {
     }
 
     #[test]
+    fn tag_resource_update_request_is_explicit_ids_only() {
+        let request: TagResourceUpdateRequest = serde_json::from_str(
+            r#"{"action":"add","resource_ids":["12345678-1234-1234-1234-123456789abc","12345678-1234-1234-1234-123456789abc","aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"]}"#,
+        )
+        .expect("valid tag resource update request");
+        let validated =
+            validate_tag_resource_update_request(request).expect("valid resource update");
+        assert_eq!(validated.action, TagResourceUpdateAction::Add);
+        assert_eq!(
+            validated.resource_ids,
+            vec![
+                "12345678-1234-1234-1234-123456789abc".to_string(),
+                "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee".to_string(),
+            ]
+        );
+
+        assert!(
+            serde_json::from_str::<TagResourceUpdateRequest>(
+                r#"{"action":"set","resource_ids":[]}"#
+            )
+            .is_err()
+        );
+        assert!(
+            serde_json::from_str::<TagResourceUpdateRequest>(
+                r#"{"action":"add","resource_ids":[],"resource_filter":"name~x"}"#,
+            )
+            .is_err()
+        );
+        assert!(matches!(
+            validate_tag_resource_update_request(TagResourceUpdateRequest {
+                action: TagResourceUpdateAction::Add,
+                resource_ids: Vec::new(),
+            }),
+            Err(ApiError::BadRequest(_))
+        ));
+        assert!(matches!(
+            validate_tag_resource_update_request(TagResourceUpdateRequest {
+                action: TagResourceUpdateAction::Remove,
+                resource_ids: vec!["not-a-uuid".to_string()],
+            }),
+            Err(ApiError::BadRequest(_))
+        ));
+        assert!(matches!(
+            validate_tag_resource_update_request(TagResourceUpdateRequest {
+                action: TagResourceUpdateAction::Add,
+                resource_ids: vec![
+                    "12345678-1234-1234-1234-123456789abc".to_string();
+                    MAX_TAG_RESOURCE_WRITE_IDS + 1
+                ],
+            }),
+            Err(ApiError::BadRequest(_))
+        ));
+    }
+
+    #[test]
     fn tag_write_plans_are_metadata_only() {
         let create = ValidatedTagCreate {
             name: "owner:x".to_string(),
@@ -664,6 +939,25 @@ mod tests {
                 ],
             }
         );
+
+        let resource_update = ValidatedTagResourceUpdate {
+            action: TagResourceUpdateAction::Remove,
+            resource_ids: vec!["12345678-1234-1234-1234-123456789abc".to_string()],
+        };
+        assert_eq!(
+            tag_resource_update_transaction_plan(&resource_update),
+            TagWriteTransactionPlan {
+                operation: TagWriteOperation::UpdateResourceAssignments,
+                steps: vec![
+                    TagWriteStep::ResolveOperatorOwner,
+                    TagWriteStep::VerifyTagExists,
+                    TagWriteStep::VerifyResourceTypeSupported,
+                    TagWriteStep::VerifyResourceExists,
+                    TagWriteStep::DeleteResourceAssignment,
+                    TagWriteStep::TouchMetadata,
+                ],
+            }
+        );
     }
 
     #[test]
@@ -687,6 +981,19 @@ mod tests {
         assert!(delete.contains("DELETE FROM tags"));
         assert!(delete.contains("WHERE id = $1"));
         assert!(!delete.contains("tag_resources"));
+
+        let add_resource = tag_resource_insert_sql();
+        assert!(add_resource.contains("INSERT INTO tag_resources"));
+        assert!(add_resource.contains("WHERE NOT EXISTS"));
+        assert!(add_resource.contains("resource_location = 0"));
+
+        let remove_resource = tag_resource_delete_sql();
+        assert!(remove_resource.contains("DELETE FROM tag_resources"));
+        assert!(remove_resource.contains("resource_type = $2"));
+        assert!(remove_resource.contains("resource_location = 0"));
+
+        let touch = tag_touch_metadata_sql();
+        assert!(touch.contains("UPDATE tags SET modification_time"));
     }
 
     #[test]

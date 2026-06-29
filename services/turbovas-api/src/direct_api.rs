@@ -335,6 +335,9 @@ fn direct_api_v1_write_method_path_is_allowed(method: &Method, path: &str) -> bo
         (&Method::PATCH | &Method::DELETE, ["", "api", "v1", "tags", tag_id]) => {
             direct_api_write_id_segment_is_allowed(tag_id)
         }
+        (&Method::POST, ["", "api", "v1", "tags", tag_id, "resources"]) => {
+            direct_api_write_id_segment_is_allowed(tag_id)
+        }
         _ => false,
     }
 }
@@ -735,6 +738,16 @@ mod tests {
         assert!(!direct_api_v1_method_is_allowed(
             &Method::DELETE,
             "/api/v1/tags/not-a-uuid",
+            true
+        ));
+        assert!(direct_api_v1_method_is_allowed(
+            &Method::POST,
+            "/api/v1/tags/12345678-1234-1234-1234-123456789abc/resources",
+            true
+        ));
+        assert!(!direct_api_v1_method_is_allowed(
+            &Method::POST,
+            "/api/v1/tags/not-a-uuid/resources",
             true
         ));
     }
