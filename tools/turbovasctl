@@ -2496,10 +2496,13 @@ def direct_native_api_posture_findings(repo_root: Path, env: dict[str, str] | No
     configured_token_ok = direct_api_bearer_token_is_acceptable(configured_token) if configured_token else None
     secret_metadata = runtime_secret_file_metadata(secret_path)
     secret_file_used = "configured-token-file" in token_sources or "running-container-token-file" in token_sources
+    environment_token_used = "environment" in token_sources or "running-container-env" in token_sources
     exposure_enabled = configured or bool(running_bindings)
     auth_details = {
         "exposure_enabled": exposure_enabled,
         "token_sources": list(token_sources),
+        "environment_token_used": environment_token_used,
+        "secret_file_used": secret_file_used,
         "bearer_token_env": TURBOVAS_API_BEARER_TOKEN_ENV,
         "bearer_token_file_env": TURBOVAS_API_BEARER_TOKEN_FILE_ENV,
         "minimum_token_length": TURBOVAS_API_BEARER_TOKEN_MIN_LENGTH,
@@ -2526,6 +2529,15 @@ def direct_native_api_posture_findings(repo_root: Path, env: dict[str, str] | No
                 "fail",
                 "production.native-api-direct.auth-boundary",
                 "Direct native API exposure is configured with a bearer token that is too short or contains unsafe characters.",
+                details=auth_details,
+            )
+        )
+    elif environment_token_used:
+        findings.append(
+            finding(
+                "fail",
+                "production.native-api-direct.auth-boundary",
+                "Direct native API exposure uses a bearer token from environment variables; use the ignored runtime secret file boundary instead of publishing auth material through process/container environment.",
                 details=auth_details,
             )
         )

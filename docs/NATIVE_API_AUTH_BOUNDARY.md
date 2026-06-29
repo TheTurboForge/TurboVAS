@@ -23,7 +23,9 @@ script/curl -> opt-in direct bearer listener -> turbovas-api -> PostgreSQL
   `127.0.0.1:19080` only when direct mode is requested. By default it creates
   an ignored runtime secret and passes it to the service as a read-only token
   file through `TURBOVAS_API_BEARER_TOKEN_FILE`; `TURBOVAS_API_BEARER_TOKEN`
-  remains an explicit environment-token override/fallback for development.
+  remains an explicit environment-token override/fallback for development smoke
+  only and fails production-posture/bootstrap checks when direct exposure is
+  enabled.
 - Direct bearer tokens must satisfy the local strength contract enforced by the
   service and helper: at least 32 printable non-whitespace ASCII characters.
   Generated runtime secrets use this stronger shape by default; weak configured
@@ -110,6 +112,9 @@ tools/turbovasctl native-api-request --direct --json --request-id 'operator-chec
 secret if needed, verifies local direct host/port/bind shape, refuses wildcard or
 non-loopback host publication, checks that the runtime token secret is not
 group/world accessible when that file is used, and reports only token metadata.
+If direct exposure would use `TURBOVAS_API_BEARER_TOKEN` from the environment,
+the bootstrap posture check fails and points operators back to the ignored
+runtime secret file boundary.
 It also requires helper-managed direct binds to target the fixed service
 container port `9081`, matching the Compose publication boundary. It does not
 start or expose the listener.
