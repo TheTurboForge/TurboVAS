@@ -185,6 +185,7 @@ pub(crate) async fn cpe_catalog_detail(
             ApiError::Database
         })?
         .ok_or(ApiError::NotFound)?;
+    let cpe_name: String = row.get("name");
     let cves = client
         .query(
             r#"SELECT cv.name AS id,
@@ -211,7 +212,7 @@ pub(crate) async fn cpe_catalog_detail(
                 WHERE cpe = $1
                 ORDER BY deprecated_by
                 LIMIT 1;"#,
-            &[&cpe_id],
+            &[&cpe_name],
         )
         .await
         .map_err(|error| {

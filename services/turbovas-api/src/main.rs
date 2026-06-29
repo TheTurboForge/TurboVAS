@@ -1160,6 +1160,23 @@ mod tests {
     }
 
     #[test]
+    fn cpe_catalog_detail_resolves_deprecated_by_by_cpe_name() {
+        let source = include_str!("catalog_payloads.rs");
+        let cpe_detail_source = source
+            .split_once("async fn cpe_catalog_detail")
+            .expect("CPE catalog detail handler must exist")
+            .1
+            .split_once("async fn cve_catalog")
+            .expect("CPE catalog detail handler must precede CVE catalog list")
+            .0;
+
+        assert!(cpe_detail_source.contains("let cpe_name: String = row.get(\"name\");"));
+        assert!(cpe_detail_source.contains("FROM scap.cpes_deprecated_by"));
+        assert!(cpe_detail_source.contains("WHERE cpe = $1"));
+        assert!(cpe_detail_source.contains("&[&cpe_name]"));
+    }
+
+    #[test]
     fn nvt_detail_user_tags_are_detail_only_active_info_tags() {
         let source = include_str!("catalog_payloads.rs");
         let catalog_payload_source = include_str!("catalog_payloads.rs");
