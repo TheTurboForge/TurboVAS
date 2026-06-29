@@ -463,6 +463,7 @@ OPENAPI_ALLOWED_SIDE_EFFECT_VALUES = frozenset(
         "export-generation",
         "feed-control",
         "metadata-write",
+        "metadata-delete",
         "report-generation",
         "scanner-control",
     }
@@ -551,6 +552,7 @@ OPENAPI_ALLOWED_REPLACES_VALUES = frozenset(
         "scope-report-result-evidence-read",
         "scope-report-tls-certificate-evidence-read",
         "tag-metadata-read",
+        "tag-metadata-delete",
         "tag-metadata-write",
         "tag-resource-name-read",
         "tag-resource-reference-read",
@@ -663,6 +665,7 @@ OPENAPI_REQUIRED_EXPOSURE = {
     ("delete", "/scopes/{scope_id}"): "direct-write",
     ("post", "/tags"): "direct-write",
     ("patch", "/tags/{tag_id}"): "direct-write",
+    ("delete", "/tags/{tag_id}"): "direct-write",
 }
 OPENAPI_REQUIRED_MIGRATION_METADATA = {
     ("get", "/alerts"): {
@@ -839,6 +842,11 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-inherited-still-owns": "tag-write-control",
         "x-turbovas-maturity": "live-write",
         "x-turbovas-replaces": "tag-metadata-write",
+    },
+    ("delete", "/tags/{tag_id}"): {
+        "x-turbovas-inherited-still-owns": "tag-write-control",
+        "x-turbovas-maturity": "live-write",
+        "x-turbovas-replaces": "tag-metadata-delete",
     },
     ("get", "/tags/{tag_id}/resources"): {
         "x-turbovas-inherited-still-owns": "tag-write-control",
@@ -6451,6 +6459,13 @@ def summarize_native_tooling(items: list[dict[str, Any]], repo_root: Path | None
                 "replacement_candidates": ["direct native tag metadata updates"],
             },
             {
+                "method": "delete",
+                "endpoint": "/api/v1/tags/{tag_id}",
+                "status": "implemented_direct_write_control",
+                "direct_access": "direct_write_control",
+                "replacement_candidates": ["direct native unassigned tag metadata deletion"],
+            },
+            {
                 "endpoint": "/api/v1/targets",
                 "status": "implemented_internal_and_browser_proxied",
                 "replacement_candidates": ["GSA target list reads (migrated through gsad same-origin proxy)", "read-only target automation", "native-api-request helper"],
@@ -11015,6 +11030,7 @@ def direct_smoke_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
             "native-api-direct.read-only-method-guard",
             "native-api-direct.scope-write-disabled",
             "native-api-direct.tag-write-disabled",
+            "native-api-direct.tag-delete-disabled",
             "native-api-direct.positive-allowlist",
             "native-api-direct.internal-only-scope-report-detail",
             "native-api-direct.internal-only-retention-plan",
@@ -11245,6 +11261,17 @@ def command_runtime_native_api_direct_smoke(repo_root: Path, status_only: bool =
     disabled_tag_write_json, disabled_tag_write_status = parse_json_output_with_http_status(disabled_tag_write)
     disabled_tag_write_ok = disabled_tag_write.returncode == 0 and disabled_tag_write_status == 405 and isinstance(disabled_tag_write_json, dict) and disabled_tag_write_json.get("error", {}).get("code") == "method_not_allowed"
     findings.append(native_api_probe_finding("pass" if disabled_tag_write_ok else "fail", "native-api-direct.tag-write-disabled", "Direct native API rejects tag metadata writes while direct write-control is disabled." if disabled_tag_write_ok else "Direct native API did not reject a tag metadata write while direct write-control is disabled.", disabled_tag_write, direct_native_api_display_command("/api/v1/tags", token=token, env=env, method="POST"), disabled_tag_write_json, {"http_status": disabled_tag_write_status, **summarize_native_api_response(disabled_tag_write_json)}))
+
+    disabled_tag_delete = direct_native_api_curl(
+        repo_root,
+        "/api/v1/tags/00000000-0000-0000-0000-000000000000",
+        token=token,
+        env=env,
+        method="DELETE",
+    )
+    disabled_tag_delete_json, disabled_tag_delete_status = parse_json_output_with_http_status(disabled_tag_delete)
+    disabled_tag_delete_ok = disabled_tag_delete.returncode == 0 and disabled_tag_delete_status == 405 and isinstance(disabled_tag_delete_json, dict) and disabled_tag_delete_json.get("error", {}).get("code") == "method_not_allowed"
+    findings.append(native_api_probe_finding("pass" if disabled_tag_delete_ok else "fail", "native-api-direct.tag-delete-disabled", "Direct native API rejects tag metadata deletes while direct write-control is disabled." if disabled_tag_delete_ok else "Direct native API did not reject a tag metadata delete while direct write-control is disabled.", disabled_tag_delete, direct_native_api_display_command("/api/v1/tags/00000000-0000-0000-0000-000000000000", token=token, env=env, method="DELETE"), disabled_tag_delete_json, {"http_status": disabled_tag_delete_status, **summarize_native_api_response(disabled_tag_delete_json)}))
 
     request_body = direct_native_api_curl(
         repo_root,

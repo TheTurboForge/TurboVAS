@@ -65,12 +65,15 @@ The next approved direct write-control slice is tag metadata create/update only:
   assigning resources.
 - `PATCH /api/v1/tags/{tag_id}` updates only name, comment, value, and active
   state.
+- `DELETE /api/v1/tags/{tag_id}` deletes only tags with zero assigned
+  resources.
 - Resource assignment filters, add/set/remove actions, resource-type patching,
-  clone/copy, export, delete, and trash behavior remain inherited until those
-  semantics receive a separate contract.
+  clone/copy, export, assigned-resource delete, and trash behavior remain
+  inherited until those semantics receive a separate contract.
 
 This slice is intentionally not full inherited `create_tag`/`modify_tag` parity;
-it is a bounded metadata write surface that does not touch `tag_resources`.
+it is a bounded metadata write surface that does not touch `tag_resources` and
+rejects deletion while a tag still has assigned resources.
 
 ### First-Slice Scope Write Semantics
 

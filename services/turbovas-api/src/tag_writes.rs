@@ -70,11 +70,19 @@ pub(crate) struct TagWriteRecord {
     pub(crate) uuid: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct TagWriteState {
+    internal_id: i64,
+    uuid: String,
+    resource_count: i64,
+}
+
 #[cfg(test)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TagWriteOperation {
     CreateMetadata,
     PatchMetadata,
+    DeleteMetadata,
 }
 
 #[cfg(test)]
@@ -83,8 +91,10 @@ pub(crate) enum TagWriteStep {
     ResolveOperatorOwner,
     VerifyResourceTypeSupported,
     VerifyTagExists,
+    VerifyTagUnassigned,
     InsertMetadata,
     UpdateMetadata,
+    DeleteMetadata,
 }
 
 #[cfg(test)]
@@ -140,6 +150,27 @@ pub(crate) async fn patch_tag(
         .map_err(|error| map_tag_write_db_error(error, "commit patch tag transaction"))?;
 
     Ok(Json(load_tag_write_detail(&client, &record.uuid).await?))
+}
+
+pub(crate) async fn delete_tag(
+    State(state): State<AppState>,
+    Path(tag_id): Path<String>,
+    operator: Option<Extension<DirectApiOperator>>,
+) -> Result<StatusCode, ApiError> {
+    let operator = require_tag_write_operator(operator)?;
+    let mut client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let tx = client
+        .transaction()
+        .await
+        .map_err(|error| map_tag_write_db_error(error, "begin delete tag transaction"))?;
+    resolve_tag_write_operator_owner(&tx, &operator).await?;
+    let state = load_unassigned_tag_write_state(&tx, &tag_id).await?;
+    execute_tag_delete_transaction(&tx, state.internal_id).await?;
+    tx.commit()
+        .await
+        .map_err(|error| map_tag_write_db_error(error, "commit delete tag transaction"))?;
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 fn default_tag_active() -> bool {
@@ -216,6 +247,19 @@ pub(crate) fn tag_patch_transaction_plan(_request: &ValidatedTagPatch) -> TagWri
     }
 }
 
+#[cfg(test)]
+pub(crate) fn tag_delete_transaction_plan() -> TagWriteTransactionPlan {
+    TagWriteTransactionPlan {
+        operation: TagWriteOperation::DeleteMetadata,
+        steps: vec![
+            TagWriteStep::ResolveOperatorOwner,
+            TagWriteStep::VerifyTagExists,
+            TagWriteStep::VerifyTagUnassigned,
+            TagWriteStep::DeleteMetadata,
+        ],
+    }
+}
+
 pub(crate) async fn execute_tag_create_transaction(
     tx: &Transaction<'_>,
     owner_id: i64,
@@ -233,6 +277,19 @@ pub(crate) async fn execute_tag_create_transaction(
             &(request.active as i32),
         ],
         "insert tag metadata",
+    )
+    .await
+}
+
+pub(crate) async fn execute_tag_delete_transaction(
+    tx: &Transaction<'_>,
+    tag_internal_id: i64,
+) -> Result<TagWriteRecord, ApiError> {
+    query_tag_write_record(
+        tx,
+        tag_delete_metadata_sql(),
+        &[&tag_internal_id],
+        "delete tag metadata",
     )
     .await
 }
@@ -296,6 +353,36 @@ where
         .map_err(|error| map_tag_write_db_error(error, "load tag write detail"))?
         .ok_or(ApiError::NotFound)?;
     Ok(tag_asset_from_row(&row))
+}
+
+async fn load_unassigned_tag_write_state(
+    tx: &Transaction<'_>,
+    tag_id: &str,
+) -> Result<TagWriteState, ApiError> {
+    let tag_id = parse_uuid(tag_id)?.to_string();
+    let row = tx
+        .query_opt(tag_write_unassigned_state_sql(), &[&tag_id])
+        .await
+        .map_err(|error| map_tag_write_db_error(error, "load tag write state"))?
+        .ok_or(ApiError::NotFound)?;
+    let state = TagWriteState {
+        internal_id: row.get(0),
+        uuid: row.get(1),
+        resource_count: row.get(2),
+    };
+    ensure_tag_is_unassigned(state.resource_count)?;
+    Ok(state)
+}
+
+fn ensure_tag_is_unassigned(resource_count: i64) -> Result<(), ApiError> {
+    if resource_count == 0 {
+        Ok(())
+    } else {
+        Err(ApiError::Conflict(
+            "tag with assigned resources cannot be deleted by this metadata-only direct API"
+                .to_string(),
+        ))
+    }
 }
 
 fn tag_write_record_from_row(row: &Row) -> TagWriteRecord {
@@ -394,6 +481,20 @@ pub(crate) fn tag_update_metadata_sql() -> &'static str {
             active = coalesce($5, active),
             modification_time = m_now()
       WHERE uuid = $1
+      RETURNING id::bigint, uuid::text;"
+}
+
+pub(crate) fn tag_write_unassigned_state_sql() -> &'static str {
+    "SELECT id::bigint,
+            uuid::text,
+            coalesce(tag_resources_count(id, resource_type), 0)::bigint AS resource_count
+       FROM tags
+      WHERE uuid = $1;"
+}
+
+pub(crate) fn tag_delete_metadata_sql() -> &'static str {
+    "DELETE FROM tags
+      WHERE id = $1
       RETURNING id::bigint, uuid::text;"
 }
 
@@ -550,6 +651,19 @@ mod tests {
                 ],
             }
         );
+
+        assert_eq!(
+            tag_delete_transaction_plan(),
+            TagWriteTransactionPlan {
+                operation: TagWriteOperation::DeleteMetadata,
+                steps: vec![
+                    TagWriteStep::ResolveOperatorOwner,
+                    TagWriteStep::VerifyTagExists,
+                    TagWriteStep::VerifyTagUnassigned,
+                    TagWriteStep::DeleteMetadata,
+                ],
+            }
+        );
     }
 
     #[test]
@@ -564,5 +678,23 @@ mod tests {
         assert!(update.contains("coalesce($2, name)"));
         assert!(!update.contains("resource_type ="));
         assert!(!update.contains("tag_resources"));
+
+        let delete_state = tag_write_unassigned_state_sql();
+        assert!(delete_state.contains("tag_resources_count"));
+        assert!(!delete_state.contains("DELETE"));
+
+        let delete = tag_delete_metadata_sql();
+        assert!(delete.contains("DELETE FROM tags"));
+        assert!(delete.contains("WHERE id = $1"));
+        assert!(!delete.contains("tag_resources"));
+    }
+
+    #[test]
+    fn tag_delete_rejects_assigned_tags() {
+        assert!(ensure_tag_is_unassigned(0).is_ok());
+        assert!(matches!(
+            ensure_tag_is_unassigned(1),
+            Err(ApiError::Conflict(_))
+        ));
     }
 }

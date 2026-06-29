@@ -90,9 +90,10 @@ separate TLS/bootstrap/host-binding posture tracked outside this v1 read API.
   and operator identity verified, it additionally accepts only
   `POST /scopes`, `PATCH /scopes/{scope_id}`, and
   `DELETE /scopes/{scope_id}` for scope metadata/membership writes, plus
-  `POST /tags` and `PATCH /tags/{tag_id}` for tag metadata writes. Tag resource
-  assignment/filter actions, delete/trash behavior, clone/copy, and export
-  remain inherited. Other valid-token non-GET requests return JSON
+  `POST /tags`, `PATCH /tags/{tag_id}`, and `DELETE /tags/{tag_id}` for tag
+  metadata writes. Tag delete is limited to unassigned tags; tag resource
+  assignment/filter actions, assigned-resource delete/trash behavior, clone/copy,
+  and export remain inherited. Other valid-token non-GET requests return JSON
   `405 method_not_allowed`.
 - Direct v1 browser boundary: direct responses do not emit browser CORS access
   headers. Browser product reads continue through the same-origin `gsad` path

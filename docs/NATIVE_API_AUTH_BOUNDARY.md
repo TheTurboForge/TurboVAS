@@ -39,7 +39,7 @@ script/curl -> opt-in direct bearer listener -> turbovas-api -> PostgreSQL
   flag. It accepts only strict boolean values, requires
   `TURBOVAS_API_OPERATOR_UUID` when truthy, and currently exposes only the
   approved direct scope metadata/membership write routes plus tag metadata
-  create/update routes.
+  create/update and unassigned-tag delete routes.
 - `/healthz` is unauthenticated for readiness. `/api/v1/...` on the direct
   listener requires `Authorization: Bearer <token>` and returns JSON `401`
   errors for missing or wrong tokens.
@@ -48,8 +48,9 @@ script/curl -> opt-in direct bearer listener -> turbovas-api -> PostgreSQL
   registered as direct write-control and `TURBOVAS_API_DIRECT_WRITE_CONTROL` is
   enabled with a verified operator identity. The current direct write surface is
   limited to scope create/update/delete metadata and membership routes, plus
-  tag metadata create/update. Tag resource assignment/filter actions,
-  delete/trash behavior, clone/copy, and export remain inherited.
+  tag metadata create/update and unassigned-tag delete. Tag resource
+  assignment/filter actions, assigned-resource delete/trash behavior,
+  clone/copy, and export remain inherited.
 - The direct listener applies a fixed in-flight cap to authenticated direct
   `GET` requests and returns JSON `429 too_many_requests` with `X-Request-Id`
   when the cap is reached. This is a coarse development pressure guard, not a
@@ -93,8 +94,8 @@ script/curl -> opt-in direct bearer listener -> turbovas-api -> PostgreSQL
 - Keep direct v1 write-control limited to explicitly reviewed routes. Scanner
   control, credentials, feed sync, feed import/update/download/mirroring,
   account management, target/task writes, alert delivery, tag resource
-  assignment/delete/trash, and destructive mutations stay inherited until
-  native write/control designs are separately reviewed. Read-only feed
+  assignment, assigned-resource delete/trash, and destructive mutations stay
+  inherited until native write/control designs are separately reviewed. Read-only feed
   inventory metadata at `/api/v1/feeds` is allowed only as a classified
   scriptable read endpoint.
 - Read-only tag-dialog resource-name lookups, including alert, are also
