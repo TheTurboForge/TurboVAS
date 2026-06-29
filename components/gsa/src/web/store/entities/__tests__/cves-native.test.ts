@@ -118,6 +118,29 @@ describe('native API CVE catalog', () => {
             tags: ['Vendor Advisory'],
           },
         ],
+        configuration_nodes: {
+          node: [
+            {
+              operator: 'OR',
+              negate: 0,
+              match_string: [
+                {
+                  criteria: 'cpe:/a:vendor:package',
+                  vulnerable: 1,
+                  status: 'Active',
+                  matched_cpes: {
+                    cpe: [
+                      {
+                        _id: 'cpe:/a:vendor:package:1.0',
+                        deprecated: 0,
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          ],
+        },
         user_tags: [
           {
             id: 'a01cce79-9ad3-4714-903d-893a333ab33d',
@@ -157,6 +180,7 @@ describe('native API CVE catalog', () => {
         tags: ['Vendor Advisory'],
       },
     ]);
+    expect(cve.products).toEqual(['cpe:/a:vendor:package:1.0']);
     expect(cve.userTags).toHaveLength(1);
     expect(cve.userTags[0].id).toEqual('a01cce79-9ad3-4714-903d-893a333ab33d');
     expect(cve.userTags[0].name).toEqual('Native tag');

@@ -1,4 +1,5 @@
-/* SPDX-FileCopyrightText: 2024 Greenbone AG
+/* TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
+ * SPDX-FileCopyrightText: 2024 Greenbone AG
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -326,6 +327,47 @@ describe('CVE model tests', () => {
         href: 'http://example.org',
         tags: ['tag3'],
       },
+    ]);
+  });
+
+  test('should parse products from configuration nodes', () => {
+    const cve = Cve.fromElement({
+      cve: {
+        products: '',
+        configuration_nodes: {
+          node: [
+            {
+              match_string: [
+                {
+                  vulnerable: 0,
+                  matched_cpes: {
+                    cpe: [{_id: 'cpe:/a:ignored:product'}],
+                  },
+                },
+                {
+                  vulnerable: 1,
+                  matched_cpes: {
+                    cpe: [{_id: 'cpe:/a:vendor:root'}],
+                  },
+                },
+              ],
+              node: {
+                match_string: {
+                  vulnerable: 1,
+                  matched_cpes: {
+                    cpe: {_id: 'cpe:/a:vendor:child'},
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+    });
+
+    expect(cve.products).toEqual([
+      'cpe:/a:vendor:root',
+      'cpe:/a:vendor:child',
     ]);
   });
 

@@ -50,6 +50,45 @@ pub(crate) struct CatalogCveReference {
 }
 
 #[derive(Debug, Serialize)]
+pub(crate) struct CatalogCveMatchedCpe {
+    #[serde(rename = "_id")]
+    pub(crate) id: String,
+    pub(crate) deprecated: i32,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct CatalogCveMatchedCpes {
+    pub(crate) cpe: Vec<CatalogCveMatchedCpe>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct CatalogCveMatchString {
+    pub(crate) criteria: String,
+    pub(crate) vulnerable: i32,
+    pub(crate) status: String,
+    pub(crate) version_start_including: String,
+    pub(crate) version_start_excluding: String,
+    pub(crate) version_end_including: String,
+    pub(crate) version_end_excluding: String,
+    pub(crate) matched_cpes: CatalogCveMatchedCpes,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct CatalogCveConfigurationNode {
+    pub(crate) operator: String,
+    pub(crate) negate: i32,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) match_string: Vec<CatalogCveMatchString>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) node: Vec<CatalogCveConfigurationNode>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct CatalogCveConfigurationNodes {
+    pub(crate) node: Vec<CatalogCveConfigurationNode>,
+}
+
+#[derive(Debug, Serialize)]
 pub(crate) struct CatalogCveItem {
     id: String,
     name: String,
@@ -64,6 +103,8 @@ pub(crate) struct CatalogCveItem {
     pub(crate) nvt_refs: Vec<CatalogCveNvtReference>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) references: Vec<CatalogCveReference>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) configuration_nodes: Option<CatalogCveConfigurationNodes>,
     #[serde(skip_serializing_if = "Option::is_none")]
     epss: Option<CatalogEpssItem>,
     published_at: Option<String>,
@@ -333,8 +374,163 @@ pub(crate) async fn cve_catalog_detail(
     item.cert_refs = cve_cert_refs(&client, &cve_id).await?;
     item.nvt_refs = cve_nvt_refs(&client, &cve_id).await?;
     item.references = cve_references(&client, cve_internal_id).await?;
+    item.configuration_nodes = cve_configuration_nodes(&client, cve_internal_id).await?;
     let user_tags = catalog_user_tags(&client, "cve", &cve_id).await?;
     Ok(Json(CatalogCveDetail { item, user_tags }))
+}
+
+async fn cve_configuration_nodes(
+    client: &tokio_postgres::Client,
+    cve_internal_id: i32,
+) -> Result<Option<CatalogCveConfigurationNodes>, ApiError> {
+    let root_rows = client
+        .query(
+            r#"SELECT DISTINCT root_id::integer AS root_id
+                 FROM scap.cpe_match_nodes
+                WHERE cve_id = $1
+                  AND root_id <> 0
+                ORDER BY root_id ASC;"#,
+            &[&cve_internal_id],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "CVE catalog configuration root query failed");
+            ApiError::Database
+        })?;
+
+    let mut nodes = Vec::new();
+    for root_row in root_rows {
+        let root_id: i32 = root_row.get("root_id");
+        let mut node = cve_configuration_node(client, root_id).await?;
+        let child_rows = client
+            .query(
+                r#"SELECT id::integer AS id
+                     FROM scap.cpe_match_nodes
+                    WHERE root_id = $1
+                      AND root_id <> id
+                    ORDER BY id ASC;"#,
+                &[&root_id],
+            )
+            .await
+            .map_err(|error| {
+                tracing::warn!(%error, "CVE catalog configuration child query failed");
+                ApiError::Database
+            })?;
+        for child_row in child_rows {
+            let child_id: i32 = child_row.get("id");
+            node.node
+                .push(cve_configuration_node(client, child_id).await?);
+        }
+        nodes.push(node);
+    }
+
+    if nodes.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(CatalogCveConfigurationNodes { node: nodes }))
+    }
+}
+
+async fn cve_configuration_node(
+    client: &tokio_postgres::Client,
+    node_id: i32,
+) -> Result<CatalogCveConfigurationNode, ApiError> {
+    let row = client
+        .query_opt(
+            r#"SELECT coalesce(operator, '') AS operator,
+                      coalesce(negate, 0)::integer AS negate
+                 FROM scap.cpe_match_nodes
+                WHERE id = $1;"#,
+            &[&node_id],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "CVE catalog configuration node query failed");
+            ApiError::Database
+        })?
+        .ok_or(ApiError::Database)?;
+
+    Ok(CatalogCveConfigurationNode {
+        operator: row.get("operator"),
+        negate: row.get("negate"),
+        match_string: cve_match_strings(client, node_id).await?,
+        node: Vec::new(),
+    })
+}
+
+async fn cve_match_strings(
+    client: &tokio_postgres::Client,
+    node_id: i32,
+) -> Result<Vec<CatalogCveMatchString>, ApiError> {
+    let rows = client
+        .query(
+            r#"SELECT coalesce(n.vulnerable, 0)::integer AS vulnerable,
+                      coalesce(r.criteria, '') AS criteria,
+                      coalesce(r.match_criteria_id, '') AS match_criteria_id,
+                      coalesce(r.status, '') AS status,
+                      coalesce(r.version_start_incl, '') AS version_start_incl,
+                      coalesce(r.version_start_excl, '') AS version_start_excl,
+                      coalesce(r.version_end_incl, '') AS version_end_incl,
+                      coalesce(r.version_end_excl, '') AS version_end_excl
+                 FROM scap.cpe_match_strings r
+                 JOIN scap.cpe_nodes_match_criteria n
+                   ON r.match_criteria_id = n.match_criteria_id
+                WHERE n.node_id = $1
+                ORDER BY r.criteria ASC, r.match_criteria_id ASC;"#,
+            &[&node_id],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "CVE catalog configuration match-string query failed");
+            ApiError::Database
+        })?;
+
+    let mut match_strings = Vec::new();
+    for row in rows {
+        let match_criteria_id: String = row.get("match_criteria_id");
+        match_strings.push(CatalogCveMatchString {
+            criteria: row.get("criteria"),
+            vulnerable: row.get("vulnerable"),
+            status: row.get("status"),
+            version_start_including: row.get("version_start_incl"),
+            version_start_excluding: row.get("version_start_excl"),
+            version_end_including: row.get("version_end_incl"),
+            version_end_excluding: row.get("version_end_excl"),
+            matched_cpes: cve_matched_cpes(client, &match_criteria_id).await?,
+        });
+    }
+    Ok(match_strings)
+}
+
+async fn cve_matched_cpes(
+    client: &tokio_postgres::Client,
+    match_criteria_id: &str,
+) -> Result<CatalogCveMatchedCpes, ApiError> {
+    let rows = client
+        .query(
+            r#"SELECT coalesce(m.cpe_name, '') AS id,
+                      coalesce(c.deprecated, 0)::integer AS deprecated
+                 FROM scap.cpe_matches m
+                 LEFT JOIN scap.cpes c ON c.cpe_name_id = m.cpe_name_id
+                WHERE m.match_criteria_id = $1
+                ORDER BY m.cpe_name ASC;"#,
+            &[&match_criteria_id],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "CVE catalog matched CPE query failed");
+            ApiError::Database
+        })?;
+
+    Ok(CatalogCveMatchedCpes {
+        cpe: rows
+            .iter()
+            .map(|row| CatalogCveMatchedCpe {
+                id: row.get("id"),
+                deprecated: row.get("deprecated"),
+            })
+            .collect(),
+    })
 }
 
 async fn cve_references(
@@ -694,6 +890,7 @@ pub(crate) fn catalog_cve_from_row(row: &Row) -> CatalogCveItem {
         cert_refs: Vec::new(),
         nvt_refs: Vec::new(),
         references: Vec::new(),
+        configuration_nodes: None,
         epss: epss_score
             .zip(epss_percentile)
             .map(|(score, percentile)| CatalogEpssItem { score, percentile }),

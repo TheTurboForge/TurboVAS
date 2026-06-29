@@ -1,4 +1,5 @@
-/* SPDX-FileCopyrightText: 2024 Greenbone AG
+/* TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
+ * SPDX-FileCopyrightText: 2024 Greenbone AG
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -42,31 +43,38 @@ interface ReferenceElement {
   };
 }
 
+interface MatchedCpeElement {
+  _id: string;
+  deprecated?: number;
+}
+
+interface MatchStringElement {
+  vulnerable?: number;
+  criteria?: string;
+  matched_cpes?: {
+    cpe?: MatchedCpeElement | MatchedCpeElement[];
+  };
+  status?: string;
+  version_end_excluding?: string;
+  version_end_including?: string;
+  version_start_excluding?: string;
+  version_start_including?: string;
+}
+
+interface ConfigurationNodeElement {
+  match_string?: MatchStringElement | MatchStringElement[];
+  negate?: number;
+  node?: ConfigurationNodeElement | ConfigurationNodeElement[];
+  operator?: string;
+}
+
 interface CveElement extends ModelElement {
   cve?: {
     cert?: {
       cert_ref?: CertRefElement | CertRefElement[];
     };
     configuration_nodes?: {
-      node?: Array<{
-        match_string?: {
-          vulnerable?: number;
-          criteria?: string;
-          matched_cpes?: {
-            cpe?: Array<{
-              _id: string;
-              deprecated?: number;
-            }>;
-          };
-          status?: string;
-          version_end_excluding?: string;
-          version_end_including?: string;
-          version_start_excluding?: string;
-          version_start_including?: string;
-        };
-        negate?: number;
-        operator?: string;
-      }>;
+      node?: ConfigurationNodeElement | ConfigurationNodeElement[];
     };
     cvss_vector?: string;
     description?: string;
@@ -418,22 +426,38 @@ class Cve extends Model {
       products.length === 0 &&
       isDefined(cveElement?.configuration_nodes?.node)
     ) {
-      const nodes = isArray(cveElement?.configuration_nodes.node)
+      const addProductsFromNode = (node: ConfigurationNodeElement) => {
+        const matchStrings = isArray(node.match_string)
+          ? node.match_string
+          : [node.match_string];
+        matchStrings.forEach(matchString => {
+          if (
+            matchString?.vulnerable === 1 &&
+            isDefined(matchString.matched_cpes?.cpe)
+          ) {
+            const cpes = isArray(matchString.matched_cpes.cpe)
+              ? matchString.matched_cpes.cpe
+              : [matchString.matched_cpes.cpe];
+            cpes.forEach(cpe => {
+              if (isDefined(cpe?._id)) {
+                products.push(cpe._id);
+              }
+            });
+          }
+        });
+        const childNodes = isArray(node.node) ? node.node : [node.node];
+        childNodes.forEach(childNode => {
+          if (isDefined(childNode)) {
+            addProductsFromNode(childNode);
+          }
+        });
+      };
+      const nodes = isArray(cveElement.configuration_nodes.node)
         ? cveElement.configuration_nodes.node
         : [cveElement.configuration_nodes.node];
       nodes.forEach(node => {
-        if (
-          node.match_string?.vulnerable === 1 &&
-          isDefined(node.match_string?.matched_cpes?.cpe)
-        ) {
-          const cpes = isArray(node.match_string.matched_cpes.cpe)
-            ? node.match_string.matched_cpes.cpe
-            : [node.match_string.matched_cpes.cpe];
-          cpes.forEach(cpe => {
-            if (isDefined(cpe._id)) {
-              products.push(cpe._id);
-            }
-          });
+        if (isDefined(node)) {
+          addProductsFromNode(node);
         }
       });
     } else {

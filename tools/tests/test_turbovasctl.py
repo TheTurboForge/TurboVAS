@@ -2267,7 +2267,7 @@ class TurboVASCtlTests(unittest.TestCase):
             "cert-bund-advisory-list-read",
             "cpe-catalog-detail-read",
             "cpe-catalog-list-read",
-            "cve-catalog-detail-epss-reference-read",
+            "cve-catalog-detail-epss-reference-configuration-read",
             "cve-catalog-list-read",
             "dfn-cert-advisory-catalog-detail-read",
             "dfn-cert-advisory-list-read",
@@ -2748,7 +2748,7 @@ class TurboVASCtlTests(unittest.TestCase):
 
         expected_catalog_metadata = {
             "/api/v1/cves": ("getCves", "cve-catalog-list-read", "scap-rich-context"),
-            "/api/v1/cves/{cve_id}": ("getCvesByCveId", "cve-catalog-detail-epss-reference-read", "scap-rich-context"),
+            "/api/v1/cves/{cve_id}": ("getCvesByCveId", "cve-catalog-detail-epss-reference-configuration-read", "scap-rich-context"),
             "/api/v1/cpes": ("getCpes", "cpe-catalog-list-read", "scap-rich-context"),
             "/api/v1/cpes/{cpe_id}": ("getCpesByCpeId", "cpe-catalog-detail-read", "scap-rich-context"),
             "/api/v1/cert-bund-advisories": ("getCertBundAdvisories", "cert-bund-advisory-list-read", "cert-advisory-rich-detail-export"),
@@ -3814,7 +3814,7 @@ class TurboVASCtlTests(unittest.TestCase):
 
         expected_catalog_metadata = [
             (cves, "getCves", "cve-catalog-list-read", "scap-rich-context"),
-            (cve_detail, "getCvesByCveId", "cve-catalog-detail-epss-reference-read", "scap-rich-context"),
+            (cve_detail, "getCvesByCveId", "cve-catalog-detail-epss-reference-configuration-read", "scap-rich-context"),
             (cpes, "getCpes", "cpe-catalog-list-read", "scap-rich-context"),
             (cpe_detail, "getCpesByCpeId", "cpe-catalog-detail-read", "scap-rich-context"),
             (cert_bund_advisories, "getCertBundAdvisories", "cert-bund-advisory-list-read", "cert-advisory-rich-detail-export"),

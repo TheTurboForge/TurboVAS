@@ -48,6 +48,35 @@ interface NativeCatalogCveReferencePayload {
   tags?: string[];
 }
 
+interface NativeCatalogCveMatchedCpePayload {
+  _id: string;
+  deprecated?: number;
+}
+
+interface NativeCatalogCveMatchStringPayload {
+  criteria?: string;
+  vulnerable?: number;
+  status?: string;
+  version_start_including?: string;
+  version_start_excluding?: string;
+  version_end_including?: string;
+  version_end_excluding?: string;
+  matched_cpes?: {
+    cpe?: NativeCatalogCveMatchedCpePayload[];
+  };
+}
+
+interface NativeCatalogCveConfigurationNodePayload {
+  operator?: string;
+  negate?: number;
+  match_string?: NativeCatalogCveMatchStringPayload[];
+  node?: NativeCatalogCveConfigurationNodePayload[];
+}
+
+interface NativeCatalogCveConfigurationNodesPayload {
+  node?: NativeCatalogCveConfigurationNodePayload[];
+}
+
 interface NativeUserTagPayload {
   id: string;
   name: string;
@@ -66,6 +95,7 @@ interface NativeCatalogCvePayload {
   cert_refs?: NativeCatalogCveCertRefPayload[];
   nvt_refs?: NativeCatalogCveNvtRefPayload[];
   references?: NativeCatalogCveReferencePayload[];
+  configuration_nodes?: NativeCatalogCveConfigurationNodesPayload;
   user_tags?: NativeUserTagPayload[];
   epss?: NativeCatalogEpssPayload;
   published_at?: string;
@@ -216,6 +246,7 @@ const nativeCveToModel = (
           },
         })),
       },
+      configuration_nodes: item.configuration_nodes,
       epss: item.epss
         ? {
             score: numberValue(item.epss.score),
