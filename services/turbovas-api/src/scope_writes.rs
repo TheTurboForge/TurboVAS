@@ -94,6 +94,25 @@ pub(crate) fn ensure_scope_is_mutable(is_global: bool, predefined: bool) -> Resu
     }
 }
 
+pub(crate) fn ensure_scope_write_references_visible(
+    field_name: &str,
+    requested_ids: &[String],
+    visible_ids: &[String],
+) -> Result<(), ApiError> {
+    let visible = visible_ids
+        .iter()
+        .map(String::as_str)
+        .collect::<HashSet<_>>();
+    if requested_ids.iter().all(|id| visible.contains(id.as_str())) {
+        return Ok(());
+    }
+    tracing::warn!(
+        field = field_name,
+        "scope write references are not visible to operator"
+    );
+    Err(ApiError::Forbidden)
+}
+
 pub(crate) fn scope_write_operator_owner_sql() -> &'static str {
     "SELECT id::bigint, uuid::text, coalesce(name, '')::text
        FROM users
@@ -330,6 +349,30 @@ mod tests {
                 Err(ApiError::Conflict(_))
             ));
         }
+    }
+
+    #[test]
+    fn scope_reference_visibility_rejects_missing_or_unauthorized_membership() {
+        let requested = vec![
+            "12345678-1234-1234-1234-123456789abc".to_string(),
+            "22345678-1234-1234-1234-123456789abc".to_string(),
+        ];
+        let visible = vec![
+            "12345678-1234-1234-1234-123456789abc".to_string(),
+            "22345678-1234-1234-1234-123456789abc".to_string(),
+        ];
+        assert!(ensure_scope_write_references_visible("target_ids", &requested, &visible).is_ok());
+
+        let partial_visible = vec!["12345678-1234-1234-1234-123456789abc".to_string()];
+        assert!(matches!(
+            ensure_scope_write_references_visible("target_ids", &requested, &partial_visible),
+            Err(ApiError::Forbidden)
+        ));
+
+        let empty: Vec<String> = vec![];
+        assert!(
+            ensure_scope_write_references_visible("host_ids", &empty, &partial_visible).is_ok()
+        );
     }
 
     #[test]
