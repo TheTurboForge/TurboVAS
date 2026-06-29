@@ -14,6 +14,7 @@ use serde::Serialize;
 use tokio_postgres::Row;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
+mod alerts;
 mod app_state;
 mod auth;
 mod cert_advisories;
@@ -26,6 +27,7 @@ mod formatters;
 mod host_assets;
 mod metrics_payloads;
 mod operating_systems;
+mod overrides;
 mod path_ids;
 mod port_lists;
 mod query;
@@ -43,6 +45,7 @@ mod tags;
 mod tls_certificates;
 mod user_tags;
 
+use alerts::{AlertAssetItem, AlertReference, alert_asset_from_row};
 use app_state::{AppState, create_pool, healthz};
 use cert_advisories::*;
 use collections::*;
@@ -54,6 +57,7 @@ use formatters::*;
 use host_assets::*;
 use metrics_payloads::*;
 use operating_systems::*;
+use overrides::{OverrideAssetItem, override_asset_from_row};
 use path_ids::*;
 use port_lists::*;
 use query::*;
@@ -615,95 +619,6 @@ struct TrashcanSummaryItem {
 struct TrashcanSummary {
     items: Vec<TrashcanSummaryItem>,
     total: i64,
-}
-
-#[derive(Serialize)]
-struct AlertOwner {
-    name: String,
-}
-
-#[derive(Serialize)]
-struct AlertReference {
-    id: String,
-    name: String,
-}
-
-#[derive(Serialize)]
-struct AlertTypeLabel {
-    #[serde(rename = "type")]
-    type_name: String,
-}
-
-#[derive(Serialize)]
-struct AlertAssetItem {
-    id: String,
-    name: String,
-    comment: String,
-    owner: AlertOwner,
-    active: bool,
-    in_use: bool,
-    task_count: i64,
-    event: AlertTypeLabel,
-    condition: AlertTypeLabel,
-    method: AlertTypeLabel,
-    method_data_redacted: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    filter: Option<AlertReference>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    tasks: Vec<AlertReference>,
-    created_at: Option<String>,
-    modified_at: Option<String>,
-}
-
-#[derive(Serialize)]
-struct OverrideOwner {
-    name: String,
-}
-
-#[derive(Serialize)]
-struct OverrideNvtReference {
-    id: String,
-    name: String,
-    #[serde(rename = "type")]
-    nvt_type: String,
-}
-
-#[derive(Serialize)]
-struct OverrideTaskReference {
-    id: String,
-    name: String,
-    trash: bool,
-}
-
-#[derive(Serialize)]
-struct OverrideReference {
-    id: String,
-    name: String,
-}
-
-#[derive(Serialize)]
-struct OverrideAssetItem {
-    id: String,
-    owner: OverrideOwner,
-    nvt: OverrideNvtReference,
-    text: String,
-    text_excerpt: bool,
-    hosts: String,
-    port: String,
-    severity: Option<f64>,
-    new_severity: Option<f64>,
-    writable: bool,
-    in_use: bool,
-    orphan: bool,
-    active: bool,
-    end_time: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    task: Option<OverrideTaskReference>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    result: Option<OverrideReference>,
-    permissions: Vec<String>,
-    created_at: Option<String>,
-    modified_at: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -8150,97 +8065,6 @@ pub(crate) fn nvt_max_severity_from_row(row: &Row) -> Option<NvtEpssItem> {
         cve: row.get::<_, Option<String>>("epss_cve").unwrap_or_default(),
         severity: row.get::<_, Option<f64>>("epss_severity").unwrap_or(0.0),
     })
-}
-
-fn alert_asset_from_row(row: &Row) -> AlertAssetItem {
-    let filter_id: Option<String> = row.get("filter_id");
-    let filter = filter_id.map(|id| AlertReference {
-        name: row
-            .get::<_, Option<String>>("filter_name")
-            .filter(|name| !name.is_empty())
-            .unwrap_or_else(|| id.clone()),
-        id,
-    });
-    let task_count: i64 = row.get("task_count");
-
-    AlertAssetItem {
-        id: row.get("id"),
-        name: row.get("name"),
-        comment: row.get("comment"),
-        owner: AlertOwner {
-            name: row.get("owner_name"),
-        },
-        active: row.get::<_, i32>("active_int") != 0,
-        in_use: task_count > 0,
-        task_count,
-        event: AlertTypeLabel {
-            type_name: row.get("event_type"),
-        },
-        condition: AlertTypeLabel {
-            type_name: row.get("condition_type"),
-        },
-        method: AlertTypeLabel {
-            type_name: row.get("method_type"),
-        },
-        method_data_redacted: true,
-        filter,
-        tasks: Vec::new(),
-        created_at: unix_ts_to_rfc3339(row.get("created_at_unix")),
-        modified_at: unix_ts_to_rfc3339(row.get("modified_at_unix")),
-    }
-}
-
-fn override_asset_from_row(row: &Row) -> OverrideAssetItem {
-    let task_id: Option<String> = row.get("task_id");
-    let task = task_id.map(|id| OverrideTaskReference {
-        name: row
-            .get::<_, Option<String>>("task_name")
-            .filter(|name| !name.is_empty())
-            .unwrap_or_else(|| id.clone()),
-        trash: false,
-        id,
-    });
-    let result_id: Option<String> = row.get("result_id");
-    let result = result_id.map(|id| OverrideReference {
-        name: row
-            .get::<_, Option<String>>("result_name")
-            .filter(|name| !name.is_empty())
-            .unwrap_or_else(|| id.clone()),
-        id,
-    });
-
-    OverrideAssetItem {
-        id: row.get("id"),
-        owner: OverrideOwner {
-            name: row.get("owner_name"),
-        },
-        nvt: OverrideNvtReference {
-            id: row.get("nvt_id"),
-            name: row.get("nvt_name"),
-            nvt_type: row.get("nvt_type"),
-        },
-        text: row.get("text"),
-        text_excerpt: false,
-        hosts: row.get("hosts"),
-        port: row.get("port"),
-        severity: row.get("severity"),
-        new_severity: row.get("new_severity"),
-        writable: true,
-        in_use: false,
-        orphan: row.get::<_, i32>("orphan_int") != 0,
-        active: row.get::<_, i32>("active_int") != 0,
-        end_time: unix_ts_to_rfc3339(row.get("end_time_unix")),
-        task,
-        result,
-        permissions: vec![
-            "get_overrides".to_string(),
-            "modify_override".to_string(),
-            "delete_override".to_string(),
-            "create_override".to_string(),
-        ],
-        created_at: unix_ts_to_rfc3339(row.get("created_at_unix")),
-        modified_at: unix_ts_to_rfc3339(row.get("modified_at_unix")),
-    }
 }
 
 fn tls_certificate_from_row(row: &Row) -> TlsCertificateItem {
