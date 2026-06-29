@@ -654,204 +654,6 @@ async fn cve_nvt_refs(
         .collect())
 }
 
-async fn dfn_cert_advisories(
-    State(state): State<AppState>,
-    ApiQuery(query): ApiQuery<CollectionQuery>,
-) -> Result<Json<Collection<DfnCertAdvisoryItem>>, ApiError> {
-    let params = normalize_collection_query(query, CERT_ADVISORY_DEFAULT_SORT)?;
-    let sort_sql = sort_clause(&params.sort, CERT_ADVISORY_SORT_FIELDS)?;
-    let sql = format!(
-        r#"WITH advisory_rows AS (
-             SELECT d.uuid AS id,
-                    d.name AS name,
-                    coalesce(d.comment, '') AS comment,
-                    coalesce(d.title, '') AS title,
-                    coalesce(d.summary, '') AS summary,
-                    coalesce(d.severity, 0)::double precision AS severity,
-                    coalesce(d.cve_refs, 0)::bigint AS cve_refs,
-                    coalesce(d.creation_time, 0)::bigint AS created_at_unix,
-                    coalesce(d.modification_time, 0)::bigint AS modified_at_unix,
-                    coalesce(array_agg(dc.cve_name ORDER BY dc.cve_name)
-                      FILTER (WHERE dc.cve_name IS NOT NULL), ARRAY[]::text[]) AS cves
-               FROM cert.dfn_cert_advs d
-               LEFT JOIN cert.dfn_cert_cves dc ON dc.adv_id = d.id
-              GROUP BY d.uuid, d.name, d.comment, d.title, d.summary,
-                       d.severity, d.cve_refs, d.creation_time,
-                       d.modification_time
-         ),
-         filtered AS (
-             SELECT * FROM advisory_rows
-              WHERE ($1 = ''
-                     OR lower(id) LIKE '%' || lower($1) || '%'
-                     OR lower(name) LIKE '%' || lower($1) || '%'
-                     OR lower(title) LIKE '%' || lower($1) || '%'
-                     OR lower(summary) LIKE '%' || lower($1) || '%'
-                     OR EXISTS (
-                         SELECT 1 FROM unnest(cves) AS cve_name
-                          WHERE lower(cve_name) LIKE '%' || lower($1) || '%'))
-         )
-         SELECT count(*) OVER()::bigint AS total, * FROM filtered
-          ORDER BY {sort_sql}, name ASC, id ASC LIMIT $2 OFFSET $3;"#,
-    );
-    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
-    let rows = client
-        .query(&sql, &[&params.filter, &params.page_size, &params.offset])
-        .await
-        .map_err(|error| {
-            tracing::warn!(%error, "DFN-CERT advisory list query failed");
-            ApiError::Database
-        })?;
-    let total = rows
-        .first()
-        .map(|row| row.get::<_, i64>("total"))
-        .unwrap_or(0);
-    let items = rows.iter().map(dfn_cert_advisory_from_row).collect();
-    Ok(Json(Collection {
-        page: params.page_info(total),
-        items,
-    }))
-}
-
-async fn dfn_cert_advisory_detail(
-    State(state): State<AppState>,
-    Path(advisory_id): Path<String>,
-) -> Result<Json<DfnCertAdvisoryDetail>, ApiError> {
-    validate_advisory_id(&advisory_id)?;
-    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
-    let row = client
-        .query_opt(
-            r#"SELECT d.uuid AS id,
-                      d.name AS name,
-                      coalesce(d.comment, '') AS comment,
-                      coalesce(d.title, '') AS title,
-                      coalesce(d.summary, '') AS summary,
-                      coalesce(d.severity, 0)::double precision AS severity,
-                      coalesce(d.cve_refs, 0)::bigint AS cve_refs,
-                      coalesce(d.creation_time, 0)::bigint AS created_at_unix,
-                      coalesce(d.modification_time, 0)::bigint AS modified_at_unix,
-                      coalesce(array_agg(dc.cve_name ORDER BY dc.cve_name)
-                        FILTER (WHERE dc.cve_name IS NOT NULL), ARRAY[]::text[]) AS cves
-                 FROM cert.dfn_cert_advs d
-                 LEFT JOIN cert.dfn_cert_cves dc ON dc.adv_id = d.id
-                WHERE d.uuid = $1 OR d.name = $1
-                GROUP BY d.uuid, d.name, d.comment, d.title, d.summary,
-                         d.severity, d.cve_refs, d.creation_time,
-                         d.modification_time;"#,
-            &[&advisory_id],
-        )
-        .await
-        .map_err(|error| {
-            tracing::warn!(%error, "DFN-CERT advisory detail query failed");
-            ApiError::Database
-        })?
-        .ok_or(ApiError::NotFound)?;
-    let id: String = row.get("id");
-    let user_tags = catalog_user_tags(&client, "dfn_cert_adv", &id).await?;
-    Ok(Json(DfnCertAdvisoryDetail {
-        item: dfn_cert_advisory_from_row(&row),
-        user_tags,
-    }))
-}
-
-async fn cert_bund_advisories(
-    State(state): State<AppState>,
-    ApiQuery(query): ApiQuery<CollectionQuery>,
-) -> Result<Json<Collection<CertBundAdvisoryItem>>, ApiError> {
-    let params = normalize_collection_query(query, CERT_ADVISORY_DEFAULT_SORT)?;
-    let sort_sql = sort_clause(&params.sort, CERT_ADVISORY_SORT_FIELDS)?;
-    let sql = format!(
-        r#"WITH advisory_rows AS (
-             SELECT d.uuid AS id,
-                    d.name AS name,
-                    coalesce(d.comment, '') AS comment,
-                    coalesce(d.title, '') AS title,
-                    coalesce(d.summary, '') AS summary,
-                    coalesce(d.severity, 0)::double precision AS severity,
-                    coalesce(d.cve_refs, 0)::bigint AS cve_refs,
-                    coalesce(d.creation_time, 0)::bigint AS created_at_unix,
-                    coalesce(d.modification_time, 0)::bigint AS modified_at_unix,
-                    coalesce(array_agg(dc.cve_name::text ORDER BY dc.cve_name)
-                      FILTER (WHERE dc.cve_name IS NOT NULL), ARRAY[]::text[]) AS cves
-               FROM cert.cert_bund_advs d
-               LEFT JOIN cert.cert_bund_cves dc ON dc.adv_id = d.id
-              GROUP BY d.uuid, d.name, d.comment, d.title, d.summary,
-                       d.severity, d.cve_refs, d.creation_time,
-                       d.modification_time
-         ),
-         filtered AS (
-             SELECT * FROM advisory_rows
-              WHERE ($1 = ''
-                     OR lower(id) LIKE '%' || lower($1) || '%'
-                     OR lower(name) LIKE '%' || lower($1) || '%'
-                     OR lower(title) LIKE '%' || lower($1) || '%'
-                     OR lower(summary) LIKE '%' || lower($1) || '%'
-                     OR EXISTS (
-                         SELECT 1 FROM unnest(cves) AS cve_name
-                          WHERE lower(cve_name) LIKE '%' || lower($1) || '%'))
-         )
-         SELECT count(*) OVER()::bigint AS total, * FROM filtered
-          ORDER BY {sort_sql}, name ASC, id ASC LIMIT $2 OFFSET $3;"#,
-    );
-    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
-    let rows = client
-        .query(&sql, &[&params.filter, &params.page_size, &params.offset])
-        .await
-        .map_err(|error| {
-            tracing::warn!(%error, "CERT-Bund advisory list query failed");
-            ApiError::Database
-        })?;
-    let total = rows
-        .first()
-        .map(|row| row.get::<_, i64>("total"))
-        .unwrap_or(0);
-    let items = rows.iter().map(cert_bund_advisory_from_row).collect();
-    Ok(Json(Collection {
-        page: params.page_info(total),
-        items,
-    }))
-}
-
-async fn cert_bund_advisory_detail(
-    State(state): State<AppState>,
-    Path(advisory_id): Path<String>,
-) -> Result<Json<CertBundAdvisoryDetail>, ApiError> {
-    validate_advisory_id(&advisory_id)?;
-    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
-    let row = client
-        .query_opt(
-            r#"SELECT d.uuid AS id,
-                      d.name AS name,
-                      coalesce(d.comment, '') AS comment,
-                      coalesce(d.title, '') AS title,
-                      coalesce(d.summary, '') AS summary,
-                      coalesce(d.severity, 0)::double precision AS severity,
-                      coalesce(d.cve_refs, 0)::bigint AS cve_refs,
-                      coalesce(d.creation_time, 0)::bigint AS created_at_unix,
-                      coalesce(d.modification_time, 0)::bigint AS modified_at_unix,
-                      coalesce(array_agg(dc.cve_name::text ORDER BY dc.cve_name)
-                        FILTER (WHERE dc.cve_name IS NOT NULL), ARRAY[]::text[]) AS cves
-                 FROM cert.cert_bund_advs d
-                 LEFT JOIN cert.cert_bund_cves dc ON dc.adv_id = d.id
-                WHERE d.uuid = $1 OR d.name = $1
-                GROUP BY d.uuid, d.name, d.comment, d.title, d.summary,
-                         d.severity, d.cve_refs, d.creation_time,
-                         d.modification_time;"#,
-            &[&advisory_id],
-        )
-        .await
-        .map_err(|error| {
-            tracing::warn!(%error, "CERT-Bund advisory detail query failed");
-            ApiError::Database
-        })?
-        .ok_or(ApiError::NotFound)?;
-    let id: String = row.get("id");
-    let user_tags = catalog_user_tags(&client, "cert_bund_adv", &id).await?;
-    Ok(Json(CertBundAdvisoryDetail {
-        item: cert_bund_advisory_from_row(&row),
-        user_tags,
-    }))
-}
-
 async fn report_ports(
     State(state): State<AppState>,
     Path(report_id): Path<String>,
@@ -4708,8 +4510,8 @@ mod tests {
             .split_once("async fn cve_catalog_detail")
             .expect("CVE catalog detail handler must exist")
             .1
-            .split_once("async fn dfn_cert_advisories")
-            .expect("CVE catalog detail handler must precede advisory handlers")
+            .split_once("async fn report_ports")
+            .expect("CVE catalog detail/reference handlers must precede report handlers")
             .0;
         let list_source = source
             .split_once("async fn cve_catalog(")
@@ -4853,7 +4655,7 @@ mod tests {
 
     #[test]
     fn cert_advisory_detail_user_tags_use_resolved_uuid_only() {
-        let source = include_str!("main.rs");
+        let source = include_str!("cert_advisories.rs");
         let payload_source = include_str!("cert_advisories.rs");
         let cert_bund_item_payload = payload_source
             .split_once("struct CertBundAdvisoryItem {")
@@ -4870,31 +4672,31 @@ mod tests {
             .expect("DFN-CERT advisory payload must precede detail payload")
             .0;
         let cert_bund_detail_source = source
-            .split_once("async fn cert_bund_advisory_detail")
+            .split_once("pub(crate) async fn cert_bund_advisory_detail")
             .expect("CERT-Bund detail handler must exist")
             .1
-            .split_once("async fn nvt_catalog")
-            .expect("CERT-Bund detail handler must precede NVT catalog")
+            .split_once("#[derive(Debug, Serialize)]")
+            .expect("CERT-Bund detail handler must precede payload structs")
             .0;
         let dfn_cert_detail_source = source
-            .split_once("async fn dfn_cert_advisory_detail")
+            .split_once("pub(crate) async fn dfn_cert_advisory_detail")
             .expect("DFN-CERT detail handler must exist")
             .1
-            .split_once("async fn cert_bund_advisories")
+            .split_once("pub(crate) async fn cert_bund_advisories")
             .expect("DFN-CERT detail handler must precede CERT-Bund list")
             .0;
         let cert_bund_list_source = source
-            .split_once("async fn cert_bund_advisories(")
+            .split_once("pub(crate) async fn cert_bund_advisories(")
             .expect("CERT-Bund list handler must exist")
             .1
-            .split_once("async fn cert_bund_advisory_detail")
+            .split_once("pub(crate) async fn cert_bund_advisory_detail")
             .expect("CERT-Bund list handler must precede detail handler")
             .0;
         let dfn_cert_list_source = source
-            .split_once("async fn dfn_cert_advisories(")
+            .split_once("pub(crate) async fn dfn_cert_advisories(")
             .expect("DFN-CERT list handler must exist")
             .1
-            .split_once("async fn dfn_cert_advisory_detail")
+            .split_once("pub(crate) async fn dfn_cert_advisory_detail")
             .expect("DFN-CERT list handler must precede detail handler")
             .0;
 
@@ -4964,6 +4766,7 @@ mod tests {
             include_str!("main.rs"),
             include_str!("alerts.rs"),
             include_str!("catalog_payloads.rs"),
+            include_str!("cert_advisories.rs"),
             include_str!("filters.rs"),
             include_str!("host_assets.rs"),
             include_str!("operating_systems.rs"),
