@@ -11,11 +11,14 @@ use tokio_postgres::Row;
 
 use crate::{
     app_state::AppState,
-    collections::{NVT_CATALOG_DEFAULT_SORT, NVT_CATALOG_SORT_FIELDS},
+    collections::{
+        CPE_CATALOG_DEFAULT_SORT, CPE_CATALOG_SORT_FIELDS, CVE_CATALOG_DEFAULT_SORT,
+        CVE_CATALOG_SORT_FIELDS, NVT_CATALOG_DEFAULT_SORT, NVT_CATALOG_SORT_FIELDS,
+    },
     errors::ApiError,
     formatters::unix_ts_to_rfc3339,
     nvt_payloads::{NvtEpssItem, nvt_epss_from_row, nvt_max_severity_from_row},
-    path_ids::validate_nvt_oid,
+    path_ids::{validate_cpe_id, validate_cve_id, validate_nvt_oid},
     query::{ApiQuery, Collection, CollectionQuery, normalize_collection_query, sort_clause},
     user_tags::{ReportUserTag, catalog_user_tags},
 };
@@ -96,6 +99,289 @@ pub(crate) struct CatalogCpeDetail {
     pub(crate) item: CatalogCpeItem,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) user_tags: Vec<ReportUserTag>,
+}
+
+pub(crate) async fn cpe_catalog(
+    State(state): State<AppState>,
+    ApiQuery(query): ApiQuery<CollectionQuery>,
+) -> Result<Json<Collection<CatalogCpeItem>>, ApiError> {
+    let params = normalize_collection_query(query, CPE_CATALOG_DEFAULT_SORT)?;
+    let sort_sql = sort_clause(&params.sort, CPE_CATALOG_SORT_FIELDS)?;
+    let sql = format!(
+        r#"WITH cpe_rows AS (
+             SELECT c.uuid AS id,
+                    c.name AS name,
+                    coalesce(c.comment, '') AS comment,
+                    coalesce(c.title, '') AS title,
+                    coalesce(c.cpe_name_id, '') AS cpe_name_id,
+                    coalesce(c.deprecated, 0)::integer AS deprecated_int,
+                    coalesce(c.severity, 0)::double precision AS severity,
+                    coalesce(c.cve_refs, 0)::bigint AS cve_refs,
+                    coalesce(c.creation_time, 0)::bigint AS created_at_unix,
+                    coalesce(c.modification_time, 0)::bigint AS modified_at_unix
+               FROM scap.cpes c
+         ),
+         filtered AS (
+             SELECT * FROM cpe_rows
+              WHERE ($1 = ''
+                     OR lower(id) LIKE '%' || lower($1) || '%'
+                     OR lower(name) LIKE '%' || lower($1) || '%'
+                     OR lower(title) LIKE '%' || lower($1) || '%'
+                     OR lower(cpe_name_id) LIKE '%' || lower($1) || '%'
+                     OR lower(comment) LIKE '%' || lower($1) || '%')
+         )
+         SELECT count(*) OVER()::bigint AS total, * FROM filtered
+          ORDER BY {sort_sql}, name ASC, id ASC LIMIT $2 OFFSET $3;"#,
+    );
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let rows = client
+        .query(&sql, &[&params.filter, &params.page_size, &params.offset])
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "CPE catalog list query failed");
+            ApiError::Database
+        })?;
+    let total = rows
+        .first()
+        .map(|row| row.get::<_, i64>("total"))
+        .unwrap_or(0);
+    let items = rows
+        .iter()
+        .map(|row| catalog_cpe_from_row(row, Vec::new(), None))
+        .collect();
+    Ok(Json(Collection {
+        page: params.page_info(total),
+        items,
+    }))
+}
+
+pub(crate) async fn cpe_catalog_detail(
+    State(state): State<AppState>,
+    Path(cpe_id): Path<String>,
+) -> Result<Json<CatalogCpeDetail>, ApiError> {
+    let cpe_id = cpe_id.strip_prefix('/').unwrap_or(&cpe_id).to_string();
+    validate_cpe_id(&cpe_id)?;
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let row = client
+        .query_opt(
+            r#"SELECT c.uuid AS id,
+                      c.name AS name,
+                      coalesce(c.comment, '') AS comment,
+                      coalesce(c.title, '') AS title,
+                      coalesce(c.cpe_name_id, '') AS cpe_name_id,
+                      coalesce(c.deprecated, 0)::integer AS deprecated_int,
+                      coalesce(c.severity, 0)::double precision AS severity,
+                      coalesce(c.cve_refs, 0)::bigint AS cve_refs,
+                      coalesce(c.creation_time, 0)::bigint AS created_at_unix,
+                      coalesce(c.modification_time, 0)::bigint AS modified_at_unix
+                 FROM scap.cpes c
+                WHERE c.uuid = $1 OR c.name = $1
+                LIMIT 1;"#,
+            &[&cpe_id],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "CPE catalog detail query failed");
+            ApiError::Database
+        })?
+        .ok_or(ApiError::NotFound)?;
+    let cves = client
+        .query(
+            r#"SELECT cv.name AS id,
+                      coalesce(cv.severity, 0)::double precision AS severity
+                 FROM scap.cves cv
+                 JOIN scap.affected_products ap ON ap.cve = cv.id
+                 JOIN scap.cpes c ON c.id = ap.cpe
+                WHERE c.uuid = $1 OR c.name = $1
+                ORDER BY severity DESC, cv.name ASC;"#,
+            &[&cpe_id],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "CPE catalog CVE reference query failed");
+            ApiError::Database
+        })?
+        .iter()
+        .map(catalog_cpe_cve_from_row)
+        .collect();
+    let deprecated_by = client
+        .query_opt(
+            r#"SELECT deprecated_by
+                 FROM scap.cpes_deprecated_by
+                WHERE cpe = $1
+                ORDER BY deprecated_by
+                LIMIT 1;"#,
+            &[&cpe_id],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "CPE catalog deprecated-by query failed");
+            ApiError::Database
+        })?
+        .map(|row| row.get("deprecated_by"));
+
+    let user_tags = catalog_user_tags(&client, "cpe", &cpe_id).await?;
+    Ok(Json(CatalogCpeDetail {
+        item: catalog_cpe_from_row(&row, cves, deprecated_by),
+        user_tags,
+    }))
+}
+
+pub(crate) async fn cve_catalog(
+    State(state): State<AppState>,
+    ApiQuery(query): ApiQuery<CollectionQuery>,
+) -> Result<Json<Collection<CatalogCveItem>>, ApiError> {
+    let params = normalize_collection_query(query, CVE_CATALOG_DEFAULT_SORT)?;
+    let sort_sql = sort_clause(&params.sort, CVE_CATALOG_SORT_FIELDS)?;
+    let sql = format!(
+        r#"WITH cve_rows AS (
+             SELECT c.name AS id,
+                    c.name AS name,
+                    coalesce(c.comment, '') AS comment,
+                    coalesce(c.description, '') AS description,
+                    coalesce(c.cvss_vector, '') AS cvss_base_vector,
+                    coalesce(c.severity, 0)::double precision AS severity,
+                    coalesce(c.products, '') AS products,
+                    e.epss::double precision AS epss_score,
+                    e.percentile::double precision AS epss_percentile,
+                    coalesce(c.creation_time, 0)::bigint AS published_at_unix,
+                    coalesce(c.modification_time, 0)::bigint AS modified_at_unix
+               FROM scap.cves c
+               LEFT JOIN scap.epss_scores e ON e.cve = c.name
+         ),
+         filtered AS (
+             SELECT * FROM cve_rows
+              WHERE ($1 = ''
+                     OR lower(id) LIKE '%' || lower($1) || '%'
+                     OR lower(description) LIKE '%' || lower($1) || '%'
+                     OR lower(cvss_base_vector) LIKE '%' || lower($1) || '%'
+                     OR lower(products) LIKE '%' || lower($1) || '%')
+         )
+         SELECT count(*) OVER()::bigint AS total, * FROM filtered
+          ORDER BY {sort_sql}, id ASC LIMIT $2 OFFSET $3;"#,
+    );
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let rows = client
+        .query(&sql, &[&params.filter, &params.page_size, &params.offset])
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "CVE catalog list query failed");
+            ApiError::Database
+        })?;
+    let total = rows
+        .first()
+        .map(|row| row.get::<_, i64>("total"))
+        .unwrap_or(0);
+    let items = rows.iter().map(catalog_cve_from_row).collect();
+    Ok(Json(Collection {
+        page: params.page_info(total),
+        items,
+    }))
+}
+
+pub(crate) async fn cve_catalog_detail(
+    State(state): State<AppState>,
+    Path(cve_id): Path<String>,
+) -> Result<Json<CatalogCveDetail>, ApiError> {
+    validate_cve_id(&cve_id)?;
+    let sql = r#"SELECT c.name AS id,
+                        c.name AS name,
+                        coalesce(c.comment, '') AS comment,
+                        coalesce(c.description, '') AS description,
+                        coalesce(c.cvss_vector, '') AS cvss_base_vector,
+                        coalesce(c.severity, 0)::double precision AS severity,
+                        coalesce(c.products, '') AS products,
+                        e.epss::double precision AS epss_score,
+                        e.percentile::double precision AS epss_percentile,
+                        coalesce(c.creation_time, 0)::bigint AS published_at_unix,
+                        coalesce(c.modification_time, 0)::bigint AS modified_at_unix
+                   FROM scap.cves c
+                   LEFT JOIN scap.epss_scores e ON e.cve = c.name
+                  WHERE lower(c.name) = lower($1)
+                  LIMIT 1;"#;
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let row = client
+        .query_opt(sql, &[&cve_id])
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "CVE catalog detail query failed");
+            ApiError::Database
+        })?
+        .ok_or(ApiError::NotFound)?;
+    let mut item = catalog_cve_from_row(&row);
+    item.cert_refs = cve_cert_refs(&client, &cve_id).await?;
+    item.nvt_refs = cve_nvt_refs(&client, &cve_id).await?;
+    let user_tags = catalog_user_tags(&client, "cve", &cve_id).await?;
+    Ok(Json(CatalogCveDetail { item, user_tags }))
+}
+
+async fn cve_cert_refs(
+    client: &tokio_postgres::Client,
+    cve_id: &str,
+) -> Result<Vec<CatalogCveCertReference>, ApiError> {
+    let rows = client
+        .query(
+            r#"SELECT *
+                 FROM (
+                       SELECT 'CERT-Bund'::text AS cert_type,
+                              d.name AS name,
+                              coalesce(d.title, '') AS title
+                         FROM cert.cert_bund_cves dc
+                         JOIN cert.cert_bund_advs d ON d.id = dc.adv_id
+                        WHERE lower(dc.cve_name) = lower($1)
+                        UNION ALL
+                       SELECT 'DFN-CERT'::text AS cert_type,
+                              d.name AS name,
+                              coalesce(d.title, '') AS title
+                         FROM cert.dfn_cert_cves dc
+                         JOIN cert.dfn_cert_advs d ON d.id = dc.adv_id
+                        WHERE lower(dc.cve_name) = lower($1)
+                      ) refs
+                ORDER BY cert_type ASC, name ASC;"#,
+            &[&cve_id],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "CVE catalog CERT reference query failed");
+            ApiError::Database
+        })?;
+    Ok(rows
+        .iter()
+        .map(|row| CatalogCveCertReference {
+            cert_type: row.get("cert_type"),
+            name: row.get("name"),
+            title: row.get("title"),
+        })
+        .collect())
+}
+
+async fn cve_nvt_refs(
+    client: &tokio_postgres::Client,
+    cve_id: &str,
+) -> Result<Vec<CatalogCveNvtReference>, ApiError> {
+    let rows = client
+        .query(
+            r#"SELECT DISTINCT n.oid AS id,
+                              coalesce(nullif(n.name, ''), n.oid) AS name
+                 FROM vt_refs vr
+                 JOIN nvts n ON n.oid = vr.vt_oid
+                WHERE lower(vr.ref_id) = lower($1)
+                  AND lower(vr.type) IN ('cve', 'cve_id')
+                ORDER BY name ASC, id ASC;"#,
+            &[&cve_id],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "CVE catalog NVT reference query failed");
+            ApiError::Database
+        })?;
+    Ok(rows
+        .iter()
+        .map(|row| CatalogCveNvtReference {
+            id: row.get("id"),
+            name: row.get("name"),
+        })
+        .collect())
 }
 
 pub(crate) async fn nvt_catalog(
