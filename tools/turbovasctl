@@ -11010,6 +11010,12 @@ def command_runtime_native_api_direct_bootstrap(repo_root: Path) -> dict[str, An
     return result
 
 
+def native_api_direct_admin_operator_uuid(repo_root: Path) -> tuple[subprocess.CompletedProcess[str], str | None]:
+    returncode_only = run_gvmd_oneoff(repo_root, ["--get-users", "--verbose"], no_deps=False)
+    admin_uuid = parse_user_uuid(returncode_only.stdout, DEV_ADMIN_USER) if returncode_only.returncode == 0 else None
+    return returncode_only, admin_uuid
+
+
 def direct_smoke_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
     compact = dict(result)
     findings = result.get("findings", [])
@@ -11031,6 +11037,13 @@ def direct_smoke_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
             "native-api-direct.scope-write-disabled",
             "native-api-direct.tag-write-disabled",
             "native-api-direct.tag-delete-disabled",
+            "native-api-direct.write-control-operator",
+            "native-api-direct.write-control-up",
+            "native-api-direct.tag-write-create",
+            "native-api-direct.tag-write-update",
+            "native-api-direct.tag-write-delete",
+            "native-api-direct.tag-write-post-delete",
+            "native-api-direct.write-control-restore",
             "native-api-direct.positive-allowlist",
             "native-api-direct.internal-only-scope-report-detail",
             "native-api-direct.internal-only-retention-plan",
@@ -11047,10 +11060,162 @@ def direct_smoke_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
         "artifact_count": len(result.get("artifacts", [])) if isinstance(result.get("artifacts"), list) else 0,
         "important_checks": important_checks,
     }
+    metadata_block = result.get("metadata", {}) if isinstance(result.get("metadata"), dict) else {}
+    command_name = str(metadata_block.get("command") or "runtime-native-api-direct-smoke")
     compact["findings"] = non_pass or [
-        finding("pass", "runtime-native-api-direct-smoke.status-only", "Direct native API smoke passed; no non-pass findings.")
+        finding("pass", f"{command_name}.status-only", f"{command_name} passed; no non-pass findings.")
     ]
     return compact
+
+
+def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: bool = False) -> dict[str, Any]:
+    artifact_dir = native_api_artifact_dir(repo_root)
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    findings = ensure_runtime_dirs(repo_root)
+    findings.extend(ensure_build_runtime_dirs(repo_root))
+
+    base_env = native_api_direct_runtime_env(repo_root)
+    token_from_env = bool(base_env.get(TURBOVAS_API_BEARER_TOKEN_ENV))
+    token_source = "environment" if token_from_env else "runtime-secret-file"
+    token = native_api_direct_bearer_token(repo_root, base_env)
+    token_ok = direct_api_bearer_token_is_acceptable(token)
+    findings.append(
+        finding(
+            "pass" if token_ok else "fail",
+            "native-api-direct.bearer-token-strength",
+            "Direct native API bearer token satisfies the minimum local strength contract."
+            if token_ok
+            else "Direct native API bearer token is too short or contains unsafe characters.",
+            details={"minimum_token_length": TURBOVAS_API_BEARER_TOKEN_MIN_LENGTH, "token_source": token_source},
+        )
+    )
+
+    users, admin_uuid = native_api_direct_admin_operator_uuid(repo_root)
+    findings.append(
+        finding(
+            "pass" if admin_uuid else "fail",
+            "native-api-direct.write-control-operator",
+            "Direct write-control smoke found the development admin operator UUID."
+            if admin_uuid
+            else "Direct write-control smoke could not find the development admin operator UUID; run runtime-manager-init.",
+            details={"admin_uuid_found": bool(admin_uuid), "output_tail": output_tail(users.stdout, 80, [DEV_ADMIN_PASSWORD])},
+        )
+    )
+
+    env = dict(base_env)
+    env[TURBOVAS_API_DIRECT_WRITE_CONTROL_ENV] = "1"
+    if admin_uuid:
+        env[TURBOVAS_API_OPERATOR_UUID_ENV] = admin_uuid
+        env[TURBOVAS_API_OPERATOR_NAME_ENV] = DEV_ADMIN_USER
+    findings.append(native_api_direct_config_shape_finding(env, check="native-api-direct.write-control-config-shape"))
+    host = native_api_direct_host(env)
+    if host_is_wildcard(host):
+        host_status = "fail"
+        host_message = "Direct write-control smoke refuses wildcard host publication."
+    elif not host_is_loopback(host):
+        host_status = "fail"
+        host_message = "Direct write-control smoke refuses non-loopback publication until production TLS/bootstrap/host-binding hardening exists."
+    else:
+        host_status = "pass"
+        host_message = "Direct write-control smoke is loopback-bounded."
+    findings.append(
+        finding(
+            host_status,
+            "native-api-direct.write-control-host-binding",
+            host_message,
+            details={"host": host, "host_port": native_api_direct_port(env), "container_bind": env.get(TURBOVAS_API_DIRECT_BIND_ENV)},
+        )
+    )
+
+    started_write_control = False
+    tag_id: str | None = None
+    tag_name = f"turbovas-direct-write-smoke-{int(time.time())}-{os.getpid()}"
+    if aggregate_status(findings) != "fail":
+        config = run_command(compose_command(repo_root, "config", "--quiet", env=env), repo_root, env=env)
+        findings.append(finding("pass" if config.returncode == 0 else "fail", "compose.direct-write.config", f"Compose direct write-control config validation exit code {config.returncode}.", str(compose_file(repo_root).relative_to(repo_root)), {"output_tail": output_tail(config.stdout, 40)}))
+
+    if aggregate_status(findings) != "fail":
+        build = run_command(compose_command(repo_root, "build", "turbovas-api", env=env), repo_root, env=env, timeout=1200)
+        findings.append(process_step_finding("pass" if build.returncode == 0 else "fail", "compose.turbovas-api-build", f"docker compose build turbovas-api exit code {build.returncode}.", build, compose_command(repo_root, "build", "turbovas-api", env=env)))
+
+    if aggregate_status(findings) != "fail":
+        up = run_command(compose_command(repo_root, "--profile", "app", "up", "-d", "--no-deps", "--force-recreate", "turbovas-api", env=env), repo_root, env=env, timeout=300)
+        started_write_control = up.returncode == 0
+        findings.append(process_step_finding("pass" if up.returncode == 0 else "fail", "native-api-direct.write-control-up", f"docker compose direct write-control turbovas-api up exit code {up.returncode}.", up, compose_command(repo_root, "--profile", "app", "up", "-d", "--no-deps", "--force-recreate", "turbovas-api", env=env)))
+
+    if aggregate_status(findings) != "fail":
+        content_type = (("Content-Type", "application/json"),)
+        create_body = json.dumps(
+            {
+                "name": tag_name,
+                "resource_type": "task",
+                "comment": "TurboVAS direct write smoke temporary tag",
+                "value": "initial",
+                "active": True,
+            },
+            separators=(",", ":"),
+        )
+        create = direct_native_api_curl(repo_root, "/api/v1/tags", token=token, env=env, method="POST", body=create_body, extra_headers=content_type)
+        create_json, create_status = parse_json_output_with_http_status(create)
+        tag_id = create_json.get("id") if isinstance(create_json, dict) and isinstance(create_json.get("id"), str) else None
+        create_ok = create.returncode == 0 and create_status == 201 and bool(tag_id) and create_json.get("name") == tag_name
+        findings.append(native_api_probe_finding("pass" if create_ok else "fail", "native-api-direct.tag-write-create", "Direct write-control created a temporary unassigned tag." if create_ok else "Direct write-control failed to create a temporary unassigned tag.", create, direct_native_api_display_command("/api/v1/tags", token=token, env=env, method="POST", body=create_body, extra_headers=content_type), create_json, {"http_status": create_status, "tag_id": tag_id, **summarize_native_api_response(create_json)}))
+
+        if tag_id:
+            patch_body = json.dumps(
+                {"comment": "TurboVAS direct write smoke updated temporary tag", "value": "updated", "active": False},
+                separators=(",", ":"),
+            )
+            patch = direct_native_api_curl(repo_root, f"/api/v1/tags/{urllib.parse.quote(tag_id)}", token=token, env=env, method="PATCH", body=patch_body, extra_headers=content_type)
+            patch_json, patch_status = parse_json_output_with_http_status(patch)
+            patch_ok = patch.returncode == 0 and patch_status == 200 and isinstance(patch_json, dict) and patch_json.get("id") == tag_id and patch_json.get("value") == "updated" and patch_json.get("active") is False
+            findings.append(native_api_probe_finding("pass" if patch_ok else "fail", "native-api-direct.tag-write-update", "Direct write-control patched temporary tag metadata." if patch_ok else "Direct write-control failed to patch temporary tag metadata.", patch, direct_native_api_display_command(f"/api/v1/tags/{urllib.parse.quote(tag_id)}", token=token, env=env, method="PATCH", body=patch_body, extra_headers=content_type), patch_json, {"http_status": patch_status, "tag_id": tag_id, **summarize_native_api_response(patch_json)}))
+
+            delete = direct_native_api_curl(repo_root, f"/api/v1/tags/{urllib.parse.quote(tag_id)}", token=token, env=env, method="DELETE")
+            delete_json, delete_status = parse_json_output_with_http_status(delete)
+            delete_ok = delete.returncode == 0 and delete_status == 204
+            findings.append(native_api_probe_finding("pass" if delete_ok else "fail", "native-api-direct.tag-write-delete", "Direct write-control deleted the temporary unassigned tag." if delete_ok else "Direct write-control failed to delete the temporary unassigned tag.", delete, direct_native_api_display_command(f"/api/v1/tags/{urllib.parse.quote(tag_id)}", token=token, env=env, method="DELETE"), delete_json, {"http_status": delete_status, "tag_id": tag_id, **summarize_native_api_response(delete_json)}))
+
+            post_delete = direct_native_api_curl(repo_root, f"/api/v1/tags/{urllib.parse.quote(tag_id)}", token=token, env=env)
+            post_delete_json, post_delete_status = parse_json_output_with_http_status(post_delete)
+            post_delete_ok = post_delete.returncode == 0 and post_delete_status == 404 and isinstance(post_delete_json, dict) and post_delete_json.get("error", {}).get("code") == "not_found"
+            findings.append(native_api_probe_finding("pass" if post_delete_ok else "fail", "native-api-direct.tag-write-post-delete", "Direct API confirms the temporary tag is gone after delete." if post_delete_ok else "Direct API did not confirm the temporary tag was deleted.", post_delete, direct_native_api_display_command(f"/api/v1/tags/{urllib.parse.quote(tag_id)}", token=token, env=env), post_delete_json, {"http_status": post_delete_status, "tag_id": tag_id, **summarize_native_api_response(post_delete_json)}))
+
+    if started_write_control and aggregate_status(findings) == "fail":
+        log_tail = service_log_tail(repo_root, "turbovas-api", lines=160)
+        interesting_log_tail = [
+            line
+            for line in log_tail
+            if any(word in line.lower() for word in ("warn", "error", "failed", "tag write", "database", "operator"))
+        ]
+        findings.append(
+            finding(
+                "warn",
+                "native-api-direct.write-control-log-tail",
+                "Captured bounded turbovas-api log tail before restoring direct write-control posture.",
+                details={"log_tail": interesting_log_tail[-40:]},
+            )
+        )
+
+    if started_write_control:
+        restore_env = native_api_direct_runtime_env(repo_root)
+        restore = run_command(compose_command(repo_root, "--profile", "app", "up", "-d", "--no-deps", "--force-recreate", "turbovas-api", env=restore_env), repo_root, env=restore_env, timeout=300)
+        findings.append(process_step_finding("pass" if restore.returncode == 0 else "fail", "native-api-direct.write-control-restore", f"docker compose restored turbovas-api direct listener with write-control disabled exit code {restore.returncode}.", restore, compose_command(repo_root, "--profile", "app", "up", "-d", "--no-deps", "--force-recreate", "turbovas-api", env=restore_env)))
+
+    result = make_result("runtime-native-api-direct-write-smoke", repo_root, "Direct native API write-control smoke checks completed.", findings, [str(artifact_dir)])
+    result["details"] = {
+        "base_url": native_api_direct_base_url(env),
+        "container_bind": env.get(TURBOVAS_API_DIRECT_BIND_ENV),
+        "token_source": token_source,
+        "operator_uuid_found": bool(admin_uuid),
+        "temporary_tag_id": tag_id,
+        "temporary_tag_name": tag_name,
+        "token_value_reported": False,
+    }
+    write_json_artifact(artifact_dir, "native-api-direct-write-smoke.json" if result["status"] != "fail" else "native-api-direct-write-smoke-failed.json", result)
+    if status_only:
+        result = direct_smoke_status_only_result(result)
+    return result
 
 
 def command_runtime_native_api_direct_smoke(repo_root: Path, status_only: bool = False) -> dict[str, Any]:
@@ -11126,8 +11291,8 @@ def command_runtime_native_api_direct_smoke(repo_root: Path, status_only: bool =
             result = direct_smoke_status_only_result(result)
         return result
 
-    up = run_command(compose_command(repo_root, "--profile", "app", "up", "-d", "--no-deps", "turbovas-api", env=env), repo_root, env=env, timeout=300)
-    findings.append(process_step_finding("pass" if up.returncode == 0 else "fail", "compose.turbovas-api-direct-up", f"docker compose direct turbovas-api up exit code {up.returncode}.", up, compose_command(repo_root, "--profile", "app", "up", "-d", "--no-deps", "turbovas-api", env=env)))
+    up = run_command(compose_command(repo_root, "--profile", "app", "up", "-d", "--no-deps", "--force-recreate", "turbovas-api", env=env), repo_root, env=env, timeout=300)
+    findings.append(process_step_finding("pass" if up.returncode == 0 else "fail", "compose.turbovas-api-direct-up", f"docker compose direct turbovas-api up exit code {up.returncode}.", up, compose_command(repo_root, "--profile", "app", "up", "-d", "--no-deps", "--force-recreate", "turbovas-api", env=env)))
     if up.returncode != 0:
         result = make_result("runtime-native-api-direct-smoke", repo_root, "Direct native API smoke stopped because turbovas-api restart failed.", findings, [str(artifact_dir)])
         result["details"] = {"base_url": native_api_direct_base_url(env)}
@@ -11908,6 +12073,9 @@ def summarize_native_api_response(parsed: dict[str, Any] | None) -> dict[str, An
         summary["summary"] = parsed["summary"]
     if isinstance(parsed.get("policy"), dict):
         summary["policy"] = parsed["policy"]
+    error = parsed.get("error")
+    if isinstance(error, dict):
+        summary["error"] = {key: error[key] for key in ("code", "message") if isinstance(error.get(key), str)}
     items = parsed.get("items")
     if isinstance(items, list):
         summary["item_count_in_response"] = len(items)
@@ -14473,6 +14641,8 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("runtime-native-api-smoke", parents=[common], help="verify the internal TurboVAS native API sidecar")
     native_api_direct_smoke = subparsers.add_parser("runtime-native-api-direct-smoke", parents=[common], help="verify the opt-in direct bearer-auth native API listener")
     native_api_direct_smoke.add_argument("--status-only", action="store_true", help="emit compact direct-smoke status and only non-pass findings for chat-safe validation")
+    native_api_direct_write_smoke = subparsers.add_parser("runtime-native-api-direct-write-smoke", parents=[common], help="verify guarded direct native API write-control with zero-residue tag metadata writes")
+    native_api_direct_write_smoke.add_argument("--status-only", action="store_true", help="emit compact write-smoke status and only non-pass findings for chat-safe validation")
     subparsers.add_parser("runtime-native-api-direct-bootstrap", parents=[common], help="prepare and check opt-in direct native API bootstrap guardrails without starting the listener")
     direct_token = subparsers.add_parser("runtime-native-api-direct-token", parents=[common], help="inspect or rotate the opt-in direct native API runtime bearer token")
     direct_token.add_argument("--rotate", action="store_true", help="rotate the ignored runtime bearer token without printing it")
@@ -14638,6 +14808,8 @@ def main(argv: list[str] | None = None) -> int:
         result = command_runtime_native_api_smoke(repo_root)
     elif args.command == "runtime-native-api-direct-smoke":
         result = command_runtime_native_api_direct_smoke(repo_root, status_only=args.status_only)
+    elif args.command == "runtime-native-api-direct-write-smoke":
+        result = command_runtime_native_api_direct_write_smoke(repo_root, status_only=args.status_only)
     elif args.command == "runtime-native-api-direct-bootstrap":
         result = command_runtime_native_api_direct_bootstrap(repo_root)
     elif args.command == "runtime-native-api-direct-token":

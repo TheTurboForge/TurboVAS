@@ -66,13 +66,13 @@ pub(crate) struct ValidatedTagPatch {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TagWriteRecord {
-    pub(crate) internal_id: i64,
+    pub(crate) internal_id: i32,
     pub(crate) uuid: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct TagWriteState {
-    internal_id: i64,
+    internal_id: i32,
     uuid: String,
     resource_count: i64,
 }
@@ -262,7 +262,7 @@ pub(crate) fn tag_delete_transaction_plan() -> TagWriteTransactionPlan {
 
 pub(crate) async fn execute_tag_create_transaction(
     tx: &Transaction<'_>,
-    owner_id: i64,
+    owner_id: i32,
     request: &ValidatedTagCreate,
 ) -> Result<TagWriteRecord, ApiError> {
     query_tag_write_record(
@@ -283,7 +283,7 @@ pub(crate) async fn execute_tag_create_transaction(
 
 pub(crate) async fn execute_tag_delete_transaction(
     tx: &Transaction<'_>,
-    tag_internal_id: i64,
+    tag_internal_id: i32,
 ) -> Result<TagWriteRecord, ApiError> {
     query_tag_write_record(
         tx,
@@ -318,7 +318,7 @@ pub(crate) async fn execute_tag_patch_transaction(
 async fn resolve_tag_write_operator_owner(
     tx: &Transaction<'_>,
     operator: &DirectApiOperator,
-) -> Result<i64, ApiError> {
+) -> Result<i32, ApiError> {
     tx.query_opt(tag_write_operator_owner_sql(), &[&operator.user_uuid()])
         .await
         .map_err(|error| map_tag_write_db_error(error, "resolve tag write operator"))?
@@ -461,7 +461,7 @@ fn map_tag_write_db_error(error: tokio_postgres::Error, action: &'static str) ->
 }
 
 pub(crate) fn tag_write_operator_owner_sql() -> &'static str {
-    "SELECT id::bigint, uuid::text, coalesce(name, '')::text
+    "SELECT id::integer, uuid::text, coalesce(name, '')::text
        FROM users
       WHERE uuid = $1;"
 }
@@ -470,7 +470,7 @@ pub(crate) fn tag_insert_metadata_sql() -> &'static str {
     "INSERT INTO tags
         (uuid, owner, name, comment, value, resource_type, active, creation_time, modification_time)
      VALUES (make_uuid(), $1, $2, coalesce($3, ''), coalesce($4, ''), $5, $6, m_now(), m_now())
-     RETURNING id::bigint, uuid::text;"
+     RETURNING id::integer, uuid::text;"
 }
 
 pub(crate) fn tag_update_metadata_sql() -> &'static str {
@@ -481,11 +481,11 @@ pub(crate) fn tag_update_metadata_sql() -> &'static str {
             active = coalesce($5, active),
             modification_time = m_now()
       WHERE uuid = $1
-      RETURNING id::bigint, uuid::text;"
+      RETURNING id::integer, uuid::text;"
 }
 
 pub(crate) fn tag_write_unassigned_state_sql() -> &'static str {
-    "SELECT id::bigint,
+    "SELECT id::integer,
             uuid::text,
             coalesce(tag_resources_count(id, resource_type), 0)::bigint AS resource_count
        FROM tags
@@ -495,7 +495,7 @@ pub(crate) fn tag_write_unassigned_state_sql() -> &'static str {
 pub(crate) fn tag_delete_metadata_sql() -> &'static str {
     "DELETE FROM tags
       WHERE id = $1
-      RETURNING id::bigint, uuid::text;"
+      RETURNING id::integer, uuid::text;"
 }
 
 pub(crate) fn tag_write_detail_sql() -> &'static str {

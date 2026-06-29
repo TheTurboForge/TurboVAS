@@ -955,7 +955,7 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_technical_foundation_commands_are_registered(self):
         source = (Path(__file__).resolve().parents[1] / "turbovasctl").read_text(encoding="utf-8")
         justfile = (Path(__file__).resolve().parents[2] / "justfile").read_text(encoding="utf-8")
-        for command in ("native-tooling-state", "native-api-request", "native-api-migration-matrix", "native-api-client-contract", "native-api-cargo-audit", "native-api-semgrep-audit", "gsa-npm-audit", "osv-lockfile-audit", "rust-migration-state", "branding-state", "production-posture-check", "runtime-log-review", "runtime-data-state", "runtime-db-introspect", "runtime-performance-snapshot", "runtime-redis-state", "security-policy-check", "path-coupling-state", "runtime-native-api-smoke", "runtime-native-api-direct-smoke", "runtime-native-api-direct-bootstrap", "runtime-native-api-rebuild", "quality-gate", "quality-gate-state", "quality-gate-schedule"):
+        for command in ("native-tooling-state", "native-api-request", "native-api-migration-matrix", "native-api-client-contract", "native-api-cargo-audit", "native-api-semgrep-audit", "gsa-npm-audit", "osv-lockfile-audit", "rust-migration-state", "branding-state", "production-posture-check", "runtime-log-review", "runtime-data-state", "runtime-db-introspect", "runtime-performance-snapshot", "runtime-redis-state", "security-policy-check", "path-coupling-state", "runtime-native-api-smoke", "runtime-native-api-direct-smoke", "runtime-native-api-direct-write-smoke", "runtime-native-api-direct-bootstrap", "runtime-native-api-rebuild", "quality-gate", "quality-gate-state", "quality-gate-schedule"):
             with self.subTest(command=command):
                 self.assertIn(command, source)
                 self.assertIn(f"{command} *args:", justfile)
@@ -976,6 +976,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("def command_runtime_redis_state", source)
         self.assertIn("def command_runtime_native_api_smoke", source)
         self.assertIn("def command_runtime_native_api_direct_smoke", source)
+        self.assertIn("def command_runtime_native_api_direct_write_smoke", source)
         self.assertIn("def command_runtime_native_api_rebuild", source)
         self.assertIn("native-api.scope-report-hosts", source)
         self.assertIn("native-api.scope-report-ports", source)
@@ -5462,6 +5463,61 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertFalse(turbovasctl.env_values_have_nonempty_key(["TOKEN=   "], "TOKEN"))
         self.assertFalse(turbovasctl.env_values_have_nonempty_key(["OTHER=value"], "TOKEN"))
         self.assertTrue(turbovasctl.env_values_have_nonempty_key(["TOKEN=secret"], "TOKEN"))
+
+    def test_direct_native_api_write_smoke_uses_guarded_operator_and_cleans_up(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            root.mkdir()
+            token = "0123456789abcdef0123456789abcdef"
+            operator_uuid = "11111111-1111-1111-1111-111111111111"
+            original_token = turbovasctl.os.environ.get(turbovasctl.TURBOVAS_API_BEARER_TOKEN_ENV)
+            commands: list[tuple[str, ...]] = []
+            envs: list[dict[str, str]] = []
+            probes: list[tuple[str, str]] = []
+
+            def fake_run_command(command, *_args, **kwargs):
+                commands.append(tuple(command))
+                env = kwargs.get("env")
+                if isinstance(env, dict):
+                    envs.append(dict(env))
+                return turbovasctl.subprocess.CompletedProcess(command, 0, "", "")
+
+            def fake_direct_curl(_root, path, *, method="GET", body=None, **_kwargs):
+                probes.append((method, path))
+                if method == "POST" and path == "/api/v1/tags":
+                    payload = json.loads(body)
+                    self.assertEqual(payload["resource_type"], "task")
+                    return turbovasctl.subprocess.CompletedProcess([], 0, json.dumps({"id": operator_uuid, "name": payload["name"], "value": "initial", "active": True}) + "\n201", "")
+                if method == "PATCH":
+                    return turbovasctl.subprocess.CompletedProcess([], 0, json.dumps({"id": operator_uuid, "value": "updated", "active": False}) + "\n200", "")
+                if method == "DELETE":
+                    return turbovasctl.subprocess.CompletedProcess([], 0, "\n204", "")
+                return turbovasctl.subprocess.CompletedProcess([], 0, '{"error":{"code":"not_found"}}\n404', "")
+
+            try:
+                turbovasctl.os.environ[turbovasctl.TURBOVAS_API_BEARER_TOKEN_ENV] = token
+                with unittest.mock.patch.object(turbovasctl, "run_command", side_effect=fake_run_command), unittest.mock.patch.object(turbovasctl, "native_api_direct_admin_operator_uuid", return_value=(turbovasctl.subprocess.CompletedProcess([], 0, f"admin {operator_uuid}", ""), operator_uuid)), unittest.mock.patch.object(turbovasctl, "direct_native_api_curl", side_effect=fake_direct_curl), unittest.mock.patch.object(turbovasctl.time, "time", return_value=1):
+                    result = turbovasctl.command_runtime_native_api_direct_write_smoke(root, status_only=True)
+            finally:
+                if original_token is None:
+                    turbovasctl.os.environ.pop(turbovasctl.TURBOVAS_API_BEARER_TOKEN_ENV, None)
+                else:
+                    turbovasctl.os.environ[turbovasctl.TURBOVAS_API_BEARER_TOKEN_ENV] = original_token
+
+        checks = result["details"]["important_checks"]
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(result["findings"][0]["check"], "runtime-native-api-direct-write-smoke.status-only")
+        self.assertEqual(checks["native-api-direct.write-control-operator"], "pass")
+        self.assertEqual(checks["native-api-direct.tag-write-create"], "pass")
+        self.assertEqual(checks["native-api-direct.tag-write-update"], "pass")
+        self.assertEqual(checks["native-api-direct.tag-write-delete"], "pass")
+        self.assertEqual(checks["native-api-direct.tag-write-post-delete"], "pass")
+        self.assertEqual(checks["native-api-direct.write-control-restore"], "pass")
+        self.assertEqual([probe[0] for probe in probes], ["POST", "PATCH", "DELETE", "GET"])
+        rendered = json.dumps(result, sort_keys=True)
+        self.assertNotIn(token, rendered)
+        self.assertTrue(any(env.get(turbovasctl.TURBOVAS_API_DIRECT_WRITE_CONTROL_ENV) == "1" for env in envs))
+        self.assertTrue(any(env.get(turbovasctl.TURBOVAS_API_DIRECT_WRITE_CONTROL_ENV) is None for env in envs))
 
     def test_direct_native_api_posture_keeps_default_internal_mode_passing(self):
         with tempfile.TemporaryDirectory() as tmp:

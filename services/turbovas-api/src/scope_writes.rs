@@ -101,13 +101,13 @@ pub(crate) struct ScopeWriteTransactionPlan {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ScopeWriteRecord {
-    pub(crate) internal_id: i64,
+    pub(crate) internal_id: i32,
     pub(crate) uuid: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ScopeWriteState {
-    internal_id: i64,
+    internal_id: i32,
     uuid: String,
 }
 
@@ -319,7 +319,7 @@ pub(crate) fn ensure_scope_write_references_visible(
 
 pub(crate) async fn execute_scope_create_transaction(
     tx: &Transaction<'_>,
-    owner_id: i64,
+    owner_id: i32,
     request: &ValidatedScopeCreate,
 ) -> Result<ScopeWriteRecord, ApiError> {
     let record = query_scope_write_record(
@@ -357,7 +357,7 @@ pub(crate) async fn execute_scope_create_transaction(
 
 pub(crate) async fn execute_scope_patch_transaction(
     tx: &Transaction<'_>,
-    scope_internal_id: i64,
+    scope_internal_id: i32,
     request: &ValidatedScopePatch,
 ) -> Result<ScopeWriteRecord, ApiError> {
     let record = if request.name.is_some()
@@ -413,7 +413,7 @@ pub(crate) async fn execute_scope_patch_transaction(
 
 pub(crate) async fn execute_scope_delete_transaction(
     tx: &Transaction<'_>,
-    scope_internal_id: i64,
+    scope_internal_id: i32,
 ) -> Result<(), ApiError> {
     execute_scope_write_sql(
         tx,
@@ -456,7 +456,7 @@ fn scope_write_location_headers(scope_id: &str) -> Result<HeaderMap, ApiError> {
 async fn resolve_scope_write_operator_owner(
     tx: &Transaction<'_>,
     operator: &DirectApiOperator,
-) -> Result<i64, ApiError> {
+) -> Result<i32, ApiError> {
     tx.query_opt(scope_write_operator_owner_sql(), &[&operator.user_uuid()])
         .await
         .map_err(|error| map_scope_write_db_error(error, "resolve scope write operator"))?
@@ -572,7 +572,7 @@ async fn execute_scope_write_sql(
 
 async fn replace_scope_membership(
     tx: &Transaction<'_>,
-    scope_internal_id: i64,
+    scope_internal_id: i32,
     requested_ids: &[String],
     delete_sql: &str,
     insert_sql: &str,
@@ -617,13 +617,13 @@ fn map_scope_write_db_error(error: tokio_postgres::Error, action: &'static str) 
 }
 
 pub(crate) fn scope_write_operator_owner_sql() -> &'static str {
-    "SELECT id::bigint, uuid::text, coalesce(name, '')::text
+    "SELECT id::integer, uuid::text, coalesce(name, '')::text
        FROM users
       WHERE uuid = $1;"
 }
 
 pub(crate) fn scope_write_mutability_sql() -> &'static str {
-    "SELECT id::bigint, coalesce(predefined, 0)::integer, coalesce(is_global, 0)::integer
+    "SELECT id::integer, coalesce(predefined, 0)::integer, coalesce(is_global, 0)::integer
        FROM scopes
       WHERE uuid = $1;"
 }
@@ -647,7 +647,7 @@ pub(crate) fn scope_write_visible_hosts_sql() -> &'static str {
 }
 
 pub(crate) fn scope_by_internal_id_sql() -> &'static str {
-    "SELECT id::bigint, uuid::text
+    "SELECT id::integer, uuid::text
        FROM scopes
       WHERE id = $1;"
 }
@@ -657,7 +657,7 @@ pub(crate) fn scope_insert_sql() -> &'static str {
         (uuid, owner, name, comment, protection_requirement, predefined, is_global,
          creation_time, modification_time)
      VALUES (make_uuid(), $1, $2, $3, $4, 0, 0, m_now(), m_now())
-     RETURNING id::bigint, uuid::text;"
+     RETURNING id::integer, uuid::text;"
 }
 
 pub(crate) fn scope_update_metadata_sql() -> &'static str {
@@ -667,7 +667,7 @@ pub(crate) fn scope_update_metadata_sql() -> &'static str {
             protection_requirement = coalesce($4, protection_requirement),
             modification_time = m_now()
       WHERE id = $1
-      RETURNING id::bigint, uuid::text;"
+      RETURNING id::integer, uuid::text;"
 }
 
 pub(crate) fn scope_delete_targets_sql() -> &'static str {
@@ -1018,7 +1018,7 @@ mod tests {
         let insert = scope_insert_sql();
         assert!(insert.contains("INSERT INTO scopes"));
         assert!(insert.contains("VALUES (make_uuid(), $1, $2, $3, $4, 0, 0"));
-        assert!(insert.contains("RETURNING id::bigint, uuid::text"));
+        assert!(insert.contains("RETURNING id::integer, uuid::text"));
 
         let update = scope_update_metadata_sql();
         assert!(update.contains("UPDATE scopes"));
