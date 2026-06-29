@@ -5347,6 +5347,23 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertTrue(checks["native-api-direct-bootstrap.token"]["details"]["runtime_secret_permission_ok"])
         self.assertEqual(checks["production.native-api-direct.auth-boundary"]["status"], "pass")
 
+    def test_direct_native_api_bootstrap_status_only_is_chat_safe(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            root.mkdir()
+            with unittest.mock.patch.object(turbovasctl, "current_native_api_direct_published_bindings", return_value=()), unittest.mock.patch.object(turbovasctl, "running_service_env_value", return_value=None):
+                full = turbovasctl.command_runtime_native_api_direct_bootstrap(root)
+                compact = turbovasctl.command_runtime_native_api_direct_bootstrap(root, status_only=True)
+            token = turbovasctl.runtime_secret_path(root, turbovasctl.TURBOVAS_API_BEARER_TOKEN_SECRET).read_text(encoding="utf-8").strip()
+
+        self.assertEqual(compact["status"], "pass")
+        self.assertEqual(compact["details"]["non_pass_count"], 0)
+        self.assertEqual(compact["details"]["finding_count"], len(full["findings"]))
+        self.assertEqual(compact["details"]["token_value_reported"], False)
+        self.assertEqual(compact["findings"][0]["check"], "runtime-native-api-direct-bootstrap.status-only")
+        self.assertNotIn(token, json.dumps(compact, sort_keys=True))
+        self.assertLess(len(json.dumps(compact)), len(json.dumps(full)))
+
     def test_direct_native_api_bootstrap_fails_broad_secret_permissions_without_leaking_token(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "TurboVAS"
@@ -5368,6 +5385,28 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertEqual(checks["production.native-api-direct.auth-boundary"]["status"], "fail")
         self.assertEqual(checks["native-api-direct-bootstrap.token"]["details"]["runtime_secret_mode"], "0644")
         self.assertFalse(checks["native-api-direct-bootstrap.token"]["details"]["runtime_secret_permission_ok"])
+        self.assertNotIn(token, rendered)
+
+    def test_direct_native_api_bootstrap_status_only_keeps_failures_without_token(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            root.mkdir()
+            token_path = turbovasctl.write_runtime_secret(
+                root,
+                turbovasctl.TURBOVAS_API_BEARER_TOKEN_SECRET,
+                "0123456789abcdef0123456789abcdef",
+            )
+            token_path.chmod(0o644)
+            token = token_path.read_text(encoding="utf-8").strip()
+            with unittest.mock.patch.object(turbovasctl, "current_native_api_direct_published_bindings", return_value=()), unittest.mock.patch.object(turbovasctl, "running_service_env_value", return_value=None):
+                compact = turbovasctl.command_runtime_native_api_direct_bootstrap(root, status_only=True)
+
+        rendered = json.dumps(compact, sort_keys=True)
+        checks = {item["check"]: item for item in compact["findings"]}
+        self.assertEqual(compact["status"], "fail")
+        self.assertEqual(compact["details"]["non_pass_count"], 2)
+        self.assertEqual(compact["details"]["important_checks"]["native-api-direct-bootstrap.token"], "fail")
+        self.assertEqual(checks["native-api-direct-bootstrap.token"]["status"], "fail")
         self.assertNotIn(token, rendered)
 
     def test_direct_native_api_bootstrap_fails_non_loopback_without_leaking_token(self):

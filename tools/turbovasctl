@@ -10997,7 +10997,48 @@ def command_runtime_native_api_direct_token(repo_root: Path, *, rotate: bool) ->
     return make_result("runtime-native-api-direct-token", repo_root, summary, findings)
 
 
-def command_runtime_native_api_direct_bootstrap(repo_root: Path) -> dict[str, Any]:
+def direct_bootstrap_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
+    compact = dict(result)
+    findings = result.get("findings", [])
+    non_pass = [compact_doctor_finding(item) for item in findings if item.get("status") != "pass"]
+    details = result.get("details", {}) if isinstance(result.get("details"), dict) else {}
+    checks = {
+        item.get("check"): item.get("status")
+        for item in findings
+        if isinstance(item, dict) and item.get("check")
+    }
+    important_checks = {
+        check: checks[check]
+        for check in (
+            "native-api-direct-bootstrap.config-shape",
+            "native-api-direct-bootstrap.host-binding",
+            "native-api-direct-bootstrap.token",
+            "production.native-api-direct.config-shape",
+            "production.native-api-direct.configured-binding",
+            "production.native-api-direct.running-binding",
+            "production.native-api-direct.auth-boundary",
+        )
+        if check in checks
+    }
+    compact["details"] = {
+        "direct_enabled": details.get("direct_enabled"),
+        "token_source": details.get("token_source"),
+        "token_value_reported": False,
+        "finding_count": len(findings),
+        "non_pass_count": len(non_pass),
+        "important_checks": important_checks,
+    }
+    compact["findings"] = non_pass or [
+        finding(
+            "pass",
+            "runtime-native-api-direct-bootstrap.status-only",
+            "Direct native API bootstrap checks passed; no non-pass findings.",
+        )
+    ]
+    return compact
+
+
+def command_runtime_native_api_direct_bootstrap(repo_root: Path, status_only: bool = False) -> dict[str, Any]:
     findings: list[dict[str, Any]] = []
     env = native_api_direct_runtime_env(repo_root)
     try:
@@ -11071,6 +11112,8 @@ def command_runtime_native_api_direct_bootstrap(repo_root: Path) -> dict[str, An
         "token_source": token_source,
         "token_value_reported": False,
     }
+    if status_only:
+        result = direct_bootstrap_status_only_result(result)
     return result
 
 
@@ -14782,7 +14825,8 @@ def build_parser() -> argparse.ArgumentParser:
     native_api_direct_smoke.add_argument("--status-only", action="store_true", help="emit compact direct-smoke status and only non-pass findings for chat-safe validation")
     native_api_direct_write_smoke = subparsers.add_parser("runtime-native-api-direct-write-smoke", parents=[common], help="verify guarded direct native API write-control with zero-residue tag metadata writes")
     native_api_direct_write_smoke.add_argument("--status-only", action="store_true", help="emit compact write-smoke status and only non-pass findings for chat-safe validation")
-    subparsers.add_parser("runtime-native-api-direct-bootstrap", parents=[common], help="prepare and check opt-in direct native API bootstrap guardrails without starting the listener")
+    native_api_direct_bootstrap = subparsers.add_parser("runtime-native-api-direct-bootstrap", parents=[common], help="prepare and check opt-in direct native API bootstrap guardrails without starting the listener")
+    native_api_direct_bootstrap.add_argument("--status-only", action="store_true", help="emit compact bootstrap status and only non-pass findings for chat-safe validation")
     direct_token = subparsers.add_parser("runtime-native-api-direct-token", parents=[common], help="inspect or rotate the opt-in direct native API runtime bearer token")
     direct_token.add_argument("--rotate", action="store_true", help="rotate the ignored runtime bearer token without printing it")
     subparsers.add_parser("runtime-native-api-rebuild", parents=[common], help="rebuild and restart only the internal TurboVAS native API sidecar")
@@ -14950,7 +14994,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "runtime-native-api-direct-write-smoke":
         result = command_runtime_native_api_direct_write_smoke(repo_root, status_only=args.status_only)
     elif args.command == "runtime-native-api-direct-bootstrap":
-        result = command_runtime_native_api_direct_bootstrap(repo_root)
+        result = command_runtime_native_api_direct_bootstrap(repo_root, status_only=args.status_only)
     elif args.command == "runtime-native-api-direct-token":
         result = command_runtime_native_api_direct_token(repo_root, rotate=args.rotate)
     elif args.command == "runtime-native-api-rebuild":
