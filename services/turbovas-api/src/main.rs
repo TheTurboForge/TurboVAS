@@ -377,22 +377,6 @@ struct CatalogCveDetail {
     user_tags: Vec<ReportUserTag>,
 }
 
-#[derive(Serialize)]
-struct ScanConfigFamilyItem {
-    name: String,
-    nvt_count: i64,
-    max_nvt_count: i64,
-    growing: i32,
-}
-
-#[derive(Serialize)]
-struct ScanConfigFamiliesPayload {
-    scan_config_id: String,
-    family_count: i64,
-    families_growing: i32,
-    families: Vec<ScanConfigFamilyItem>,
-}
-
 #[derive(Debug, Serialize)]
 struct CatalogCpeCveItem {
     id: String,
@@ -1828,31 +1812,10 @@ async fn scan_config_asset_families(
         }
     }
 
-    let (family_count, families_growing) = rows
-        .first()
-        .map(|row| {
-            (
-                row.get::<_, i64>("family_count"),
-                row.get::<_, i32>("families_growing"),
-            )
-        })
-        .unwrap_or((0, 0));
-    let families = rows
-        .iter()
-        .map(|row| ScanConfigFamilyItem {
-            name: row.get("name"),
-            nvt_count: row.get("nvt_count"),
-            max_nvt_count: row.get("max_nvt_count"),
-            growing: row.get("growing"),
-        })
-        .collect();
-
-    Ok(Json(ScanConfigFamiliesPayload {
+    Ok(Json(scan_config_families_payload_from_rows(
         scan_config_id,
-        family_count,
-        families_growing,
-        families,
-    }))
+        &rows,
+    )))
 }
 
 async fn filter_assets(

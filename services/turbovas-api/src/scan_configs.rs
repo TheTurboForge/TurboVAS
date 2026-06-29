@@ -58,6 +58,53 @@ pub(crate) struct ScanConfigAssetDetail {
     pub(crate) user_tags: Vec<ReportUserTag>,
 }
 
+#[derive(Serialize)]
+struct ScanConfigFamilyItem {
+    name: String,
+    nvt_count: i64,
+    max_nvt_count: i64,
+    growing: i32,
+}
+
+#[derive(Serialize)]
+pub(crate) struct ScanConfigFamiliesPayload {
+    scan_config_id: String,
+    family_count: i64,
+    families_growing: i32,
+    families: Vec<ScanConfigFamilyItem>,
+}
+
+pub(crate) fn scan_config_families_payload_from_rows(
+    scan_config_id: String,
+    rows: &[Row],
+) -> ScanConfigFamiliesPayload {
+    let (family_count, families_growing) = rows
+        .first()
+        .map(|row| {
+            (
+                row.get::<_, i64>("family_count"),
+                row.get::<_, i32>("families_growing"),
+            )
+        })
+        .unwrap_or((0, 0));
+    let families = rows
+        .iter()
+        .map(|row| ScanConfigFamilyItem {
+            name: row.get("name"),
+            nvt_count: row.get("nvt_count"),
+            max_nvt_count: row.get("max_nvt_count"),
+            growing: row.get("growing"),
+        })
+        .collect();
+
+    ScanConfigFamiliesPayload {
+        scan_config_id,
+        family_count,
+        families_growing,
+        families,
+    }
+}
+
 pub(crate) fn scan_config_asset_from_row(row: &Row) -> ScanConfigAssetItem {
     let family_count = row.get("family_count");
     let families_growing = row.get("families_growing");
