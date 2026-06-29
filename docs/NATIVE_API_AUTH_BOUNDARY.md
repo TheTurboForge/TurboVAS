@@ -30,6 +30,11 @@ script/curl -> opt-in direct bearer listener -> turbovas-api -> PostgreSQL
   service and helper: at least 32 printable non-whitespace ASCII characters.
   Generated runtime secrets use this stronger shape by default; weak configured
   environment tokens are rejected before use.
+- Optional direct operator identity is carried by `TURBOVAS_API_OPERATOR_UUID`
+  and `TURBOVAS_API_OPERATOR_NAME`. The helper validates shape locally, and the
+  service verifies configured operator UUIDs against `users` before exposing the
+  direct listener. This is identity groundwork for future owner-bearing writes;
+  it does not authorize write routes by itself.
 - `/healthz` is unauthenticated for readiness. `/api/v1/...` on the direct
   listener requires `Authorization: Bearer <token>` and returns JSON `401`
   errors for missing or wrong tokens.
@@ -118,6 +123,9 @@ runtime secret file boundary.
 It also requires helper-managed direct binds to target the fixed service
 container port `9081`, matching the Compose publication boundary. It does not
 start or expose the listener.
+When `TURBOVAS_API_OPERATOR_UUID` is present, malformed UUID or operator-name
+values fail helper validation before the runtime is refreshed; unknown user UUIDs
+fail service startup rather than falling back to an arbitrary owner.
 
 `runtime-native-api-direct-token --rotate` rotates only the ignored development
 runtime bearer-token secret and never prints the token value. Restart

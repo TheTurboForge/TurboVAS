@@ -235,10 +235,15 @@ TURBOVAS_API_DIRECT_PORT_ENV = "TURBOVAS_API_DIRECT_PORT"
 TURBOVAS_API_DIRECT_BIND_ENV = "TURBOVAS_API_DIRECT_BIND"
 TURBOVAS_API_BEARER_TOKEN_ENV = "TURBOVAS_API_BEARER_TOKEN"
 TURBOVAS_API_BEARER_TOKEN_FILE_ENV = "TURBOVAS_API_BEARER_TOKEN_FILE"
+TURBOVAS_API_OPERATOR_UUID_ENV = "TURBOVAS_API_OPERATOR_UUID"
+TURBOVAS_API_OPERATOR_NAME_ENV = "TURBOVAS_API_OPERATOR_NAME"
 TURBOVAS_API_BEARER_TOKEN_CONTAINER_FILE = "/runtime/secrets/native-api-bearer-token"
 TURBOVAS_API_BEARER_TOKEN_SECRET = "native-api-bearer-token"
 TURBOVAS_API_BEARER_TOKEN_MIN_LENGTH = 32
 TURBOVAS_API_BEARER_TOKEN_MAX_LENGTH = 1024
+UUID_VALUE_RE = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
 DIRECT_API_REQUEST_ID_HEADER = "X-Request-Id"
 MAX_DIRECT_API_REQUEST_ID_LENGTH = 128
 DIRECT_API_EXPECTED_RESPONSE_HEADERS = {
@@ -2176,6 +2181,18 @@ def validate_native_api_direct_bind_value(value: str, *, env_name: str) -> str:
     return f"{validate_native_api_direct_host_value(host, env_name=env_name)}:{normalized_port}"
 
 
+def validate_native_api_operator_uuid_value(value: str, *, env_name: str) -> str:
+    if not UUID_VALUE_RE.fullmatch(value):
+        raise ValueError(f"{env_name} must be a UUID")
+    return value.lower()
+
+
+def validate_native_api_operator_name_value(value: str, *, env_name: str) -> str:
+    if not value.strip() or len(value.strip()) > 256 or any(ord(ch) < 32 for ch in value):
+        raise ValueError(f"{env_name} must be a non-empty printable operator name up to 256 characters")
+    return value.strip()
+
+
 def native_api_direct_config_errors(env: dict[str, str]) -> tuple[str, ...]:
     errors: list[str] = []
     for value, env_name, validator in (
@@ -2190,6 +2207,20 @@ def native_api_direct_config_errors(env: dict[str, str]) -> tuple[str, ...]:
     if direct_bind:
         try:
             validate_native_api_direct_bind_value(direct_bind, env_name=TURBOVAS_API_DIRECT_BIND_ENV)
+        except ValueError as exc:
+            errors.append(str(exc))
+    operator_uuid = env.get(TURBOVAS_API_OPERATOR_UUID_ENV, "").strip()
+    operator_name = env.get(TURBOVAS_API_OPERATOR_NAME_ENV, "")
+    if operator_uuid:
+        try:
+            validate_native_api_operator_uuid_value(operator_uuid, env_name=TURBOVAS_API_OPERATOR_UUID_ENV)
+        except ValueError as exc:
+            errors.append(str(exc))
+    elif operator_name.strip():
+        errors.append(f"{TURBOVAS_API_OPERATOR_NAME_ENV} requires {TURBOVAS_API_OPERATOR_UUID_ENV}")
+    if operator_name.strip():
+        try:
+            validate_native_api_operator_name_value(operator_name, env_name=TURBOVAS_API_OPERATOR_NAME_ENV)
         except ValueError as exc:
             errors.append(str(exc))
     return tuple(errors)
@@ -2527,6 +2558,8 @@ def direct_native_api_posture_findings(repo_root: Path, env: dict[str, str] | No
         TURBOVAS_API_DIRECT_HOST_ENV,
         TURBOVAS_API_DIRECT_PORT_ENV,
         TURBOVAS_API_DIRECT_BIND_ENV,
+        TURBOVAS_API_OPERATOR_UUID_ENV,
+        TURBOVAS_API_OPERATOR_NAME_ENV,
     )
     configured_env = [name for name in direct_env_names if env.get(name)]
     running_bindings = current_native_api_direct_published_bindings(repo_root)

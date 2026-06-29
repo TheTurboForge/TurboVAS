@@ -657,7 +657,7 @@ class TurboVASCtlTests(unittest.TestCase):
 
     def test_scope_report_evidence_api_handlers_remain_scope_source_scoped(self):
         root = Path(__file__).resolve().parents[2]
-        source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
+        source = (root / "services" / "turbovas-api" / "src" / "scope_report_handlers.rs").read_text(encoding="utf-8")
 
         def section(start, end):
             self.assertIn(start, source)
@@ -665,7 +665,7 @@ class TurboVASCtlTests(unittest.TestCase):
             return source.split(start, 1)[1].split(end, 1)[0]
 
         handlers = [
-            ("async fn scope_report_results", "async fn scope_report_metrics", "srs.source_report_uuid AS source_report_id"),
+            ("async fn scope_report_results", "fn scope_report_retention_sources_sql", "srs.source_report_uuid AS source_report_id"),
             ("async fn scope_report_errors", "async fn scope_reports", "srs.source_report_uuid AS source_report_id"),
             ("async fn scope_report_hosts", "async fn scope_report_ports", "source_report_ids"),
             ("async fn scope_report_ports", "async fn scope_report_applications", "source_report_ids"),
@@ -3615,7 +3615,8 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_openapi_tracks_raw_report_contracts(self):
         root = Path(__file__).resolve().parents[2]
         openapi = (root / "api" / "openapi" / "turbovas-v1.yaml").read_text(encoding="utf-8")
-        source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
+        route_source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
+        report_source = (root / "services" / "turbovas-api" / "src" / "report_payloads.rs").read_text(encoding="utf-8")
         smoke = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
         self.assertIn("/reports:", openapi)
         self.assertIn("/reports/{report_id}:", openapi)
@@ -3623,13 +3624,13 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("/reports/{report_id}/ports:", openapi)
         self.assertIn("description_excerpt", openapi)
         self.assertIn("nvt_family", openapi)
-        self.assertIn("count(DISTINCT nullif(res.nvt, '')) FILTER (WHERE coalesce(res.severity, 0) != -3.0)", source)
+        self.assertIn("count(DISTINCT nullif(res.nvt, '')) FILTER (WHERE coalesce(res.severity, 0) != -3.0)", report_source)
         self.assertIn("ReportReference", openapi)
         self.assertIn("ReportSeverityCounts", openapi)
-        self.assertIn("route(\"/api/v1/reports\", get(reports))", source)
-        self.assertIn("route(\"/api/v1/reports/:report_id\", get(report_detail))", source)
-        self.assertIn("route(\"/api/v1/reports/:report_id/results\", get(report_results))", source)
-        self.assertIn("route(\"/api/v1/reports/:report_id/ports\", get(report_ports))", source)
+        self.assertIn("route(\"/api/v1/reports\", get(reports))", route_source)
+        self.assertIn("route(\"/api/v1/reports/:report_id\", get(report_detail))", route_source)
+        self.assertIn("route(\"/api/v1/reports/:report_id/results\", get(report_results))", route_source)
+        self.assertIn("route(\"/api/v1/reports/:report_id/ports\", get(report_ports))", route_source)
         self.assertIn("native-api.raw-reports", smoke)
         self.assertIn("native-api.raw-report-detail", smoke)
         self.assertIn("native-api.raw-report-results", smoke)
@@ -3659,9 +3660,9 @@ class TurboVASCtlTests(unittest.TestCase):
 
     def test_scope_report_retention_source_sql_preserves_source_identity_contract(self):
         root = Path(__file__).resolve().parents[2]
-        source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
+        source = (root / "services" / "turbovas-api" / "src" / "scope_report_handlers.rs").read_text(encoding="utf-8")
         start = "fn scope_report_retention_sources_sql() -> &'static str {"
-        end = "\n}\n\nasync fn report_metrics"
+        end = "\n}\n\npub(crate) async fn scope_report_errors"
         self.assertIn(start, source)
         self.assertIn(end, source)
         body = source.split(start, 1)[1].split(end, 1)[0]
@@ -3810,10 +3811,11 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_operating_system_asset_detail_contract_is_internal_and_parameterized(self):
         root = Path(__file__).resolve().parents[2]
         openapi = (root / "api" / "openapi" / "turbovas-v1.yaml").read_text(encoding="utf-8")
-        api_source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
+        route_source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
+        api_source = (root / "services" / "turbovas-api" / "src" / "operating_systems.rs").read_text(encoding="utf-8")
         native_tooling = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
 
-        self.assertIn('/api/v1/operating-systems/:os_id', api_source)
+        self.assertIn('/api/v1/operating-systems/:os_id', route_source)
         self.assertIn('parse_uuid(&os_id)?;', api_source)
         self.assertIn('WHERE oss.uuid = $1', api_source)
         self.assertIn('/operating-systems/{os_id}:', openapi)
@@ -3825,10 +3827,11 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_host_asset_detail_contract_is_internal_bounded_and_safe_metadata_only(self):
         root = Path(__file__).resolve().parents[2]
         openapi = (root / "api" / "openapi" / "turbovas-v1.yaml").read_text(encoding="utf-8")
-        api_source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
+        route_source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
+        api_source = (root / "services" / "turbovas-api" / "src" / "host_assets.rs").read_text(encoding="utf-8")
         native_tooling = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
 
-        self.assertIn('/api/v1/hosts/:host_id', api_source)
+        self.assertIn('/api/v1/hosts/:host_id', route_source)
         self.assertIn('parse_uuid(&host_id)?;', api_source)
         self.assertIn('WHERE h.uuid = $1', api_source)
         self.assertIn("JOIN host_identifiers hi ON hi.host = h.id", api_source)
@@ -3849,13 +3852,13 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_tls_certificate_asset_detail_contract_is_internal_and_source_only(self):
         root = Path(__file__).resolve().parents[2]
         openapi = (root / "api" / "openapi" / "turbovas-v1.yaml").read_text(encoding="utf-8")
-        api_source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
+        route_source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
         tls_source = (root / "services" / "turbovas-api" / "src" / "tls_certificates.rs").read_text(encoding="utf-8")
         native_tooling = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
-        tls_detail_source = api_source.split("async fn tls_certificate_asset_detail", 1)[1].split("async fn scanner_assets", 1)[0]
+        tls_detail_source = tls_source.split("async fn tls_certificate_asset_detail", 1)[1].split("fn tls_certificate_sources", 1)[0]
 
-        self.assertIn('/api/v1/tls-certificates/:certificate_id', api_source)
-        self.assertIn('parse_uuid(&certificate_id)?;', api_source)
+        self.assertIn('/api/v1/tls-certificates/:certificate_id', route_source)
+        self.assertIn('parse_uuid(&certificate_id)?;', tls_detail_source)
         self.assertIn('WHERE c.uuid = $1', tls_detail_source)
         self.assertIn('JOIN tls_certificate_sources src ON src.tls_certificate = c.id', tls_detail_source)
         self.assertIn('TlsCertificateSourceItem', tls_source)
@@ -3870,12 +3873,13 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_scanner_asset_detail_contract_is_internal_metadata_only(self):
         root = Path(__file__).resolve().parents[2]
         openapi = (root / "api" / "openapi" / "turbovas-v1.yaml").read_text(encoding="utf-8")
-        api_source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
+        route_source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
+        api_source = (root / "services" / "turbovas-api" / "src" / "scanner_assets.rs").read_text(encoding="utf-8")
         native_tooling = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
-        scanner_detail_source = api_source.split("async fn scanner_asset_detail", 1)[1].split("async fn scan_config_assets", 1)[0]
+        scanner_detail_source = api_source.split("async fn scanner_asset_detail", 1)[1].split("fn scanner_task_references_sql", 1)[0]
 
-        self.assertIn('/api/v1/scanners/:scanner_id', api_source)
-        self.assertIn('let scanner_id = parse_uuid(&scanner_id)?.to_string();', api_source)
+        self.assertIn('/api/v1/scanners/:scanner_id', route_source)
+        self.assertIn('let scanner_id = parse_uuid(&scanner_id)?.to_string();', scanner_detail_source)
         self.assertIn('WHERE s.uuid = $1', scanner_detail_source)
         self.assertIn('LEFT JOIN credentials c ON c.id = s.credential', scanner_detail_source)
         self.assertIn('nullif(c.uuid, \'\') AS credential_id', scanner_detail_source)
@@ -4664,6 +4668,8 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertEqual(turbovasctl.TURBOVAS_API_DIRECT_DEFAULT_HOST, "127.0.0.1")
         self.assertEqual(turbovasctl.TURBOVAS_API_DIRECT_DEFAULT_PORT, "19080")
         self.assertEqual(turbovasctl.TURBOVAS_API_BEARER_TOKEN_MIN_LENGTH, 32)
+        self.assertEqual(turbovasctl.TURBOVAS_API_OPERATOR_UUID_ENV, "TURBOVAS_API_OPERATOR_UUID")
+        self.assertEqual(turbovasctl.TURBOVAS_API_OPERATOR_NAME_ENV, "TURBOVAS_API_OPERATOR_NAME")
         self.assertEqual(turbovasctl.DEV_ADMIN_USER, "admin")
         self.assertEqual(turbovasctl.DEV_ADMIN_PASSWORD, "admin")
 
@@ -4922,6 +4928,8 @@ db2:keys=5,expires=0,avg_ttl=0
             turbovasctl.TURBOVAS_API_DIRECT_HOST_ENV: "127.0.0.1",
             turbovasctl.TURBOVAS_API_DIRECT_PORT_ENV: "19080",
             turbovasctl.TURBOVAS_API_DIRECT_BIND_ENV: "0.0.0.0:9081",
+            turbovasctl.TURBOVAS_API_OPERATOR_UUID_ENV: "12345678-1234-1234-1234-123456789abc",
+            turbovasctl.TURBOVAS_API_OPERATOR_NAME_ENV: "admin",
         }
         self.assertEqual(turbovasctl.native_api_direct_config_errors(valid), ())
         ipv6 = dict(valid)
@@ -4939,12 +4947,21 @@ db2:keys=5,expires=0,avg_ttl=0
             (turbovasctl.TURBOVAS_API_DIRECT_BIND_ENV, "0.0.0.0"),
             (turbovasctl.TURBOVAS_API_DIRECT_BIND_ENV, "0.0.0.0:not-a-port"),
             (turbovasctl.TURBOVAS_API_DIRECT_BIND_ENV, "0.0.0.0:9999"),
+            (turbovasctl.TURBOVAS_API_OPERATOR_UUID_ENV, "not-a-uuid"),
+            (turbovasctl.TURBOVAS_API_OPERATOR_NAME_ENV, "admin\nroot"),
         ]
         for env_name, value in cases:
             with self.subTest(env_name=env_name, value=value):
                 env = dict(valid)
                 env[env_name] = value
                 self.assertTrue(turbovasctl.native_api_direct_config_errors(env))
+
+        name_without_uuid = dict(valid)
+        name_without_uuid.pop(turbovasctl.TURBOVAS_API_OPERATOR_UUID_ENV)
+        self.assertIn(
+            f"{turbovasctl.TURBOVAS_API_OPERATOR_NAME_ENV} requires {turbovasctl.TURBOVAS_API_OPERATOR_UUID_ENV}",
+            turbovasctl.native_api_direct_config_errors(name_without_uuid),
+        )
 
         bad_bind = dict(valid)
         bad_bind[turbovasctl.TURBOVAS_API_DIRECT_BIND_ENV] = "0.0.0.0:9999"

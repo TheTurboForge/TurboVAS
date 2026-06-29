@@ -103,6 +103,13 @@ address such as `[::1]`, `TURBOVAS_API_DIRECT_PORT` for one TCP port, and
 `TURBOVAS_API_DIRECT_BIND` for `host:port` or `[ipv6]:port`. Do not put URLs,
 paths, comma-separated host lists, or whitespace in these values; the helper
 rejects malformed direct settings before sending a direct request.
+Future owner-bearing native writes use optional direct operator identity
+metadata: set `TURBOVAS_API_OPERATOR_UUID` to a real gvmd user UUID and, for
+audit readability, `TURBOVAS_API_OPERATOR_NAME`. When an operator UUID is set,
+`turbovas-api` verifies that it exists in `users` before binding the direct
+listener. These variables do not enable write routes by themselves; direct mode
+still accepts only read-only `GET` requests until write/control APIs are
+explicitly implemented.
 Use a request ID when a direct probe needs a visible correlation ID in
 responses/logs:
 

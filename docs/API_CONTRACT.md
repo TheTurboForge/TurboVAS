@@ -77,6 +77,10 @@ separate TLS/bootstrap/host-binding posture tracked outside this v1 read API.
   API listener. The development helper uses a read-only runtime token file by
   default instead of passing generated bearer tokens through the container
   environment. See `docs/NATIVE_API_AUTH_BOUNDARY.md`.
+- Direct operator identity: `TURBOVAS_API_OPERATOR_UUID` and
+  `TURBOVAS_API_OPERATOR_NAME` are optional for current read-only direct access.
+  A configured operator UUID is verified against `users` at startup and is the
+  identity anchor for future owner-bearing write/control slices.
 - Direct v1 method boundary: the opt-in direct listener accepts only read-only
   `GET` requests under `/api/v1` and returns JSON `405 method_not_allowed` for
   valid-token non-GET requests until native write/control APIs are separately
@@ -161,6 +165,9 @@ IPv6 address, `TURBOVAS_API_DIRECT_PORT` is a decimal TCP port, and
 `TURBOVAS_API_DIRECT_BIND` is `host:port` or `[ipv6]:port`. URLs, paths,
 comma-separated hosts, whitespace, and out-of-range ports are rejected before a
 direct request is sent.
+If `TURBOVAS_API_OPERATOR_NAME` is set, `TURBOVAS_API_OPERATOR_UUID` must also
+be set; malformed operator UUID/name values are rejected before a direct request
+is sent.
 
 The first runtime implementation proof is scoped in
 `docs/NATIVE_API_PROOF_PLAN.md`. It started with an internal Rust sidecar and now
