@@ -1770,6 +1770,10 @@ class TurboVASCtlTests(unittest.TestCase):
                 "alignment_status",
                 "rust_route_count",
                 "openapi_marked_direct_count",
+                "openapi_marked_direct_operation_count",
+                "openapi_marked_direct_read_operation_count",
+                "openapi_marked_direct_write_control_count",
+                "non_get_openapi_marked_direct_count",
                 "rust_direct_allowlist_count",
                 "scriptable_read_count",
                 "internal_only_count",
@@ -1785,6 +1789,10 @@ class TurboVASCtlTests(unittest.TestCase):
         )
         self.assertEqual(status_only["details"]["direct_api_contract"]["missing_openapi_direct_marker_count"], 0)
         self.assertEqual(status_only["details"]["direct_api_contract"]["unexpected_openapi_direct_marker_count"], 0)
+        self.assertEqual(status_only["details"]["direct_api_contract"]["openapi_marked_direct_operation_count"], 72)
+        self.assertEqual(status_only["details"]["direct_api_contract"]["openapi_marked_direct_read_operation_count"], 72)
+        self.assertEqual(status_only["details"]["direct_api_contract"]["openapi_marked_direct_write_control_count"], 0)
+        self.assertEqual(status_only["details"]["direct_api_contract"]["non_get_openapi_marked_direct_count"], 0)
         self.assertEqual(status_only["details"]["direct_api_contract"]["missing_rust_route_count"], 0)
         self.assertEqual(status_only["details"]["direct_api_contract"]["untracked_rust_route_count"], 0)
         self.assertEqual(status_only["details"]["direct_api_contract"]["missing_rust_direct_allowlist_count"], 0)
@@ -1903,6 +1911,12 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(contract["untracked_rust_routes"], [])
         self.assertEqual(contract["missing_rust_direct_allowlist"], [])
         self.assertEqual(contract["unexpected_rust_direct_allowlist"], [])
+        self.assertEqual(contract["openapi_marked_direct_operation_count"], len(contract["openapi_marked_direct_operations"]))
+        self.assertEqual(contract["openapi_marked_direct_read_operation_count"], 72)
+        self.assertEqual(contract["openapi_marked_direct_write_control_count"], 0)
+        self.assertEqual(contract["openapi_marked_direct_write_control_operations"], [])
+        self.assertEqual(contract["non_get_openapi_marked_direct_count"], 0)
+        self.assertEqual(contract["non_get_openapi_marked_direct_operations"], [])
         self.assertEqual(contract["segment_guard"]["alignment_status"], "pass")
         self.assertEqual(contract["segment_guard"]["missing_guard_properties"], [])
         self.assertEqual(endpoints["/api/v1/reports"]["direct_access"], "scriptable_read")
@@ -1940,6 +1954,38 @@ class TurboVASCtlTests(unittest.TestCase):
             "/api/v1/scopes/{scope_id}/reports/{scope_report_id}/retention-plan",
             contract["rust_direct_allowlist_endpoints"],
         )
+
+    def test_openapi_direct_operation_templates_are_method_aware(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            openapi = root / "api" / "openapi" / "turbovas-v1.yaml"
+            openapi.parent.mkdir(parents=True)
+            openapi.write_text(
+                "paths:\n"
+                "  /reports:\n"
+                "    get:\n"
+                "      operationId: getReports\n"
+                "      x-turbovas-direct: true\n"
+                "      x-turbovas-exposure: direct-read\n"
+                "  /scopes:\n"
+                "    post:\n"
+                "      operationId: postScopes\n"
+                "      x-turbovas-direct: true\n"
+                "      x-turbovas-exposure: direct-write\n",
+                encoding="utf-8",
+            )
+
+            operations = turbovasctl.openapi_direct_operation_templates(root)
+            direct_read_endpoints = turbovasctl.openapi_direct_endpoint_templates(root)
+
+        self.assertEqual(
+            operations,
+            [
+                {"method": "get", "endpoint": "/api/v1/reports", "exposure": "direct-read"},
+                {"method": "post", "endpoint": "/api/v1/scopes", "exposure": "direct-write"},
+            ],
+        )
+        self.assertEqual(direct_read_endpoints, ["/api/v1/reports"])
 
     def test_native_tooling_state_fails_on_direct_contract_drift(self):
         root = Path(__file__).resolve().parents[2]

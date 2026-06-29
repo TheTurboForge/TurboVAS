@@ -4698,7 +4698,30 @@ def native_api_direct_access(endpoint: str) -> str:
     return "not_native_api"
 
 
+def openapi_direct_operation_templates(repo_root: Path | None) -> list[dict[str, str]]:
+    templates: list[dict[str, str]] = []
+    for operation in openapi_contract_operations(repo_root):
+        fields = set(operation.get("x_turbovas_fields", [])) if isinstance(operation.get("x_turbovas_fields"), list) else set()
+        values = operation.get("x_turbovas_values", {}) if isinstance(operation.get("x_turbovas_values"), dict) else {}
+        exposure = values.get("x-turbovas-exposure")
+        if "x-turbovas-direct" not in fields and exposure not in OPENAPI_DIRECT_EXPOSURE_VALUES:
+            continue
+        method = str(operation.get("method", ""))
+        path = str(operation.get("path", ""))
+        if not method or not path:
+            continue
+        templates.append({"method": method, "endpoint": f"/api/v1{path}", "exposure": str(exposure or "")})
+    return sorted(templates, key=lambda item: (item["method"], item["endpoint"]))
+
+
 def openapi_direct_endpoint_templates(repo_root: Path | None) -> list[str]:
+    direct_read_endpoints = [
+        item["endpoint"]
+        for item in openapi_direct_operation_templates(repo_root)
+        if item["method"] == "get" and item["exposure"] == "direct-read"
+    ]
+    if direct_read_endpoints:
+        return sorted(direct_read_endpoints)
     if repo_root is None:
         return []
     path = repo_root / "api" / "openapi" / "turbovas-v1.yaml"
@@ -5706,6 +5729,17 @@ def native_api_direct_contract_summary(repo_root: Path | None, endpoints: list[d
         for item in endpoints
         if item.get("direct_access") == "internal_only" and isinstance(item.get("endpoint"), str)
     )
+    openapi_direct_operations = openapi_direct_operation_templates(repo_root)
+    openapi_direct_operation_labels = [f"{item['method'].upper()} {item['endpoint']}" for item in openapi_direct_operations]
+    openapi_direct_read_operations = [label for item, label in zip(openapi_direct_operations, openapi_direct_operation_labels) if item["method"] == "get"]
+    openapi_direct_write_control_operations = [
+        label
+        for item, label in zip(openapi_direct_operations, openapi_direct_operation_labels)
+        if item["method"] in OPENAPI_WRITE_CONTROL_METHODS or item["exposure"] == "direct-write"
+    ]
+    openapi_non_get_direct_operations = [
+        label for item, label in zip(openapi_direct_operations, openapi_direct_operation_labels) if item["method"] != "get"
+    ]
     openapi_marked = openapi_direct_endpoint_templates(repo_root)
     rust_routes = rust_native_api_route_templates(repo_root)
     rust_direct_allowed = rust_direct_api_allowed_endpoint_templates(repo_root)
@@ -5736,12 +5770,20 @@ def native_api_direct_contract_summary(repo_root: Path | None, endpoints: list[d
         "scriptable_read_count": len(scriptable),
         "internal_only_count": len(internal_only),
         "openapi_marked_direct_count": len(openapi_marked),
+        "openapi_marked_direct_operation_count": len(openapi_direct_operations),
+        "openapi_marked_direct_read_operation_count": len(openapi_direct_read_operations),
+        "openapi_marked_direct_write_control_count": len(openapi_direct_write_control_operations),
+        "non_get_openapi_marked_direct_count": len(openapi_non_get_direct_operations),
         "rust_route_count": len(rust_routes),
         "rust_direct_allowlist_count": len(rust_direct_allowed),
         "inventory_endpoints": inventory,
         "scriptable_read_endpoints": scriptable,
         "internal_only_endpoints": internal_only,
         "openapi_marked_direct_endpoints": openapi_marked,
+        "openapi_marked_direct_operations": openapi_direct_operation_labels,
+        "openapi_marked_direct_read_operations": openapi_direct_read_operations,
+        "openapi_marked_direct_write_control_operations": openapi_direct_write_control_operations,
+        "non_get_openapi_marked_direct_operations": openapi_non_get_direct_operations,
         "rust_route_endpoints": rust_routes,
         "rust_direct_allowlist_endpoints": rust_direct_allowed,
         "missing_openapi_direct_markers": missing,
@@ -6445,6 +6487,10 @@ def compact_native_tooling_summary(summary: dict[str, Any]) -> dict[str, Any]:
         "scriptable_read_count": direct_contract.get("scriptable_read_count", 0) if isinstance(direct_contract, dict) else 0,
         "internal_only_count": direct_contract.get("internal_only_count", 0) if isinstance(direct_contract, dict) else 0,
         "openapi_marked_direct_count": direct_contract.get("openapi_marked_direct_count", 0) if isinstance(direct_contract, dict) else 0,
+        "openapi_marked_direct_operation_count": direct_contract.get("openapi_marked_direct_operation_count", 0) if isinstance(direct_contract, dict) else 0,
+        "openapi_marked_direct_read_operation_count": direct_contract.get("openapi_marked_direct_read_operation_count", 0) if isinstance(direct_contract, dict) else 0,
+        "openapi_marked_direct_write_control_count": direct_contract.get("openapi_marked_direct_write_control_count", 0) if isinstance(direct_contract, dict) else 0,
+        "non_get_openapi_marked_direct_count": direct_contract.get("non_get_openapi_marked_direct_count", 0) if isinstance(direct_contract, dict) else 0,
         "rust_route_count": direct_contract.get("rust_route_count", 0) if isinstance(direct_contract, dict) else 0,
         "rust_direct_allowlist_count": direct_contract.get("rust_direct_allowlist_count", 0) if isinstance(direct_contract, dict) else 0,
         "missing_openapi_direct_marker_count": len(direct_contract.get("missing_openapi_direct_markers", [])) if isinstance(direct_contract, dict) else 0,
@@ -6564,6 +6610,10 @@ def native_tooling_status_only_details(summary: dict[str, Any]) -> dict[str, Any
             "alignment_status": direct_contract.get("alignment_status", "unknown"),
             "rust_route_count": direct_contract.get("rust_route_count", 0),
             "openapi_marked_direct_count": direct_contract.get("openapi_marked_direct_count", 0),
+            "openapi_marked_direct_operation_count": direct_contract.get("openapi_marked_direct_operation_count", 0),
+            "openapi_marked_direct_read_operation_count": direct_contract.get("openapi_marked_direct_read_operation_count", 0),
+            "openapi_marked_direct_write_control_count": direct_contract.get("openapi_marked_direct_write_control_count", 0),
+            "non_get_openapi_marked_direct_count": direct_contract.get("non_get_openapi_marked_direct_count", 0),
             "rust_direct_allowlist_count": direct_contract.get("rust_direct_allowlist_count", 0),
             "scriptable_read_count": direct_contract.get("scriptable_read_count", 0),
             "internal_only_count": direct_contract.get("internal_only_count", 0),
