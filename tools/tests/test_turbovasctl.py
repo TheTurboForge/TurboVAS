@@ -2105,6 +2105,8 @@ class TurboVASCtlTests(unittest.TestCase):
                 "x-turbovas-exposure",
                 "x-turbovas-inherited-still-owns",
                 "x-turbovas-maturity",
+                "x-turbovas-operator-identity",
+                "x-turbovas-owner-semantics",
                 "x-turbovas-replaces",
                 "x-turbovas-safety-contract",
                 "x-turbovas-side-effect",
@@ -3093,6 +3095,8 @@ class TurboVASCtlTests(unittest.TestCase):
                 "      x-turbovas-maturity: preview-write\n"
                 "      x-turbovas-replaces: none\n"
                 "      x-turbovas-inherited-still-owns: tag-write-control\n"
+                "      x-turbovas-operator-identity: direct-token-operator\n"
+                "      x-turbovas-owner-semantics: request-operator-owner\n"
                 "      x-turbovas-safety-contract: write-control-v1\n"
                 "      x-turbovas-side-effect: metadata-write\n"
                 "      requestBody:\n"
@@ -3119,6 +3123,8 @@ class TurboVASCtlTests(unittest.TestCase):
                 "      x-turbovas-maturity: preview-write\n"
                 "      x-turbovas-replaces: none\n"
                 "      x-turbovas-inherited-still-owns: tag-write-control\n"
+                "      x-turbovas-operator-identity: not-applicable-preview\n"
+                "      x-turbovas-owner-semantics: not-applicable-preview\n"
                 "      x-turbovas-safety-contract: write-control-v1\n"
                 "      x-turbovas-side-effect: metadata-write\n"
                 "      requestBody:\n"
@@ -3142,6 +3148,8 @@ class TurboVASCtlTests(unittest.TestCase):
         missing = {(item["operation"], item["field"]) for item in write_control["missing_write_control_metadata"]}
         self.assertIn(("PATCH /bad-write", "x-turbovas-inherited-still-owns"), missing)
         self.assertIn(("PATCH /bad-write", "x-turbovas-maturity"), missing)
+        self.assertIn(("PATCH /bad-write", "x-turbovas-operator-identity"), missing)
+        self.assertIn(("PATCH /bad-write", "x-turbovas-owner-semantics"), missing)
         self.assertIn(("PATCH /bad-write", "x-turbovas-replaces"), missing)
         invalid = {(item["operation"], item["field"]): item for item in write_control["invalid_write_control_metadata"]}
         self.assertEqual(invalid[("PATCH /bad-write", "x-turbovas-exposure")]["actual"], "direct-read")

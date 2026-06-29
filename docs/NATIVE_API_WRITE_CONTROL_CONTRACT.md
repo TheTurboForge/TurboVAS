@@ -19,6 +19,14 @@ operation must declare these OpenAPI fields before implementation:
   contract is still a scaffold.
 - `x-turbovas-inherited-still-owns`: the legacy behavior that still owns any
   unreplaced part of the workflow.
+- `x-turbovas-operator-identity`: how the write/control operation maps the
+  request to an operator principal: `proxied-session-operator`,
+  `direct-token-operator`, `service-admin-dev-only`, or
+  `not-applicable-preview`.
+- `x-turbovas-owner-semantics`: how persistent owner fields or gvmd-style
+  current-user semantics are handled: `request-operator-owner`,
+  `preserve-existing-owner`, `single-admin-owner`, `no-owner-state`, or
+  `not-applicable-preview`.
 - `x-turbovas-safety-contract`: currently `write-control-v1`.
 - `x-turbovas-side-effect`: one of `metadata-write`, `scanner-control`,
   `feed-control`, `credential-secret-control`, `account-auth-control`,

@@ -422,6 +422,8 @@ OPENAPI_ALLOWED_TURBOVAS_OPERATION_FIELDS = frozenset(
         "x-turbovas-exposure",
         "x-turbovas-inherited-still-owns",
         "x-turbovas-maturity",
+        "x-turbovas-operator-identity",
+        "x-turbovas-owner-semantics",
         "x-turbovas-replaces",
         "x-turbovas-safety-contract",
         "x-turbovas-side-effect",
@@ -430,6 +432,23 @@ OPENAPI_ALLOWED_TURBOVAS_OPERATION_FIELDS = frozenset(
 OPENAPI_ALLOWED_EXPOSURE_VALUES = frozenset({"direct-read", "direct-write", "internal-only"})
 OPENAPI_DIRECT_EXPOSURE_VALUES = frozenset({"direct-read", "direct-write"})
 OPENAPI_ALLOWED_SAFETY_CONTRACT_VALUES = frozenset({"write-control-v1"})
+OPENAPI_ALLOWED_OPERATOR_IDENTITY_VALUES = frozenset(
+    {
+        "direct-token-operator",
+        "not-applicable-preview",
+        "proxied-session-operator",
+        "service-admin-dev-only",
+    }
+)
+OPENAPI_ALLOWED_OWNER_SEMANTICS_VALUES = frozenset(
+    {
+        "no-owner-state",
+        "not-applicable-preview",
+        "preserve-existing-owner",
+        "request-operator-owner",
+        "single-admin-owner",
+    }
+)
 OPENAPI_ALLOWED_SIDE_EFFECT_VALUES = frozenset(
     {
         "account-auth-control",
@@ -447,6 +466,8 @@ OPENAPI_WRITE_CONTROL_REQUIRED_FIELDS = frozenset(
         "x-turbovas-exposure",
         "x-turbovas-inherited-still-owns",
         "x-turbovas-maturity",
+        "x-turbovas-operator-identity",
+        "x-turbovas-owner-semantics",
         "x-turbovas-replaces",
         "x-turbovas-safety-contract",
         "x-turbovas-side-effect",
@@ -570,6 +591,8 @@ OPENAPI_ALLOWED_INHERITED_STILL_OWNS_VALUES = frozenset(
 OPENAPI_ALLOWED_MIGRATION_METADATA_VALUES = {
     "x-turbovas-inherited-still-owns": OPENAPI_ALLOWED_INHERITED_STILL_OWNS_VALUES,
     "x-turbovas-maturity": OPENAPI_ALLOWED_MATURITY_VALUES,
+    "x-turbovas-operator-identity": OPENAPI_ALLOWED_OPERATOR_IDENTITY_VALUES,
+    "x-turbovas-owner-semantics": OPENAPI_ALLOWED_OWNER_SEMANTICS_VALUES,
     "x-turbovas-replaces": OPENAPI_ALLOWED_REPLACES_VALUES,
     "x-turbovas-safety-contract": OPENAPI_ALLOWED_SAFETY_CONTRACT_VALUES,
     "x-turbovas-side-effect": OPENAPI_ALLOWED_SIDE_EFFECT_VALUES,
@@ -4968,6 +4991,8 @@ def openapi_write_control_contract_summary(operations: list[dict[str, Any]]) -> 
         for field in sorted(OPENAPI_WRITE_CONTROL_REQUIRED_FIELDS - fields):
             missing_metadata.append({"operation": label, "field": field})
         for field, allowed in {
+            "x-turbovas-operator-identity": OPENAPI_ALLOWED_OPERATOR_IDENTITY_VALUES,
+            "x-turbovas-owner-semantics": OPENAPI_ALLOWED_OWNER_SEMANTICS_VALUES,
             "x-turbovas-safety-contract": OPENAPI_ALLOWED_SAFETY_CONTRACT_VALUES,
             "x-turbovas-side-effect": OPENAPI_ALLOWED_SIDE_EFFECT_VALUES,
         }.items():
@@ -5018,6 +5043,8 @@ def openapi_write_control_contract_summary(operations: list[dict[str, Any]]) -> 
         "missing_write_control_metadata": missing_metadata,
         "invalid_write_control_metadata": invalid_metadata,
         "allowed_safety_contract_values": sorted(OPENAPI_ALLOWED_SAFETY_CONTRACT_VALUES),
+        "allowed_operator_identity_values": sorted(OPENAPI_ALLOWED_OPERATOR_IDENTITY_VALUES),
+        "allowed_owner_semantics_values": sorted(OPENAPI_ALLOWED_OWNER_SEMANTICS_VALUES),
         "allowed_side_effect_values": sorted(OPENAPI_ALLOWED_SIDE_EFFECT_VALUES),
         "required_write_control_fields": sorted(OPENAPI_WRITE_CONTROL_REQUIRED_FIELDS),
     }
