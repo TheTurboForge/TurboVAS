@@ -11148,6 +11148,8 @@ def direct_smoke_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
             "native-api-direct.write-control-up",
             "native-api-direct.scope-write-create",
             "native-api-direct.scope-write-update",
+            "native-api-direct.scope-write-query-denied",
+            "native-api-direct.scope-delete-body-denied",
             "native-api-direct.scope-write-delete",
             "native-api-direct.scope-write-post-delete",
             "native-api-direct.tag-write-create",
@@ -11285,6 +11287,20 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
             scope_patch_json, scope_patch_status = parse_json_output_with_http_status(scope_patch)
             scope_patch_ok = scope_patch.returncode == 0 and scope_patch_status == 200 and isinstance(scope_patch_json, dict) and scope_patch_json.get("id") == scope_id and scope_patch_json.get("comment") == "TurboVAS direct write smoke updated temporary scope"
             findings.append(native_api_probe_finding("pass" if scope_patch_ok else "fail", "native-api-direct.scope-write-update", "Direct write-control patched temporary scope metadata." if scope_patch_ok else "Direct write-control failed to patch temporary scope metadata.", scope_patch, direct_native_api_display_command(f"/api/v1/scopes/{urllib.parse.quote(scope_id)}", token=token, env=env, method="PATCH", body=scope_patch_body, extra_headers=content_type), scope_patch_json, {"http_status": scope_patch_status, "scope_id": scope_id, **summarize_native_api_response(scope_patch_json)}))
+
+            scope_query_patch_body = json.dumps(
+                {"comment": "query-denied"},
+                separators=(",", ":"),
+            )
+            scope_query_patch = direct_native_api_curl(repo_root, f"/api/v1/scopes/{urllib.parse.quote(scope_id)}?unexpected=1", token=token, env=env, method="PATCH", body=scope_query_patch_body, extra_headers=content_type)
+            scope_query_patch_json, scope_query_patch_status = parse_json_output_with_http_status(scope_query_patch)
+            scope_query_patch_ok = scope_query_patch.returncode == 0 and scope_query_patch_status == 413 and isinstance(scope_query_patch_json, dict) and scope_query_patch_json.get("error", {}).get("code") == "request_too_large"
+            findings.append(native_api_probe_finding("pass" if scope_query_patch_ok else "fail", "native-api-direct.scope-write-query-denied", "Direct write-control rejects non-GET query strings before scope mutation." if scope_query_patch_ok else "Direct write-control did not reject a non-GET query string before scope mutation.", scope_query_patch, direct_native_api_display_command(f"/api/v1/scopes/{urllib.parse.quote(scope_id)}?unexpected=1", token=token, env=env, method="PATCH", body=scope_query_patch_body, extra_headers=content_type), scope_query_patch_json, {"http_status": scope_query_patch_status, "scope_id": scope_id, **summarize_native_api_response(scope_query_patch_json)}))
+
+            scope_delete_body = direct_native_api_curl(repo_root, f"/api/v1/scopes/{urllib.parse.quote(scope_id)}", token=token, env=env, method="DELETE", body="probe-body", extra_headers=content_type)
+            scope_delete_body_json, scope_delete_body_status = parse_json_output_with_http_status(scope_delete_body)
+            scope_delete_body_ok = scope_delete_body.returncode == 0 and scope_delete_body_status == 413 and isinstance(scope_delete_body_json, dict) and scope_delete_body_json.get("error", {}).get("code") == "request_too_large"
+            findings.append(native_api_probe_finding("pass" if scope_delete_body_ok else "fail", "native-api-direct.scope-delete-body-denied", "Direct write-control rejects DELETE request bodies before scope deletion." if scope_delete_body_ok else "Direct write-control did not reject a DELETE request body before scope deletion.", scope_delete_body, direct_native_api_display_command(f"/api/v1/scopes/{urllib.parse.quote(scope_id)}", token=token, env=env, method="DELETE", body="probe-body", extra_headers=content_type), scope_delete_body_json, {"http_status": scope_delete_body_status, "scope_id": scope_id, **summarize_native_api_response(scope_delete_body_json)}))
 
             scope_delete = direct_native_api_curl(repo_root, f"/api/v1/scopes/{urllib.parse.quote(scope_id)}", token=token, env=env, method="DELETE")
             scope_delete_json, scope_delete_status = parse_json_output_with_http_status(scope_delete)

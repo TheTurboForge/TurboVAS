@@ -5580,7 +5580,11 @@ db2:keys=5,expires=0,avg_ttl=0
                     self.assertEqual(payload["host_ids"], [])
                     return turbovasctl.subprocess.CompletedProcess([], 0, json.dumps({"id": scope_uuid, "name": payload["name"], "comment": payload["comment"]}) + "\n201", "")
                 if method == "PATCH" and path.startswith("/api/v1/scopes/"):
+                    if "?" in path:
+                        return turbovasctl.subprocess.CompletedProcess([], 0, '{"error":{"code":"request_too_large"}}\n413', "")
                     return turbovasctl.subprocess.CompletedProcess([], 0, json.dumps({"id": scope_uuid, "comment": "TurboVAS direct write smoke updated temporary scope"}) + "\n200", "")
+                if method == "DELETE" and path.startswith("/api/v1/scopes/") and body is not None:
+                    return turbovasctl.subprocess.CompletedProcess([], 0, '{"error":{"code":"request_too_large"}}\n413', "")
                 if method == "DELETE" and path.startswith("/api/v1/scopes/"):
                     return turbovasctl.subprocess.CompletedProcess([], 0, "\n204", "")
                 if method == "GET" and path.startswith("/api/v1/scopes/"):
@@ -5615,6 +5619,8 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertEqual(checks["native-api-direct.write-control-operator"], "pass")
         self.assertEqual(checks["native-api-direct.scope-write-create"], "pass")
         self.assertEqual(checks["native-api-direct.scope-write-update"], "pass")
+        self.assertEqual(checks["native-api-direct.scope-write-query-denied"], "pass")
+        self.assertEqual(checks["native-api-direct.scope-delete-body-denied"], "pass")
         self.assertEqual(checks["native-api-direct.scope-write-delete"], "pass")
         self.assertEqual(checks["native-api-direct.scope-write-post-delete"], "pass")
         self.assertEqual(checks["native-api-direct.tag-write-create"], "pass")
@@ -5624,7 +5630,7 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertEqual(checks["native-api-direct.tag-write-delete"], "pass")
         self.assertEqual(checks["native-api-direct.tag-write-post-delete"], "pass")
         self.assertEqual(checks["native-api-direct.write-control-restore"], "pass")
-        self.assertEqual([probe[0] for probe in probes], ["POST", "PATCH", "DELETE", "GET", "POST", "PATCH", "PATCH", "DELETE", "DELETE", "GET"])
+        self.assertEqual([probe[0] for probe in probes], ["POST", "PATCH", "PATCH", "DELETE", "DELETE", "GET", "POST", "PATCH", "PATCH", "DELETE", "DELETE", "GET"])
         rendered = json.dumps(result, sort_keys=True)
         self.assertNotIn(token, rendered)
         self.assertTrue(any(env.get(turbovasctl.TURBOVAS_API_DIRECT_WRITE_CONTROL_ENV) == "1" for env in envs))
