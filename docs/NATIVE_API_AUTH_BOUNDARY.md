@@ -175,6 +175,9 @@ internal-only endpoint denial for the retention preview when a scope report is
 available, plus continued internal native API smoke. Malformed HTTP framing can
 be rejected by the HTTP parser before native middleware; the smoke records that
 layer explicitly.
+The write-control smoke also proves that direct DELETE requests reject bodies
+before mutation, because current direct DELETE contracts do not consume request
+bodies.
 `native-api-request --request-id` sends a safe `X-Request-Id` value for
 correlation; it is not an authentication or audit identity.
 Direct listener host/port env is locally shape-checked as part of the direct

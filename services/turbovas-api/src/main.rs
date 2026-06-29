@@ -2561,6 +2561,17 @@ mod tests {
             &delete
         ));
 
+        let delete_body = Request::builder()
+            .method("DELETE")
+            .uri("/api/v1/scopes/12345678-1234-1234-1234-123456789abc")
+            .header(header::CONTENT_LENGTH, "1")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        assert!(!direct_api_request_shape_is_allowed_for_method(
+            &axum::http::Method::DELETE,
+            &delete_body
+        ));
+
         let oversized = Request::builder()
             .method("POST")
             .uri("/api/v1/scopes")

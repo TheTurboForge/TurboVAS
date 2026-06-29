@@ -32,9 +32,9 @@ pub(crate) fn direct_api_request_shape_is_allowed_for_method(
     let Some(length) = direct_api_content_length(request) else {
         return false;
     };
-    if method == Method::GET {
+    if method == Method::GET || method == Method::DELETE {
         length == 0
-    } else if matches!(method, &Method::POST | &Method::PATCH | &Method::DELETE) {
+    } else if matches!(method, &Method::POST | &Method::PATCH) {
         length <= MAX_DIRECT_API_WRITE_BODY_BYTES
     } else {
         false

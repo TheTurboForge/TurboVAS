@@ -98,12 +98,14 @@ separate TLS/bootstrap/host-binding posture tracked outside this v1 read API.
 - Direct v1 browser boundary: direct responses do not emit browser CORS access
   headers. Browser product reads continue through the same-origin `gsad` path
   while direct access remains script/operator oriented.
-- Direct v1 request-shape boundary: bearer-authenticated direct `GET` requests
-  reject request bodies, transfer-encoded bodies, and oversized query strings
-  with JSON `413 request_too_large`. Malformed `Content-Length` is rejected as
-  malformed HTTP before middleware in the live stack, currently with HTTP 400.
-  This first bound is listener-level hardening; endpoint-specific cost limits
-  and full rate limits remain separate B-130/B-134 work.
+- Direct v1 request-shape boundary: bearer-authenticated direct `GET` and
+  `DELETE` requests reject request bodies, direct write-control `POST`/`PATCH`
+  bodies are size-bounded, and transfer-encoded bodies plus oversized query
+  strings are rejected with JSON `413 request_too_large`. Malformed
+  `Content-Length` is rejected as malformed HTTP before middleware in the live
+  stack, currently with HTTP 400. This first bound is listener-level hardening;
+  endpoint-specific cost limits and full rate limits remain separate
+  B-130/B-134 work.
 - Direct v1 pressure guard: authenticated direct `GET` requests also pass
   through a fixed in-flight request cap. When the cap is reached, the listener
   returns JSON `429 too_many_requests` with `X-Request-Id`. This is a coarse

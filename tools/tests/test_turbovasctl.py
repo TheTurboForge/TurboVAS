@@ -3618,6 +3618,8 @@ class TurboVASCtlTests(unittest.TestCase):
             turbovasctl.validate_native_api_request_shape("POST", body=None, allow_write_control=False)
         with self.assertRaises(ValueError):
             turbovasctl.validate_native_api_request_shape("GET", body='{}', allow_write_control=True)
+        with self.assertRaises(ValueError):
+            turbovasctl.validate_native_api_request_shape("DELETE", body='{}', allow_write_control=True)
 
     def test_native_api_request_rejects_non_get_without_write_control_intent(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -5503,6 +5505,8 @@ db2:keys=5,expires=0,avg_ttl=0
                     return turbovasctl.subprocess.CompletedProcess([], 0, json.dumps({"id": tag_uuid, "name": payload["name"], "value": "initial", "active": True}) + "\n201", "")
                 if method == "PATCH" and path.startswith("/api/v1/tags/"):
                     return turbovasctl.subprocess.CompletedProcess([], 0, json.dumps({"id": tag_uuid, "value": "updated", "active": False}) + "\n200", "")
+                if method == "DELETE" and path.startswith("/api/v1/tags/") and body is not None:
+                    return turbovasctl.subprocess.CompletedProcess([], 0, '{"error":{"code":"request_too_large"}}\n413', "")
                 if method == "DELETE" and path.startswith("/api/v1/tags/"):
                     return turbovasctl.subprocess.CompletedProcess([], 0, "\n204", "")
                 return turbovasctl.subprocess.CompletedProcess([], 0, '{"error":{"code":"not_found"}}\n404', "")
@@ -5527,10 +5531,11 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertEqual(checks["native-api-direct.scope-write-post-delete"], "pass")
         self.assertEqual(checks["native-api-direct.tag-write-create"], "pass")
         self.assertEqual(checks["native-api-direct.tag-write-update"], "pass")
+        self.assertEqual(checks["native-api-direct.tag-delete-body-denied"], "pass")
         self.assertEqual(checks["native-api-direct.tag-write-delete"], "pass")
         self.assertEqual(checks["native-api-direct.tag-write-post-delete"], "pass")
         self.assertEqual(checks["native-api-direct.write-control-restore"], "pass")
-        self.assertEqual([probe[0] for probe in probes], ["POST", "PATCH", "DELETE", "GET", "POST", "PATCH", "DELETE", "GET"])
+        self.assertEqual([probe[0] for probe in probes], ["POST", "PATCH", "DELETE", "GET", "POST", "PATCH", "DELETE", "DELETE", "GET"])
         rendered = json.dumps(result, sort_keys=True)
         self.assertNotIn(token, rendered)
         self.assertTrue(any(env.get(turbovasctl.TURBOVAS_API_DIRECT_WRITE_CONTROL_ENV) == "1" for env in envs))
