@@ -37,6 +37,26 @@ authorization, validation and rejection paths, idempotency or rollback semantics
 audit logging, secret redaction, OpenAPI request/response shape, and focused
 tests. The rule is not to avoid these paths; the rule is not to half-ass them.
 
+## First Candidate: Scope Metadata And Membership
+
+The preferred first live-write candidate is scope metadata and membership, not
+report generation or scanner control. Scope create/modify/delete and target or
+host membership edits are metadata writes over gvmd/PostgreSQL state and do not
+start scans, touch credentials, mutate feeds, or generate reports by themselves.
+
+Before any scope write route is implemented, the contract must state:
+
+- operator identity and owner semantics for created and modified scopes;
+- whether the global scope is immutable, partially editable, or excluded;
+- membership invariants for targets, hosts, empty scopes, and duplicate links;
+- delete behavior, including any scope-report references that block deletion;
+- idempotency and rejection semantics for repeated add/remove operations;
+- audit fields that do not include credentials, tokens, or private network
+  details.
+
+`generate_scope_report` remains a separate report-generation workflow. It must
+not be folded into the first scope metadata-write slice.
+
 Current checks:
 
 - `just native-api-client-contract --status-only --json`
