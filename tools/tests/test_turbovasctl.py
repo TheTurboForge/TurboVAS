@@ -3969,19 +3969,17 @@ class TurboVASCtlTests(unittest.TestCase):
                 "components/gvm-tools/scripts/export-pdf-report.gmp.py",
                 "components/gvm-tools/scripts/verify-scanners.gmp.py",
                 "components/gvm-tools/scripts/empty-trash.gmp.py",
-                "components/gvm-tools/scripts/check-gmp-gos24.10.gmp.py",
                 "components/gvm-tools/scripts/unclassified.gmp.py",
             ]
         )
 
         self.assertEqual(review["safe_removal_count"], 0)
-        self.assertEqual(review["blocked_or_review_count"], 6)
+        self.assertEqual(review["blocked_or_review_count"], 5)
         buckets = review["buckets"]
         self.assertEqual(buckets["credential_or_account"]["count"], 1)
         self.assertEqual(buckets["export_or_report_generation"]["count"], 1)
         self.assertEqual(buckets["scanner_or_task_control"]["count"], 1)
         self.assertEqual(buckets["write_or_mutation"]["count"], 1)
-        self.assertEqual(buckets["compatibility_probe"]["count"], 1)
         self.assertEqual(buckets["needs_review"]["count"], 1)
 
     def test_native_tooling_residue_classifies_remaining_product_workflow(self):

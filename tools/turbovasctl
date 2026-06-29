@@ -359,10 +359,7 @@ NATIVE_TOOLING_PRODUCT_GVM_TOOLS_SCRIPTS = frozenset(
     }
 )
 NATIVE_TOOLING_GVM_TOOLS_REMOVAL_BUCKETS = {
-    "compatibility_probe": {
-        "check-gmp-gos22.04.gmp.py",
-        "check-gmp-gos24.10.gmp.py",
-    },
+    "compatibility_probe": set(),
     "credential_or_account": {
         "create-credentials-from-csv.gmp.py",
         "list-credentials.gmp.py",

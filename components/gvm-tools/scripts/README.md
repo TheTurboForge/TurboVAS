@@ -18,47 +18,6 @@ This script creates a new scan config with nvts from a given CERT-Bund!
 
 ---
 
-## `check-gmp.gmp.py`
-
-This script can test different methods of the gmp API.
-
-| Optional argument | Description |
-| --- | --- |
-|`-H`:      |              Show this help message and exit
-|`-V`, `--version`: |        Show program's version number and exit
-|`--cache [CACHE]`:  |   Path to cache file. Default: `/var/folders/mk/ dfxkj16j4779x98r26n21qnr0000gn/ T/check_gmp/reports.db`
-| `--clean` | Activate to clean the database
-| `-u GMP_USERNAME`, `--gmp-username GMP_USERNAME` | GMP username
-| `-w GMP_PASSWORD`, `--gmp-password GMP_PASSWORD` | GMP password
-|`-F HOSTADDRESS`, `--hostaddress HOSTADDRESS` | Report last report status of host `<ip>`.
-|`-T TASK`, `--task TASK` | Report status of task `<task>`.
-|`--apply-overrides`    | Apply overrides.
-|`--overrides`          | Include overrides.
-|`-d`, `--details`       |  Include connection details in output.
-|`-l`, `--report-link`   |  Include URL of report in output.
-|`--dfn`               |  Include DFN-CERT IDs on vulnerabilities in output.
-|`--oid`               |  Include OIDs of NVTs finding vulnerabilities in output.
-|`--descr`             |  Include descriptions of NVTs finding vulnerabilities in output.
-|`--showlog`           |  Include log messages in output.
-| `--show-ports`       |   Include port of given vulnerable nvt in output.
-| `--scanend`          |   Include timestamp of scan end in output.
-| `--autofp {0,1,2}`  |    Trust vendor security updates for automatic false positive filtering (`0=No`, `1=full match`, `2=partial`).
-| `-e`, `--empty-as-unknown` | Respond with `UNKNOWN` on empty results.
-| `-I MAX_RUNNING_INSTANCES`, `--max-running-instances MAX_RUNNING_INSTANCES` | Set the maximum simultaneous processes of check-gmp
-| `--hostname [HOSTNAME]`
-| `--ping`               | Ping the gsm appliance.
-| `--status`            |  Report status of task.
-| `--days DAYS`        |   Delete database entries that are older than given days.
-| `--ip IP`             |  Delete database entry for given ip.
-| `--trend`             |  Report status by trend.
-| `--last-report`      |   Report status by last report.
-
-### Example
-
-`$ gvm-script --gmp-username name --gmp-password pass ssh --hostname <gsm> scripts/check-gmp.gmp.py --ip 127.0.0.1 --ping`
-
----
-
 ## `clean-sensor.gmp.py`
 
 This script removes all resources from a sensor, except active tasks.
