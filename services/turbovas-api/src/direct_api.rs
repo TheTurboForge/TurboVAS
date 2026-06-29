@@ -18,7 +18,7 @@ use crate::{
     },
     errors::ApiError,
     request_ids::{attach_request_id_header, request_id_from_headers},
-    request_shapes::direct_api_request_shape_is_allowed,
+    request_shapes::direct_api_request_shape_is_allowed_for_method,
 };
 
 const DIRECT_API_BIND_ENV: &str = "TURBOVAS_API_DIRECT_BIND";
@@ -117,8 +117,8 @@ pub(crate) async fn require_direct_api_auth(
         if !direct_api_v1_path_is_allowed(&path) {
             audit_reason = Some("route_not_allowlisted");
             ApiError::NotFound.into_response()
-        } else if request.method() == Method::GET {
-            if direct_api_request_shape_is_allowed(&request) {
+        } else if direct_api_v1_method_is_allowed(&method, &path) {
+            if direct_api_request_shape_is_allowed_for_method(&method, &request) {
                 if let Some(_slot) = auth.try_acquire_request_slot() {
                     attach_direct_api_operator_extension(&mut request, &auth);
                     next.run(request).await
@@ -279,6 +279,21 @@ pub(crate) fn direct_api_v1_path_is_allowed(path: &str) -> bool {
                 && !scope_id.is_empty()
                 && !scope_report_id.is_empty()
     )
+}
+
+pub(crate) fn direct_api_v1_method_is_allowed(method: &Method, path: &str) -> bool {
+    if !direct_api_v1_path_is_allowed(path) {
+        return false;
+    }
+    method == Method::GET || direct_api_v1_write_method_path_is_allowed(method, path)
+}
+
+fn direct_api_v1_write_method_path_is_allowed(method: &Method, path: &str) -> bool {
+    if !matches!(method, &Method::POST | &Method::PATCH | &Method::DELETE) {
+        return false;
+    }
+    let _ = path;
+    false
 }
 
 fn direct_api_segments_are_nonempty(parts: &[&str]) -> bool {

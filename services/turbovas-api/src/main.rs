@@ -267,8 +267,12 @@ mod tests {
     };
 
     use crate::{
-        auth::*, collections::*, direct_api::direct_api_v1_path_is_allowed, request_ids::*,
-        request_shapes::*, user_tags::catalog_user_tags_sql,
+        auth::*,
+        collections::*,
+        direct_api::{direct_api_v1_method_is_allowed, direct_api_v1_path_is_allowed},
+        request_ids::*,
+        request_shapes::*,
+        user_tags::catalog_user_tags_sql,
     };
 
     use super::*;
@@ -2261,6 +2265,29 @@ mod tests {
         ));
         assert!(!direct_api_v1_path_is_allowed("/api/v1/internal-preview"));
         assert!(!direct_api_v1_path_is_allowed("/api/v1/reports/id/raw-xml"));
+    }
+
+    #[test]
+    fn direct_api_method_classifier_keeps_write_methods_closed_until_allowlisted() {
+        assert!(direct_api_v1_method_is_allowed(
+            &axum::http::Method::GET,
+            "/api/v1/scopes"
+        ));
+        for method in [
+            axum::http::Method::POST,
+            axum::http::Method::PATCH,
+            axum::http::Method::DELETE,
+            axum::http::Method::PUT,
+        ] {
+            assert!(
+                !direct_api_v1_method_is_allowed(&method, "/api/v1/scopes"),
+                "{method} should stay closed until direct write-control exposure is explicit"
+            );
+        }
+        assert!(!direct_api_v1_method_is_allowed(
+            &axum::http::Method::GET,
+            "/api/v1/internal-preview"
+        ));
     }
 
     #[test]
