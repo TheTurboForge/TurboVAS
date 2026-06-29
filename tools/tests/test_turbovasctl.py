@@ -278,6 +278,53 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertNotIn("manifest", compact["findings"][1]["details"])
         self.assertEqual(compact["findings"][1]["details"]["manifest_entry_count"], 2)
 
+    def test_direct_smoke_status_only_keeps_signal_without_pass_payloads(self):
+        result = {
+            "status": "warn",
+            "summary": "Direct native API smoke checks completed.",
+            "artifacts": ["/tmp/native-api-direct-smoke.json", "/tmp/native-api-smoke.json"],
+            "details": {
+                "base_url": "http://127.0.0.1:8081",
+                "container_bind": "127.0.0.1:8081:8080",
+                "token_source": "runtime-secret-file",
+                "direct_request_example": "tools/turbovasctl native-api-request --direct --json --path '/api/v1/reports?page_size=1'",
+            },
+            "findings": [
+                {
+                    "status": "pass",
+                    "check": "native-api-direct.valid-token",
+                    "message": "Direct native API accepts the configured bearer token and returns JSON.",
+                    "details": {"response_json": {"items": [{"id": "r1"}]}, "output_tail": "large"},
+                },
+                {
+                    "status": "pass",
+                    "check": "native-api-direct.scope-write-disabled",
+                    "message": "Direct native API rejects scope writes while direct write-control is disabled.",
+                    "details": {"http_status": 405, "response_json": {"error": {"code": "method_not_allowed"}}},
+                },
+                {
+                    "status": "warn",
+                    "check": "native-api.internal-smoke",
+                    "message": "Internal smoke skipped optional detail probes.",
+                    "details": {"status": "warn", "artifacts": ["/tmp/a.json", "/tmp/b.json"]},
+                },
+            ],
+        }
+
+        compact = turbovasctl.direct_smoke_status_only_result(result)
+
+        self.assertEqual(compact["status"], "warn")
+        self.assertEqual(compact["details"]["finding_count"], 3)
+        self.assertEqual(compact["details"]["non_pass_count"], 1)
+        self.assertEqual(compact["details"]["artifact_count"], 2)
+        self.assertEqual(compact["details"]["important_checks"]["native-api-direct.valid-token"], "pass")
+        self.assertEqual(compact["details"]["important_checks"]["native-api-direct.scope-write-disabled"], "pass")
+        self.assertEqual(compact["details"]["important_checks"]["native-api.internal-smoke"], "warn")
+        self.assertEqual(len(compact["findings"]), 1)
+        self.assertEqual(compact["findings"][0]["check"], "native-api.internal-smoke")
+        self.assertEqual(compact["findings"][0]["details"]["artifacts"], {"type": "list", "count": 2})
+        self.assertNotIn("response_json", json.dumps(compact))
+
     def test_runtime_app_up_retry_is_limited_to_docker_removal_races(self):
         self.assertTrue(turbovasctl.compose_app_up_transient_error("Error response from daemon: No such container: abc123"))
         self.assertTrue(turbovasctl.compose_app_up_transient_error("removal of container abc123 is already in progress"))
