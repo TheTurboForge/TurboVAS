@@ -26,6 +26,7 @@ const DIRECT_API_BEARER_TOKEN_ENV: &str = "TURBOVAS_API_BEARER_TOKEN";
 const DIRECT_API_BEARER_TOKEN_FILE_ENV: &str = "TURBOVAS_API_BEARER_TOKEN_FILE";
 const DIRECT_API_OPERATOR_UUID_ENV: &str = "TURBOVAS_API_OPERATOR_UUID";
 const DIRECT_API_OPERATOR_NAME_ENV: &str = "TURBOVAS_API_OPERATOR_NAME";
+const DIRECT_API_WRITE_CONTROL_ENV: &str = "TURBOVAS_API_DIRECT_WRITE_CONTROL";
 
 fn env_string(name: &str) -> Option<String> {
     env::var(name)
@@ -46,9 +47,13 @@ pub(crate) fn direct_api_config() -> Result<Option<(String, DirectApiAuth)>, Api
         env_string(DIRECT_API_OPERATOR_UUID_ENV),
         env_string(DIRECT_API_OPERATOR_NAME_ENV),
     )?;
+    let write_control_enabled = direct_api_write_control_enabled()?;
+    require_direct_api_write_control_operator(write_control_enabled, operator.as_ref())?;
     Ok(Some((
         bind,
-        DirectApiAuth::new(token).with_operator(operator),
+        DirectApiAuth::new(token)
+            .with_operator(operator)
+            .with_write_control_enabled(write_control_enabled),
     )))
 }
 
@@ -95,6 +100,31 @@ fn direct_api_operator_from_sources(
         (Some(user_uuid), user_name) => DirectApiOperator::new(&user_uuid, user_name).map(Some),
         (None, Some(_)) => Err(ApiError::Config),
         (None, None) => Ok(None),
+    }
+}
+
+fn direct_api_write_control_enabled() -> Result<bool, ApiError> {
+    direct_api_write_control_enabled_from_source(env_string(DIRECT_API_WRITE_CONTROL_ENV))
+}
+
+fn direct_api_write_control_enabled_from_source(value: Option<String>) -> Result<bool, ApiError> {
+    let normalized = value.as_deref().map(str::to_ascii_lowercase);
+    match normalized.as_deref() {
+        None => Ok(false),
+        Some("1" | "true" | "yes" | "on") => Ok(true),
+        Some("0" | "false" | "no" | "off") => Ok(false),
+        Some(_) => Err(ApiError::Config),
+    }
+}
+
+fn require_direct_api_write_control_operator(
+    write_control_enabled: bool,
+    operator: Option<&DirectApiOperator>,
+) -> Result<(), ApiError> {
+    if write_control_enabled && operator.is_none() {
+        Err(ApiError::Config)
+    } else {
+        Ok(())
     }
 }
 
@@ -534,6 +564,43 @@ mod tests {
         ));
         assert!(matches!(
             direct_api_operator_from_sources(Some("not-a-uuid".to_string()), None),
+            Err(ApiError::Config)
+        ));
+    }
+
+    #[test]
+    fn direct_api_write_control_requires_configured_operator() {
+        let operator = direct_api_operator_from_sources(
+            Some("12345678-1234-1234-1234-123456789abc".to_string()),
+            Some("admin".to_string()),
+        )
+        .expect("operator should parse");
+
+        assert!(require_direct_api_write_control_operator(false, None).is_ok());
+        assert!(require_direct_api_write_control_operator(true, operator.as_ref()).is_ok());
+        assert!(matches!(
+            require_direct_api_write_control_operator(true, None),
+            Err(ApiError::Config)
+        ));
+    }
+
+    #[test]
+    fn direct_api_write_control_flag_is_strict_boolean() {
+        assert!(!direct_api_write_control_enabled_from_source(None).expect("default false"));
+        for value in ["1", "true", "TRUE", "yes", "on"] {
+            assert!(
+                direct_api_write_control_enabled_from_source(Some(value.to_string()))
+                    .expect("truthy value")
+            );
+        }
+        for value in ["0", "false", "FALSE", "no", "off"] {
+            assert!(
+                !direct_api_write_control_enabled_from_source(Some(value.to_string()))
+                    .expect("false value")
+            );
+        }
+        assert!(matches!(
+            direct_api_write_control_enabled_from_source(Some("maybe".to_string())),
             Err(ApiError::Config)
         ));
     }

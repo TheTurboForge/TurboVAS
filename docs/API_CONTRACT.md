@@ -81,10 +81,14 @@ separate TLS/bootstrap/host-binding posture tracked outside this v1 read API.
   `TURBOVAS_API_OPERATOR_NAME` are optional for current read-only direct access.
   A configured operator UUID is verified against `users` at startup and is the
   identity anchor for future owner-bearing write/control slices.
+- Direct write-control enablement: `TURBOVAS_API_DIRECT_WRITE_CONTROL` is a
+  strict-boolean future enablement flag. Truthy values require
+  `TURBOVAS_API_OPERATOR_UUID`; the flag does not expose writes while write
+  routes remain unregistered.
 - Direct v1 method boundary: the opt-in direct listener accepts only read-only
   `GET` requests under `/api/v1` and returns JSON `405 method_not_allowed` for
   valid-token non-GET requests until native write/control APIs are separately
-  designed.
+  designed, registered on the direct router, and enabled with operator identity.
 - Direct v1 browser boundary: direct responses do not emit browser CORS access
   headers. Browser product reads continue through the same-origin `gsad` path
   while direct access remains script/operator oriented.

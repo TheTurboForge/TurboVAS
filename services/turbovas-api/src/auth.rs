@@ -63,6 +63,11 @@ impl DirectApiAuth {
         self
     }
 
+    pub(crate) fn with_write_control_enabled(mut self, enabled: bool) -> Self {
+        self.write_control_enabled = enabled;
+        self
+    }
+
     pub(crate) fn operator_uuid(&self) -> Option<&str> {
         self.operator.as_ref().map(DirectApiOperator::user_uuid)
     }
@@ -199,6 +204,12 @@ mod tests {
         assert_eq!(
             with_operator.operator_uuid(),
             Some("12345678-1234-1234-1234-123456789abc")
+        );
+        assert!(!with_operator.write_control_enabled());
+        assert!(
+            with_operator
+                .with_write_control_enabled(true)
+                .write_control_enabled()
         );
     }
 }

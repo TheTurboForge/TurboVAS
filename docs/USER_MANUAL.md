@@ -107,9 +107,11 @@ Future owner-bearing native writes use optional direct operator identity
 metadata: set `TURBOVAS_API_OPERATOR_UUID` to a real gvmd user UUID and, for
 audit readability, `TURBOVAS_API_OPERATOR_NAME`. When an operator UUID is set,
 `turbovas-api` verifies that it exists in `users` before binding the direct
-listener. These variables do not enable write routes by themselves; direct mode
-still accepts only read-only `GET` requests until write/control APIs are
-explicitly implemented.
+listener. The future direct write-control flag is
+`TURBOVAS_API_DIRECT_WRITE_CONTROL=1`; it is strict-boolean, requires
+`TURBOVAS_API_OPERATOR_UUID`, and does not expose write routes by itself while
+write routes remain unregistered. Direct mode still accepts only read-only
+`GET` requests until write/control APIs are explicitly implemented.
 Use a request ID when a direct probe needs a visible correlation ID in
 responses/logs:
 

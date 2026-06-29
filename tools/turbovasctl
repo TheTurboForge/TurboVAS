@@ -237,6 +237,7 @@ TURBOVAS_API_BEARER_TOKEN_ENV = "TURBOVAS_API_BEARER_TOKEN"
 TURBOVAS_API_BEARER_TOKEN_FILE_ENV = "TURBOVAS_API_BEARER_TOKEN_FILE"
 TURBOVAS_API_OPERATOR_UUID_ENV = "TURBOVAS_API_OPERATOR_UUID"
 TURBOVAS_API_OPERATOR_NAME_ENV = "TURBOVAS_API_OPERATOR_NAME"
+TURBOVAS_API_DIRECT_WRITE_CONTROL_ENV = "TURBOVAS_API_DIRECT_WRITE_CONTROL"
 TURBOVAS_API_BEARER_TOKEN_CONTAINER_FILE = "/runtime/secrets/native-api-bearer-token"
 TURBOVAS_API_BEARER_TOKEN_SECRET = "native-api-bearer-token"
 TURBOVAS_API_BEARER_TOKEN_MIN_LENGTH = 32
@@ -2194,6 +2195,13 @@ def validate_native_api_operator_name_value(value: str, *, env_name: str) -> str
     return value.strip()
 
 
+def validate_native_api_direct_write_control_value(value: str, *, env_name: str) -> str:
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on", "0", "false", "no", "off"}:
+        return normalized
+    raise ValueError(f"{env_name} must be a boolean value such as 1/0 or true/false")
+
+
 def native_api_direct_config_errors(env: dict[str, str]) -> tuple[str, ...]:
     errors: list[str] = []
     for value, env_name, validator in (
@@ -2224,6 +2232,17 @@ def native_api_direct_config_errors(env: dict[str, str]) -> tuple[str, ...]:
             validate_native_api_operator_name_value(operator_name, env_name=TURBOVAS_API_OPERATOR_NAME_ENV)
         except ValueError as exc:
             errors.append(str(exc))
+    write_control = env.get(TURBOVAS_API_DIRECT_WRITE_CONTROL_ENV, "")
+    if write_control.strip():
+        try:
+            normalized_write_control = validate_native_api_direct_write_control_value(
+                write_control,
+                env_name=TURBOVAS_API_DIRECT_WRITE_CONTROL_ENV,
+            )
+            if normalized_write_control in {"1", "true", "yes", "on"} and not operator_uuid:
+                errors.append(f"{TURBOVAS_API_DIRECT_WRITE_CONTROL_ENV} requires {TURBOVAS_API_OPERATOR_UUID_ENV}")
+        except ValueError as exc:
+            errors.append(str(exc))
     return tuple(errors)
 
 
@@ -2242,6 +2261,8 @@ def native_api_direct_config_shape_finding(env: dict[str, str], *, check: str) -
             "port": native_api_direct_port(env),
             "bind_env": TURBOVAS_API_DIRECT_BIND_ENV,
             "bind": env.get(TURBOVAS_API_DIRECT_BIND_ENV),
+            "write_control_env": TURBOVAS_API_DIRECT_WRITE_CONTROL_ENV,
+            "write_control": env.get(TURBOVAS_API_DIRECT_WRITE_CONTROL_ENV),
             "errors": list(errors),
         },
     )
@@ -2561,6 +2582,7 @@ def direct_native_api_posture_findings(repo_root: Path, env: dict[str, str] | No
         TURBOVAS_API_DIRECT_BIND_ENV,
         TURBOVAS_API_OPERATOR_UUID_ENV,
         TURBOVAS_API_OPERATOR_NAME_ENV,
+        TURBOVAS_API_DIRECT_WRITE_CONTROL_ENV,
     )
     configured_env = [name for name in direct_env_names if env.get(name)]
     running_bindings = current_native_api_direct_published_bindings(repo_root)

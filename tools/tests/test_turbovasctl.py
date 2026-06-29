@@ -4731,6 +4731,7 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertEqual(turbovasctl.TURBOVAS_API_BEARER_TOKEN_MIN_LENGTH, 32)
         self.assertEqual(turbovasctl.TURBOVAS_API_OPERATOR_UUID_ENV, "TURBOVAS_API_OPERATOR_UUID")
         self.assertEqual(turbovasctl.TURBOVAS_API_OPERATOR_NAME_ENV, "TURBOVAS_API_OPERATOR_NAME")
+        self.assertEqual(turbovasctl.TURBOVAS_API_DIRECT_WRITE_CONTROL_ENV, "TURBOVAS_API_DIRECT_WRITE_CONTROL")
         self.assertEqual(turbovasctl.DEV_ADMIN_USER, "admin")
         self.assertEqual(turbovasctl.DEV_ADMIN_PASSWORD, "admin")
 
@@ -4908,6 +4909,9 @@ db2:keys=5,expires=0,avg_ttl=0
             token_only_env = turbovasctl.runtime_env(root)
             token_only_env[turbovasctl.TURBOVAS_API_BEARER_TOKEN_ENV] = "secret-token"
             self.assertFalse(turbovasctl.native_api_direct_requested(token_only_env))
+            write_control_only_env = turbovasctl.runtime_env(root)
+            write_control_only_env[turbovasctl.TURBOVAS_API_DIRECT_WRITE_CONTROL_ENV] = "1"
+            self.assertFalse(turbovasctl.native_api_direct_requested(write_control_only_env))
 
             direct_env = dict(token_only_env)
             direct_env[turbovasctl.TURBOVAS_API_DIRECT_ENV] = "1"
@@ -4993,6 +4997,9 @@ db2:keys=5,expires=0,avg_ttl=0
             turbovasctl.TURBOVAS_API_OPERATOR_NAME_ENV: "admin",
         }
         self.assertEqual(turbovasctl.native_api_direct_config_errors(valid), ())
+        write_control = dict(valid)
+        write_control[turbovasctl.TURBOVAS_API_DIRECT_WRITE_CONTROL_ENV] = "1"
+        self.assertEqual(turbovasctl.native_api_direct_config_errors(write_control), ())
         ipv6 = dict(valid)
         ipv6[turbovasctl.TURBOVAS_API_DIRECT_HOST_ENV] = "[::1]"
         ipv6[turbovasctl.TURBOVAS_API_DIRECT_BIND_ENV] = "[::]:9081"
@@ -5010,6 +5017,7 @@ db2:keys=5,expires=0,avg_ttl=0
             (turbovasctl.TURBOVAS_API_DIRECT_BIND_ENV, "0.0.0.0:9999"),
             (turbovasctl.TURBOVAS_API_OPERATOR_UUID_ENV, "not-a-uuid"),
             (turbovasctl.TURBOVAS_API_OPERATOR_NAME_ENV, "admin\nroot"),
+            (turbovasctl.TURBOVAS_API_DIRECT_WRITE_CONTROL_ENV, "maybe"),
         ]
         for env_name, value in cases:
             with self.subTest(env_name=env_name, value=value):
@@ -5022,6 +5030,14 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertIn(
             f"{turbovasctl.TURBOVAS_API_OPERATOR_NAME_ENV} requires {turbovasctl.TURBOVAS_API_OPERATOR_UUID_ENV}",
             turbovasctl.native_api_direct_config_errors(name_without_uuid),
+        )
+        write_without_uuid = dict(valid)
+        write_without_uuid.pop(turbovasctl.TURBOVAS_API_OPERATOR_UUID_ENV)
+        write_without_uuid.pop(turbovasctl.TURBOVAS_API_OPERATOR_NAME_ENV)
+        write_without_uuid[turbovasctl.TURBOVAS_API_DIRECT_WRITE_CONTROL_ENV] = "true"
+        self.assertIn(
+            f"{turbovasctl.TURBOVAS_API_DIRECT_WRITE_CONTROL_ENV} requires {turbovasctl.TURBOVAS_API_OPERATOR_UUID_ENV}",
+            turbovasctl.native_api_direct_config_errors(write_without_uuid),
         )
 
         bad_bind = dict(valid)
