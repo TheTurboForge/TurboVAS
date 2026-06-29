@@ -56,7 +56,6 @@ use alerts::*;
 use app_state::{AppState, create_pool, healthz};
 use catalog_payloads::*;
 use cert_advisories::*;
-use collections::*;
 use direct_api::direct_api_config;
 use errors::ApiError;
 use feeds::feeds;
@@ -83,7 +82,6 @@ use tags::*;
 use task_targets::*;
 use tls_certificates::*;
 use trashcan::trashcan_summary;
-use user_tags::*;
 use vulnerability_payloads::*;
 
 #[tokio::main]
@@ -264,7 +262,8 @@ mod tests {
     };
 
     use crate::{
-        auth::*, direct_api::direct_api_v1_path_is_allowed, request_ids::*, request_shapes::*,
+        auth::*, collections::*, direct_api::direct_api_v1_path_is_allowed, request_ids::*,
+        request_shapes::*, user_tags::catalog_user_tags_sql,
     };
 
     use super::*;
