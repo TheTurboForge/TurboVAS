@@ -110,9 +110,10 @@ struct ScopeWriteState {
 
 pub(crate) async fn create_scope(
     State(state): State<AppState>,
-    Extension(operator): Extension<DirectApiOperator>,
+    operator: Option<Extension<DirectApiOperator>>,
     Json(request): Json<ScopeCreateRequest>,
 ) -> Result<(StatusCode, HeaderMap, Json<ScopeItem>), ApiError> {
+    let operator = require_scope_write_operator(operator)?;
     let request = validate_scope_create_request(request)?;
     let mut client = state.pool.get().await.map_err(|_| ApiError::Database)?;
     let tx = client
@@ -137,9 +138,10 @@ pub(crate) async fn create_scope(
 pub(crate) async fn patch_scope(
     State(state): State<AppState>,
     Path(scope_id): Path<String>,
-    Extension(operator): Extension<DirectApiOperator>,
+    operator: Option<Extension<DirectApiOperator>>,
     Json(request): Json<ScopePatchRequest>,
 ) -> Result<Json<ScopeItem>, ApiError> {
+    let operator = require_scope_write_operator(operator)?;
     let request = validate_scope_patch_request(request)?;
     let mut client = state.pool.get().await.map_err(|_| ApiError::Database)?;
     let tx = client
@@ -165,8 +167,9 @@ pub(crate) async fn patch_scope(
 pub(crate) async fn delete_scope(
     State(state): State<AppState>,
     Path(scope_id): Path<String>,
-    Extension(operator): Extension<DirectApiOperator>,
+    operator: Option<Extension<DirectApiOperator>>,
 ) -> Result<StatusCode, ApiError> {
+    let operator = require_scope_write_operator(operator)?;
     let mut client = state.pool.get().await.map_err(|_| ApiError::Database)?;
     let tx = client
         .transaction()
@@ -181,6 +184,16 @@ pub(crate) async fn delete_scope(
         .map_err(|error| map_scope_write_db_error(error, "commit delete scope transaction"))?;
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+fn require_scope_write_operator(
+    operator: Option<Extension<DirectApiOperator>>,
+) -> Result<DirectApiOperator, ApiError> {
+    let Some(Extension(operator)) = operator else {
+        tracing::warn!("scope write request missing direct API operator context");
+        return Err(ApiError::Forbidden);
+    };
+    Ok(operator)
 }
 
 pub(crate) fn validate_scope_create_request(
@@ -1092,6 +1105,24 @@ mod tests {
     }
 
     #[test]
+    fn scope_write_operator_guard_fails_closed_without_direct_context() {
+        assert!(matches!(
+            require_scope_write_operator(None),
+            Err(ApiError::Forbidden)
+        ));
+
+        let operator = DirectApiOperator::new(
+            "12345678-1234-1234-1234-123456789abc",
+            Some("operator".to_string()),
+        )
+        .expect("valid direct operator");
+        assert_eq!(
+            require_scope_write_operator(Some(Extension(operator.clone()))).expect("operator"),
+            operator
+        );
+    }
+
+    #[test]
     fn scope_write_handlers_require_operator_transactions_and_payload_reload() {
         let _create = create_scope;
         let _patch = patch_scope;
@@ -1121,7 +1152,8 @@ mod tests {
             .0;
 
         for body in [create_body, patch_body, delete_body] {
-            assert!(body.contains("Extension(operator): Extension<DirectApiOperator>"));
+            assert!(body.contains("operator: Option<Extension<DirectApiOperator>>"));
+            assert!(body.contains("let operator = require_scope_write_operator(operator)?;"));
             assert!(body.contains("state.pool.get()"));
             assert!(body.contains("client"));
             assert!(body.contains(".transaction()"));
