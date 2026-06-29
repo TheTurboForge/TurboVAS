@@ -1,4 +1,5 @@
-/* SPDX-FileCopyrightText: 2026 Robert Pelfrey <Robert@Pelfrey.de>
+/* TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
+ * SPDX-FileCopyrightText: 2026 Robert Pelfrey <Robert@Pelfrey.de>
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -42,6 +43,11 @@ interface NativeCatalogCveNvtRefPayload {
   name?: string;
 }
 
+interface NativeCatalogCveReferencePayload {
+  url: string;
+  tags?: string[];
+}
+
 interface NativeUserTagPayload {
   id: string;
   name: string;
@@ -59,6 +65,7 @@ interface NativeCatalogCvePayload {
   products?: string[];
   cert_refs?: NativeCatalogCveCertRefPayload[];
   nvt_refs?: NativeCatalogCveNvtRefPayload[];
+  references?: NativeCatalogCveReferencePayload[];
   user_tags?: NativeUserTagPayload[];
   epss?: NativeCatalogEpssPayload;
   published_at?: string;
@@ -199,6 +206,14 @@ const nativeCveToModel = (
         nvt: (item.nvt_refs ?? []).map(ref => ({
           _oid: stringValue(ref.id),
           name: stringValue(ref.name),
+        })),
+      },
+      references: {
+        reference: (item.references ?? []).map(ref => ({
+          url: stringValue(ref.url),
+          tags: {
+            tag: ref.tags ?? [],
+          },
         })),
       },
       epss: item.epss

@@ -333,11 +333,12 @@ PostgreSQL state. This catalog is intentionally distinct from `/vulnerabilities`
 and report/scope-report CVE tabs: `/cves` is reference intelligence, while the
 report paths are observed evidence from completed scans.
 
-Native CVE detail also includes EPSS score/percentile plus CERT-Bund,
-DFN-CERT, and NVT references that are available from PostgreSQL. EPSS
-provenance is not exposed because the current `scap.epss_scores` schema stores
-only CVE, score, and percentile; source/revision/import provenance would need a
-separate SCAP/feed-schema design.
+Native CVE detail also includes EPSS score/percentile plus generic URL/tag
+references from `scap.cve_references`, CERT-Bund/DFN-CERT advisory references,
+and NVT references that are available from PostgreSQL. EPSS provenance is not
+exposed because the current `scap.epss_scores` schema stores only CVE, score,
+and percentile; source/revision/import provenance would need a separate
+SCAP/feed-schema design.
 
 Native Security Information CPE catalog rows include the CPE URI, title,
 deprecation status, severity, CVE reference count, and reported CVE references

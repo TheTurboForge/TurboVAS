@@ -1078,13 +1078,20 @@ mod tests {
 
         assert!(payload_source.contains("cert_refs: Vec<CatalogCveCertReference>"));
         assert!(payload_source.contains("nvt_refs: Vec<CatalogCveNvtReference>"));
+        assert!(payload_source.contains("references: Vec<CatalogCveReference>"));
         assert!(payload_source.contains("epss: Option<CatalogEpssItem>"));
         assert!(detail_source.contains("LEFT JOIN scap.epss_scores e ON e.cve = c.name"));
         assert!(detail_source.contains("item.cert_refs = cve_cert_refs(&client, &cve_id).await?"));
         assert!(detail_source.contains("item.nvt_refs = cve_nvt_refs(&client, &cve_id).await?"));
+        assert!(
+            detail_source
+                .contains("item.references = cve_references(&client, cve_internal_id).await?")
+        );
+        assert!(detail_source.contains("FROM scap.cve_references"));
         assert!(detail_source.contains("FROM cert.cert_bund_cves dc"));
         assert!(detail_source.contains("FROM cert.dfn_cert_cves dc"));
         assert!(detail_source.contains("FROM vt_refs vr"));
+        assert!(!list_source.contains("cve_references"));
         assert!(!list_source.contains("cve_cert_refs"));
         assert!(!list_source.contains("cve_nvt_refs"));
         for inherited_workflow in ["export", "delete", "modify", "create"] {

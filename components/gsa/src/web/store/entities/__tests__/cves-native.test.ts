@@ -1,4 +1,5 @@
-/* SPDX-FileCopyrightText: 2026 Robert Pelfrey <Robert@Pelfrey.de>
+/* TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
+ * SPDX-FileCopyrightText: 2026 Robert Pelfrey <Robert@Pelfrey.de>
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -111,6 +112,12 @@ describe('native API CVE catalog', () => {
             name: 'Example vulnerability test',
           },
         ],
+        references: [
+          {
+            url: 'https://example.test/advisory',
+            tags: ['Vendor Advisory'],
+          },
+        ],
         user_tags: [
           {
             id: 'a01cce79-9ad3-4714-903d-893a333ab33d',
@@ -141,6 +148,13 @@ describe('native API CVE catalog', () => {
         id: '1.3.6.1.4.1.25623.1.0.900001',
         name: 'Example vulnerability test',
         oid: '1.3.6.1.4.1.25623.1.0.900001',
+      },
+    ]);
+    expect(cve.references).toEqual([
+      {
+        name: 'https://example.test/advisory',
+        href: 'https://example.test/advisory',
+        tags: ['Vendor Advisory'],
       },
     ]);
     expect(cve.userTags).toHaveLength(1);

@@ -44,6 +44,12 @@ pub(crate) struct CatalogCveNvtReference {
 }
 
 #[derive(Debug, Serialize)]
+pub(crate) struct CatalogCveReference {
+    pub(crate) url: String,
+    pub(crate) tags: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
 pub(crate) struct CatalogCveItem {
     id: String,
     name: String,
@@ -56,6 +62,8 @@ pub(crate) struct CatalogCveItem {
     pub(crate) cert_refs: Vec<CatalogCveCertReference>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) nvt_refs: Vec<CatalogCveNvtReference>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) references: Vec<CatalogCveReference>,
     #[serde(skip_serializing_if = "Option::is_none")]
     epss: Option<CatalogEpssItem>,
     published_at: Option<String>,
@@ -296,6 +304,7 @@ pub(crate) async fn cve_catalog_detail(
 ) -> Result<Json<CatalogCveDetail>, ApiError> {
     validate_cve_id(&cve_id)?;
     let sql = r#"SELECT c.name AS id,
+                        c.id AS internal_id,
                         c.name AS name,
                         coalesce(c.comment, '') AS comment,
                         coalesce(c.description, '') AS description,
@@ -319,11 +328,40 @@ pub(crate) async fn cve_catalog_detail(
             ApiError::Database
         })?
         .ok_or(ApiError::NotFound)?;
+    let cve_internal_id: i32 = row.get("internal_id");
     let mut item = catalog_cve_from_row(&row);
     item.cert_refs = cve_cert_refs(&client, &cve_id).await?;
     item.nvt_refs = cve_nvt_refs(&client, &cve_id).await?;
+    item.references = cve_references(&client, cve_internal_id).await?;
     let user_tags = catalog_user_tags(&client, "cve", &cve_id).await?;
     Ok(Json(CatalogCveDetail { item, user_tags }))
+}
+
+async fn cve_references(
+    client: &tokio_postgres::Client,
+    cve_internal_id: i32,
+) -> Result<Vec<CatalogCveReference>, ApiError> {
+    let rows = client
+        .query(
+            r#"SELECT coalesce(url, '') AS url,
+                      coalesce(tags, ARRAY[]::text[]) AS tags
+                 FROM scap.cve_references
+                WHERE cve_id = $1
+                ORDER BY url ASC;"#,
+            &[&cve_internal_id],
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, "CVE catalog reference query failed");
+            ApiError::Database
+        })?;
+    Ok(rows
+        .iter()
+        .map(|row| CatalogCveReference {
+            url: row.get("url"),
+            tags: row.get("tags"),
+        })
+        .collect())
 }
 
 async fn cve_cert_refs(
@@ -655,6 +693,7 @@ pub(crate) fn catalog_cve_from_row(row: &Row) -> CatalogCveItem {
         products: split_catalog_products(row.get("products")),
         cert_refs: Vec::new(),
         nvt_refs: Vec::new(),
+        references: Vec::new(),
         epss: epss_score
             .zip(epss_percentile)
             .map(|(score, percentile)| CatalogEpssItem { score, percentile }),
