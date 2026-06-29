@@ -47,6 +47,7 @@ mod task_targets;
 mod tls_certificates;
 mod trashcan;
 mod user_tags;
+mod vulnerability_payloads;
 
 use alerts::{AlertAssetItem, AlertReference, alert_asset_from_row};
 use app_state::{AppState, create_pool, healthz};
@@ -68,7 +69,6 @@ use query::*;
 use report_configs::*;
 use report_formats::*;
 use result_payloads::*;
-use row_helpers::*;
 use scan_configs::*;
 use scanner_assets::*;
 use schedules::*;
@@ -78,6 +78,7 @@ use task_targets::{TargetItem, TaskItem, target_from_row, task_from_row};
 use tls_certificates::*;
 use trashcan::{TrashcanSummary, trashcan_summary_from_rows};
 use user_tags::*;
+use vulnerability_payloads::{VulnerabilityItem, vulnerability_from_row};
 
 #[derive(Debug, Serialize)]
 struct ScopeSummary {
@@ -463,44 +464,6 @@ struct TlsCertificateItem {
     port_count: i64,
     result_count: i64,
     source_report_ids: Vec<String>,
-}
-
-#[derive(Serialize)]
-struct VulnerabilityItem {
-    id: String,
-    name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    family: Option<String>,
-    oldest_result: Option<String>,
-    newest_result: Option<String>,
-    severity: f64,
-    qod: i64,
-    result_count: i64,
-    host_count: i64,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    cves: Vec<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    cert_refs: Vec<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    xrefs: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    max_epss: Option<NvtEpssItem>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    max_severity: Option<NvtEpssItem>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    summary: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    insight: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    affected: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    impact: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    detection: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    solution_type: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    solution: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -7355,32 +7318,6 @@ async fn raw_report_exists(
         .await
         .map_err(|_| ApiError::Database)?;
     Ok(row.get::<_, bool>(0))
-}
-
-fn vulnerability_from_row(row: &Row) -> VulnerabilityItem {
-    VulnerabilityItem {
-        id: row.get("id"),
-        name: row.get("name"),
-        family: optional_row_string(row, "family"),
-        oldest_result: unix_ts_to_rfc3339(row.get("oldest_result_unix")),
-        newest_result: unix_ts_to_rfc3339(row.get("newest_result_unix")),
-        severity: row.get("severity"),
-        qod: row.get("qod"),
-        result_count: row.get("result_count"),
-        host_count: row.get("host_count"),
-        cves: optional_row_strings(row, "cves"),
-        cert_refs: optional_row_strings(row, "cert_refs"),
-        xrefs: optional_row_strings(row, "xrefs"),
-        max_epss: nvt_epss_from_row(row),
-        max_severity: nvt_max_severity_from_row(row),
-        summary: optional_row_string(row, "summary"),
-        insight: optional_row_string(row, "insight"),
-        affected: optional_row_string(row, "affected"),
-        impact: optional_row_string(row, "impact"),
-        detection: optional_row_string(row, "detection"),
-        solution_type: optional_row_string(row, "solution_type"),
-        solution: optional_row_string(row, "solution"),
-    }
 }
 
 pub(crate) fn report_reference(
