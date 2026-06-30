@@ -2502,7 +2502,8 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(result["status"], "pass")
         self.assertEqual(details["openapi_version"], "0.1.0-contract")
         self.assertEqual(details["operation_count"], 83)
-        self.assertGreater(details["direct_read_operation_count"], 0)
+        self.assertEqual(details["direct_operation_count"], 82)
+        self.assertEqual(details["direct_read_operation_count"], 72)
         self.assertEqual(
             details["non_get_direct_operations"],
             ["POST /tags", "PATCH /tags/{tag_id}", "DELETE /tags/{tag_id}", "POST /tags/{tag_id}/resources", "PATCH /port-lists/{port_list_id}", "POST /report-configs", "PATCH /report-configs/{report_config_id}", "POST /scopes", "PATCH /scopes/{scope_id}", "DELETE /scopes/{scope_id}"],
@@ -2530,6 +2531,7 @@ class TurboVASCtlTests(unittest.TestCase):
 
         self.assertEqual(status_only["status"], "pass")
         self.assertEqual(status_only["details"]["operation_count"], full["details"]["operation_count"])
+        self.assertEqual(status_only["details"]["direct_operation_count"], full["details"]["direct_operation_count"])
         self.assertEqual(status_only["details"]["direct_read_operation_count"], full["details"]["direct_read_operation_count"])
         self.assertEqual(status_only["details"]["non_get_direct_operation_count"], 10)
         self.assertEqual(status_only["details"]["write_control_operation_count"], 10)

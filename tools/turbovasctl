@@ -7729,6 +7729,7 @@ def native_api_client_contract_status_only_result(result: dict[str, Any]) -> dic
     compact["details"] = {
         "openapi_version": details.get("openapi_version"),
         "operation_count": details.get("operation_count", 0),
+        "direct_operation_count": details.get("direct_operation_count", 0),
         "direct_read_operation_count": details.get("direct_read_operation_count", 0),
         "non_get_direct_operation_count": len(details.get("non_get_direct_operations", [])) if isinstance(details.get("non_get_direct_operations"), list) else 0,
         "write_control_operation_count": details.get("write_control_operation_count", 0),
@@ -7779,8 +7780,10 @@ def command_native_api_client_contract(repo_root: Path, status_only: bool = Fals
         for operation in operations
         if "x-turbovas-direct" in set(operation.get("x_turbovas_fields", []))
     ]
+    direct_read_operations = [operation for operation in direct_operations if operation.get("method") == "get"]
     non_get_direct = [openapi_operation_label(operation) for operation in direct_operations if operation.get("method") != "get"]
     direct_count = len(direct_operations)
+    direct_read_count = len(direct_read_operations)
     openapi_status = contract_drift_status(contract.get("alignment_status"))
     auth_status = contract_drift_status(auth_contract.get("alignment_status"))
     write_control_status = contract_drift_status(write_control_contract.get("alignment_status"))
@@ -7789,7 +7792,8 @@ def command_native_api_client_contract(repo_root: Path, status_only: bool = Fals
     details = {
         "openapi_version": openapi_info_version(repo_root),
         "operation_count": contract.get("operation_count", 0),
-        "direct_read_operation_count": direct_count,
+        "direct_operation_count": direct_count,
+        "direct_read_operation_count": direct_read_count,
         "non_get_direct_operations": non_get_direct,
         "write_control_operation_count": len(write_control_contract.get("write_control_operations", [])),
         "direct_write_control_operation_count": len(write_control_contract.get("direct_write_control_operations", [])),
@@ -7850,7 +7854,11 @@ def command_native_api_client_contract(repo_root: Path, status_only: bool = Fals
             f"OpenAPI marks {direct_count} direct operation(s) for generated/client use."
             if direct_status == "pass"
             else "OpenAPI direct markers are missing for generated/client use.",
-            details={"direct_read_operation_count": direct_count, "non_get_direct_operations": non_get_direct},
+            details={
+                "direct_operation_count": direct_count,
+                "direct_read_operation_count": direct_read_count,
+                "non_get_direct_operations": non_get_direct,
+            },
         ),
         finding(
             write_control_status,
