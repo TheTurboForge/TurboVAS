@@ -2344,6 +2344,7 @@ class TurboVASCtlTests(unittest.TestCase):
             )
             source_dir = root / "services" / "turbovas-api" / "src"
             api_source = source_dir / "main.rs"
+            api_contract_source = source_dir / "direct_api_contract.rs"
             routes_source = source_dir / "routes.rs"
             source_dir.mkdir(parents=True)
             routes_source.write_text(
@@ -2354,6 +2355,10 @@ class TurboVASCtlTests(unittest.TestCase):
                 encoding="utf-8",
             )
             api_source.write_text(
+                "",
+                encoding="utf-8",
+            )
+            api_contract_source.write_text(
                 'fn direct_api_v1_path_is_allowed(path: &str) -> bool {\n'
                 '    let parts = path.split(\'/\').collect::<Vec<_>>();\n'
                 '    matches!(parts.as_slice(), ["", "api", "v1", "reports"] | ["", "api", "v1", "feeds"] if direct_api_segments_are_nonempty(&parts))\n'

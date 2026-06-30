@@ -14,6 +14,7 @@ mod cpe_catalog_payloads;
 mod cve_catalog;
 mod cve_catalog_payloads;
 mod direct_api;
+mod direct_api_contract;
 mod errors;
 mod feeds;
 mod filter_payloads;

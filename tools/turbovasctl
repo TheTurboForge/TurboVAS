@@ -5887,6 +5887,7 @@ def rust_direct_api_source(repo_root: Path | None) -> str:
     if repo_root is None:
         return ""
     for relative_path in (
+        "services/turbovas-api/src/direct_api_contract.rs",
         "services/turbovas-api/src/direct_api.rs",
         "services/turbovas-api/src/main.rs",
     ):
