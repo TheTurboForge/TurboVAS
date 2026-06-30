@@ -3,6 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use super::*;
+use crate::report_config_write_validation::{
+    MAX_REPORT_CONFIG_PARAMS, ReportConfigParamWriteRequest,
+};
 
 #[test]
 fn report_config_create_request_normalizes_metadata_and_params() {

@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2026 Robert Pelfrey <Robert@Pelfrey.de>
+ * TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -6,7 +7,10 @@
 import {afterEach, describe, expect, test, testing} from '@gsa/testing';
 import {fetchNativeTask, fetchNativeTasks} from 'gmp/native-api/tasks';
 
-const createGmp = ({jwt, token = 'test-token'}: {jwt?: string; token?: string} = {}) => ({
+const createGmp = ({
+  jwt,
+  token = 'test-token',
+}: {jwt?: string; token?: string} = {}) => ({
   buildUrl: testing.fn((path: string) => `https://turbovas.example/${path}`),
   session: {jwt, token},
 });
@@ -34,6 +38,8 @@ describe('native API task list', () => {
             scanner: {id: 'scanner-1', name: 'Default scanner'},
             scanner_type: 2,
             schedule: {id: 'schedule-1', name: 'Weekly'},
+            schedule_periods: 3,
+            alterable: true,
             report_count: {total: 3, finished: 2},
             last_report: {
               id: 'report-1',
@@ -73,6 +79,8 @@ describe('native API task list', () => {
     expect(task.scanner?.id).toEqual('scanner-1');
     expect(task.scanner?.scannerType).toEqual('2');
     expect(task.schedule?.id).toEqual('schedule-1');
+    expect(task.schedule_periods).toEqual(3);
+    expect(task.alterable).toEqual(1);
     expect(task.isWritable()).toEqual(true);
     expect(gmp.buildUrl).toHaveBeenCalledWith('api/v1/tasks', {
       token: 'test-token',

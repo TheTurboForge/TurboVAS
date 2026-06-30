@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use super::*;
+use crate::port_list_write_validation::MAX_PORT_LIST_TEXT_BYTES;
 
 fn patch_request(name: Option<&str>, comment: Option<&str>) -> PortListPatchRequest {
     PortListPatchRequest {

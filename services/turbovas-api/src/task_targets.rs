@@ -320,6 +320,12 @@ fn task_sql(filtered_predicate: &str, sort_sql: &str, limit_clause: &str) -> Str
                     scanner.type AS scanner_type,
                     schedule.uuid AS schedule_id,
                     schedule.name AS schedule_name,
+                    coalesce(task.start_time, 0)::bigint AS start_time,
+                    coalesce(task.end_time, 0)::bigint AS end_time,
+                    coalesce(task.schedule_next_time, 0)::bigint AS schedule_next_time,
+                    task.schedule_periods::bigint AS schedule_periods,
+                    CASE WHEN task.alterable IS NULL THEN NULL
+                         ELSE coalesce(task.alterable, 0) <> 0 END AS alterable,
                     coalesce(report_rollup.report_count_total, 0)::bigint AS report_count_total,
                     coalesce(report_rollup.report_count_finished, 0)::bigint AS report_count_finished,
                     latest_report.uuid AS current_report_id,

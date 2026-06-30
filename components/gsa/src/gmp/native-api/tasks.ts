@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2026 Robert Pelfrey <Robert@Pelfrey.de>
+ * TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -49,6 +50,11 @@ interface NativeTaskItem {
   scanner?: NativeReference;
   scanner_type?: number | string | null;
   schedule?: NativeReference;
+  start_time?: string | null;
+  end_time?: string | null;
+  schedule_next_time?: string | null;
+  schedule_periods?: number | null;
+  alterable?: boolean | null;
   report_count?: NativeTaskReportCount;
   current_report?: NativeTaskReportReference;
   last_report?: NativeTaskReportReference;
@@ -207,6 +213,13 @@ export const nativeTaskToModel = (item: NativeTaskItem): Task => {
     config: referenceElement(item.config, 'scanconfig'),
     scanner,
     schedule: referenceElement(item.schedule, 'schedule'),
+    alterable:
+      item.alterable === undefined || item.alterable === null
+        ? undefined
+        : item.alterable
+          ? 1
+          : 0,
+    schedule_periods: item.schedule_periods ?? undefined,
     report_count: {
       __text: integerValue(reportCount.total),
       finished: integerValue(reportCount.finished),

@@ -73,6 +73,38 @@ fn cve_catalog_detail_reads_reference_context_without_mutation_workflows() {
 }
 
 #[test]
+fn task_detail_contract_includes_db_owned_schedule_lifecycle_metadata() {
+    let task_source = include_str!("task_targets.rs");
+    let payload_source = include_str!("task_target_payloads.rs");
+
+    for column in [
+        "coalesce(task.start_time, 0)::bigint AS start_time",
+        "coalesce(task.end_time, 0)::bigint AS end_time",
+        "coalesce(task.schedule_next_time, 0)::bigint AS schedule_next_time",
+        "task.schedule_periods::bigint AS schedule_periods",
+        "ELSE coalesce(task.alterable, 0) <> 0 END AS alterable",
+    ] {
+        assert!(
+            task_source.contains(column),
+            "task SQL must expose {column}"
+        );
+    }
+
+    for field in [
+        "start_time: Option<String>",
+        "end_time: Option<String>",
+        "schedule_next_time: Option<String>",
+        "schedule_periods: Option<i64>",
+        "alterable: Option<bool>",
+    ] {
+        assert!(
+            payload_source.contains(field),
+            "task payload must keep {field}"
+        );
+    }
+}
+
+#[test]
 fn catalog_detail_user_tags_are_detail_only_active_info_tags() {
     let cve_source = include_str!("cve_catalog.rs");
     let cpe_source = include_str!("cpe_catalog.rs");

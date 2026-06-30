@@ -4372,6 +4372,29 @@ components:
           description: Inherited scanner type identifier used only for read-only UI metadata.
         schedule:
           $ref: '#/components/schemas/ResourceReference'
+        start_time:
+          type: string
+          format: date-time
+          nullable: true
+          description: Current task execution start time from PostgreSQL task state, when present.
+        end_time:
+          type: string
+          format: date-time
+          nullable: true
+          description: Current task execution end time from PostgreSQL task state, when present.
+        schedule_next_time:
+          type: string
+          format: date-time
+          nullable: true
+          description: Next scheduled task start time computed and persisted by gvmd, when present.
+        schedule_periods:
+          type: integer
+          nullable: true
+          description: Remaining scheduled periods from inherited task schedule state, when present.
+        alterable:
+          type: boolean
+          nullable: true
+          description: Inherited task mutability flag as persisted by gvmd.
         report_count:
           type: object
           required: [total, finished]

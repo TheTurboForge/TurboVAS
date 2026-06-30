@@ -19,10 +19,10 @@ use crate::{
         tag_resource_active_lookup_sql, tag_resource_direct_write_type_is_supported,
     },
     tag_write_validation::{
-        MAX_TAG_RESOURCE_WRITE_IDS, TagCreateRequest, TagPatchRequest, TagResourceUpdateAction,
-        TagResourceUpdateRequest, ValidatedTagCreate, ValidatedTagPatch,
-        ValidatedTagResourceUpdate, default_tag_active, validate_tag_create_request,
-        validate_tag_patch_request, validate_tag_resource_update_request,
+        TagCreateRequest, TagPatchRequest, TagResourceUpdateAction, TagResourceUpdateRequest,
+        ValidatedTagCreate, ValidatedTagPatch, ValidatedTagResourceUpdate,
+        validate_tag_create_request, validate_tag_patch_request,
+        validate_tag_resource_update_request,
     },
 };
 

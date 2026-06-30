@@ -13,8 +13,7 @@ use crate::{
     auth::DirectApiOperator,
     errors::ApiError,
     port_list_write_validation::{
-        MAX_PORT_LIST_TEXT_BYTES, PortListPatchRequest, ValidatedPortListPatch,
-        validate_port_list_patch_request,
+        PortListPatchRequest, ValidatedPortListPatch, validate_port_list_patch_request,
     },
     port_lists::{PortListAssetDetail, load_port_list_asset_detail},
 };

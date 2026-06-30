@@ -17,11 +17,10 @@ use crate::{
     path_ids::parse_uuid,
     report_config_payloads::ReportConfigAssetItem,
     report_config_write_validation::{
-        MAX_REPORT_CONFIG_PARAMS, ReportConfigCreateRequest, ReportConfigFormatParam,
-        ReportConfigFormatState, ReportConfigParamWriteRequest, ReportConfigPatchRequest,
-        ValidatedReportConfigCreate, ValidatedReportConfigParamWrite, ValidatedReportConfigPatch,
-        validate_report_config_create_request, validate_report_config_param_values,
-        validate_report_config_patch_request,
+        ReportConfigCreateRequest, ReportConfigFormatParam, ReportConfigFormatState,
+        ReportConfigPatchRequest, ValidatedReportConfigCreate, ValidatedReportConfigParamWrite,
+        ValidatedReportConfigPatch, validate_report_config_create_request,
+        validate_report_config_param_values, validate_report_config_patch_request,
     },
     report_configs::load_report_config_asset_detail,
 };
