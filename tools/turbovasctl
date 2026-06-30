@@ -7793,6 +7793,28 @@ def native_api_migration_matrix_focus_terms(focus: str | Iterable[str] | None = 
     return terms
 
 
+NATIVE_API_MIGRATION_RESIDUAL_BUCKET_TOKENS = {
+    "write_or_mutation": ("write", "writes", "mutation", "mutations", "delete", "deletes", "creation", "import"),
+    "control_or_operation": ("control", "actions", "feed-sync", "scan-control", "delivery"),
+    "export_or_download": ("export", "exports", "download", "downloads"),
+    "credential_or_secret": ("credential", "credentials", "secret", "secrets"),
+    "rich_context_or_history": ("rich", "history", "raw", "xml", "row-data"),
+    "report_generation_or_retention": ("generation", "report-generation", "retention"),
+}
+
+
+def native_api_migration_matrix_residual_buckets(row: dict[str, Any]) -> list[str]:
+    residue = row.get("x_turbovas_inherited_still_owns")
+    if not isinstance(residue, str) or not residue:
+        return []
+    residue_words = residue.lower()
+    return [
+        bucket
+        for bucket, tokens in NATIVE_API_MIGRATION_RESIDUAL_BUCKET_TOKENS.items()
+        if any(token in residue_words for token in tokens)
+    ]
+
+
 def native_api_migration_matrix_filter_rows(rows: list[dict[str, Any]], focus: str | Iterable[str] | None = None) -> list[dict[str, Any]]:
     terms = native_api_migration_matrix_focus_terms(focus)
     if not terms:
@@ -7819,6 +7841,7 @@ def native_api_migration_matrix_filter_rows(rows: list[dict[str, Any]], focus: s
         candidates = row.get("replacement_candidates")
         if isinstance(candidates, list):
             values.extend(str(candidate) for candidate in candidates)
+        values.extend(native_api_migration_matrix_residual_buckets(row))
         return "\n".join(values).lower()
 
     return [row for row in rows if any(term in searchable_text(row) for term in terms)]
@@ -7834,15 +7857,7 @@ def openapi_operation_is_pending_write_control(operation: dict[str, Any] | None)
 
 
 def native_api_migration_matrix_remaining_surface(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    bucket_tokens = {
-        "write_or_mutation": ("write", "writes", "mutation", "mutations", "delete", "deletes", "creation", "import"),
-        "control_or_operation": ("control", "actions", "feed-sync", "scan-control", "delivery"),
-        "export_or_download": ("export", "exports", "download", "downloads"),
-        "credential_or_secret": ("credential", "credentials", "secret", "secrets"),
-        "rich_context_or_history": ("rich", "history", "raw", "xml", "row-data"),
-        "report_generation_or_retention": ("generation", "report-generation", "retention"),
-    }
-    bucket_counts = {bucket: 0 for bucket in bucket_tokens}
+    bucket_counts = {bucket: 0 for bucket in NATIVE_API_MIGRATION_RESIDUAL_BUCKET_TOKENS}
     residue_counts: dict[str, int] = {}
     examples: dict[str, str] = {}
     for row in rows:
@@ -7853,10 +7868,8 @@ def native_api_migration_matrix_remaining_surface(rows: list[dict[str, Any]]) ->
         endpoint = row.get("endpoint")
         if isinstance(endpoint, str):
             examples.setdefault(residue, endpoint)
-        residue_words = residue.lower()
-        for bucket, tokens in bucket_tokens.items():
-            if any(token in residue_words for token in tokens):
-                bucket_counts[bucket] += 1
+        for bucket in native_api_migration_matrix_residual_buckets(row):
+            bucket_counts[bucket] += 1
 
     top_residuals = [
         {"residue": residue, "count": count, "example_endpoint": examples.get(residue)}

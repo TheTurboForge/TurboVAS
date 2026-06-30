@@ -3310,6 +3310,51 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(result["details"]["focus_match_count"], 2)
         self.assertEqual([row["endpoint"] for row in result["details"]["items"]], ["/api/v1/schedules", "/api/v1/alerts"])
 
+    def test_native_api_migration_matrix_focus_accepts_residual_buckets(self):
+        root = Path(__file__).resolve().parents[2]
+        rows = [
+            {
+                "endpoint": "/api/v1/filters",
+                "method": "get",
+                "inventory_endpoint": "/api/v1/filters",
+                "openapi_path": "/filters",
+                "direct_access": "scriptable_read",
+                "browser_access": "browser_proxied",
+                "openapi_direct_marker": True,
+                "x_turbovas_exposure": "direct-read",
+                "x_turbovas_maturity": "live-read",
+                "x_turbovas_replaces": "saved-filter-metadata-list-read",
+                "x_turbovas_inherited_still_owns": "saved-filter-term-type-create-restore-hard-delete-alert-linkage",
+                "replacement_candidates": ["filter list automation"],
+            },
+            {
+                "endpoint": "/api/v1/cpes",
+                "method": "get",
+                "inventory_endpoint": "/api/v1/cpes",
+                "openapi_path": "/cpes",
+                "direct_access": "scriptable_read",
+                "browser_access": "browser_proxied",
+                "openapi_direct_marker": True,
+                "x_turbovas_exposure": "direct-read",
+                "x_turbovas_maturity": "live-read",
+                "x_turbovas_replaces": "cpe-catalog-list-read",
+                "x_turbovas_inherited_still_owns": "scap-rich-context",
+                "replacement_candidates": ["CPE list automation"],
+            },
+        ]
+
+        with unittest.mock.patch.object(turbovasctl, "native_api_migration_matrix_rows", return_value=rows):
+            result = turbovasctl.command_native_api_migration_matrix(root, focus="write_or_mutation")
+        with unittest.mock.patch.object(turbovasctl, "native_api_migration_matrix_rows", return_value=rows):
+            compact = turbovasctl.command_native_api_migration_matrix(root, status_only=True, focus="rich_context_or_history")
+
+        self.assertEqual(result["details"]["focus_terms"], ["write_or_mutation"])
+        self.assertEqual(result["details"]["focus_match_count"], 1)
+        self.assertEqual(result["details"]["items"][0]["endpoint"], "/api/v1/filters")
+        self.assertEqual(compact["details"]["focus_terms"], ["rich_context_or_history"])
+        self.assertEqual(compact["details"]["focus_match_count"], 1)
+        self.assertEqual(compact["details"]["focus_rows"][0]["endpoint"], "/api/v1/cpes")
+
     def test_native_api_migration_matrix_focus_warns_on_zero_matches(self):
         root = Path(__file__).resolve().parents[2]
         rows = [
