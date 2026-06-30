@@ -14,7 +14,7 @@ use crate::{
     path_ids::parse_uuid,
     query::{ApiQuery, Collection, CollectionQuery, normalize_collection_query, sort_clause},
     report_evidence_payloads::{CveItem, cve_from_row},
-    scope_report_handlers::scope_report_exists,
+    scope_report_lookup::scope_report_exists,
 };
 
 pub(crate) async fn scope_report_cves(
