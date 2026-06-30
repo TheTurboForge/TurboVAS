@@ -89,6 +89,8 @@ async fn main() -> Result<(), ApiError> {
 #[cfg(test)]
 mod contract_tests;
 #[cfg(test)]
+mod direct_api_contract_tests;
+#[cfg(test)]
 mod filter_characterization_tests;
 #[cfg(test)]
 mod port_list_characterization_tests;
