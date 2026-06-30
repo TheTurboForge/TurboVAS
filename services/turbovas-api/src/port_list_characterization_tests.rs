@@ -21,6 +21,43 @@ fn inherited_function(source: &str, name: &str) -> String {
     tail[..end].to_string()
 }
 
+#[test]
+fn inherited_copy_port_list_copies_metadata_ranges_and_tags_as_non_predefined() {
+    let copy_port_list = inherited_function(MANAGE_SQL_PORT_LISTS, "copy_port_list");
+    for required in [
+        "copy_resource_lock (\"port_list\", name, comment, port_list_id, NULL, 1",
+        "UPDATE port_lists SET predefined = 0",
+        "INSERT INTO port_ranges",
+        "SELECT make_uuid(), %llu, type, start",
+        "FROM port_ranges WHERE port_list = %llu",
+        "sql_commit ()",
+    ] {
+        assert!(
+            copy_port_list.contains(required),
+            "copy_port_list missing {required}"
+        );
+    }
+
+    let copy_resource = inherited_function(
+        include_str!("../../../components/gvmd/src/manage_sql_resources.c"),
+        "copy_resource_lock",
+    );
+    for required in [
+        "acl_user_may (command)",
+        "find_resource_with_permission",
+        "resource_with_name_exists (name, type, 0)",
+        "uniquify ('%s', name, %llu, ' Clone')",
+        "INSERT INTO tag_resources",
+        "resource_location = ",
+        "LOCATION_TABLE",
+    ] {
+        assert!(
+            copy_resource.contains(required),
+            "copy_resource_lock missing {required}"
+        );
+    }
+}
+
 fn openapi_path_block(path: &str) -> String {
     let marker = format!("  {path}:");
     let start = OPENAPI
@@ -214,7 +251,7 @@ fn inherited_restore_port_list_moves_ranges_targets_permissions_and_tags_back_to
 }
 
 #[test]
-fn native_direct_api_allows_only_port_list_metadata_patch_under_write_control() {
+fn native_direct_api_allows_current_port_list_write_control_paths_only_when_enabled() {
     assert!(direct_api_v1_method_is_allowed(
         &Method::GET,
         "/api/v1/port-lists",
@@ -258,7 +295,17 @@ fn native_direct_api_allows_only_port_list_metadata_patch_under_write_control() 
     ));
     assert!(direct_api_v1_method_is_allowed(
         &Method::POST,
+        "/api/v1/port-lists/12345678-1234-1234-1234-123456789abc/clone",
+        true,
+    ));
+    assert!(direct_api_v1_method_is_allowed(
+        &Method::POST,
         "/api/v1/port-lists/12345678-1234-1234-1234-123456789abc/restore",
+        true,
+    ));
+    assert!(!direct_api_v1_method_is_allowed(
+        &Method::POST,
+        "/api/v1/port-lists/not-a-uuid/clone",
         true,
     ));
     assert!(!direct_api_v1_method_is_allowed(
@@ -279,7 +326,7 @@ fn native_direct_api_allows_only_port_list_metadata_patch_under_write_control() 
 }
 
 #[test]
-fn openapi_documents_port_list_metadata_patch_boundary() {
+fn openapi_documents_port_list_write_control_boundary() {
     let list = openapi_path_block("/port-lists");
     assert!(list.contains("get:"));
     assert!(list.contains("post:"));
@@ -298,6 +345,14 @@ fn openapi_documents_port_list_metadata_patch_boundary() {
     assert!(detail.contains("x-turbovas-replaces: port-list-trash-move"));
     assert!(detail.contains("x-turbovas-safety-contract: write-control-v1"));
     assert!(detail.contains("x-turbovas-inherited-still-owns: port-list-range-import-export"));
+
+    let clone = openapi_path_block("/port-lists/{port_list_id}/clone");
+    assert!(clone.contains("post:"));
+    assert!(clone.contains("operationId: postPortListsByPortListIdClone"));
+    assert!(clone.contains("x-turbovas-exposure: direct-write"));
+    assert!(clone.contains("x-turbovas-replaces: port-list-clone"));
+    assert!(clone.contains("x-turbovas-safety-contract: write-control-v1"));
+    assert!(clone.contains("x-turbovas-inherited-still-owns: port-list-range-import-export"));
 
     let restore = openapi_path_block("/port-lists/{port_list_id}/restore");
     assert!(restore.contains("post:"));

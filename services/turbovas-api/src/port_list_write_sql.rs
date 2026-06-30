@@ -19,6 +19,38 @@ pub(crate) fn port_list_create_range_sql() -> &'static str {
      VALUES (make_uuid(), $1, $2, $3, $4, $5, 0);"
 }
 
+pub(crate) fn port_list_clone_metadata_sql() -> &'static str {
+    "INSERT INTO port_lists
+        (uuid, owner, name, comment, predefined, creation_time, modification_time)
+     SELECT make_uuid(),
+            $2,
+            coalesce($3, uniquify('port_list', name, $2, ' Clone')),
+            coalesce($4, comment),
+            0,
+            m_now(),
+            m_now()
+       FROM port_lists
+      WHERE id = $1
+      RETURNING id::integer, uuid::text;"
+}
+
+pub(crate) fn port_list_clone_ranges_sql() -> &'static str {
+    "INSERT INTO port_ranges
+        (uuid, port_list, type, start, \"end\", comment, exclude)
+     SELECT make_uuid(), $2, type, start, \"end\", comment, exclude
+       FROM port_ranges
+      WHERE port_list = $1;"
+}
+
+pub(crate) fn port_list_clone_tags_sql() -> &'static str {
+    "INSERT INTO tag_resources (tag, resource_type, resource, resource_uuid, resource_location)
+     SELECT tag, resource_type, $2, $3, resource_location
+       FROM tag_resources
+      WHERE resource_type = 'port_list'
+        AND resource = $1
+        AND resource_location = 0;"
+}
+
 pub(crate) fn port_list_write_state_sql() -> &'static str {
     "SELECT id::integer, coalesce(predefined, 0)::integer
        FROM port_lists

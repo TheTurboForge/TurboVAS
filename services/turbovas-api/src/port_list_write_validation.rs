@@ -27,6 +27,15 @@ pub(crate) struct PortListCreateRequest {
     pub(crate) port_ranges: Vec<PortListCreateRangeRequest>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PortListCloneRequest {
+    #[serde(default)]
+    pub(crate) name: Option<String>,
+    #[serde(default)]
+    pub(crate) comment: Option<String>,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct PortListCreateRangeRequest {
@@ -48,6 +57,12 @@ pub(crate) struct ValidatedPortListCreate {
     pub(crate) name: String,
     pub(crate) comment: String,
     pub(crate) port_ranges: Vec<ValidatedPortListCreateRange>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct ValidatedPortListClone {
+    pub(crate) name: Option<String>,
+    pub(crate) comment: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -140,6 +155,15 @@ pub(crate) fn validate_port_list_patch_request(
         ));
     }
     Ok(validated)
+}
+
+pub(crate) fn validate_port_list_clone_request(
+    request: PortListCloneRequest,
+) -> Result<ValidatedPortListClone, ApiError> {
+    Ok(ValidatedPortListClone {
+        name: normalize_optional_required_port_list_text(request.name, "name")?,
+        comment: normalize_optional_port_list_text(request.comment, "comment")?,
+    })
 }
 
 fn normalize_optional_required_port_list_text(

@@ -16,9 +16,9 @@ use crate::{
     port_list_payloads::PortListAssetDetail,
     port_list_write_sql::*,
     port_list_write_validation::{
-        PortListCreateRequest, PortListPatchRequest, ValidatedPortListCreate,
-        ValidatedPortListPatch, validate_port_list_create_request,
-        validate_port_list_patch_request,
+        PortListCloneRequest, PortListCreateRequest, PortListPatchRequest, ValidatedPortListClone,
+        ValidatedPortListCreate, ValidatedPortListPatch, validate_port_list_clone_request,
+        validate_port_list_create_request, validate_port_list_patch_request,
     },
     port_lists::load_port_list_asset_detail,
 };
@@ -93,6 +93,39 @@ pub(crate) async fn execute_port_list_create_transaction(
     Ok(record)
 }
 
+pub(crate) async fn clone_port_list(
+    State(state): State<AppState>,
+    Path(port_list_id): Path<String>,
+    operator: Option<Extension<DirectApiOperator>>,
+    Json(request): Json<PortListCloneRequest>,
+) -> Result<(StatusCode, Json<PortListAssetDetail>), ApiError> {
+    let operator = require_port_list_write_operator(operator)?;
+    let request = validate_port_list_clone_request(request)?;
+    let mut client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let tx = client.transaction().await.map_err(|error| {
+        map_port_list_write_db_error(error, "begin clone port list transaction")
+    })?;
+    let owner_id = resolve_port_list_write_operator_owner(&tx, &operator).await?;
+    tx.batch_execute(
+        "LOCK TABLE port_lists, port_lists_trash, port_ranges, tag_resources IN SHARE ROW EXCLUSIVE MODE;",
+    )
+    .await
+    .map_err(|error| map_port_list_write_db_error(error, "lock port list tables for clone"))?;
+    let source = load_port_list_write_state(&tx, &port_list_id).await?;
+    if let Some(name) = request.name.as_ref() {
+        ensure_unique_port_list_name(&tx, name, -1).await?;
+    }
+    let record =
+        execute_port_list_clone_transaction(&tx, source.internal_id, owner_id, &request).await?;
+    tx.commit().await.map_err(|error| {
+        map_port_list_write_db_error(error, "commit clone port list transaction")
+    })?;
+    Ok((
+        StatusCode::CREATED,
+        Json(load_port_list_asset_detail(&client, &record.uuid).await?),
+    ))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct PortListTrashWriteState {
     internal_id: i32,
@@ -111,6 +144,7 @@ struct PortListWriteState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PortListWriteOperation {
     Create,
+    Clone,
     Patch,
     Delete,
     Restore,
@@ -128,6 +162,9 @@ pub(crate) enum PortListWriteStep {
     VerifyUniqueLiveAndTrashName,
     VerifyTargetDeleteSafety,
     InsertPortList,
+    ClonePortListMetadata,
+    ClonePortListRanges,
+    ClonePortListTags,
     ReplacePortRanges,
     UpdatePortListMetadata,
     MovePortListToTrash,
@@ -458,6 +495,45 @@ pub(crate) async fn execute_port_list_trash_transaction(
     Ok(record)
 }
 
+pub(crate) async fn execute_port_list_clone_transaction(
+    tx: &Transaction<'_>,
+    source_port_list_internal_id: i32,
+    owner_id: i32,
+    request: &ValidatedPortListClone,
+) -> Result<PortListWriteRecord, ApiError> {
+    let record = query_port_list_write_record(
+        tx,
+        port_list_clone_metadata_sql(),
+        &[
+            &source_port_list_internal_id,
+            &owner_id,
+            &request.name,
+            &request.comment,
+        ],
+        "clone port list metadata",
+    )
+    .await?;
+    execute_port_list_write_sql(
+        tx,
+        port_list_clone_ranges_sql(),
+        &[&source_port_list_internal_id, &record.internal_id],
+        "clone port list ranges",
+    )
+    .await?;
+    execute_port_list_write_sql(
+        tx,
+        port_list_clone_tags_sql(),
+        &[
+            &source_port_list_internal_id,
+            &record.internal_id,
+            &record.uuid,
+        ],
+        "clone port list tags",
+    )
+    .await?;
+    Ok(record)
+}
+
 pub(crate) async fn execute_port_list_restore_transaction(
     tx: &Transaction<'_>,
     trash_port_list_internal_id: i32,
@@ -664,6 +740,28 @@ pub(crate) fn port_list_patch_transaction_plan() -> PortListWriteTransactionPlan
             PortListWriteStep::VerifyUniqueLiveAndTrashName,
             PortListWriteStep::UpdatePortListMetadata,
         ],
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn port_list_clone_transaction_plan(
+    request: &ValidatedPortListClone,
+) -> PortListWriteTransactionPlan {
+    let mut steps = vec![
+        PortListWriteStep::ResolveOperatorOwner,
+        PortListWriteStep::VerifyExistingPortListMutable,
+    ];
+    if request.name.is_some() {
+        steps.push(PortListWriteStep::VerifyUniqueLiveAndTrashName);
+    }
+    steps.extend([
+        PortListWriteStep::ClonePortListMetadata,
+        PortListWriteStep::ClonePortListRanges,
+        PortListWriteStep::ClonePortListTags,
+    ]);
+    PortListWriteTransactionPlan {
+        operation: PortListWriteOperation::Clone,
+        steps,
     }
 }
 

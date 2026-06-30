@@ -4,12 +4,20 @@
 
 use super::*;
 use crate::port_list_write_validation::{
-    MAX_PORT_LIST_CREATE_RANGES, MAX_PORT_LIST_TEXT_BYTES, PortListCreateRangeRequest,
-    PortListCreateRequest, validate_port_list_create_request,
+    MAX_PORT_LIST_CREATE_RANGES, MAX_PORT_LIST_TEXT_BYTES, PortListCloneRequest,
+    PortListCreateRangeRequest, PortListCreateRequest, validate_port_list_clone_request,
+    validate_port_list_create_request,
 };
 
 fn patch_request(name: Option<&str>, comment: Option<&str>) -> PortListPatchRequest {
     PortListPatchRequest {
+        name: name.map(str::to_string),
+        comment: comment.map(str::to_string),
+    }
+}
+
+fn clone_request(name: Option<&str>, comment: Option<&str>) -> PortListCloneRequest {
+    PortListCloneRequest {
         name: name.map(str::to_string),
         comment: comment.map(str::to_string),
     }
@@ -23,12 +31,74 @@ fn create_request(name: &str, ranges: Vec<PortListCreateRangeRequest>) -> PortLi
     }
 }
 
+#[test]
+fn port_list_clone_request_accepts_default_or_metadata_override() {
+    let default = validate_port_list_clone_request(clone_request(None, None))
+        .expect("default clone metadata");
+    assert_eq!(default.name, None);
+    assert_eq!(default.comment, None);
+
+    let named = validate_port_list_clone_request(clone_request(
+        Some("  Operator copy  "),
+        Some("  copied note  "),
+    ))
+    .expect("named clone");
+    assert_eq!(named.name.as_deref(), Some("Operator copy"));
+    assert_eq!(named.comment.as_deref(), Some("copied note"));
+
+    let clear_comment = validate_port_list_clone_request(clone_request(None, Some("   ")))
+        .expect("blank comment clears comment");
+    assert_eq!(clear_comment.comment.as_deref(), Some(""));
+}
+
+#[test]
+fn port_list_clone_request_rejects_blank_name_control_characters_and_unknown_fields() {
+    assert!(matches!(
+        validate_port_list_clone_request(clone_request(Some("   "), None)),
+        Err(ApiError::BadRequest(_))
+    ));
+    assert!(matches!(
+        validate_port_list_clone_request(clone_request(Some("bad\nname"), None)),
+        Err(ApiError::BadRequest(_))
+    ));
+    let unknown = serde_json::json!({"name": "copy", "port_ranges": []});
+    assert!(serde_json::from_value::<PortListCloneRequest>(unknown).is_err());
+}
+
 fn create_range(protocol: &str, start: i32, end: i32) -> PortListCreateRangeRequest {
     PortListCreateRangeRequest {
         protocol: protocol.to_string(),
         start,
         end,
         comment: Some("  operator range  ".to_string()),
+    }
+}
+
+#[test]
+fn port_list_clone_sql_copies_metadata_ranges_and_tags_without_range_mutation() {
+    let metadata = port_list_clone_metadata_sql();
+    assert!(metadata.contains("INSERT INTO port_lists"));
+    assert!(metadata.contains("coalesce($3, uniquify('port_list', name, $2, ' Clone'))"));
+    assert!(metadata.contains("coalesce($4, comment)"));
+    assert!(metadata.contains("0,"));
+    assert!(metadata.contains("FROM port_lists"));
+    assert!(metadata.contains("WHERE id = $1"));
+
+    let ranges = port_list_clone_ranges_sql();
+    assert!(ranges.contains("INSERT INTO port_ranges"));
+    assert!(ranges.contains("SELECT make_uuid(), $2, type, start"));
+    assert!(ranges.contains("FROM port_ranges"));
+    assert!(ranges.contains("WHERE port_list = $1"));
+
+    let tags = port_list_clone_tags_sql();
+    assert!(tags.contains("INSERT INTO tag_resources"));
+    assert!(tags.contains("resource_type = 'port_list'"));
+    assert!(tags.contains("resource_location = 0"));
+
+    for sql in [metadata, ranges, tags] {
+        assert!(!sql.contains("port_lists_trash"));
+        assert!(!sql.contains("port_ranges_trash"));
+        assert!(!sql.contains("DELETE"));
     }
 }
 
@@ -42,6 +112,36 @@ fn port_list_create_plan_validates_ranges_before_insert() {
             PortListWriteStep::VerifyUniqueLiveAndTrashName,
             PortListWriteStep::InsertPortList,
             PortListWriteStep::ReplacePortRanges,
+        ]
+    );
+}
+
+#[test]
+fn port_list_clone_plan_copies_metadata_ranges_and_tags_after_optional_name_check() {
+    let named = validate_port_list_clone_request(clone_request(Some("copy"), None))
+        .expect("valid named clone");
+    assert_eq!(
+        port_list_clone_transaction_plan(&named).steps,
+        vec![
+            PortListWriteStep::ResolveOperatorOwner,
+            PortListWriteStep::VerifyExistingPortListMutable,
+            PortListWriteStep::VerifyUniqueLiveAndTrashName,
+            PortListWriteStep::ClonePortListMetadata,
+            PortListWriteStep::ClonePortListRanges,
+            PortListWriteStep::ClonePortListTags,
+        ]
+    );
+
+    let default =
+        validate_port_list_clone_request(clone_request(None, None)).expect("valid default clone");
+    assert_eq!(
+        port_list_clone_transaction_plan(&default).steps,
+        vec![
+            PortListWriteStep::ResolveOperatorOwner,
+            PortListWriteStep::VerifyExistingPortListMutable,
+            PortListWriteStep::ClonePortListMetadata,
+            PortListWriteStep::ClonePortListRanges,
+            PortListWriteStep::ClonePortListTags,
         ]
     );
 }
