@@ -27,3 +27,60 @@ pub(crate) fn port_list_update_metadata_sql() -> &'static str {
       WHERE id = $1
       RETURNING uuid::text;"
 }
+
+pub(crate) fn port_list_live_target_count_sql() -> &'static str {
+    "SELECT count(*)::bigint
+       FROM targets
+      WHERE port_list = $1;"
+}
+
+pub(crate) fn port_list_trash_insert_sql() -> &'static str {
+    "INSERT INTO port_lists_trash
+        (uuid, owner, name, comment, predefined, creation_time, modification_time)
+     SELECT uuid, owner, name, comment, predefined, creation_time, modification_time
+       FROM port_lists
+      WHERE id = $1
+      RETURNING id::integer, uuid::text;"
+}
+
+pub(crate) fn port_list_trash_ranges_insert_sql() -> &'static str {
+    "INSERT INTO port_ranges_trash
+        (uuid, port_list, type, start, \"end\", comment, exclude)
+     SELECT uuid, $1, type, start, \"end\", comment, exclude
+       FROM port_ranges
+      WHERE port_list = $2;"
+}
+
+pub(crate) fn port_list_trash_target_relink_sql() -> &'static str {
+    "UPDATE targets_trash
+        SET port_list = $1,
+            port_list_location = 1
+      WHERE port_list = $2
+        AND port_list_location = 0;"
+}
+
+pub(crate) fn port_list_tag_locations_to_trash_sql() -> &'static str {
+    "UPDATE tag_resources
+        SET resource_location = 1,
+            resource = $1
+      WHERE resource_type = 'port_list'
+        AND resource = $2
+        AND resource_location = 0;"
+}
+
+pub(crate) fn port_list_trash_tag_locations_to_trash_sql() -> &'static str {
+    "UPDATE tag_resources_trash
+        SET resource_location = 1,
+            resource = $1
+      WHERE resource_type = 'port_list'
+        AND resource = $2
+        AND resource_location = 0;"
+}
+
+pub(crate) fn port_list_delete_ranges_sql() -> &'static str {
+    "DELETE FROM port_ranges WHERE port_list = $1;"
+}
+
+pub(crate) fn port_list_delete_metadata_sql() -> &'static str {
+    "DELETE FROM port_lists WHERE id = $1;"
+}

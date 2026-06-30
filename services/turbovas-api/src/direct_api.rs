@@ -350,7 +350,7 @@ fn direct_api_v1_write_method_path_is_allowed(method: &Method, path: &str) -> bo
         (&Method::PATCH, ["", "api", "v1", "filters", filter_id]) => {
             direct_api_write_id_segment_is_allowed(filter_id)
         }
-        (&Method::PATCH, ["", "api", "v1", "port-lists", port_list_id]) => {
+        (&Method::PATCH | &Method::DELETE, ["", "api", "v1", "port-lists", port_list_id]) => {
             direct_api_write_id_segment_is_allowed(port_list_id)
         }
         (&Method::PATCH, ["", "api", "v1", "schedules", schedule_id]) => {

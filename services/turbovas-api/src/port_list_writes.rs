@@ -5,6 +5,7 @@
 use axum::{
     Json,
     extract::{Extension, Path, State},
+    http::StatusCode,
 };
 use tokio_postgres::{Transaction, types::ToSql};
 
@@ -22,6 +23,12 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct PortListWriteRecord {
+    uuid: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PortListTrashWriteRecord {
+    internal_id: i32,
     uuid: String,
 }
 
@@ -102,6 +109,37 @@ pub(crate) async fn patch_port_list(
     ))
 }
 
+pub(crate) async fn delete_port_list(
+    State(state): State<AppState>,
+    Path(port_list_id): Path<String>,
+    operator: Option<Extension<DirectApiOperator>>,
+) -> Result<StatusCode, ApiError> {
+    let operator = require_port_list_write_operator(operator)?;
+    let mut client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let tx = client.transaction().await.map_err(|error| {
+        map_port_list_write_db_error(error, "begin delete port list transaction")
+    })?;
+    resolve_port_list_write_operator_owner(&tx, &operator).await?;
+    tx.batch_execute(
+        "LOCK TABLE port_lists, port_lists_trash, port_ranges, port_ranges_trash, targets, targets_trash, tag_resources, tag_resources_trash IN SHARE ROW EXCLUSIVE MODE;",
+    )
+    .await
+    .map_err(|error| map_port_list_write_db_error(error, "lock port list tables for delete"))?;
+    let state = load_port_list_write_state(&tx, &port_list_id).await?;
+    if state.predefined {
+        return Err(ApiError::Conflict(
+            "predefined port lists cannot be deleted".to_string(),
+        ));
+    }
+    ensure_port_list_not_in_use_by_live_targets(&tx, state.internal_id).await?;
+    execute_port_list_trash_transaction(&tx, state.internal_id).await?;
+    tx.commit().await.map_err(|error| {
+        map_port_list_write_db_error(error, "commit delete port list transaction")
+    })?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
 fn require_port_list_write_operator(
     operator: Option<Extension<DirectApiOperator>>,
 ) -> Result<DirectApiOperator, ApiError> {
@@ -177,6 +215,80 @@ pub(crate) async fn execute_port_list_patch_transaction(
     .await
 }
 
+pub(crate) async fn execute_port_list_trash_transaction(
+    tx: &Transaction<'_>,
+    port_list_internal_id: i32,
+) -> Result<PortListTrashWriteRecord, ApiError> {
+    let record = query_port_list_trash_write_record(
+        tx,
+        port_list_trash_insert_sql(),
+        &[&port_list_internal_id],
+        "move port list metadata to trash",
+    )
+    .await?;
+    execute_port_list_write_sql(
+        tx,
+        port_list_trash_ranges_insert_sql(),
+        &[&record.internal_id, &port_list_internal_id],
+        "move port list ranges to trash",
+    )
+    .await?;
+    execute_port_list_write_sql(
+        tx,
+        port_list_trash_target_relink_sql(),
+        &[&record.internal_id, &port_list_internal_id],
+        "relink trash targets to trashed port list",
+    )
+    .await?;
+    execute_port_list_write_sql(
+        tx,
+        port_list_tag_locations_to_trash_sql(),
+        &[&record.internal_id, &port_list_internal_id],
+        "move live port list tag links to trash",
+    )
+    .await?;
+    execute_port_list_write_sql(
+        tx,
+        port_list_trash_tag_locations_to_trash_sql(),
+        &[&record.internal_id, &port_list_internal_id],
+        "move trashed tag links to port list trash id",
+    )
+    .await?;
+    execute_port_list_write_sql(
+        tx,
+        port_list_delete_ranges_sql(),
+        &[&port_list_internal_id],
+        "delete live port list ranges after trash move",
+    )
+    .await?;
+    execute_port_list_write_sql(
+        tx,
+        port_list_delete_metadata_sql(),
+        &[&port_list_internal_id],
+        "delete live port list after trash move",
+    )
+    .await?;
+    Ok(record)
+}
+
+async fn ensure_port_list_not_in_use_by_live_targets(
+    tx: &Transaction<'_>,
+    port_list_internal_id: i32,
+) -> Result<(), ApiError> {
+    let count: i64 = tx
+        .query_one(port_list_live_target_count_sql(), &[&port_list_internal_id])
+        .await
+        .map_err(|error| map_port_list_write_db_error(error, "check port list target usage"))?
+        .get(0);
+    if count == 0 {
+        Ok(())
+    } else {
+        Err(ApiError::Conflict(
+            "port list is still referenced by a live target".to_string(),
+        ))
+    }
+}
+
 async fn query_port_list_write_record(
     tx: &Transaction<'_>,
     sql: &str,
@@ -188,6 +300,33 @@ async fn query_port_list_write_record(
         .map_err(|error| map_port_list_write_db_error(error, action))?
         .map(|row| PortListWriteRecord { uuid: row.get(0) })
         .ok_or(ApiError::NotFound)
+}
+
+async fn query_port_list_trash_write_record(
+    tx: &Transaction<'_>,
+    sql: &str,
+    params: &[&(dyn ToSql + Sync)],
+    action: &'static str,
+) -> Result<PortListTrashWriteRecord, ApiError> {
+    tx.query_opt(sql, params)
+        .await
+        .map_err(|error| map_port_list_write_db_error(error, action))?
+        .map(|row| PortListTrashWriteRecord {
+            internal_id: row.get(0),
+            uuid: row.get(1),
+        })
+        .ok_or(ApiError::NotFound)
+}
+
+async fn execute_port_list_write_sql(
+    tx: &Transaction<'_>,
+    sql: &str,
+    params: &[&(dyn ToSql + Sync)],
+    action: &'static str,
+) -> Result<u64, ApiError> {
+    tx.execute(sql, params)
+        .await
+        .map_err(|error| map_port_list_write_db_error(error, action))
 }
 
 fn map_port_list_write_db_error(error: tokio_postgres::Error, action: &'static str) -> ApiError {

@@ -110,6 +110,44 @@ fn port_list_patch_sql_is_metadata_only() {
 }
 
 #[test]
+fn port_list_delete_sql_moves_metadata_ranges_targets_and_tags_to_trash() {
+    let target_guard = port_list_live_target_count_sql();
+    assert!(target_guard.contains("FROM targets"));
+    assert!(target_guard.contains("WHERE port_list = $1"));
+
+    let trash = port_list_trash_insert_sql();
+    assert!(trash.contains("INSERT INTO port_lists_trash"));
+    assert!(trash.contains("FROM port_lists"));
+    assert!(trash.contains("WHERE id = $1"));
+    assert!(trash.contains("RETURNING id::integer, uuid::text"));
+
+    let ranges = port_list_trash_ranges_insert_sql();
+    assert!(ranges.contains("INSERT INTO port_ranges_trash"));
+    assert!(ranges.contains("SELECT uuid, $1, type, start"));
+    assert!(ranges.contains("FROM port_ranges"));
+    assert!(ranges.contains("WHERE port_list = $2"));
+
+    let targets = port_list_trash_target_relink_sql();
+    assert!(targets.contains("UPDATE targets_trash"));
+    assert!(targets.contains("port_list_location = 1"));
+    assert!(targets.contains("WHERE port_list = $2"));
+    assert!(targets.contains("port_list_location = 0"));
+
+    let live_tags = port_list_tag_locations_to_trash_sql();
+    assert!(live_tags.contains("UPDATE tag_resources"));
+    assert!(live_tags.contains("resource_type = 'port_list'"));
+    assert!(live_tags.contains("resource_location = 1"));
+
+    let trash_tags = port_list_trash_tag_locations_to_trash_sql();
+    assert!(trash_tags.contains("UPDATE tag_resources_trash"));
+    assert!(trash_tags.contains("resource_type = 'port_list'"));
+    assert!(trash_tags.contains("resource_location = 1"));
+
+    assert!(port_list_delete_ranges_sql().contains("DELETE FROM port_ranges"));
+    assert!(port_list_delete_metadata_sql().contains("DELETE FROM port_lists"));
+}
+
+#[test]
 fn port_list_patch_name_uniqueness_checks_live_and_trash_names() {
     let sql = port_list_unique_name_sql();
     assert!(sql.contains("FROM port_lists WHERE name = $1 AND id != $2"));

@@ -510,6 +510,7 @@ OPENAPI_ALLOWED_REPLACES_VALUES = frozenset(
         "port-list-metadata-detail-read",
         "port-list-metadata-list-read",
         "port-list-metadata-modify",
+        "port-list-trash-move",
         "raw-report-application-evidence-read",
         "raw-report-cve-evidence-read",
         "raw-report-detail-summary-read",
@@ -581,7 +582,7 @@ OPENAPI_ALLOWED_INHERITED_STILL_OWNS_VALUES = frozenset(
         "nvt-rich-detail",
         "operating-system-writes-deletes-and-rich-history",
         "override-writes-exports-trash-and-result-expansion",
-        "port-list-import-export-range-trash-restore-delete",
+        "port-list-create-range-import-export-restore-and-hard-delete",
         "port-list-import-export-writes-and-deletes",
         "raw-report-generation-xml-export-retention-and-mutations",
         "report-config-hard-delete-restore-export",
@@ -792,9 +793,18 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-replaces": "port-list-metadata-detail-read",
     },
     ("patch", "/port-lists/{port_list_id}"): {
-        "x-turbovas-inherited-still-owns": "port-list-import-export-range-trash-restore-delete",
+        "x-turbovas-inherited-still-owns": "port-list-create-range-import-export-restore-and-hard-delete",
         "x-turbovas-maturity": "live-write",
         "x-turbovas-replaces": "port-list-metadata-modify",
+    },
+    ("delete", "/port-lists/{port_list_id}"): {
+        "x-turbovas-inherited-still-owns": "port-list-create-range-import-export-restore-and-hard-delete",
+        "x-turbovas-maturity": "live-write",
+        "x-turbovas-operator-identity": "direct-token-operator",
+        "x-turbovas-owner-semantics": "preserve-existing-owner",
+        "x-turbovas-replaces": "port-list-trash-move",
+        "x-turbovas-safety-contract": "write-control-v1",
+        "x-turbovas-side-effect": "metadata-delete",
     },
     ("get", "/hosts"): {
         "x-turbovas-inherited-still-owns": "host-target-creation-tags-writes-and-rich-history",
@@ -6523,6 +6533,13 @@ def summarize_native_tooling(items: list[dict[str, Any]], repo_root: Path | None
                 "replacement_candidates": ["direct native port-list name/comment metadata modification"],
             },
             {
+                "method": "delete",
+                "endpoint": "/api/v1/port-lists/{port_list_id}",
+                "status": "implemented_direct_write_control",
+                "direct_access": "direct_write_control",
+                "replacement_candidates": ["direct native port-list live-to-trash move"],
+            },
+            {
                 "endpoint": "/api/v1/schedules",
                 "status": "implemented_internal_and_browser_proxied",
                 "replacement_candidates": ["GSA top-level Schedules list (migrated through gsad same-origin proxy)", "read-only schedule automation", "native-api-request helper"],
@@ -11670,6 +11687,7 @@ def direct_smoke_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
             "native-api-direct.report-config-patch-disabled",
             "native-api-direct.filter-patch-disabled",
             "native-api-direct.port-list-patch-disabled",
+            "native-api-direct.port-list-delete-disabled",
             "native-api-direct.schedule-patch-disabled",
             "native-api-direct.override-patch-disabled",
             "native-api-direct.tag-write-disabled",
@@ -11706,6 +11724,7 @@ def direct_smoke_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
             "native-api-direct.schedule-write-cleanup",
             "native-api-direct.schedule-write-post-cleanup",
             "native-api-direct.port-list-predefined-patch-denied",
+            "native-api-direct.port-list-predefined-delete-denied",
             "native-api-direct.tag-write-update",
             "native-api-direct.tag-resource-fixture",
             "native-api-direct.tag-resource-add",
@@ -12196,8 +12215,14 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
             port_list_patch_json, port_list_patch_status = parse_json_output_with_http_status(port_list_patch)
             port_list_patch_ok = port_list_patch.returncode == 0 and port_list_patch_status == 409 and isinstance(port_list_patch_json, dict) and port_list_patch_json.get("error", {}).get("code") == "conflict"
             findings.append(native_api_probe_finding("pass" if port_list_patch_ok else "fail", "native-api-direct.port-list-predefined-patch-denied", "Direct write-control rejects predefined port-list metadata patches without mutating state." if port_list_patch_ok else "Direct write-control did not reject a predefined port-list metadata patch as expected.", port_list_patch, direct_native_api_display_command(f"/api/v1/port-lists/{urllib.parse.quote(predefined_port_list_id)}", token=token, env=env, method="PATCH", body=port_list_patch_body, extra_headers=content_type), port_list_patch_json, {"http_status": port_list_patch_status, "port_list_id": predefined_port_list_id, **summarize_native_api_response(port_list_patch_json)}))
+
+            port_list_delete = direct_native_api_curl(repo_root, f"/api/v1/port-lists/{urllib.parse.quote(predefined_port_list_id)}", token=token, env=env, method="DELETE")
+            port_list_delete_json, port_list_delete_status = parse_json_output_with_http_status(port_list_delete)
+            port_list_delete_ok = port_list_delete.returncode == 0 and port_list_delete_status == 409 and isinstance(port_list_delete_json, dict) and port_list_delete_json.get("error", {}).get("code") == "conflict"
+            findings.append(native_api_probe_finding("pass" if port_list_delete_ok else "fail", "native-api-direct.port-list-predefined-delete-denied", "Direct write-control rejects predefined port-list delete/trash moves without mutating state." if port_list_delete_ok else "Direct write-control did not reject a predefined port-list delete as expected.", port_list_delete, direct_native_api_display_command(f"/api/v1/port-lists/{urllib.parse.quote(predefined_port_list_id)}", token=token, env=env, method="DELETE"), port_list_delete_json, {"http_status": port_list_delete_status, "port_list_id": predefined_port_list_id, **summarize_native_api_response(port_list_delete_json)}))
         else:
             findings.append(native_api_probe_finding("warn", "native-api-direct.port-list-predefined-patch-denied", "Direct write-control smoke could not find a predefined port-list fixture for the no-mutation patch guard.", port_list_fixture, direct_native_api_display_command("/api/v1/port-lists?page_size=1", token=token, env=env), port_list_fixture_json, {"http_status": port_list_fixture_status, "port_list_id": predefined_port_list_id, **summarize_native_api_response(port_list_fixture_json)}))
+            findings.append(native_api_probe_finding("warn", "native-api-direct.port-list-predefined-delete-denied", "Direct write-control smoke could not find a predefined port-list fixture for the no-mutation delete guard.", port_list_fixture, direct_native_api_display_command("/api/v1/port-lists?page_size=1", token=token, env=env), port_list_fixture_json, {"http_status": port_list_fixture_status, "port_list_id": predefined_port_list_id, **summarize_native_api_response(port_list_fixture_json)}))
 
         if tag_id:
             tag_resource = direct_native_api_curl(repo_root, "/api/v1/cpes?page_size=1", token=token, env=env)
@@ -12568,6 +12593,17 @@ def command_runtime_native_api_direct_smoke(repo_root: Path, status_only: bool =
     disabled_port_list_patch_json, disabled_port_list_patch_status = parse_json_output_with_http_status(disabled_port_list_patch)
     disabled_port_list_patch_ok = disabled_port_list_patch.returncode == 0 and disabled_port_list_patch_status == 405 and isinstance(disabled_port_list_patch_json, dict) and disabled_port_list_patch_json.get("error", {}).get("code") == "method_not_allowed"
     findings.append(native_api_probe_finding("pass" if disabled_port_list_patch_ok else "fail", "native-api-direct.port-list-patch-disabled", "Direct native API rejects port-list patches while direct write-control is disabled." if disabled_port_list_patch_ok else "Direct native API did not reject a port-list patch while direct write-control is disabled.", disabled_port_list_patch, direct_native_api_display_command("/api/v1/port-lists/00000000-0000-0000-0000-000000000000", token=token, env=env, method="PATCH"), disabled_port_list_patch_json, {"http_status": disabled_port_list_patch_status, **summarize_native_api_response(disabled_port_list_patch_json)}))
+
+    disabled_port_list_delete = direct_native_api_curl(
+        repo_root,
+        "/api/v1/port-lists/00000000-0000-0000-0000-000000000000",
+        token=token,
+        env=env,
+        method="DELETE",
+    )
+    disabled_port_list_delete_json, disabled_port_list_delete_status = parse_json_output_with_http_status(disabled_port_list_delete)
+    disabled_port_list_delete_ok = disabled_port_list_delete.returncode == 0 and disabled_port_list_delete_status == 405 and isinstance(disabled_port_list_delete_json, dict) and disabled_port_list_delete_json.get("error", {}).get("code") == "method_not_allowed"
+    findings.append(native_api_probe_finding("pass" if disabled_port_list_delete_ok else "fail", "native-api-direct.port-list-delete-disabled", "Direct native API rejects port-list deletes while direct write-control is disabled." if disabled_port_list_delete_ok else "Direct native API did not reject a port-list delete while direct write-control is disabled.", disabled_port_list_delete, direct_native_api_display_command("/api/v1/port-lists/00000000-0000-0000-0000-000000000000", token=token, env=env, method="DELETE"), disabled_port_list_delete_json, {"http_status": disabled_port_list_delete_status, **summarize_native_api_response(disabled_port_list_delete_json)}))
 
     disabled_schedule_patch = direct_native_api_curl(
         repo_root,
