@@ -2,11 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use axum::{
-    Router,
-    extract::DefaultBodyLimit,
-    routing::{delete, get, patch, post},
-};
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 mod alerts;
@@ -38,6 +33,7 @@ mod report_payloads;
 mod request_ids;
 mod request_shapes;
 mod result_payloads;
+mod routes;
 mod row_helpers;
 mod runtime;
 mod scan_configs;
@@ -55,40 +51,12 @@ mod trashcan;
 mod user_tags;
 mod vulnerability_payloads;
 
-use alerts::*;
-use app_state::{AppState, create_pool, healthz};
-use catalog_payloads::*;
-use cert_advisories::*;
+use app_state::{AppState, create_pool};
 use direct_api::direct_api_config;
 use errors::ApiError;
-use feeds::feeds;
-use filters::*;
-use host_assets::*;
-use metrics_payloads::*;
-use operating_systems::*;
 use operator_identity::resolve_configured_direct_api_operator;
-use overrides::*;
-use port_lists::*;
-use query::*;
-use report_configs::*;
-use report_evidence_handlers::*;
-use report_formats::*;
-use report_payloads::*;
-use request_shapes::MAX_DIRECT_API_WRITE_BODY_BYTES;
-use result_payloads::*;
+use routes::{direct_native_api_router, native_api_router};
 use runtime::{DirectApiListener, serve_api};
-use scan_configs::*;
-use scanner_assets::*;
-use schedules::*;
-use scope_payloads::*;
-use scope_report_handlers::*;
-use scope_writes::{create_scope, delete_scope, patch_scope};
-use tag_writes::{create_tag, delete_tag, patch_tag, update_tag_resources};
-use tags::*;
-use task_targets::*;
-use tls_certificates::*;
-use trashcan::trashcan_summary;
-use vulnerability_payloads::*;
 
 #[tokio::main]
 async fn main() -> Result<(), ApiError> {
@@ -122,178 +90,6 @@ async fn main() -> Result<(), ApiError> {
     serve_api(internal_app, direct_api).await
 }
 
-fn native_api_router() -> Router<AppState> {
-    Router::new()
-        .route("/healthz", get(healthz))
-        .route("/api/v1/results", get(results))
-        .route("/api/v1/results/:result_id", get(result_detail))
-        .route("/api/v1/vulnerabilities", get(vulnerabilities))
-        .route("/api/v1/cpes", get(cpe_catalog))
-        .route("/api/v1/cpes/*cpe_id", get(cpe_catalog_detail))
-        .route("/api/v1/cves", get(cve_catalog))
-        .route("/api/v1/cves/:cve_id", get(cve_catalog_detail))
-        .route("/api/v1/cert-bund-advisories", get(cert_bund_advisories))
-        .route(
-            "/api/v1/cert-bund-advisories/*advisory_id",
-            get(cert_bund_advisory_detail),
-        )
-        .route("/api/v1/dfn-cert-advisories", get(dfn_cert_advisories))
-        .route(
-            "/api/v1/dfn-cert-advisories/*advisory_id",
-            get(dfn_cert_advisory_detail),
-        )
-        .route("/api/v1/nvts", get(nvt_catalog))
-        .route("/api/v1/nvts/:nvt_id", get(nvt_catalog_detail))
-        .route("/api/v1/operating-systems", get(operating_system_assets))
-        .route(
-            "/api/v1/operating-systems/:os_id",
-            get(operating_system_asset_detail),
-        )
-        .route("/api/v1/hosts", get(host_assets))
-        .route("/api/v1/hosts/:host_id", get(host_asset_detail))
-        .route("/api/v1/tls-certificates", get(tls_certificate_assets))
-        .route(
-            "/api/v1/tls-certificates/:certificate_id",
-            get(tls_certificate_asset_detail),
-        )
-        .route("/api/v1/scanners", get(scanner_assets))
-        .route("/api/v1/scanners/:scanner_id", get(scanner_asset_detail))
-        .route("/api/v1/scan-configs", get(scan_config_assets))
-        .route(
-            "/api/v1/scan-configs/:scan_config_id",
-            get(scan_config_asset_detail),
-        )
-        .route(
-            "/api/v1/scan-configs/:scan_config_id/families",
-            get(scan_config_asset_families),
-        )
-        .route("/api/v1/filters", get(filter_assets))
-        .route("/api/v1/filters/:filter_id", get(filter_asset_detail))
-        .route("/api/v1/feeds", get(feeds))
-        .route("/api/v1/alerts", get(alert_assets))
-        .route("/api/v1/alerts/:alert_id", get(alert_asset_detail))
-        .route("/api/v1/tags", get(tag_assets))
-        .route(
-            "/api/v1/tags/resource-names/:resource_type",
-            get(tag_resource_names),
-        )
-        .route("/api/v1/tags/:tag_id/resources", get(tag_asset_resources))
-        .route("/api/v1/tags/:tag_id", get(tag_asset_detail))
-        .route("/api/v1/overrides", get(override_assets))
-        .route("/api/v1/overrides/:override_id", get(override_asset_detail))
-        .route("/api/v1/port-lists", get(port_list_assets))
-        .route(
-            "/api/v1/port-lists/:port_list_id",
-            get(port_list_asset_detail),
-        )
-        .route("/api/v1/schedules", get(schedule_assets))
-        .route("/api/v1/schedules/:schedule_id", get(schedule_asset_detail))
-        .route("/api/v1/report-configs", get(report_config_assets))
-        .route(
-            "/api/v1/report-configs/:report_config_id",
-            get(report_config_asset_detail),
-        )
-        .route("/api/v1/report-formats", get(report_format_assets))
-        .route(
-            "/api/v1/report-formats/:report_format_id",
-            get(report_format_asset_detail),
-        )
-        .route("/api/v1/trashcan/summary", get(trashcan_summary))
-        .route("/api/v1/reports", get(reports))
-        .route("/api/v1/reports/:report_id", get(report_detail))
-        .route("/api/v1/reports/:report_id/results", get(report_results))
-        .route("/api/v1/reports/:report_id/hosts", get(report_hosts))
-        .route("/api/v1/reports/:report_id/ports", get(report_ports))
-        .route(
-            "/api/v1/reports/:report_id/applications",
-            get(report_applications),
-        )
-        .route(
-            "/api/v1/reports/:report_id/operating-systems",
-            get(report_operating_systems),
-        )
-        .route("/api/v1/reports/:report_id/cves", get(report_cves))
-        .route(
-            "/api/v1/reports/:report_id/tls-certificates",
-            get(report_tls_certificates),
-        )
-        .route("/api/v1/reports/:report_id/errors", get(report_errors))
-        .route("/api/v1/scopes", get(scopes))
-        .route("/api/v1/scopes/:scope_id", get(scope_detail))
-        .route("/api/v1/targets", get(targets))
-        .route("/api/v1/targets/:target_id", get(target_detail))
-        .route("/api/v1/tasks", get(tasks))
-        .route("/api/v1/tasks/:task_id", get(task_detail))
-        .route("/api/v1/scope-reports", get(scope_reports))
-        .route(
-            "/api/v1/scope-reports/:scope_report_id",
-            get(scope_report_detail),
-        )
-        .route("/api/v1/reports/:report_id/metrics", get(report_metrics))
-        .route(
-            "/api/v1/scopes/:scope_id/reports/:scope_report_id/results",
-            get(scope_report_results),
-        )
-        .route(
-            "/api/v1/scopes/:scope_id/reports/:scope_report_id/hosts",
-            get(scope_report_hosts),
-        )
-        .route(
-            "/api/v1/scopes/:scope_id/reports/:scope_report_id/ports",
-            get(scope_report_ports),
-        )
-        .route(
-            "/api/v1/scopes/:scope_id/reports/:scope_report_id/applications",
-            get(scope_report_applications),
-        )
-        .route(
-            "/api/v1/scopes/:scope_id/reports/:scope_report_id/operating-systems",
-            get(scope_report_operating_systems),
-        )
-        .route(
-            "/api/v1/scopes/:scope_id/reports/:scope_report_id/cves",
-            get(scope_report_cves),
-        )
-        .route(
-            "/api/v1/scopes/:scope_id/reports/:scope_report_id/tls-certificates",
-            get(scope_report_tls_certificates),
-        )
-        .route(
-            "/api/v1/scopes/:scope_id/reports/:scope_report_id/errors",
-            get(scope_report_errors),
-        )
-        .route(
-            "/api/v1/scopes/:scope_id/reports/:scope_report_id/metrics",
-            get(scope_report_metrics),
-        )
-        .route(
-            "/api/v1/scopes/:scope_id/reports/:scope_report_id/retention-plan",
-            get(scope_report_retention_plan),
-        )
-}
-
-fn direct_native_api_router(
-    router: Router<AppState>,
-    write_control_enabled: bool,
-) -> Router<AppState> {
-    let router = if write_control_enabled {
-        router
-            .route("/api/v1/scopes", post(create_scope))
-            .route("/api/v1/scopes/:scope_id", patch(patch_scope))
-            .route("/api/v1/scopes/:scope_id", delete(delete_scope))
-            .route("/api/v1/tags", post(create_tag))
-            .route("/api/v1/tags/:tag_id", patch(patch_tag))
-            .route("/api/v1/tags/:tag_id", delete(delete_tag))
-            .route("/api/v1/tags/:tag_id/resources", post(update_tag_resources))
-    } else {
-        router
-    };
-
-    router.layer(DefaultBodyLimit::max(
-        MAX_DIRECT_API_WRITE_BODY_BYTES as usize,
-    ))
-}
-
 #[cfg(test)]
 mod tests {
     use axum::{
@@ -302,10 +98,21 @@ mod tests {
     };
 
     use crate::{
+        alerts::{alert_asset_detail_sql, alert_asset_tasks_sql, alert_assets_sql},
         auth::*,
         collections::*,
         direct_api::{direct_api_v1_method_is_allowed, direct_api_v1_path_is_allowed},
+        host_assets::host_user_tags_sql,
+        operating_systems::operating_system_user_tags_sql,
+        port_lists::port_list_user_tags_sql,
+        query::sort_clause,
         request_ids::*,
+        scan_configs::{scan_config_task_references_sql, scan_config_user_tags_sql},
+        scanner_assets::{scanner_task_references_sql, scanner_user_tags_sql},
+        schedules::schedule_user_tags_sql,
+        scope_payloads::{scope_candidate_hosts_sql, scope_sql},
+        scope_report_handlers::{scope_report_results_sql, scope_report_retention_sources_sql},
+        tls_certificates::tls_certificate_user_tags_sql,
         user_tags::catalog_user_tags_sql,
     };
 
@@ -1508,7 +1315,7 @@ mod tests {
 
     #[test]
     fn direct_api_allowlist_tracks_registered_get_routes_and_write_contracts() {
-        let source = include_str!("main.rs");
+        let source = include_str!("routes.rs");
         let routes = app_route_registration_block(source);
         let api_routes = registered_routes(routes)
             .into_iter()
@@ -1568,7 +1375,7 @@ mod tests {
 
     #[test]
     fn direct_api_write_control_routes_are_direct_only_and_flag_gated() {
-        let source = include_str!("main.rs");
+        let source = include_str!("routes.rs");
         let internal_routes = registered_routes(app_route_registration_block(source));
         let direct_routes = registered_routes(direct_api_route_registration_block(source));
         let direct_writes = direct_routes
@@ -1653,27 +1460,29 @@ mod tests {
 
     fn app_route_registration_block(source: &str) -> &str {
         source
-            .split_once("fn native_api_router() -> Router<AppState> {\n    Router::new()")
+            .split_once(
+                "pub(crate) fn native_api_router() -> Router<AppState> {\n    Router::new()",
+            )
             .expect("native API router must be registered")
             .1
-            .split_once("\n}\n\nfn direct_native_api_router")
+            .split_once("\n}\n\npub(crate) fn direct_native_api_router")
             .expect("native API router must end before direct router")
             .0
     }
 
     fn direct_api_route_registration_block(source: &str) -> &str {
         source
-            .split_once("fn direct_native_api_router(")
+            .split_once("pub(crate) fn direct_native_api_router(")
             .expect("direct API router must be registered")
             .1
-            .split_once("\n}\n\n#[cfg(test)]")
-            .expect("direct API router must end before tests")
+            .split_once("\n}\n")
+            .expect("direct API router must end")
             .0
     }
 
     #[test]
     fn direct_api_router_applies_body_limit_to_extractors() {
-        let source = include_str!("main.rs");
+        let source = include_str!("routes.rs");
         let direct_routes = direct_api_route_registration_block(source);
         assert!(direct_routes.contains("DefaultBodyLimit::max("));
         assert!(direct_routes.contains("MAX_DIRECT_API_WRITE_BODY_BYTES as usize"));
@@ -1722,9 +1531,9 @@ mod tests {
 
     #[test]
     fn scope_report_native_routes_remain_get_only_read_paths() {
-        let source = include_str!("main.rs");
+        let source = include_str!("routes.rs");
         let start = ".route(\"/api/v1/scope-reports\", get(scope_reports))";
-        let end = "\n}\n\nfn direct_native_api_router";
+        let end = "\n}\n\npub(crate) fn direct_native_api_router";
         let routes = source
             .split_once(start)
             .expect("scope report routes must be registered")

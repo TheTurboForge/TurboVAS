@@ -1740,7 +1740,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(dfn_cert_detail["status"], "implemented_internal_and_browser_proxied")
         self.assertIn("GSA Security Information DFN-CERT advisory detail metadata overlay (migrated through gsad same-origin proxy)", dfn_cert_detail["replacement_candidates"])
         alerts = next(item for item in details["implemented_native_endpoints"] if item["endpoint"] == "/api/v1/alerts")
-        api_source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
+        api_source = (root / "services" / "turbovas-api" / "src" / "routes.rs").read_text(encoding="utf-8")
         proxy_source = (root / "components" / "gsad" / "src" / "gsad_native_api.c").read_text(encoding="utf-8")
         alerts_api_declared = '.route("/api/v1/alerts"' in api_source
         alerts_proxy_declared = "/api/v1/alerts" in proxy_source
@@ -2180,12 +2180,18 @@ class TurboVASCtlTests(unittest.TestCase):
                 "      x-turbovas-direct: true\n",
                 encoding="utf-8",
             )
-            api_source = root / "services" / "turbovas-api" / "src" / "main.rs"
-            api_source.parent.mkdir(parents=True)
-            api_source.write_text(
+            source_dir = root / "services" / "turbovas-api" / "src"
+            api_source = source_dir / "main.rs"
+            routes_source = source_dir / "routes.rs"
+            source_dir.mkdir(parents=True)
+            routes_source.write_text(
                 'fn router() { Router::new()\n'
                 '    .route("/api/v1/reports", get(reports))\n'
                 '    .route("/api/v1/orphans", get(orphans)); }\n'
+                'fn direct_native_api_router() {}\n',
+                encoding="utf-8",
+            )
+            api_source.write_text(
                 'fn direct_api_v1_path_is_allowed(path: &str) -> bool {\n'
                 '    let parts = path.split(\'/\').collect::<Vec<_>>();\n'
                 '    matches!(parts.as_slice(), ["", "api", "v1", "reports"] | ["", "api", "v1", "feeds"] if direct_api_segments_are_nonempty(&parts))\n'
@@ -3962,7 +3968,7 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_openapi_tracks_raw_report_contracts(self):
         root = Path(__file__).resolve().parents[2]
         openapi = (root / "api" / "openapi" / "turbovas-v1.yaml").read_text(encoding="utf-8")
-        route_source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
+        route_source = (root / "services" / "turbovas-api" / "src" / "routes.rs").read_text(encoding="utf-8")
         report_source = (root / "services" / "turbovas-api" / "src" / "report_payloads.rs").read_text(encoding="utf-8")
         smoke = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
         self.assertIn("/reports:", openapi)
@@ -3986,7 +3992,8 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_openapi_tracks_scope_report_retention_preview(self):
         root = Path(__file__).resolve().parents[2]
         openapi = (root / "api" / "openapi" / "turbovas-v1.yaml").read_text(encoding="utf-8")
-        source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
+        route_source = (root / "services" / "turbovas-api" / "src" / "routes.rs").read_text(encoding="utf-8")
+        handler_source = (root / "services" / "turbovas-api" / "src" / "scope_report_handlers.rs").read_text(encoding="utf-8")
         smoke = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
         self.assertIn("/scopes/{scope_id}/reports/{scope_report_id}/retention-plan:", openapi)
         operations = {(item["method"], item["path"]): item for item in turbovasctl.openapi_contract_operations(root)}
@@ -4000,9 +4007,9 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("detail_compacted", openapi)
         self.assertIn("aggregate_only", openapi)
         self.assertIn("future_tiered_retention_candidate", openapi)
-        self.assertIn("scope_report_retention_plan", source)
-        self.assertIn("destructive_actions: false", source)
-        self.assertIn("/api/v1/scopes/:scope_id/reports/:scope_report_id/retention-plan", source)
+        self.assertIn("scope_report_retention_plan", route_source)
+        self.assertIn("destructive_actions: false", handler_source)
+        self.assertIn("/api/v1/scopes/:scope_id/reports/:scope_report_id/retention-plan", route_source)
         self.assertIn("native-api.scope-report-retention-plan", smoke)
 
     def test_scope_report_retention_source_sql_preserves_source_identity_contract(self):
@@ -4033,7 +4040,7 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_openapi_tracks_scope_read_contracts(self):
         root = Path(__file__).resolve().parents[2]
         openapi = (root / "api" / "openapi" / "turbovas-v1.yaml").read_text(encoding="utf-8")
-        source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
+        source = (root / "services" / "turbovas-api" / "src" / "routes.rs").read_text(encoding="utf-8")
         smoke = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
         native_client = (root / "components" / "gsa" / "src" / "gmp" / "native-api" / "scopes.ts").read_text(encoding="utf-8")
         scope_list = (root / "components" / "gsa" / "src" / "web" / "pages" / "scopes" / "ScopeListPage.tsx").read_text(encoding="utf-8")
@@ -4156,7 +4163,7 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_operating_system_asset_detail_contract_is_internal_and_parameterized(self):
         root = Path(__file__).resolve().parents[2]
         openapi = (root / "api" / "openapi" / "turbovas-v1.yaml").read_text(encoding="utf-8")
-        route_source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
+        route_source = (root / "services" / "turbovas-api" / "src" / "routes.rs").read_text(encoding="utf-8")
         api_source = (root / "services" / "turbovas-api" / "src" / "operating_systems.rs").read_text(encoding="utf-8")
         native_tooling = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
 
@@ -4172,7 +4179,7 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_host_asset_detail_contract_is_internal_bounded_and_safe_metadata_only(self):
         root = Path(__file__).resolve().parents[2]
         openapi = (root / "api" / "openapi" / "turbovas-v1.yaml").read_text(encoding="utf-8")
-        route_source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
+        route_source = (root / "services" / "turbovas-api" / "src" / "routes.rs").read_text(encoding="utf-8")
         api_source = (root / "services" / "turbovas-api" / "src" / "host_assets.rs").read_text(encoding="utf-8")
         native_tooling = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
 
@@ -4197,7 +4204,7 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_tls_certificate_asset_detail_contract_is_internal_and_source_only(self):
         root = Path(__file__).resolve().parents[2]
         openapi = (root / "api" / "openapi" / "turbovas-v1.yaml").read_text(encoding="utf-8")
-        route_source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
+        route_source = (root / "services" / "turbovas-api" / "src" / "routes.rs").read_text(encoding="utf-8")
         tls_source = (root / "services" / "turbovas-api" / "src" / "tls_certificates.rs").read_text(encoding="utf-8")
         native_tooling = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
         tls_detail_source = tls_source.split("async fn tls_certificate_asset_detail", 1)[1].split("fn tls_certificate_sources", 1)[0]
@@ -4218,7 +4225,7 @@ class TurboVASCtlTests(unittest.TestCase):
     def test_scanner_asset_detail_contract_is_internal_metadata_only(self):
         root = Path(__file__).resolve().parents[2]
         openapi = (root / "api" / "openapi" / "turbovas-v1.yaml").read_text(encoding="utf-8")
-        route_source = (root / "services" / "turbovas-api" / "src" / "main.rs").read_text(encoding="utf-8")
+        route_source = (root / "services" / "turbovas-api" / "src" / "routes.rs").read_text(encoding="utf-8")
         api_source = (root / "services" / "turbovas-api" / "src" / "scanner_assets.rs").read_text(encoding="utf-8")
         native_tooling = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
         scanner_detail_source = api_source.split("async fn scanner_asset_detail", 1)[1].split("fn scanner_task_references_sql", 1)[0]

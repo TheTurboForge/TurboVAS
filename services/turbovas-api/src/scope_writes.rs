@@ -1178,11 +1178,14 @@ mod tests {
     #[test]
     fn scope_write_scaffold_is_not_registered_as_a_live_route() {
         let main_source = include_str!("main.rs");
-        let router_block = main_source
-            .split_once("fn native_api_router() -> Router<AppState> {\n    Router::new()")
+        let routes_source = include_str!("routes.rs");
+        let router_block = routes_source
+            .split_once(
+                "pub(crate) fn native_api_router() -> Router<AppState> {\n    Router::new()",
+            )
             .expect("router setup must exist")
             .1
-            .split_once("\n}\n\nfn direct_native_api_router")
+            .split_once("\n}\n\npub(crate) fn direct_native_api_router")
             .expect("base router setup must end before direct router")
             .0;
 

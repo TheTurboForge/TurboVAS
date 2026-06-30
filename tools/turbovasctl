@@ -5761,7 +5761,7 @@ def rust_route_to_endpoint_template(route: str) -> str:
 def rust_native_api_route_templates(repo_root: Path | None) -> list[str]:
     if repo_root is None:
         return []
-    path = repo_root / "services" / "turbovas-api" / "src" / "main.rs"
+    path = repo_root / "services" / "turbovas-api" / "src" / "routes.rs"
     try:
         source = path.read_text(encoding="utf-8")
     except OSError:
@@ -5862,9 +5862,9 @@ def rust_repo_file_source(repo_root: Path | None, relative_path: str) -> str:
 
 
 def rust_direct_api_body_limit_summary(repo_root: Path | None) -> dict[str, Any]:
-    main_source = rust_repo_file_source(repo_root, "services/turbovas-api/src/main.rs")
+    route_source = rust_repo_file_source(repo_root, "services/turbovas-api/src/routes.rs")
     request_shape_source = rust_repo_file_source(repo_root, "services/turbovas-api/src/request_shapes.rs")
-    direct_router_body = rust_source_function_body(main_source, "direct_native_api_router")
+    direct_router_body = rust_source_function_body(route_source, "direct_native_api_router")
     properties = {
         "direct_router_present": bool(direct_router_body),
         "uses_default_body_limit": "DefaultBodyLimit::max(" in direct_router_body,
@@ -12616,7 +12616,7 @@ def command_runtime_native_api_smoke(repo_root: Path) -> dict[str, Any]:
         )
     )
 
-    if source_file_contains(repo_root, "services/turbovas-api/src/main.rs", '.route("/api/v1/trashcan/summary"'):
+    if source_file_contains(repo_root, "services/turbovas-api/src/routes.rs", '.route("/api/v1/trashcan/summary"'):
         trashcan_summary = native_api_curl(repo_root, "/api/v1/trashcan/summary")
         trashcan_summary_json = parse_json_output(trashcan_summary)
         details["trashcan_summary"] = summarize_native_api_response(trashcan_summary_json)

@@ -11,7 +11,6 @@ use axum::{
 };
 
 use crate::{
-    PageInfo,
     app_state::AppState,
     collections::{
         TAG_DEFAULT_SORT, TAG_RESOURCE_DEFAULT_SORT, TAG_RESOURCE_NAME_MAX_PAGE_SIZE,
@@ -20,7 +19,9 @@ use crate::{
     errors::ApiError,
     formatters::unix_ts_to_rfc3339,
     path_ids::parse_uuid,
-    query::{ApiQuery, Collection, CollectionQuery, normalize_collection_query, sort_clause},
+    query::{
+        ApiQuery, Collection, CollectionQuery, PageInfo, normalize_collection_query, sort_clause,
+    },
     tag_resource_helpers::{
         normalize_tag_resource_type, tag_resource_collection_sql, tag_resource_name_collection_sql,
         tag_resource_name_filter,
