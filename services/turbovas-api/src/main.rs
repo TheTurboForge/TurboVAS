@@ -47,6 +47,7 @@ mod scope_report_errors;
 mod scope_report_handlers;
 mod scope_report_results;
 mod scope_report_retention;
+mod scope_report_tls_certificates;
 mod scope_writes;
 mod startup;
 mod tag_resource_helpers;

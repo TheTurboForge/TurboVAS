@@ -1096,6 +1096,7 @@ fn collection_handlers_use_api_query_contract_extractor() {
         include_str!("scope_report_handlers.rs"),
         include_str!("scope_report_retention.rs"),
         include_str!("scope_report_results.rs"),
+        include_str!("scope_report_tls_certificates.rs"),
         include_str!("scanner_assets.rs"),
         include_str!("schedules.rs"),
         include_str!("tags.rs"),
@@ -1507,6 +1508,7 @@ fn scope_report_handlers_do_not_trigger_scanner_or_task_control() {
         include_str!("scope_report_cves.rs"),
         include_str!("scope_report_errors.rs"),
         include_str!("scope_report_handlers.rs"),
+        include_str!("scope_report_tls_certificates.rs"),
     ]
     .join("\n");
     let start = "pub(crate) async fn scope_report_results(";
