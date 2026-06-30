@@ -9,6 +9,7 @@ mod catalog_payloads;
 mod cert_advisories;
 mod collections;
 mod cpe_catalog;
+mod cve_catalog;
 mod direct_api;
 mod errors;
 mod feeds;

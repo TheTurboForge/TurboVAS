@@ -14,6 +14,7 @@ use crate::{
     catalog_payloads::*,
     cert_advisories::*,
     cpe_catalog::*,
+    cve_catalog::*,
     feeds::feeds,
     filters::*,
     host_assets::*,
