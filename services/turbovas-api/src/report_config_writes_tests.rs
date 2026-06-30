@@ -4,8 +4,10 @@
 
 use super::*;
 use crate::report_config_write_plans::*;
+use crate::report_config_write_sql::*;
 use crate::report_config_write_validation::{
-    MAX_REPORT_CONFIG_PARAMS, ReportConfigCloneRequest, ReportConfigParamWriteRequest,
+    MAX_REPORT_CONFIG_PARAMS, ReportConfigCloneRequest, ReportConfigFormatParam,
+    ReportConfigFormatState, ReportConfigParamWriteRequest, ValidatedReportConfigParamWrite,
 };
 
 #[test]
