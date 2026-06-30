@@ -177,8 +177,10 @@ pub(crate) fn tag_resource_direct_write_type_is_supported(resource_type: &str) -
         "config"
             | "cert_bund_adv"
             | "cpe"
+            | "cve"
             | "dfn_cert_adv"
             | "host"
+            | "nvt"
             | "os"
             | "port_list"
             | "report_config"
@@ -192,7 +194,10 @@ pub(crate) fn tag_resource_direct_write_type_is_supported(resource_type: &str) -
 }
 
 pub(crate) fn tag_resource_direct_write_id_must_be_uuid(resource_type: &str) -> bool {
-    !matches!(resource_type, "cert_bund_adv" | "cpe" | "dfn_cert_adv")
+    !matches!(
+        resource_type,
+        "cert_bund_adv" | "cpe" | "cve" | "dfn_cert_adv" | "nvt"
+    )
 }
 
 pub(crate) fn tag_resource_active_lookup_sql(resource_type: &str) -> Result<String, ApiError> {
@@ -209,11 +214,12 @@ pub(crate) fn tag_resource_active_lookup_sql(resource_type: &str) -> Result<Stri
     };
 
     Ok(format!(
-        r#"SELECT r.id::integer, r.uuid::text
+        r#"SELECT r.id::integer, ({id_expr})::text
              FROM {table} r
-            WHERE lower(r.uuid) = lower($1){extra_where}
+            WHERE lower(({id_expr})::text) = lower($1){extra_where}
             LIMIT 1;"#,
         table = spec.table,
+        id_expr = spec.id_expr,
     ))
 }
 
@@ -340,10 +346,10 @@ mod tests {
     }
 
     #[test]
-    fn tag_resource_direct_write_lookup_is_uuid_active_table_only() {
+    fn tag_resource_direct_write_lookup_uses_whitelisted_public_ids() {
         let target_sql = tag_resource_active_lookup_sql("target").unwrap();
         assert!(target_sql.contains("FROM targets r"));
-        assert!(target_sql.contains("lower(r.uuid) = lower($1)"));
+        assert!(target_sql.contains("lower((r.uuid)::text) = lower($1)"));
 
         let task_sql = tag_resource_active_lookup_sql("task").unwrap();
         assert!(task_sql.contains("coalesce(r.usage_type, 'scan') = 'scan'"));
@@ -351,8 +357,13 @@ mod tests {
 
         let cpe_sql = tag_resource_active_lookup_sql("cpe").unwrap();
         assert!(cpe_sql.contains("FROM scap.cpes r"));
-        assert!(cpe_sql.contains("lower(r.uuid) = lower($1)"));
+        assert!(cpe_sql.contains("lower((r.uuid)::text) = lower($1)"));
         assert!(!tag_resource_direct_write_id_must_be_uuid("cpe"));
+
+        let cve_sql = tag_resource_active_lookup_sql("cve").unwrap();
+        assert!(cve_sql.contains("FROM scap.cves r"));
+        assert!(cve_sql.contains("lower((r.name)::text) = lower($1)"));
+        assert!(!tag_resource_direct_write_id_must_be_uuid("cve"));
 
         let cert_sql = tag_resource_active_lookup_sql("cert_bund_adv").unwrap();
         assert!(cert_sql.contains("FROM cert.cert_bund_advs r"));
@@ -362,11 +373,14 @@ mod tests {
         assert!(dfn_sql.contains("FROM cert.dfn_cert_advs r"));
         assert!(!tag_resource_direct_write_id_must_be_uuid("dfn_cert_adv"));
 
+        let nvt_sql = tag_resource_active_lookup_sql("nvt").unwrap();
+        assert!(nvt_sql.contains("FROM nvts r"));
+        assert!(nvt_sql.contains("lower((r.oid)::text) = lower($1)"));
+        assert!(!tag_resource_direct_write_id_must_be_uuid("nvt"));
+
         assert!(tag_resource_direct_write_id_must_be_uuid("target"));
         assert!(tag_resource_direct_write_id_must_be_uuid("task"));
 
-        assert!(tag_resource_active_lookup_sql("cve").is_err());
-        assert!(tag_resource_active_lookup_sql("nvt").is_err());
         assert!(tag_resource_active_lookup_sql("alert").is_err());
         assert!(tag_resource_active_lookup_sql("credential").is_err());
     }

@@ -190,16 +190,10 @@ fn tag_resource_direct_write_support_is_narrower_than_read_support() {
     assert!(ensure_tag_resource_direct_write_type_is_supported("target").is_ok());
     assert!(ensure_tag_resource_direct_write_type_is_supported("task").is_ok());
     assert!(ensure_tag_resource_direct_write_type_is_supported("cpe").is_ok());
+    assert!(ensure_tag_resource_direct_write_type_is_supported("cve").is_ok());
     assert!(ensure_tag_resource_direct_write_type_is_supported("cert_bund_adv").is_ok());
     assert!(ensure_tag_resource_direct_write_type_is_supported("dfn_cert_adv").is_ok());
-    assert!(matches!(
-        ensure_tag_resource_direct_write_type_is_supported("cve"),
-        Err(ApiError::BadRequest(_))
-    ));
-    assert!(matches!(
-        ensure_tag_resource_direct_write_type_is_supported("nvt"),
-        Err(ApiError::BadRequest(_))
-    ));
+    assert!(ensure_tag_resource_direct_write_type_is_supported("nvt").is_ok());
     assert!(matches!(
         ensure_tag_resource_direct_write_type_is_supported("alert"),
         Err(ApiError::BadRequest(_))
