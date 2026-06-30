@@ -13,6 +13,7 @@ pub(crate) enum ReportConfigWriteOperation {
     Clone,
     Delete,
     Restore,
+    HardDelete,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -31,12 +32,28 @@ pub(crate) enum ReportConfigWriteStep {
     MoveReportConfigToTrash,
     VerifyTrashReportConfigRestorable,
     RestoreReportConfigFromTrash,
+    VerifyTrashReportConfigDeleteSafety,
+    RemoveTrashReportConfigTags,
+    HardDeleteReportConfigFromTrash,
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct ReportConfigWriteTransactionPlan {
     pub(crate) operation: ReportConfigWriteOperation,
     pub(crate) steps: Vec<ReportConfigWriteStep>,
+}
+
+pub(crate) fn report_config_hard_delete_transaction_plan() -> ReportConfigWriteTransactionPlan {
+    ReportConfigWriteTransactionPlan {
+        operation: ReportConfigWriteOperation::HardDelete,
+        steps: vec![
+            ReportConfigWriteStep::ResolveOperatorOwner,
+            ReportConfigWriteStep::VerifyTrashReportConfigRestorable,
+            ReportConfigWriteStep::VerifyTrashReportConfigDeleteSafety,
+            ReportConfigWriteStep::RemoveTrashReportConfigTags,
+            ReportConfigWriteStep::HardDeleteReportConfigFromTrash,
+        ],
+    }
 }
 
 pub(crate) fn report_config_restore_transaction_plan() -> ReportConfigWriteTransactionPlan {

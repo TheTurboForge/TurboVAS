@@ -391,6 +391,17 @@ fn report_config_write_transaction_plans_keep_validation_before_mutation() {
             ReportConfigWriteStep::RestoreReportConfigFromTrash,
         ]
     );
+
+    assert_eq!(
+        report_config_hard_delete_transaction_plan().steps,
+        vec![
+            ReportConfigWriteStep::ResolveOperatorOwner,
+            ReportConfigWriteStep::VerifyTrashReportConfigRestorable,
+            ReportConfigWriteStep::VerifyTrashReportConfigDeleteSafety,
+            ReportConfigWriteStep::RemoveTrashReportConfigTags,
+            ReportConfigWriteStep::HardDeleteReportConfigFromTrash,
+        ]
+    );
 }
 
 #[test]
@@ -486,4 +497,30 @@ fn report_config_restore_sql_moves_metadata_params_and_tags_to_live() {
         report_config_delete_trash_params_sql().contains("DELETE FROM report_config_params_trash")
     );
     assert!(report_config_delete_trash_metadata_sql().contains("DELETE FROM report_configs_trash"));
+}
+
+#[test]
+fn report_config_hard_delete_sql_removes_trash_tags_params_and_metadata_only() {
+    assert!(report_config_trash_in_use_by_alerts_sql().contains("SELECT 0::bigint"));
+
+    let tags = report_config_trash_tag_delete_sql();
+    assert!(tags.contains("DELETE FROM tag_resources"));
+    assert!(tags.contains("resource_type = 'report_config'"));
+    assert!(tags.contains("resource = $1"));
+    assert!(tags.contains("resource_location = 1"));
+
+    assert!(
+        report_config_delete_trash_params_sql().contains("DELETE FROM report_config_params_trash")
+    );
+    assert!(report_config_delete_trash_metadata_sql().contains("DELETE FROM report_configs_trash"));
+
+    for sql in [
+        report_config_trash_tag_delete_sql(),
+        report_config_delete_trash_params_sql(),
+        report_config_delete_trash_metadata_sql(),
+    ] {
+        assert!(!sql.contains("report_configs WHERE"));
+        assert!(!sql.contains("report_config_params WHERE"));
+        assert!(!sql.contains("report_formats"));
+    }
 }

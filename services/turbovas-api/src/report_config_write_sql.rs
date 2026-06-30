@@ -169,6 +169,17 @@ pub(crate) fn report_config_delete_trash_metadata_sql() -> &'static str {
     "DELETE FROM report_configs_trash WHERE id = $1;"
 }
 
+pub(crate) fn report_config_trash_tag_delete_sql() -> &'static str {
+    "DELETE FROM tag_resources
+      WHERE resource_type = 'report_config'
+        AND resource = $1
+        AND resource_location = 1;"
+}
+
+pub(crate) fn report_config_trash_in_use_by_alerts_sql() -> &'static str {
+    "SELECT 0::bigint;"
+}
+
 pub(crate) fn report_config_insert_param_sql() -> &'static str {
     "INSERT INTO report_config_params (report_config, name, value)
      VALUES ($1, $2, $3)

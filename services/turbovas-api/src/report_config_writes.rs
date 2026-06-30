@@ -81,6 +81,34 @@ pub(crate) async fn create_report_config(
     ))
 }
 
+pub(crate) async fn hard_delete_report_config(
+    State(state): State<AppState>,
+    Path(report_config_id): Path<String>,
+    operator: Option<Extension<DirectApiOperator>>,
+) -> Result<StatusCode, ApiError> {
+    let operator = require_report_config_write_operator(operator)?;
+    let mut client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let tx = client.transaction().await.map_err(|error| {
+        map_report_config_write_db_error(error, "begin hard-delete report config transaction")
+    })?;
+    resolve_report_config_write_operator_owner(&tx, &operator).await?;
+    tx.batch_execute(
+        "LOCK TABLE report_configs_trash, report_config_params_trash, tag_resources IN SHARE ROW EXCLUSIVE MODE;",
+    )
+    .await
+    .map_err(|error| {
+        map_report_config_write_db_error(error, "lock report config trash tables for hard delete")
+    })?;
+    let trash = load_report_config_trash_state(&tx, &report_config_id).await?;
+    ensure_trash_report_config_not_in_use_by_alerts(&tx, trash.internal_id).await?;
+    execute_report_config_hard_delete_transaction(&tx, trash.internal_id).await?;
+    tx.commit().await.map_err(|error| {
+        map_report_config_write_db_error(error, "commit hard-delete report config transaction")
+    })?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
 pub(crate) async fn clone_report_config(
     State(state): State<AppState>,
     Path(report_config_id): Path<String>,
@@ -118,6 +146,34 @@ pub(crate) async fn clone_report_config(
     ))
 }
 
+pub(crate) async fn execute_report_config_hard_delete_transaction(
+    tx: &Transaction<'_>,
+    trash_report_config_internal_id: i32,
+) -> Result<(), ApiError> {
+    execute_report_config_write_sql(
+        tx,
+        report_config_trash_tag_delete_sql(),
+        &[&trash_report_config_internal_id],
+        "delete report config trash tag links",
+    )
+    .await?;
+    execute_report_config_write_sql(
+        tx,
+        report_config_delete_trash_params_sql(),
+        &[&trash_report_config_internal_id],
+        "delete report config trash params",
+    )
+    .await?;
+    execute_report_config_write_sql(
+        tx,
+        report_config_delete_trash_metadata_sql(),
+        &[&trash_report_config_internal_id],
+        "delete report config trash metadata",
+    )
+    .await?;
+    Ok(())
+}
+
 pub(crate) async fn delete_report_config(
     State(state): State<AppState>,
     Path(report_config_id): Path<String>,
@@ -142,6 +198,26 @@ pub(crate) async fn delete_report_config(
     })?;
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+async fn ensure_trash_report_config_not_in_use_by_alerts(
+    tx: &Transaction<'_>,
+    _report_config_internal_id: i32,
+) -> Result<(), ApiError> {
+    let count: i64 = tx
+        .query_one(report_config_trash_in_use_by_alerts_sql(), &[])
+        .await
+        .map_err(|error| {
+            map_report_config_write_db_error(error, "check trash report config alert usage")
+        })?
+        .get(0);
+    if count == 0 {
+        Ok(())
+    } else {
+        Err(ApiError::Conflict(
+            "trash report config is still referenced by an alert".to_string(),
+        ))
+    }
 }
 
 pub(crate) async fn restore_report_config(

@@ -26,8 +26,8 @@ use crate::{
     port_lists::*,
     report_applications::report_applications,
     report_config_writes::{
-        clone_report_config, create_report_config, delete_report_config, patch_report_config,
-        restore_report_config,
+        clone_report_config, create_report_config, delete_report_config, hard_delete_report_config,
+        patch_report_config, restore_report_config,
     },
     report_configs::*,
     report_cves::report_cves,
@@ -239,6 +239,10 @@ pub(crate) fn direct_native_api_router(
             .route(
                 "/api/v1/report-configs/:report_config_id/restore",
                 post(restore_report_config),
+            )
+            .route(
+                "/api/v1/report-configs/:report_config_id/trash",
+                delete(hard_delete_report_config),
             )
             .route("/api/v1/filters/:filter_id", patch(patch_filter))
             .route("/api/v1/filters/:filter_id", delete(delete_filter))
