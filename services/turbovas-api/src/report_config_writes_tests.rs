@@ -141,6 +141,141 @@ fn report_config_param_values_are_size_capped_and_reject_nul() {
     ));
 }
 
+fn report_config_format_param(
+    param_type: i32,
+    min: i64,
+    max: i64,
+    options: &[&str],
+) -> ReportConfigFormatParam {
+    ReportConfigFormatParam {
+        param_type,
+        min,
+        max,
+        options: options.iter().map(|option| (*option).to_string()).collect(),
+    }
+}
+
+#[test]
+fn report_config_param_type_validation_accepts_supported_values() {
+    let format = ReportConfigFormatState {
+        params: std::collections::BTreeMap::from([
+            (
+                "copies".to_string(),
+                report_config_format_param(1, 1, 10, &[]),
+            ),
+            (
+                "style".to_string(),
+                report_config_format_param(2, 0, 0, &["summary"]),
+            ),
+            (
+                "subject".to_string(),
+                report_config_format_param(3, 3, 20, &[]),
+            ),
+            (
+                "formats".to_string(),
+                report_config_format_param(5, 0, 0, &[]),
+            ),
+            (
+                "sections".to_string(),
+                report_config_format_param(6, 1, 2, &["summary", "details"]),
+            ),
+        ]),
+    };
+
+    let params = vec![
+        ValidatedReportConfigParamWrite {
+            name: "copies".to_string(),
+            value: "3".to_string(),
+        },
+        ValidatedReportConfigParamWrite {
+            name: "style".to_string(),
+            value: "summary".to_string(),
+        },
+        ValidatedReportConfigParamWrite {
+            name: "subject".to_string(),
+            value: "Daily".to_string(),
+        },
+        ValidatedReportConfigParamWrite {
+            name: "formats".to_string(),
+            value: "12345678-1234-1234-1234-123456789abc,abcdef".to_string(),
+        },
+        ValidatedReportConfigParamWrite {
+            name: "sections".to_string(),
+            value: r#"["summary","details"]"#.to_string(),
+        },
+    ];
+
+    validate_report_config_param_values(&params, &format).expect("supported values are valid");
+}
+
+#[test]
+fn report_config_param_type_validation_rejects_bad_values() {
+    let format = ReportConfigFormatState {
+        params: std::collections::BTreeMap::from([
+            (
+                "copies".to_string(),
+                report_config_format_param(1, 1, 3, &[]),
+            ),
+            (
+                "style".to_string(),
+                report_config_format_param(2, 0, 0, &["summary"]),
+            ),
+            (
+                "subject".to_string(),
+                report_config_format_param(3, 3, 5, &[]),
+            ),
+            (
+                "formats".to_string(),
+                report_config_format_param(5, 0, 0, &[]),
+            ),
+            (
+                "sections".to_string(),
+                report_config_format_param(6, 1, 1, &["summary"]),
+            ),
+        ]),
+    };
+    let cases = [
+        ValidatedReportConfigParamWrite {
+            name: "missing".to_string(),
+            value: "x".to_string(),
+        },
+        ValidatedReportConfigParamWrite {
+            name: "copies".to_string(),
+            value: "zero".to_string(),
+        },
+        ValidatedReportConfigParamWrite {
+            name: "copies".to_string(),
+            value: "4".to_string(),
+        },
+        ValidatedReportConfigParamWrite {
+            name: "style".to_string(),
+            value: "full".to_string(),
+        },
+        ValidatedReportConfigParamWrite {
+            name: "subject".to_string(),
+            value: "too long".to_string(),
+        },
+        ValidatedReportConfigParamWrite {
+            name: "formats".to_string(),
+            value: "abc/def".to_string(),
+        },
+        ValidatedReportConfigParamWrite {
+            name: "sections".to_string(),
+            value: r#"["summary","details"]"#.to_string(),
+        },
+    ];
+
+    for param in cases {
+        assert!(
+            matches!(
+                validate_report_config_param_values(std::slice::from_ref(&param), &format),
+                Err(ApiError::BadRequest(_))
+            ),
+            "expected invalid param to fail: {param:?}"
+        );
+    }
+}
+
 #[test]
 fn report_config_write_transaction_plans_keep_validation_before_mutation() {
     let create = validate_report_config_create_request(ReportConfigCreateRequest {
