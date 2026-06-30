@@ -5950,6 +5950,39 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertFalse(turbovasctl.env_values_have_nonempty_key(["OTHER=value"], "TOKEN"))
         self.assertTrue(turbovasctl.env_values_have_nonempty_key(["TOKEN=secret"], "TOKEN"))
 
+    def test_direct_native_api_write_smoke_status_only_preserves_fixture_warnings(self):
+        result = {
+            "status": "warn",
+            "summary": "Direct native API write-control smoke checks completed.",
+            "artifacts": ["/tmp/native-api-direct-write-smoke.json"],
+            "details": {
+                "base_url": "http://127.0.0.1:19080",
+                "container_bind": "127.0.0.1:9081",
+                "token_source": "runtime-secret-file",
+            },
+            "metadata": {"command": "runtime-native-api-direct-write-smoke"},
+            "findings": [
+                {"status": "pass", "check": "native-api-direct.write-control-operator", "message": "ok"},
+                {"status": "warn", "check": "native-api-direct.report-config-fixture", "message": "missing configurable report-format fixture"},
+                {"status": "pass", "check": "native-api-direct.report-config-missing-format-denied", "message": "ok"},
+                {"status": "warn", "check": "native-api-direct.schedule-fixture", "message": "missing schedule fixture"},
+                {"status": "pass", "check": "native-api-direct.tag-resource-add", "message": "ok"},
+                {"status": "pass", "check": "native-api-direct.write-control-restore", "message": "ok"},
+            ],
+        }
+
+        compact = turbovasctl.direct_smoke_status_only_result(result)
+
+        self.assertEqual(compact["status"], "warn")
+        self.assertEqual(compact["details"]["non_pass_count"], 2)
+        self.assertEqual([item["check"] for item in compact["findings"]], ["native-api-direct.report-config-fixture", "native-api-direct.schedule-fixture"])
+        checks = compact["details"]["important_checks"]
+        self.assertEqual(checks["native-api-direct.report-config-fixture"], "warn")
+        self.assertEqual(checks["native-api-direct.report-config-missing-format-denied"], "pass")
+        self.assertEqual(checks["native-api-direct.schedule-fixture"], "warn")
+        self.assertEqual(checks["native-api-direct.tag-resource-add"], "pass")
+        self.assertNotIn("native-api-direct.schedule-write-update", checks)
+
     def test_direct_native_api_write_smoke_uses_guarded_operator_and_cleans_up(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "TurboVAS"

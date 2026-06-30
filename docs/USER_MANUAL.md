@@ -63,6 +63,7 @@ Useful development checks include:
 - `just runtime-app-smoke`
 - `just runtime-native-api-smoke --json`
 - `just runtime-native-api-direct-smoke --json`
+- `just runtime-native-api-direct-write-smoke --status-only --json`
 - `just runtime-native-api-direct-token --json`
 - `just runtime-native-api-direct-token --json --rotate`
 - `just runtime-webui-smoke --json`
@@ -84,8 +85,9 @@ command details.
 The native HTTP/JSON API is internal by default for browser/runtime migration.
 For development automation, `just runtime-native-api-direct-smoke --json`
 enables and validates an opt-in bearer-auth direct listener, defaulting to
-loopback. That direct mode is for read-only `/api/v1` development proof work;
-it is not production deployment guidance and does not authorize scanner control,
+loopback. That direct mode is for approved `/api/v1` development proof work:
+broadly allowlisted reads plus explicitly gated write-control routes. It is not
+production deployment guidance and does not authorize scanner control,
 credential, feed, account, or destructive write endpoints.
 It also has a fixed in-flight development pressure guard; hitting the cap
 returns JSON `429 too_many_requests` rather than queueing unbounded work.
@@ -111,11 +113,13 @@ listener. The direct write-control flag is
 `TURBOVAS_API_DIRECT_WRITE_CONTROL=1`; it is strict-boolean, requires
 `TURBOVAS_API_OPERATOR_UUID`, and currently enables only approved scope
 metadata/membership writes, tag metadata create/update, unassigned-tag delete,
-and explicit add/remove of UUID resource assignments for the tag's existing
-native-safe active-table resource type. Security-information tag assignment,
-filter/bulk actions, trash, clone/copy, export, credentials, users, reports, and
-results remain on inherited compatibility paths. Direct mode otherwise accepts
-only classified read-only `GET` requests.
+and explicit add/remove of resource assignments for selected native-safe active
+resource types. UUID-backed resources use UUIDs; catalog-backed security
+information resources use exact public IDs such as CPE URI, CVE name, NVT OID,
+or CERT/DFN advisory id. Alerts, filter/bulk actions, trash, clone/copy,
+export, credentials, users, reports, and results remain on inherited
+compatibility paths. Direct mode otherwise accepts only classified read-only
+`GET` requests.
 Use a request ID when a direct probe needs a visible correlation ID in
 responses/logs:
 
