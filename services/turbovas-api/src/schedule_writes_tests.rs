@@ -131,6 +131,38 @@ fn schedule_patch_plan_refreshes_tasks_only_for_calendar_changes() {
 }
 
 #[test]
+fn schedule_patch_sql_is_metadata_only() {
+    let sql = schedule_update_metadata_sql();
+    assert!(sql.contains("UPDATE schedules"));
+    assert!(sql.contains("name = coalesce($2, name)"));
+    assert!(sql.contains("comment = coalesce($3, comment)"));
+    assert!(sql.contains("modification_time = m_now()"));
+    for forbidden in [
+        "icalendar",
+        "timezone",
+        "first_time",
+        "period",
+        "period_months",
+        "byday",
+        "duration",
+        "tasks",
+        "schedule_next_time",
+    ] {
+        assert!(
+            !sql.contains(forbidden),
+            "schedule patch SQL must not touch {forbidden}"
+        );
+    }
+}
+
+#[test]
+fn schedule_patch_uniqueness_checks_live_and_trash_names() {
+    let sql = schedule_unique_name_sql();
+    assert!(sql.contains("FROM schedules WHERE name = $1 AND id != $2"));
+    assert!(sql.contains("FROM schedules_trash WHERE name = $1"));
+}
+
+#[test]
 fn schedule_delete_plan_keeps_task_and_trash_side_effects_explicit() {
     assert_eq!(
         schedule_delete_transaction_plan().steps,

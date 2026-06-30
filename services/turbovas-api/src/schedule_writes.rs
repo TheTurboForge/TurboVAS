@@ -2,16 +2,23 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#[cfg(test)]
+use axum::{
+    Json,
+    extract::{Extension, Path, State},
+};
 use serde::Deserialize;
+use tokio_postgres::{Row, Transaction, types::ToSql};
 
-#[cfg(test)]
-use crate::errors::ApiError;
+use crate::{
+    app_state::AppState,
+    auth::DirectApiOperator,
+    errors::ApiError,
+    path_ids::parse_uuid,
+    schedules::{ScheduleAssetDetail, load_schedule_asset_detail},
+};
 
-#[cfg(test)]
 const MAX_SCHEDULE_TEXT_BYTES: usize = 4096;
 
-#[cfg(test)]
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct SchedulePatchRequest {
@@ -21,11 +28,20 @@ pub(crate) struct SchedulePatchRequest {
     comment: Option<String>,
 }
 
-#[cfg(test)]
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct ValidatedSchedulePatch {
     pub(crate) name: Option<String>,
     pub(crate) comment: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ScheduleWriteRecord {
+    uuid: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ScheduleWriteState {
+    internal_id: i32,
 }
 
 #[cfg(test)]
@@ -62,7 +78,6 @@ pub(crate) struct ScheduleWriteTransactionPlan {
     pub(crate) steps: Vec<ScheduleWriteStep>,
 }
 
-#[cfg(test)]
 pub(crate) fn validate_schedule_patch_request(
     request: SchedulePatchRequest,
 ) -> Result<ValidatedSchedulePatch, ApiError> {
@@ -78,7 +93,6 @@ pub(crate) fn validate_schedule_patch_request(
     Ok(validated)
 }
 
-#[cfg(test)]
 fn normalize_optional_required_schedule_text(
     value: Option<String>,
     field_name: &str,
@@ -88,7 +102,6 @@ fn normalize_optional_required_schedule_text(
         .transpose()
 }
 
-#[cfg(test)]
 fn normalize_required_schedule_text(value: String, field_name: &str) -> Result<String, ApiError> {
     let value = normalize_schedule_text_value(value, field_name)?;
     if value.is_empty() {
@@ -98,7 +111,6 @@ fn normalize_required_schedule_text(value: String, field_name: &str) -> Result<S
     }
 }
 
-#[cfg(test)]
 fn normalize_optional_schedule_text(
     value: Option<String>,
     field_name: &str,
@@ -108,7 +120,6 @@ fn normalize_optional_schedule_text(
         .transpose()
 }
 
-#[cfg(test)]
 fn normalize_schedule_text_value(value: String, field_name: &str) -> Result<String, ApiError> {
     let value = value.trim().to_string();
     if value.len() > MAX_SCHEDULE_TEXT_BYTES || value.chars().any(char::is_control) {
@@ -117,6 +128,158 @@ fn normalize_schedule_text_value(value: String, field_name: &str) -> Result<Stri
         )));
     }
     Ok(value)
+}
+
+pub(crate) async fn patch_schedule(
+    State(state): State<AppState>,
+    Path(schedule_id): Path<String>,
+    operator: Option<Extension<DirectApiOperator>>,
+    Json(request): Json<SchedulePatchRequest>,
+) -> Result<Json<ScheduleAssetDetail>, ApiError> {
+    let operator = require_schedule_write_operator(operator)?;
+    let request = validate_schedule_patch_request(request)?;
+    let mut client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let tx = client
+        .transaction()
+        .await
+        .map_err(|error| map_schedule_write_db_error(error, "begin patch schedule transaction"))?;
+    resolve_schedule_write_operator_owner(&tx, &operator).await?;
+    tx.batch_execute("LOCK TABLE schedules, schedules_trash IN SHARE ROW EXCLUSIVE MODE;")
+        .await
+        .map_err(|error| map_schedule_write_db_error(error, "lock schedules for patch"))?;
+    let state = load_schedule_write_state(&tx, &schedule_id).await?;
+    if let Some(name) = request.name.as_ref() {
+        ensure_unique_schedule_name(&tx, name, state.internal_id).await?;
+    }
+    let record = execute_schedule_patch_transaction(&tx, state.internal_id, &request).await?;
+    tx.commit()
+        .await
+        .map_err(|error| map_schedule_write_db_error(error, "commit patch schedule transaction"))?;
+    Ok(Json(
+        load_schedule_asset_detail(&client, &record.uuid).await?,
+    ))
+}
+
+fn require_schedule_write_operator(
+    operator: Option<Extension<DirectApiOperator>>,
+) -> Result<DirectApiOperator, ApiError> {
+    let Some(Extension(operator)) = operator else {
+        tracing::warn!("schedule write request missing direct API operator context");
+        return Err(ApiError::Forbidden);
+    };
+    Ok(operator)
+}
+
+async fn resolve_schedule_write_operator_owner(
+    tx: &Transaction<'_>,
+    operator: &DirectApiOperator,
+) -> Result<i32, ApiError> {
+    tx.query_opt(
+        schedule_write_operator_owner_sql(),
+        &[&operator.user_uuid()],
+    )
+    .await
+    .map_err(|error| map_schedule_write_db_error(error, "resolve schedule write operator"))?
+    .map(|row| row.get(0))
+    .ok_or_else(|| {
+        tracing::warn!("direct API schedule write operator does not resolve to a database user");
+        ApiError::Forbidden
+    })
+}
+
+async fn load_schedule_write_state(
+    tx: &Transaction<'_>,
+    schedule_id: &str,
+) -> Result<ScheduleWriteState, ApiError> {
+    let schedule_id = parse_uuid(schedule_id)?.to_string();
+    tx.query_opt(schedule_write_state_sql(), &[&schedule_id])
+        .await
+        .map_err(|error| map_schedule_write_db_error(error, "load schedule write state"))?
+        .map(|row| ScheduleWriteState {
+            internal_id: row.get(0),
+        })
+        .ok_or(ApiError::NotFound)
+}
+
+async fn ensure_unique_schedule_name(
+    tx: &Transaction<'_>,
+    name: &str,
+    except_internal_id: i32,
+) -> Result<(), ApiError> {
+    let count: i64 = tx
+        .query_one(schedule_unique_name_sql(), &[&name, &except_internal_id])
+        .await
+        .map_err(|error| map_schedule_write_db_error(error, "check schedule name uniqueness"))?
+        .get(0);
+    if count == 0 {
+        Ok(())
+    } else {
+        Err(ApiError::Conflict(
+            "schedule with the same name already exists".to_string(),
+        ))
+    }
+}
+
+pub(crate) async fn execute_schedule_patch_transaction(
+    tx: &Transaction<'_>,
+    schedule_internal_id: i32,
+    request: &ValidatedSchedulePatch,
+) -> Result<ScheduleWriteRecord, ApiError> {
+    query_schedule_write_record(
+        tx,
+        schedule_update_metadata_sql(),
+        &[&schedule_internal_id, &request.name, &request.comment],
+        "update schedule metadata",
+    )
+    .await
+}
+
+async fn query_schedule_write_record(
+    tx: &Transaction<'_>,
+    sql: &str,
+    params: &[&(dyn ToSql + Sync)],
+    action: &'static str,
+) -> Result<ScheduleWriteRecord, ApiError> {
+    tx.query_opt(sql, params)
+        .await
+        .map_err(|error| map_schedule_write_db_error(error, action))?
+        .map(schedule_write_record_from_row)
+        .ok_or(ApiError::NotFound)
+}
+
+fn schedule_write_record_from_row(row: Row) -> ScheduleWriteRecord {
+    ScheduleWriteRecord { uuid: row.get(0) }
+}
+
+fn map_schedule_write_db_error(error: tokio_postgres::Error, action: &'static str) -> ApiError {
+    tracing::warn!(%error, action, "schedule write database operation failed");
+    ApiError::Database
+}
+
+pub(crate) fn schedule_write_operator_owner_sql() -> &'static str {
+    "SELECT id::integer FROM users WHERE uuid = $1;"
+}
+
+pub(crate) fn schedule_write_state_sql() -> &'static str {
+    "SELECT id::integer
+       FROM schedules
+      WHERE uuid = $1;"
+}
+
+pub(crate) fn schedule_unique_name_sql() -> &'static str {
+    "SELECT (
+        (SELECT count(*) FROM schedules WHERE name = $1 AND id != $2)
+        + (SELECT count(*) FROM schedules_trash WHERE name = $1)
+      )::bigint;"
+}
+
+pub(crate) fn schedule_update_metadata_sql() -> &'static str {
+    "UPDATE schedules
+        SET name = coalesce($2, name),
+            comment = coalesce($3, comment),
+            modification_time = m_now()
+      WHERE id = $1
+      RETURNING uuid::text;"
 }
 
 #[cfg(test)]

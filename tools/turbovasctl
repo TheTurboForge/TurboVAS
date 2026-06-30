@@ -538,6 +538,7 @@ OPENAPI_ALLOWED_REPLACES_VALUES = frozenset(
         "scanner-metadata-list-read",
         "schedule-metadata-detail-read",
         "schedule-metadata-list-read",
+        "schedule-metadata-modify",
         "scope-detail-membership-read",
         "scope-list-read",
         "scope-metadata-membership-write",
@@ -590,7 +591,7 @@ OPENAPI_ALLOWED_INHERITED_STILL_OWNS_VALUES = frozenset(
         "remote-scanner-certificate-context-control-credentials-writes-downloads-and-deletes",
         "scan-config-preferences-export-import-writes-and-deletes",
         "scap-rich-context",
-        "schedule-writes-exports-and-deletes",
+        "schedule-create-calendar-export-delete",
         "scope-report-generation",
         "scope-report-generation-retention-and-mutations",
         "tag-security-info-filter-actions-clone-export-trash",
@@ -873,14 +874,19 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-replaces": "trashcan-count-summary-read",
     },
     ("get", "/schedules"): {
-        "x-turbovas-inherited-still-owns": "schedule-writes-exports-and-deletes",
+        "x-turbovas-inherited-still-owns": "schedule-create-calendar-export-delete",
         "x-turbovas-maturity": "live-read",
         "x-turbovas-replaces": "schedule-metadata-list-read",
     },
     ("get", "/schedules/{schedule_id}"): {
-        "x-turbovas-inherited-still-owns": "schedule-writes-exports-and-deletes",
+        "x-turbovas-inherited-still-owns": "schedule-create-calendar-export-delete",
         "x-turbovas-maturity": "live-read",
         "x-turbovas-replaces": "schedule-metadata-detail-read",
+    },
+    ("patch", "/schedules/{schedule_id}"): {
+        "x-turbovas-inherited-still-owns": "schedule-create-calendar-export-delete",
+        "x-turbovas-maturity": "live-write",
+        "x-turbovas-replaces": "schedule-metadata-modify",
     },
     ("get", "/report-configs"): {
         "x-turbovas-inherited-still-owns": "report-config-delete-trash-restore-clone-export",
@@ -2524,7 +2530,7 @@ def native_tooling_residue(relative_path: str, category: str) -> tuple[str, str]
     if name == "scan-configs.js":
         return "scan-config-preference-write-or-export", "Scan-config preferences, imports, exports, writes, and deletes remain inherited."
     if name == "schedules.js":
-        return "schedule-write-or-export", "Schedule writes, exports, and deletes remain inherited."
+        return "schedule-write-or-export", "GSA schedule writes, calendar changes, exports, and deletes remain inherited."
     if name == "filter.ts":
         return "saved-filter-write-or-alert-linkage", "Saved-filter writes and alert linkage remain inherited."
     if name == "tag.ts":
@@ -6480,6 +6486,13 @@ def summarize_native_tooling(items: list[dict[str, Any]], repo_root: Path | None
                 "endpoint": "/api/v1/schedules/{schedule_id}",
                 "status": "implemented_internal_and_browser_proxied",
                 "replacement_candidates": ["GSA Schedule detail (migrated through gsad same-origin proxy)", "read-only schedule automation"],
+            },
+            {
+                "method": "patch",
+                "endpoint": "/api/v1/schedules/{schedule_id}",
+                "status": "implemented_direct_write_control",
+                "direct_access": "direct_write_control",
+                "replacement_candidates": ["direct native schedule name/comment metadata modification"],
             },
             {
                 "endpoint": "/api/v1/report-configs",
@@ -11559,6 +11572,9 @@ def direct_smoke_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
             "native-api-direct.report-config-write-update",
             "native-api-direct.report-config-write-cleanup",
             "native-api-direct.report-config-write-post-cleanup",
+            "native-api-direct.schedule-fixture",
+            "native-api-direct.schedule-write-update",
+            "native-api-direct.schedule-write-restore",
             "native-api-direct.port-list-predefined-patch-denied",
             "native-api-direct.tag-write-update",
             "native-api-direct.tag-resource-fixture",
@@ -11661,6 +11677,8 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
     report_config_id: str | None = None
     report_config_format_id: str | None = None
     predefined_port_list_id: str | None = None
+    schedule_id: str | None = None
+    schedule_original_comment = ""
     scope_name = f"turbovas-direct-write-smoke-scope-{int(time.time())}-{os.getpid()}"
     report_config_name = f"turbovas-direct-write-smoke-report-config-{int(time.time())}-{os.getpid()}"
     tag_name = f"turbovas-direct-write-smoke-{int(time.time())}-{os.getpid()}"
@@ -11818,6 +11836,35 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
             missing_format_json, missing_format_status = parse_json_output_with_http_status(missing_format)
             missing_format_ok = missing_format.returncode == 0 and missing_format_status == 404 and isinstance(missing_format_json, dict) and missing_format_json.get("error", {}).get("code") == "not_found"
             findings.append(native_api_probe_finding("pass" if missing_format_ok else "fail", "native-api-direct.report-config-missing-format-denied", "Direct write-control rejects report-config creation for a missing report format without creating state." if missing_format_ok else "Direct write-control did not reject missing report-format report-config creation as expected.", missing_format, direct_native_api_display_command("/api/v1/report-configs", token=token, env=env, method="POST", body=missing_format_body, extra_headers=content_type), missing_format_json, {"http_status": missing_format_status, **summarize_native_api_response(missing_format_json)}))
+
+        schedule_fixture = direct_native_api_curl(repo_root, "/api/v1/schedules?page_size=1", token=token, env=env)
+        schedule_fixture_json, schedule_fixture_status = parse_json_output_with_http_status(schedule_fixture)
+        schedule_items = schedule_fixture_json.get("items", []) if isinstance(schedule_fixture_json, dict) else []
+        if schedule_items and isinstance(schedule_items[0], dict) and isinstance(schedule_items[0].get("id"), str):
+            schedule_id = schedule_items[0]["id"]
+            schedule_original_comment = schedule_items[0].get("comment") if isinstance(schedule_items[0].get("comment"), str) else ""
+        schedule_fixture_ok = schedule_fixture.returncode == 0 and schedule_fixture_status == 200 and bool(schedule_id)
+        findings.append(native_api_probe_finding("pass" if schedule_fixture_ok else "warn", "native-api-direct.schedule-fixture", "Direct write-control smoke found a schedule fixture for reversible metadata patching." if schedule_fixture_ok else "Direct write-control smoke could not find a schedule fixture for reversible metadata patching.", schedule_fixture, direct_native_api_display_command("/api/v1/schedules?page_size=1", token=token, env=env), schedule_fixture_json, {"http_status": schedule_fixture_status, "schedule_id": schedule_id, **summarize_native_api_response(schedule_fixture_json)}))
+
+        if schedule_id:
+            schedule_patch_comment = "TurboVAS direct write smoke updated schedule comment"
+            schedule_patch_body = json.dumps(
+                {"comment": schedule_patch_comment},
+                separators=(",", ":"),
+            )
+            schedule_patch = direct_native_api_curl(repo_root, f"/api/v1/schedules/{urllib.parse.quote(schedule_id)}", token=token, env=env, method="PATCH", body=schedule_patch_body, extra_headers=content_type)
+            schedule_patch_json, schedule_patch_status = parse_json_output_with_http_status(schedule_patch)
+            schedule_patch_ok = schedule_patch.returncode == 0 and schedule_patch_status == 200 and isinstance(schedule_patch_json, dict) and schedule_patch_json.get("id") == schedule_id and schedule_patch_json.get("comment") == schedule_patch_comment
+            findings.append(native_api_probe_finding("pass" if schedule_patch_ok else "fail", "native-api-direct.schedule-write-update", "Direct write-control patched schedule comment metadata." if schedule_patch_ok else "Direct write-control failed to patch schedule comment metadata.", schedule_patch, direct_native_api_display_command(f"/api/v1/schedules/{urllib.parse.quote(schedule_id)}", token=token, env=env, method="PATCH", body=schedule_patch_body, extra_headers=content_type), schedule_patch_json, {"http_status": schedule_patch_status, "schedule_id": schedule_id, **summarize_native_api_response(schedule_patch_json)}))
+
+            schedule_restore_body = json.dumps(
+                {"comment": schedule_original_comment},
+                separators=(",", ":"),
+            )
+            schedule_restore = direct_native_api_curl(repo_root, f"/api/v1/schedules/{urllib.parse.quote(schedule_id)}", token=token, env=env, method="PATCH", body=schedule_restore_body, extra_headers=content_type)
+            schedule_restore_json, schedule_restore_status = parse_json_output_with_http_status(schedule_restore)
+            schedule_restore_ok = schedule_restore.returncode == 0 and schedule_restore_status == 200 and isinstance(schedule_restore_json, dict) and schedule_restore_json.get("id") == schedule_id and schedule_restore_json.get("comment") == schedule_original_comment
+            findings.append(native_api_probe_finding("pass" if schedule_restore_ok else "fail", "native-api-direct.schedule-write-restore", "Direct write-control restored the schedule comment after reversible metadata patching." if schedule_restore_ok else "Direct write-control failed to restore the schedule comment after metadata patching.", schedule_restore, direct_native_api_display_command(f"/api/v1/schedules/{urllib.parse.quote(schedule_id)}", token=token, env=env, method="PATCH", body=schedule_restore_body, extra_headers=content_type), schedule_restore_json, {"http_status": schedule_restore_status, "schedule_id": schedule_id, **summarize_native_api_response(schedule_restore_json)}))
 
         port_list_fixture = direct_native_api_curl(repo_root, "/api/v1/port-lists?page_size=1", token=token, env=env)
         port_list_fixture_json, port_list_fixture_status = parse_json_output_with_http_status(port_list_fixture)

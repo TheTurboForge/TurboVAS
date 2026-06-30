@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use serde::Serialize;
-use tokio_postgres::Row;
+use tokio_postgres::{Client, Row};
 
 use axum::{
     Json,
@@ -147,8 +147,17 @@ pub(crate) async fn schedule_asset_detail(
     State(state): State<AppState>,
     Path(schedule_id): Path<String>,
 ) -> Result<Json<ScheduleAssetDetail>, ApiError> {
-    parse_uuid(&schedule_id)?;
     let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    Ok(Json(
+        load_schedule_asset_detail(&client, &schedule_id).await?,
+    ))
+}
+
+pub(crate) async fn load_schedule_asset_detail(
+    client: &Client,
+    schedule_id: &str,
+) -> Result<ScheduleAssetDetail, ApiError> {
+    parse_uuid(schedule_id)?;
     let row = client
         .query_opt(
             r#"SELECT s.id AS internal_id,
@@ -201,10 +210,10 @@ pub(crate) async fn schedule_asset_detail(
         .map(schedule_task_from_row)
         .collect();
     let user_tags = schedule_user_tags(&client, &schedule_id).await?;
-    Ok(Json(schedule_asset_detail_payload(
+    Ok(schedule_asset_detail_payload(
         schedule_asset_from_row(&row, tasks),
         user_tags,
-    )))
+    ))
 }
 
 pub(crate) fn schedule_user_tags_sql() -> &'static str {
