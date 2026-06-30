@@ -805,15 +805,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              additionalProperties: false
-              minProperties: 1
-              properties:
-                name:
-                  type: string
-                  minLength: 1
-                comment:
-                  type: string
+              $ref: '#/components/schemas/FilterPatchRequest'
       responses:
         '200':
           description: Updated saved filter detail
@@ -4607,6 +4599,18 @@ components:
       type: object
       additionalProperties: false
       description: Optional metadata overrides for a cloned saved filter. Empty object uses the inherited-style unique Clone name and copies the source comment, term, and type.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 4096
+        comment:
+          type: string
+          maxLength: 4096
+    FilterPatchRequest:
+      type: object
+      minProperties: 1
+      additionalProperties: false
       properties:
         name:
           type: string

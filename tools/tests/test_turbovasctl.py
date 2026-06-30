@@ -2008,6 +2008,9 @@ class TurboVASCtlTests(unittest.TestCase):
                 "operations_missing_error_response_count",
                 "missing_error_schema_field_count",
                 "invalid_error_schema_field_count",
+                "request_body_schema_ref_count",
+                "missing_request_body_schema_ref_count",
+                "invalid_request_body_schema_ref_count",
                 "auth_contract_alignment_status",
                 "missing_server_count",
                 "unexpected_server_count",
@@ -2041,6 +2044,9 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(status_only["details"]["openapi_contract"]["operations_missing_error_response_count"], 0)
         self.assertEqual(status_only["details"]["openapi_contract"]["missing_error_schema_field_count"], 0)
         self.assertEqual(status_only["details"]["openapi_contract"]["invalid_error_schema_field_count"], 0)
+        self.assertEqual(status_only["details"]["openapi_contract"]["request_body_schema_ref_count"], 15)
+        self.assertEqual(status_only["details"]["openapi_contract"]["missing_request_body_schema_ref_count"], 0)
+        self.assertEqual(status_only["details"]["openapi_contract"]["invalid_request_body_schema_ref_count"], 0)
         self.assertEqual(status_only["details"]["openapi_contract"]["auth_contract_alignment_status"], "pass")
         self.assertEqual(status_only["details"]["openapi_contract"]["missing_server_count"], 0)
         self.assertEqual(status_only["details"]["openapi_contract"]["unexpected_server_count"], 0)
@@ -4148,6 +4154,104 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(invalid["properties.error.type"]["actual"], "string")
         self.assertEqual(invalid["properties.error.properties.code.type"]["actual"], "integer")
         self.assertEqual(invalid["properties.error.properties.details.additionalProperties"]["actual"], "false")
+
+    def test_openapi_contract_checks_request_body_schema_shape(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "TurboVAS"
+            openapi = root / "api" / "openapi" / "turbovas-v1.yaml"
+            openapi.parent.mkdir(parents=True)
+            openapi.write_text(
+                "openapi: 3.1.0\n"
+                "paths:\n"
+                "  /good:\n"
+                "    post:\n"
+                "      summary: Good body\n"
+                "      operationId: postGood\n"
+                "      requestBody:\n"
+                "        required: true\n"
+                "        content:\n"
+                "          application/json:\n"
+                "            schema:\n"
+                "              $ref: '#/components/schemas/GoodRequest'\n"
+                "      responses:\n"
+                "        '200':\n"
+                "          description: Good\n"
+                "  /nested:\n"
+                "    post:\n"
+                "      summary: Nested body\n"
+                "      operationId: postNested\n"
+                "      requestBody:\n"
+                "        required: true\n"
+                "        content:\n"
+                "          application/json:\n"
+                "            schema:\n"
+                "              $ref: '#/components/schemas/NestedRequest'\n"
+                "      responses:\n"
+                "        '200':\n"
+                "          description: Nested\n"
+                "  /missing:\n"
+                "    post:\n"
+                "      summary: Missing body\n"
+                "      operationId: postMissing\n"
+                "      requestBody:\n"
+                "        required: true\n"
+                "        content:\n"
+                "          application/json:\n"
+                "            schema:\n"
+                "              $ref: '#/components/schemas/MissingRequest'\n"
+                "      responses:\n"
+                "        '200':\n"
+                "          description: Missing\n"
+                "  /bad-shape:\n"
+                "    post:\n"
+                "      summary: Bad shape body\n"
+                "      operationId: postBadShape\n"
+                "      requestBody:\n"
+                "        required: true\n"
+                "        content:\n"
+                "          application/json:\n"
+                "            schema:\n"
+                "              $ref: '#/components/schemas/BadShapeRequest'\n"
+                "      responses:\n"
+                "        '200':\n"
+                "          description: Bad shape\n"
+                "components:\n"
+                "  schemas:\n"
+                "    GoodRequest:\n"
+                "      type: object\n"
+                "      additionalProperties: false\n"
+                "      properties:\n"
+                "        name:\n"
+                "          type: string\n"
+                "    ParentRequest:\n"
+                "      type: object\n"
+                "      additionalProperties: false\n"
+                "      properties:\n"
+                "        child:\n"
+                "          type: object\n"
+                "      NestedRequest:\n"
+                "        type: object\n"
+                "        properties:\n"
+                "          value:\n"
+                "            type: string\n"
+                "    BadShapeRequest:\n"
+                "      type: object\n"
+                "      additionalProperties: false\n",
+                encoding="utf-8",
+            )
+
+            summary = turbovasctl.native_api_openapi_contract_summary(root)
+
+        self.assertEqual(summary["alignment_status"], "warn")
+        self.assertIn("#/components/schemas/GoodRequest", summary["request_body_schema_refs"])
+        missing = {(item["operation"], item["field"]) for item in summary["missing_request_body_schema_refs"]}
+        self.assertIn(("POST /missing", "components.schemas.MissingRequest"), missing)
+        self.assertIn(("POST /nested", "components.schemas.NestedRequest"), missing)
+        invalid = {(item["operation"], item["field"]): item for item in summary["invalid_request_body_schema_refs"]}
+        self.assertEqual(
+            invalid[("POST /bad-shape", "components.schemas.BadShapeRequest.properties")]["expected"],
+            "top-level properties",
+        )
 
     def test_openapi_contract_tracks_auth_and_server_boundary(self):
         root = Path(__file__).resolve().parents[2]

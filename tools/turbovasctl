@@ -5178,15 +5178,17 @@ def openapi_contract_operations(repo_root: Path | None) -> list[dict[str, Any]]:
     current: dict[str, Any] | None = None
     in_responses = False
     in_parameters = False
+    in_request_body = False
     current_status: str | None = None
 
     def finish_current() -> None:
-        nonlocal current, in_responses, in_parameters, current_status
+        nonlocal current, in_responses, in_parameters, in_request_body, current_status
         if current is not None:
             operations.append(current)
         current = None
         in_responses = False
         in_parameters = False
+        in_request_body = False
         current_status = None
 
     for line in lines:
@@ -5212,6 +5214,7 @@ def openapi_contract_operations(repo_root: Path | None) -> list[dict[str, Any]]:
                 "parameters": [],
                 "responses": {},
                 "request_body": False,
+                "request_body_schema_ref": None,
             }
             continue
         if current is None:
@@ -5235,14 +5238,23 @@ def openapi_contract_operations(repo_root: Path | None) -> list[dict[str, Any]]:
             continue
         if line == "      requestBody:":
             current["request_body"] = True
+            in_request_body = True
             in_parameters = False
             in_responses = False
             current_status = None
             continue
         if line == "      parameters:":
+            in_request_body = False
             in_parameters = True
             in_responses = False
             current_status = None
+            continue
+        if in_request_body and line.startswith("      ") and not line.startswith("        "):
+            in_request_body = False
+        if in_request_body:
+            request_ref_match = re.match(r"^\s+\$ref: ['\"](#/components/schemas/[^'\"]+)['\"]$", line)
+            if request_ref_match:
+                current["request_body_schema_ref"] = request_ref_match.group(1)
             continue
         if in_parameters and line.startswith("      ") and not line.startswith("        "):
             in_parameters = False
@@ -5254,6 +5266,7 @@ def openapi_contract_operations(repo_root: Path | None) -> list[dict[str, Any]]:
         if line == "      responses:":
             in_responses = True
             in_parameters = False
+            in_request_body = False
             current_status = None
             continue
         if in_responses and line.startswith("      ") and not line.startswith("        "):
@@ -5700,6 +5713,57 @@ def openapi_error_schema_contract_drift(repo_root: Path | None) -> dict[str, Any
     }
 
 
+def openapi_schema_top_level_keys(block: list[str]) -> set[str]:
+    keys: set[str] = set()
+    for line in block:
+        match = re.match(r"^      ([A-Za-z][A-Za-z0-9_-]*):", line)
+        if match:
+            keys.add(match.group(1))
+    return keys
+
+
+def openapi_request_body_schema_contract_drift(repo_root: Path | None, operations: list[dict[str, Any]]) -> dict[str, Any]:
+    request_body_schema_refs = sorted(
+        {
+            str(operation.get("request_body_schema_ref"))
+            for operation in operations
+            if isinstance(operation.get("request_body_schema_ref"), str)
+        }
+    )
+    missing: list[dict[str, Any]] = []
+    invalid: list[dict[str, Any]] = []
+
+    for operation in operations:
+        if not operation.get("request_body"):
+            continue
+        ref = operation.get("request_body_schema_ref")
+        label = openapi_operation_label(operation)
+        if not isinstance(ref, str):
+            missing.append({"operation": label, "field": "requestBody.schema.$ref", "expected": "#/components/schemas/..."})
+            continue
+        match = re.fullmatch(r"#/components/schemas/([A-Za-z][A-Za-z0-9_-]*)", ref)
+        if not match:
+            invalid.append({"operation": label, "field": "requestBody.schema.$ref", "actual": ref, "expected": "#/components/schemas/..."})
+            continue
+        schema_name = match.group(1)
+        block = openapi_component_schema_block(repo_root, schema_name)
+        if not block:
+            missing.append({"operation": label, "field": f"components.schemas.{schema_name}", "expected": "top-level schema"})
+            continue
+        values = openapi_indented_scalar_fields(block)
+        top_level_keys = openapi_schema_top_level_keys(block)
+        if values.get("type") != "object":
+            invalid.append({"operation": label, "field": f"components.schemas.{schema_name}.type", "actual": values.get("type"), "expected": "object"})
+        if "properties" not in top_level_keys:
+            invalid.append({"operation": label, "field": f"components.schemas.{schema_name}.properties", "actual": None, "expected": "top-level properties"})
+
+    return {
+        "request_body_schema_refs": request_body_schema_refs,
+        "missing_request_body_schema_refs": missing,
+        "invalid_request_body_schema_refs": invalid,
+    }
+
+
 def rust_collection_contract_constants(repo_root: Path | None) -> dict[str, int | None]:
     if repo_root is None:
         return {"default_page_size": None, "max_page_size": None, "max_filter_length": None}
@@ -5866,6 +5930,7 @@ def native_api_openapi_contract_summary(repo_root: Path | None) -> dict[str, Any
     exposure_drift = openapi_exposure_contract_drift(operations)
     migration_metadata_drift = openapi_migration_metadata_contract_drift(operations)
     error_schema_drift = openapi_error_schema_contract_drift(repo_root)
+    request_body_schema_drift = openapi_request_body_schema_contract_drift(repo_root, operations)
     collection_query_contract = openapi_collection_query_contract_summary(repo_root, operations)
     auth_contract = openapi_auth_contract_summary(repo_root)
 
@@ -5908,6 +5973,8 @@ def native_api_openapi_contract_summary(repo_root: Path | None) -> dict[str, Any
         or operations_missing_error_responses
         or error_schema_drift["missing_error_schema_fields"]
         or error_schema_drift["invalid_error_schema_fields"]
+        or request_body_schema_drift["missing_request_body_schema_refs"]
+        or request_body_schema_drift["invalid_request_body_schema_refs"]
         or collection_query_contract["alignment_status"] != "pass"
         or auth_contract["alignment_status"] != "pass"
         or write_control_contract["alignment_status"] != "pass"
@@ -5935,6 +6002,7 @@ def native_api_openapi_contract_summary(repo_root: Path | None) -> dict[str, Any
         "invalid_shared_error_responses": invalid_shared_responses,
         "operations_missing_error_responses": operations_missing_error_responses,
         **error_schema_drift,
+        **request_body_schema_drift,
         "collection_query_contract": collection_query_contract,
         "auth_contract": auth_contract,
         "write_control_contract": write_control_contract,
@@ -7171,6 +7239,9 @@ def compact_native_tooling_summary(summary: dict[str, Any]) -> dict[str, Any]:
         "operations_missing_error_response_count": len(openapi_contract.get("operations_missing_error_responses", [])) if isinstance(openapi_contract, dict) else 0,
         "missing_error_schema_field_count": len(openapi_contract.get("missing_error_schema_fields", [])) if isinstance(openapi_contract, dict) else 0,
         "invalid_error_schema_field_count": len(openapi_contract.get("invalid_error_schema_fields", [])) if isinstance(openapi_contract, dict) else 0,
+        "request_body_schema_ref_count": len(openapi_contract.get("request_body_schema_refs", [])) if isinstance(openapi_contract, dict) else 0,
+        "missing_request_body_schema_ref_count": len(openapi_contract.get("missing_request_body_schema_refs", [])) if isinstance(openapi_contract, dict) else 0,
+        "invalid_request_body_schema_ref_count": len(openapi_contract.get("invalid_request_body_schema_refs", [])) if isinstance(openapi_contract, dict) else 0,
         "collection_query_alignment_status": openapi_contract.get("collection_query_contract", {}).get("alignment_status", "unknown") if isinstance(openapi_contract.get("collection_query_contract", {}), dict) else "unknown",
         "rust_collection_contract_count": openapi_contract.get("collection_query_contract", {}).get("rust_collection_contract_count", 0) if isinstance(openapi_contract.get("collection_query_contract", {}), dict) else 0,
         "openapi_collection_operation_count": openapi_contract.get("collection_query_contract", {}).get("openapi_collection_operation_count", 0) if isinstance(openapi_contract.get("collection_query_contract", {}), dict) else 0,
@@ -7299,6 +7370,9 @@ def native_tooling_status_only_details(summary: dict[str, Any]) -> dict[str, Any
             "operations_missing_error_response_count": openapi_contract.get("operations_missing_error_response_count", 0),
             "missing_error_schema_field_count": openapi_contract.get("missing_error_schema_field_count", 0),
             "invalid_error_schema_field_count": openapi_contract.get("invalid_error_schema_field_count", 0),
+            "request_body_schema_ref_count": openapi_contract.get("request_body_schema_ref_count", 0),
+            "missing_request_body_schema_ref_count": openapi_contract.get("missing_request_body_schema_ref_count", 0),
+            "invalid_request_body_schema_ref_count": openapi_contract.get("invalid_request_body_schema_ref_count", 0),
             "auth_contract_alignment_status": openapi_contract.get("auth_contract_alignment_status", "unknown"),
             "missing_server_count": openapi_contract.get("missing_server_count", 0),
             "unexpected_server_count": openapi_contract.get("unexpected_server_count", 0),
