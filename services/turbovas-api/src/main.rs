@@ -44,6 +44,7 @@ mod report_ports;
 mod report_tls_certificates;
 mod request_ids;
 mod request_shapes;
+mod result_payload_rows;
 mod result_payloads;
 mod routes;
 mod row_helpers;

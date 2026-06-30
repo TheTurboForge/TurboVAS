@@ -1561,9 +1561,9 @@ fn scope_reports_do_not_trigger_scanner_or_task_control() {
 #[test]
 fn result_rows_expose_nvt_epss_context_without_mutation_workflows() {
     let source = include_str!("result_payloads.rs");
-    let result_source = source;
+    let result_row_source = include_str!("result_payload_rows.rs");
     let scope_report_results_source = include_str!("scope_report_results.rs");
-    let result_payload = result_source
+    let result_payload = result_row_source
         .split_once("pub(crate) struct ResultItem {")
         .expect("result payload struct must exist")
         .1
@@ -1594,7 +1594,7 @@ fn result_rows_expose_nvt_epss_context_without_mutation_workflows() {
             .expect("scope report result SQL helper must exist")
             .1,
     ];
-    let row_mapper = result_source
+    let row_mapper = result_row_source
         .split_once("pub(crate) fn result_from_row")
         .expect("result row mapper must exist")
         .1

@@ -13,7 +13,7 @@ use crate::{
     errors::ApiError,
     path_ids::parse_uuid,
     query::{ApiQuery, Collection, CollectionQuery, normalize_collection_query, sort_clause},
-    result_payloads::{ResultItem, result_from_row},
+    result_payload_rows::{ResultItem, result_from_row},
     scope_report_lookup::scope_report_exists,
 };
 
