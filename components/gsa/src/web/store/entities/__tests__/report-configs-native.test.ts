@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2026 Robert Pelfrey <Robert@Pelfrey.de>
+ * TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -85,6 +86,7 @@ describe('native API report configs', () => {
       json: testing.fn().mockResolvedValue({
         id: 'afde48df-7f26-4b2b-9c1e-03b0e1bfb3a6',
         name: 'Default config',
+        in_use: true,
         report_format: {
           id: 'a994b278-1f62-11e1-96ac-406186ea4fc5',
           name: 'XML',
@@ -129,6 +131,7 @@ describe('native API report configs', () => {
     );
 
     expect(config.reportFormat?.name).toEqual('XML');
+    expect(config.isInUse()).toEqual(true);
     expect(config.alerts).toHaveLength(1);
     expect(config.alerts[0].name).toEqual('Send report');
     expect(config.params).toHaveLength(1);

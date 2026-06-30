@@ -238,6 +238,7 @@ fn native_report_config_reads_are_metadata_only_and_do_not_generate_reports_or_t
         "report_format_params rfp",
         "LEFT JOIN report_config_params rcp",
         "report_config_param_from_row",
+        "let in_use = !alerts.is_empty();",
         "owner_name",
         "report_format_id",
     ] {
@@ -255,6 +256,7 @@ fn native_report_config_reads_are_metadata_only_and_do_not_generate_reports_or_t
         "INSERT INTO",
         "UPDATE ",
         "DELETE FROM",
+        "report_config_in_use",
     ] {
         assert!(
             !detail_loader.contains(forbidden),

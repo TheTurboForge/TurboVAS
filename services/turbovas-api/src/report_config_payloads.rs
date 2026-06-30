@@ -176,7 +176,7 @@ pub(crate) async fn report_config_asset_from_row(
     let report_config_id: String = row.get("id");
     let internal_id: i64 = row.get("internal_id");
     let report_format_rowid: i64 = row.get("report_format_rowid");
-    let alerts = client
+    let alerts: Vec<ReportConfigValueReference> = client
         .query(
             r#"SELECT a.uuid AS id,
                       coalesce(a.name, '') AS name
@@ -194,6 +194,7 @@ pub(crate) async fn report_config_asset_from_row(
         .iter()
         .map(report_config_reference_from_row)
         .collect();
+    let in_use = !alerts.is_empty();
     let params = if report_format_rowid == 0 {
         Vec::new()
     } else {
@@ -241,7 +242,7 @@ pub(crate) async fn report_config_asset_from_row(
         },
         report_format,
         writable: true,
-        in_use: false,
+        in_use,
         orphan: row.get::<_, i32>("orphan") != 0,
         alerts,
         params,
