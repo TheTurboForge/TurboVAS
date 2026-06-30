@@ -91,6 +91,8 @@ mod asset_detail_contract_tests;
 #[cfg(test)]
 mod collection_contract_tests;
 #[cfg(test)]
+mod collection_query_contract_tests;
+#[cfg(test)]
 mod direct_api_contract_tests;
 #[cfg(test)]
 mod filter_characterization_tests;
