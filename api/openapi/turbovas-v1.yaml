@@ -3906,6 +3906,8 @@ components:
           $ref: '#/components/schemas/ReportOwner'
         status:
           type: string
+        progress:
+          type: integer
         task:
           $ref: '#/components/schemas/ReportReference'
         target:

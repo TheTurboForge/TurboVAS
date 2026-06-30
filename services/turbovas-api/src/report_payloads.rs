@@ -40,6 +40,7 @@ pub(crate) struct ReportItem {
     name: String,
     owner: ReportOwner,
     status: String,
+    progress: i64,
     task: Option<ReportReference>,
     target: Option<ReportReference>,
     scan_start: Option<String>,
@@ -90,11 +91,16 @@ pub(crate) fn report_from_row(row: &Row) -> ReportItem {
             log: row.get(22),
             false_positive: row.get(23),
         },
+        progress: row.get(24),
         user_tags: Vec::new(),
     }
 }
 
-fn raw_report_sql(filtered_predicate: &str, sort_sql: &str, limit_clause: &str) -> String {
+pub(crate) fn raw_report_sql(
+    filtered_predicate: &str,
+    sort_sql: &str,
+    limit_clause: &str,
+) -> String {
     format!(
         r#"WITH base AS (
              SELECT r.id AS report_pk,
@@ -147,7 +153,7 @@ fn raw_report_sql(filtered_predicate: &str, sort_sql: &str, limit_clause: &str) 
               GROUP BY b.report_pk
          ),
          joined AS (
-             SELECT b.uuid, b.name, b.owner_name, b.task_uuid, b.task_name, b.target_uuid, b.target_name,
+             SELECT b.report_pk, b.uuid, b.name, b.owner_name, b.task_uuid, b.task_name, b.target_uuid, b.target_name,
                     b.status, b.creation_time, b.scan_start, b.scan_end, b.modification_time,
                     coalesce(ra.result_count, 0)::bigint AS result_count,
                     coalesce(ra.vulnerability_count, 0)::bigint AS vulnerability_count,
@@ -173,7 +179,9 @@ fn raw_report_sql(filtered_predicate: &str, sort_sql: &str, limit_clause: &str) 
                 creation_time, scan_start, scan_end, modification_time,
                 result_count, vulnerability_count, host_count, cve_count, max_severity,
                 severity_critical, severity_high, severity_medium, severity_low,
-                severity_log, severity_false_positive
+                severity_log, severity_false_positive,
+                CASE WHEN status = 'Done' THEN 100::bigint
+                     ELSE least(greatest(coalesce(report_progress(report_pk), 0), 0), 100)::bigint END AS progress
            FROM filtered
           ORDER BY {sort_sql}, creation_time DESC, uuid DESC {limit_clause};"#,
     )

@@ -46,6 +46,8 @@ mod report_helpers;
 mod report_hosts;
 mod report_operating_systems;
 mod report_payloads;
+#[cfg(test)]
+mod report_payloads_tests;
 mod report_ports;
 mod report_tls_certificates;
 mod request_ids;

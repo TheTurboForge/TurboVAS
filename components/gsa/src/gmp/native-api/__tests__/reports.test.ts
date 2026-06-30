@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2026 Robert Pelfrey <Robert@Pelfrey.de>
+ * TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -53,6 +54,8 @@ describe('report native API query builders', () => {
         name: 'Report 1',
         owner: {name: 'native-owner'},
         status: 'Done',
+        progress: 87,
+        task: {id: 'task-1', name: 'Native Task'},
         result_count: 1,
         vulnerability_count: 1,
         host_count: 1,
@@ -80,6 +83,7 @@ describe('report native API query builders', () => {
 
     expect(report.owner?.name).toBe('native-owner');
     expect(report.report?.owner?.name).toBe('native-owner');
+    expect(report.report?.task?.progress).toBe(87);
     expect(report.report?.userTags[0]?.name).toBe('Native Tag');
     expect(report.report?.filter?.toFilterString()).toBe(
       filter.toFilterString(),

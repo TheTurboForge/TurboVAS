@@ -121,6 +121,7 @@ interface NativeReportItem {
   name: string;
   owner?: NativeReportOwner;
   status: string;
+  progress?: number;
   task?: NativeReportReference;
   target?: NativeReportReference;
   scan_start?: string;
@@ -1065,11 +1066,17 @@ export const nativeReportToModel = (
   item: NativeReportItem,
   reportFilter?: Filter,
 ): Report => {
+  const progress =
+    typeof item.progress === 'number'
+      ? integerValue(item.progress)
+      : item.status === 'Done'
+        ? 100
+        : undefined;
   const task = item.task
     ? {
         _id: item.task.id,
         name: item.task.name,
-        progress: item.status === 'Done' ? 100 : undefined,
+        progress,
         target: item.target
           ? {
               _id: item.target.id,
