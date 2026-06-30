@@ -12,10 +12,11 @@ use crate::{
     app_state::AppState,
     auth::DirectApiOperator,
     errors::ApiError,
+    filter_payloads::FilterAssetItem,
     filter_write_validation::{
         FilterPatchRequest, ValidatedFilterPatch, validate_filter_patch_request,
     },
-    filters::{FilterAssetItem, load_filter_asset_detail},
+    filters::load_filter_asset_detail,
     path_ids::parse_uuid,
 };
 
