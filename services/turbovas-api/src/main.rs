@@ -18,6 +18,7 @@ mod direct_api_contract;
 mod errors;
 mod feeds;
 mod filter_payloads;
+mod filter_write_db;
 #[cfg(test)]
 mod filter_write_plans;
 mod filter_write_sql;

@@ -7,13 +7,14 @@ use axum::{
     extract::{Extension, Path, State},
     http::StatusCode,
 };
-use tokio_postgres::{Transaction, types::ToSql};
+use tokio_postgres::Transaction;
 
 use crate::{
     app_state::AppState,
     auth::DirectApiOperator,
     errors::ApiError,
     filter_payloads::FilterAssetItem,
+    filter_write_db::*,
     filter_write_sql::*,
     filter_write_validation::{
         FilterCloneRequest, FilterPatchRequest, ValidatedFilterClone, ValidatedFilterPatch,
@@ -22,36 +23,6 @@ use crate::{
     filters::load_filter_asset_detail,
     path_ids::parse_uuid,
 };
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct FilterWriteRecord {
-    uuid: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct FilterCloneWriteRecord {
-    internal_id: i32,
-    uuid: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct FilterTrashWriteRecord {
-    internal_id: i32,
-    uuid: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct FilterWriteState {
-    internal_id: i32,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct FilterTrashWriteState {
-    internal_id: i32,
-    uuid: String,
-    name: String,
-    owner_id: i32,
-}
 
 pub(crate) async fn delete_filter(
     State(state): State<AppState>,
@@ -219,154 +190,6 @@ pub(crate) async fn execute_filter_trash_transaction(
     Ok(record)
 }
 
-async fn ensure_filter_not_in_use_by_trash_alerts(
-    tx: &Transaction<'_>,
-    filter_internal_id: i32,
-) -> Result<(), ApiError> {
-    let direct_count: i64 = tx
-        .query_one(filter_trash_alert_count_sql(), &[&filter_internal_id])
-        .await
-        .map_err(|error| map_filter_write_db_error(error, "check trash alert filter usage"))?
-        .get(0);
-    let condition_count: i64 = tx
-        .query_one(
-            filter_trash_alert_condition_count_sql(),
-            &[&filter_internal_id],
-        )
-        .await
-        .map_err(|error| {
-            map_filter_write_db_error(error, "check trash alert condition filter usage")
-        })?
-        .get(0);
-    if direct_count == 0 && condition_count == 0 {
-        Ok(())
-    } else {
-        Err(ApiError::Conflict(
-            "filter is still referenced by a trash alert".to_string(),
-        ))
-    }
-}
-
-async fn query_filter_clone_write_record(
-    tx: &Transaction<'_>,
-    sql: &str,
-    params: &[&(dyn ToSql + Sync)],
-    action: &'static str,
-) -> Result<FilterCloneWriteRecord, ApiError> {
-    tx.query_opt(sql, params)
-        .await
-        .map_err(|error| map_filter_write_db_error(error, action))?
-        .map(|row| FilterCloneWriteRecord {
-            internal_id: row.get(0),
-            uuid: row.get(1),
-        })
-        .ok_or(ApiError::NotFound)
-}
-
-async fn ensure_filter_not_in_use_by_alerts(
-    tx: &Transaction<'_>,
-    filter_internal_id: i32,
-) -> Result<(), ApiError> {
-    let direct_count: i64 = tx
-        .query_one(filter_live_alert_count_sql(), &[&filter_internal_id])
-        .await
-        .map_err(|error| map_filter_write_db_error(error, "check direct alert filter usage"))?
-        .get(0);
-    let condition_count: i64 = tx
-        .query_one(filter_alert_condition_count_sql(), &[&filter_internal_id])
-        .await
-        .map_err(|error| map_filter_write_db_error(error, "check alert condition filter usage"))?
-        .get(0);
-    if direct_count == 0 && condition_count == 0 {
-        Ok(())
-    } else {
-        Err(ApiError::Conflict(
-            "filter is still referenced by an alert".to_string(),
-        ))
-    }
-}
-
-async fn query_filter_trash_write_record(
-    tx: &Transaction<'_>,
-    sql: &str,
-    params: &[&(dyn ToSql + Sync)],
-    action: &'static str,
-) -> Result<FilterTrashWriteRecord, ApiError> {
-    tx.query_opt(sql, params)
-        .await
-        .map_err(|error| map_filter_write_db_error(error, action))?
-        .map(|row| FilterTrashWriteRecord {
-            internal_id: row.get(0),
-            uuid: row.get(1),
-        })
-        .ok_or(ApiError::NotFound)
-}
-
-async fn load_filter_trash_state(
-    tx: &Transaction<'_>,
-    filter_id: &str,
-) -> Result<FilterTrashWriteState, ApiError> {
-    let filter_id = parse_uuid(filter_id)?.to_string();
-    tx.query_opt(filter_trash_state_sql(), &[&filter_id])
-        .await
-        .map_err(|error| map_filter_write_db_error(error, "load filter trash state"))?
-        .map(|row| FilterTrashWriteState {
-            internal_id: row.get(0),
-            uuid: row.get(1),
-            name: row.get(2),
-            owner_id: row.get(3),
-        })
-        .ok_or(ApiError::NotFound)
-}
-
-async fn execute_filter_write_sql(
-    tx: &Transaction<'_>,
-    sql: &str,
-    params: &[&(dyn ToSql + Sync)],
-    action: &'static str,
-) -> Result<u64, ApiError> {
-    tx.execute(sql, params)
-        .await
-        .map_err(|error| map_filter_write_db_error(error, action))
-}
-
-async fn ensure_unique_live_filter_name_for_owner(
-    tx: &Transaction<'_>,
-    name: &str,
-    owner_id: i32,
-) -> Result<(), ApiError> {
-    let count: i64 = tx
-        .query_one(filter_unique_live_owner_name_sql(), &[&name, &owner_id])
-        .await
-        .map_err(|error| map_filter_write_db_error(error, "check live filter name uniqueness"))?
-        .get(0);
-    if count == 0 {
-        Ok(())
-    } else {
-        Err(ApiError::Conflict(
-            "filter with the same name already exists".to_string(),
-        ))
-    }
-}
-
-async fn ensure_filter_uuid_not_live(
-    tx: &Transaction<'_>,
-    filter_uuid: &str,
-) -> Result<(), ApiError> {
-    let count: i64 = tx
-        .query_one(filter_live_uuid_conflict_sql(), &[&filter_uuid])
-        .await
-        .map_err(|error| map_filter_write_db_error(error, "check live filter uuid conflict"))?
-        .get(0);
-    if count == 0 {
-        Ok(())
-    } else {
-        Err(ApiError::Conflict(
-            "filter with the same id already exists".to_string(),
-        ))
-    }
-}
-
 pub(crate) async fn execute_filter_restore_transaction(
     tx: &Transaction<'_>,
     filter_trash_internal_id: i32,
@@ -497,63 +320,6 @@ pub(crate) async fn patch_filter(
     Ok(Json(load_filter_asset_detail(&client, &record.uuid).await?))
 }
 
-fn require_filter_write_operator(
-    operator: Option<Extension<DirectApiOperator>>,
-) -> Result<DirectApiOperator, ApiError> {
-    let Some(Extension(operator)) = operator else {
-        tracing::warn!("filter write request missing direct API operator context");
-        return Err(ApiError::Forbidden);
-    };
-    Ok(operator)
-}
-
-async fn resolve_filter_write_operator_owner(
-    tx: &Transaction<'_>,
-    operator: &DirectApiOperator,
-) -> Result<i32, ApiError> {
-    tx.query_opt(filter_write_operator_owner_sql(), &[&operator.user_uuid()])
-        .await
-        .map_err(|error| map_filter_write_db_error(error, "resolve filter write operator"))?
-        .map(|row| row.get(0))
-        .ok_or_else(|| {
-            tracing::warn!("direct API filter write operator does not resolve to a database user");
-            ApiError::Forbidden
-        })
-}
-
-async fn load_filter_write_state(
-    tx: &Transaction<'_>,
-    filter_id: &str,
-) -> Result<FilterWriteState, ApiError> {
-    let filter_id = parse_uuid(filter_id)?.to_string();
-    tx.query_opt(filter_write_state_sql(), &[&filter_id])
-        .await
-        .map_err(|error| map_filter_write_db_error(error, "load filter write state"))?
-        .map(|row| FilterWriteState {
-            internal_id: row.get(0),
-        })
-        .ok_or(ApiError::NotFound)
-}
-
-async fn ensure_unique_filter_name(
-    tx: &Transaction<'_>,
-    name: &str,
-    except_internal_id: i32,
-) -> Result<(), ApiError> {
-    let count: i64 = tx
-        .query_one(filter_unique_name_sql(), &[&name, &except_internal_id])
-        .await
-        .map_err(|error| map_filter_write_db_error(error, "check filter name uniqueness"))?
-        .get(0);
-    if count == 0 {
-        Ok(())
-    } else {
-        Err(ApiError::Conflict(
-            "filter with the same name already exists".to_string(),
-        ))
-    }
-}
-
 pub(crate) async fn execute_filter_patch_transaction(
     tx: &Transaction<'_>,
     filter_internal_id: i32,
@@ -566,24 +332,6 @@ pub(crate) async fn execute_filter_patch_transaction(
         "update filter metadata",
     )
     .await
-}
-
-async fn query_filter_write_record(
-    tx: &Transaction<'_>,
-    sql: &str,
-    params: &[&(dyn ToSql + Sync)],
-    action: &'static str,
-) -> Result<FilterWriteRecord, ApiError> {
-    tx.query_opt(sql, params)
-        .await
-        .map_err(|error| map_filter_write_db_error(error, action))?
-        .map(|row| FilterWriteRecord { uuid: row.get(0) })
-        .ok_or(ApiError::NotFound)
-}
-
-fn map_filter_write_db_error(error: tokio_postgres::Error, action: &'static str) -> ApiError {
-    tracing::warn!(%error, action, "filter write database operation failed");
-    ApiError::Database
 }
 
 #[cfg(test)]
