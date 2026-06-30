@@ -64,6 +64,35 @@ pub(crate) struct ValidatedReportConfigPatch {
     pub(crate) params: Option<Vec<ValidatedReportConfigParamWrite>>,
 }
 
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ReportConfigWriteOperation {
+    Create,
+    Patch,
+    Delete,
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ReportConfigWriteStep {
+    ResolveOperatorOwner,
+    VerifyReportFormatVisible,
+    VerifyReportFormatParams,
+    VerifyUniqueLiveName,
+    VerifyExistingReportConfigMutable,
+    InsertReportConfig,
+    UpdateReportConfigMetadata,
+    ReplaceReportConfigParams,
+    MoveReportConfigToTrash,
+}
+
+#[cfg(test)]
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct ReportConfigWriteTransactionPlan {
+    pub(crate) operation: ReportConfigWriteOperation,
+    pub(crate) steps: Vec<ReportConfigWriteStep>,
+}
+
 pub(crate) fn validate_report_config_create_request(
     request: ReportConfigCreateRequest,
 ) -> Result<ValidatedReportConfigCreate, ApiError> {
@@ -100,6 +129,60 @@ pub(crate) fn validate_report_config_patch_request(
         ));
     }
     Ok(validated)
+}
+
+#[cfg(test)]
+pub(crate) fn report_config_create_transaction_plan(
+    _request: &ValidatedReportConfigCreate,
+) -> ReportConfigWriteTransactionPlan {
+    ReportConfigWriteTransactionPlan {
+        operation: ReportConfigWriteOperation::Create,
+        steps: vec![
+            ReportConfigWriteStep::ResolveOperatorOwner,
+            ReportConfigWriteStep::VerifyReportFormatVisible,
+            ReportConfigWriteStep::VerifyReportFormatParams,
+            ReportConfigWriteStep::VerifyUniqueLiveName,
+            ReportConfigWriteStep::InsertReportConfig,
+            ReportConfigWriteStep::ReplaceReportConfigParams,
+        ],
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn report_config_patch_transaction_plan(
+    request: &ValidatedReportConfigPatch,
+) -> ReportConfigWriteTransactionPlan {
+    let mut steps = vec![
+        ReportConfigWriteStep::ResolveOperatorOwner,
+        ReportConfigWriteStep::VerifyExistingReportConfigMutable,
+    ];
+    if request.report_format_id.is_some() || request.params.is_some() {
+        steps.push(ReportConfigWriteStep::VerifyReportFormatVisible);
+        steps.push(ReportConfigWriteStep::VerifyReportFormatParams);
+    }
+    if request.name.is_some() {
+        steps.push(ReportConfigWriteStep::VerifyUniqueLiveName);
+    }
+    steps.push(ReportConfigWriteStep::UpdateReportConfigMetadata);
+    if request.params.is_some() {
+        steps.push(ReportConfigWriteStep::ReplaceReportConfigParams);
+    }
+    ReportConfigWriteTransactionPlan {
+        operation: ReportConfigWriteOperation::Patch,
+        steps,
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn report_config_delete_transaction_plan() -> ReportConfigWriteTransactionPlan {
+    ReportConfigWriteTransactionPlan {
+        operation: ReportConfigWriteOperation::Delete,
+        steps: vec![
+            ReportConfigWriteStep::ResolveOperatorOwner,
+            ReportConfigWriteStep::VerifyExistingReportConfigMutable,
+            ReportConfigWriteStep::MoveReportConfigToTrash,
+        ],
+    }
 }
 
 fn normalize_required_report_config_text(
@@ -311,5 +394,62 @@ mod tests {
             validate_report_config_create_request(too_many),
             Err(ApiError::BadRequest(_))
         ));
+    }
+
+    #[test]
+    fn report_config_write_transaction_plans_keep_validation_before_mutation() {
+        let create = validate_report_config_create_request(ReportConfigCreateRequest {
+            name: "config".to_string(),
+            comment: None,
+            report_format_id: "12345678-1234-1234-1234-123456789abc".to_string(),
+            params: vec![ReportConfigParamWriteRequest {
+                name: "timezone".to_string(),
+                value: "UTC".to_string(),
+            }],
+        })
+        .expect("valid create");
+        assert_eq!(
+            report_config_create_transaction_plan(&create).steps,
+            vec![
+                ReportConfigWriteStep::ResolveOperatorOwner,
+                ReportConfigWriteStep::VerifyReportFormatVisible,
+                ReportConfigWriteStep::VerifyReportFormatParams,
+                ReportConfigWriteStep::VerifyUniqueLiveName,
+                ReportConfigWriteStep::InsertReportConfig,
+                ReportConfigWriteStep::ReplaceReportConfigParams,
+            ]
+        );
+
+        let patch = validate_report_config_patch_request(ReportConfigPatchRequest {
+            name: Some("renamed".to_string()),
+            comment: None,
+            report_format_id: Some("12345678-1234-1234-1234-123456789abc".to_string()),
+            params: Some(vec![ReportConfigParamWriteRequest {
+                name: "timezone".to_string(),
+                value: "CET".to_string(),
+            }]),
+        })
+        .expect("valid patch");
+        assert_eq!(
+            report_config_patch_transaction_plan(&patch).steps,
+            vec![
+                ReportConfigWriteStep::ResolveOperatorOwner,
+                ReportConfigWriteStep::VerifyExistingReportConfigMutable,
+                ReportConfigWriteStep::VerifyReportFormatVisible,
+                ReportConfigWriteStep::VerifyReportFormatParams,
+                ReportConfigWriteStep::VerifyUniqueLiveName,
+                ReportConfigWriteStep::UpdateReportConfigMetadata,
+                ReportConfigWriteStep::ReplaceReportConfigParams,
+            ]
+        );
+
+        assert_eq!(
+            report_config_delete_transaction_plan().steps,
+            vec![
+                ReportConfigWriteStep::ResolveOperatorOwner,
+                ReportConfigWriteStep::VerifyExistingReportConfigMutable,
+                ReportConfigWriteStep::MoveReportConfigToTrash,
+            ]
+        );
     }
 }
