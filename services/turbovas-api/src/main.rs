@@ -25,6 +25,7 @@ mod operating_systems;
 mod operator_identity;
 #[cfg(test)]
 mod override_characterization_tests;
+mod override_writes;
 mod overrides;
 mod path_ids;
 mod port_list_writes;
