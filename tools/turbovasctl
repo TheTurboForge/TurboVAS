@@ -5518,7 +5518,7 @@ def rust_collection_contract_paths(repo_root: Path | None) -> list[str]:
         return []
     source = ""
     for relative_path in (
-        "services/turbovas-api/src/contract_tests.rs",
+        "services/turbovas-api/src/collection_contract_tests.rs",
         "services/turbovas-api/src/main.rs",
     ):
         try:
