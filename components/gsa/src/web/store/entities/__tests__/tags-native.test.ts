@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2026 Robert Pelfrey <Robert@Pelfrey.de>
+ * TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -37,6 +38,7 @@ describe('native API tags', () => {
             resource_type: 'task',
             resource_count: 3,
             active: true,
+            in_use: true,
             value: 'production',
             writable: true,
             permissions: ['get_tags', 'modify_tag'],
@@ -69,6 +71,7 @@ describe('native API tags', () => {
     expect(tag.resourceCount).toEqual(3);
     expect(tag.value).toEqual('production');
     expect(tag.isActive()).toEqual(true);
+    expect(tag.isInUse()).toEqual(true);
     expect(tag.userCapabilities.mayEdit('tag')).toEqual(true);
     expect(gmp.buildUrl).toHaveBeenCalledWith('api/v1/tags', {
       token: 'test-token',
