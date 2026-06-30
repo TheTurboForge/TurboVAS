@@ -127,6 +127,21 @@ fn inherited_report_config_schema_has_live_trash_and_param_children() {
 
 #[test]
 fn inherited_create_and_modify_report_config_validate_format_params_acl_and_owner() {
+    let validate_report_config_param =
+        inherited_function(MANAGE_SQL_REPORT_CONFIGS, "validate_report_config_param");
+    for required in [
+        "SELECT id FROM report_format_params",
+        "report_format = %llu",
+        "AND name = '%s'",
+        "report format has no parameter",
+        "report_format_validate_param_value",
+    ] {
+        assert!(
+            validate_report_config_param.contains(required),
+            "validate_report_config_param missing {required}"
+        );
+    }
+
     let create_report_config =
         inherited_function(MANAGE_SQL_REPORT_CONFIGS, "create_report_config");
     for required in [
@@ -197,6 +212,8 @@ fn inherited_delete_and_restore_report_config_are_alert_guarded_trash_permission
     for required in [
         "find_trash (\"report_config\", report_config_id",
         "ACL_USER_OWNS",
+        "SELECT count(*) FROM report_configs",
+        "WHERE name =",
         "WHERE uuid = (SELECT uuid",
         "INSERT INTO report_configs",
         "INSERT INTO report_config_params",
