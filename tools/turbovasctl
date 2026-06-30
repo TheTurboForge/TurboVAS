@@ -554,6 +554,7 @@ OPENAPI_ALLOWED_REPLACES_VALUES = frozenset(
         "schedule-hard-delete",
         "schedule-restore",
         "schedule-trash-move",
+        "timezone-list-read",
         "scope-detail-membership-read",
         "scope-list-read",
         "scope-metadata-membership-write",
@@ -678,6 +679,7 @@ OPENAPI_REQUIRED_EXPOSURE = {
     ("get", "/scopes/{scope_id}/reports/{scope_report_id}/errors"): "direct-read",
     ("get", "/scopes/{scope_id}/reports/{scope_report_id}/metrics"): "direct-read",
     ("get", "/scopes/{scope_id}/reports/{scope_report_id}/retention-plan"): "direct-read",
+    ("get", "/timezones"): "direct-read",
     ("post", "/scopes"): "direct-write",
     ("patch", "/scopes/{scope_id}"): "direct-write",
     ("delete", "/scopes/{scope_id}"): "direct-write",
@@ -987,6 +989,11 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-inherited-still-owns": "schedule-create-calendar-export",
         "x-turbovas-maturity": "live-read",
         "x-turbovas-replaces": "schedule-metadata-detail-read",
+    },
+    ("get", "/timezones"): {
+        "x-turbovas-inherited-still-owns": "schedule-create-calendar-export",
+        "x-turbovas-maturity": "live-read",
+        "x-turbovas-replaces": "timezone-list-read",
     },
     ("patch", "/schedules/{schedule_id}"): {
         "x-turbovas-inherited-still-owns": "schedule-create-calendar-export",
@@ -1312,6 +1319,7 @@ DIRECT_API_SCRIPTABLE_ENDPOINTS = frozenset(
         "/api/v1/port-lists/{}",
         "/api/v1/schedules",
         "/api/v1/schedules/{}",
+        "/api/v1/timezones",
         "/api/v1/scan-configs",
         "/api/v1/scan-configs/{}",
         "/api/v1/scan-configs/{}/families",
@@ -6709,6 +6717,12 @@ def summarize_native_tooling(items: list[dict[str, Any]], repo_root: Path | None
                 "endpoint": "/api/v1/schedules/{schedule_id}",
                 "status": "implemented_internal_and_browser_proxied",
                 "replacement_candidates": ["GSA Schedule detail (migrated through gsad same-origin proxy)", "read-only schedule automation"],
+            },
+            {
+                "endpoint": "/api/v1/timezones",
+                "status": "implemented_internal_and_browser_proxied",
+                "direct_access": "scriptable_read",
+                "replacement_candidates": ["GSA schedule dialog timezone lookup (migrated through gsad same-origin proxy)", "read-only timezone automation", "native-api-request helper"],
             },
             {
                 "method": "patch",

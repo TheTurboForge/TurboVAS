@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2026 Robert Pelfrey <Robert@Pelfrey.de>
+ * TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -282,6 +283,7 @@ native_api_path_is_allowed (const gchar *path)
   const gchar *port_list_prefix = "/api/v1/port-lists/";
   const gchar *schedules_path = "/api/v1/schedules";
   const gchar *schedule_prefix = "/api/v1/schedules/";
+  const gchar *timezones_path = "/api/v1/timezones";
   const gchar *report_configs_path = "/api/v1/report-configs";
   const gchar *report_config_prefix = "/api/v1/report-configs/";
   const gchar *report_formats_path = "/api/v1/report-formats";
@@ -493,6 +495,9 @@ native_api_path_is_allowed (const gchar *path)
     }
 
   if (g_strcmp0 (path, schedules_path) == 0)
+    return TRUE;
+
+  if (g_strcmp0 (path, timezones_path) == 0)
     return TRUE;
 
   if (g_str_has_prefix (path, schedule_prefix))

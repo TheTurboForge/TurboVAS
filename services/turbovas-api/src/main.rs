@@ -112,6 +112,7 @@ mod target_handlers;
 mod task_handlers;
 mod task_target_payloads;
 mod task_targets;
+mod timezones;
 mod tls_certificate_payloads;
 mod tls_certificates;
 mod trashcan;

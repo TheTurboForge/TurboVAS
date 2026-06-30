@@ -2002,6 +2002,35 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
+  /timezones:
+    get:
+      operationId: getTimezones
+      x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: timezone-list-read
+      x-turbovas-inherited-still-owns: schedule-create-calendar-export
+      summary: List supported timezones
+      description: Read-only PostgreSQL timezone list for schedule dialogs and automation. Schedule create, calendar mutation, export, and task next-time recalculation remain inherited.
+      responses:
+        '200':
+          description: Supported timezone names
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimezoneCollection'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '413':
+          $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /report-configs:
     get:
       operationId: getReportConfigs
@@ -6115,6 +6144,14 @@ components:
               description: Active user tags attached directly to this schedule. Write/tag actions remain inherited.
               items:
                 $ref: '#/components/schemas/ReportUserTag'
+    TimezoneCollection:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: string
     ReportFormatReference:
       type: object
       required: [id, name]

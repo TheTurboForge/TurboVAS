@@ -62,6 +62,7 @@ use crate::{
     tag_writes::{create_tag, delete_tag, patch_tag, update_tag_resources},
     tags::*,
     task_targets::*,
+    timezones::timezones,
     tls_certificates::*,
     trashcan::trashcan_summary,
     vulnerability_payloads::*,
@@ -133,6 +134,7 @@ pub(crate) fn native_api_router() -> Router<AppState> {
         )
         .route("/api/v1/schedules", get(schedule_assets))
         .route("/api/v1/schedules/:schedule_id", get(schedule_asset_detail))
+        .route("/api/v1/timezones", get(timezones))
         .route("/api/v1/report-configs", get(report_config_assets))
         .route(
             "/api/v1/report-configs/:report_config_id",

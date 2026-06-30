@@ -31,6 +31,7 @@ pub(crate) fn direct_api_v1_path_is_allowed(path: &str) -> bool {
             | ["", "api", "v1", "overrides"]
             | ["", "api", "v1", "port-lists"]
             | ["", "api", "v1", "schedules"]
+            | ["", "api", "v1", "timezones"]
             | ["", "api", "v1", "report-configs"]
             | ["", "api", "v1", "report-formats"]
             | ["", "api", "v1", "trashcan", "summary"]
