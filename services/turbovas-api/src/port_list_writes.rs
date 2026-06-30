@@ -6,32 +6,18 @@ use axum::{
     Json,
     extract::{Extension, Path, State},
 };
-use serde::Deserialize;
 use tokio_postgres::{Transaction, types::ToSql};
 
 use crate::{
     app_state::AppState,
     auth::DirectApiOperator,
     errors::ApiError,
+    port_list_write_validation::{
+        MAX_PORT_LIST_TEXT_BYTES, PortListPatchRequest, ValidatedPortListPatch,
+        validate_port_list_patch_request,
+    },
     port_lists::{PortListAssetDetail, load_port_list_asset_detail},
 };
-
-const MAX_PORT_LIST_TEXT_BYTES: usize = 4096;
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct PortListPatchRequest {
-    #[serde(default)]
-    name: Option<String>,
-    #[serde(default)]
-    comment: Option<String>,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub(crate) struct ValidatedPortListPatch {
-    pub(crate) name: Option<String>,
-    pub(crate) comment: Option<String>,
-}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct PortListWriteRecord {
@@ -123,58 +109,6 @@ fn require_port_list_write_operator(
         return Err(ApiError::Forbidden);
     };
     Ok(operator)
-}
-
-pub(crate) fn validate_port_list_patch_request(
-    request: PortListPatchRequest,
-) -> Result<ValidatedPortListPatch, ApiError> {
-    let validated = ValidatedPortListPatch {
-        name: normalize_optional_required_port_list_text(request.name, "name")?,
-        comment: normalize_optional_port_list_text(request.comment, "comment")?,
-    };
-    if validated.name.is_none() && validated.comment.is_none() {
-        return Err(ApiError::BadRequest(
-            "port list patch request must include at least one field".to_string(),
-        ));
-    }
-    Ok(validated)
-}
-
-fn normalize_optional_required_port_list_text(
-    value: Option<String>,
-    field_name: &str,
-) -> Result<Option<String>, ApiError> {
-    value
-        .map(|value| normalize_required_port_list_text(value, field_name))
-        .transpose()
-}
-
-fn normalize_required_port_list_text(value: String, field_name: &str) -> Result<String, ApiError> {
-    let value = normalize_port_list_text_value(value, field_name)?;
-    if value.is_empty() {
-        Err(ApiError::BadRequest(format!("{field_name} is required")))
-    } else {
-        Ok(value)
-    }
-}
-
-fn normalize_optional_port_list_text(
-    value: Option<String>,
-    field_name: &str,
-) -> Result<Option<String>, ApiError> {
-    value
-        .map(|value| normalize_port_list_text_value(value, field_name))
-        .transpose()
-}
-
-fn normalize_port_list_text_value(value: String, field_name: &str) -> Result<String, ApiError> {
-    let value = value.trim().to_string();
-    if value.len() > MAX_PORT_LIST_TEXT_BYTES || value.chars().any(char::is_control) {
-        return Err(ApiError::BadRequest(format!(
-            "{field_name} must be printable text up to {MAX_PORT_LIST_TEXT_BYTES} bytes"
-        )));
-    }
-    Ok(value)
 }
 
 async fn resolve_port_list_write_operator_owner(
