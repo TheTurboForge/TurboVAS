@@ -2475,6 +2475,7 @@ paths:
       x-turbovas-replaces: task-list-read
       x-turbovas-inherited-still-owns: task-scan-control-writes-and-deletes
       summary: List scan tasks
+      description: Native direct API currently exposes task reads only. Start, stop, modify, delete, clone, export, resume, and scanner-control semantics remain inherited until their scanner, report, permission, and rejection-path contracts are characterized.
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
@@ -2508,6 +2509,7 @@ paths:
       x-turbovas-replaces: task-detail-summary-read
       x-turbovas-inherited-still-owns: task-scan-control-writes-and-deletes
       summary: Read one scan task summary
+      description: Native direct API currently exposes task summary reads only. Start/stop lifecycle control remains inherited until a native scanner-control contract defines report creation, scanner side effects, task/report status transitions, audit behavior, and failure mapping.
       parameters:
         - $ref: '#/components/parameters/TaskId'
       responses:
