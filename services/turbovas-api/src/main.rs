@@ -27,6 +27,7 @@ mod path_ids;
 mod port_lists;
 mod query;
 mod report_configs;
+mod report_errors;
 mod report_evidence_handlers;
 mod report_evidence_payloads;
 mod report_formats;
