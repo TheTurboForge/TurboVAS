@@ -84,6 +84,32 @@ pub(crate) async fn delete_schedule(
     Ok(StatusCode::NO_CONTENT)
 }
 
+pub(crate) async fn hard_delete_schedule(
+    State(state): State<AppState>,
+    Path(schedule_id): Path<String>,
+    operator: Option<Extension<DirectApiOperator>>,
+) -> Result<StatusCode, ApiError> {
+    let operator = require_schedule_write_operator(operator)?;
+    let mut client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let tx = client.transaction().await.map_err(|error| {
+        map_schedule_write_db_error(error, "begin hard-delete schedule transaction")
+    })?;
+    resolve_schedule_write_operator_owner(&tx, &operator).await?;
+    tx.batch_execute(
+        "LOCK TABLE schedules_trash, tasks, tag_resources, tag_resources_trash IN SHARE ROW EXCLUSIVE MODE;",
+    )
+    .await
+    .map_err(|error| map_schedule_write_db_error(error, "lock schedule trash tables for hard delete"))?;
+    let trash = load_schedule_trash_state(&tx, &schedule_id).await?;
+    ensure_schedule_not_in_use_by_trash_tasks(&tx, trash.internal_id).await?;
+    execute_schedule_hard_delete_transaction(&tx, trash.internal_id).await?;
+    tx.commit().await.map_err(|error| {
+        map_schedule_write_db_error(error, "commit hard-delete schedule transaction")
+    })?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
 pub(crate) async fn restore_schedule(
     State(state): State<AppState>,
     Path(schedule_id): Path<String>,
@@ -120,6 +146,7 @@ pub(crate) enum ScheduleWriteOperation {
     Patch,
     Delete,
     Restore,
+    HardDelete,
 }
 
 pub(crate) async fn execute_schedule_trash_transaction(
@@ -193,13 +220,34 @@ pub(crate) enum ScheduleWriteStep {
     DeriveScheduleFields,
     VerifyUniqueLiveName,
     VerifyTaskDeleteSafety,
+    VerifyTrashTaskDeleteSafety,
     InsertSchedule,
     UpdateScheduleMetadata,
     RefreshTaskNextTimes,
     MoveScheduleToTrash,
     RestoreScheduleFromTrash,
+    RemoveTrashTagLinks,
+    HardDeleteScheduleFromTrash,
     RelocateTasks,
     RelocatePermissionsAndTags,
+}
+
+async fn ensure_schedule_not_in_use_by_trash_tasks(
+    tx: &Transaction<'_>,
+    schedule_internal_id: i32,
+) -> Result<(), ApiError> {
+    let count: i64 = tx
+        .query_one(schedule_trash_task_count_sql(), &[&schedule_internal_id])
+        .await
+        .map_err(|error| map_schedule_write_db_error(error, "check schedule trash task usage"))?
+        .get(0);
+    if count == 0 {
+        Ok(())
+    } else {
+        Err(ApiError::Conflict(
+            "schedule is still referenced by a trash task".to_string(),
+        ))
+    }
 }
 
 async fn query_schedule_trash_write_record(
@@ -488,6 +536,34 @@ pub(crate) async fn execute_schedule_restore_transaction(
     Ok(ScheduleWriteRecord { uuid: record.uuid })
 }
 
+pub(crate) async fn execute_schedule_hard_delete_transaction(
+    tx: &Transaction<'_>,
+    schedule_trash_internal_id: i32,
+) -> Result<(), ApiError> {
+    execute_schedule_write_sql(
+        tx,
+        schedule_trash_tag_delete_sql(),
+        &[&schedule_trash_internal_id],
+        "delete schedule trash tag links",
+    )
+    .await?;
+    execute_schedule_write_sql(
+        tx,
+        schedule_trash_tag_trash_delete_sql(),
+        &[&schedule_trash_internal_id],
+        "delete trashed tag links to schedule trash id",
+    )
+    .await?;
+    execute_schedule_write_sql(
+        tx,
+        schedule_delete_trash_metadata_sql(),
+        &[&schedule_trash_internal_id],
+        "delete schedule trash metadata for hard delete",
+    )
+    .await?;
+    Ok(())
+}
+
 async fn query_schedule_write_record(
     tx: &Transaction<'_>,
     sql: &str,
@@ -537,6 +613,20 @@ pub(crate) fn schedule_create_transaction_plan() -> ScheduleWriteTransactionPlan
             ScheduleWriteStep::DeriveScheduleFields,
             ScheduleWriteStep::VerifyUniqueLiveName,
             ScheduleWriteStep::InsertSchedule,
+        ],
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn schedule_hard_delete_transaction_plan() -> ScheduleWriteTransactionPlan {
+    ScheduleWriteTransactionPlan {
+        operation: ScheduleWriteOperation::HardDelete,
+        steps: vec![
+            ScheduleWriteStep::ResolveOperatorOwner,
+            ScheduleWriteStep::VerifyExistingScheduleMutable,
+            ScheduleWriteStep::VerifyTrashTaskDeleteSafety,
+            ScheduleWriteStep::RemoveTrashTagLinks,
+            ScheduleWriteStep::HardDeleteScheduleFromTrash,
         ],
     }
 }

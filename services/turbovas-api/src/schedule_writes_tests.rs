@@ -56,6 +56,32 @@ fn schedule_restore_sql_moves_metadata_tasks_and_tags_to_live() {
 }
 
 #[test]
+fn schedule_hard_delete_sql_deletes_only_trash_metadata_and_tags() {
+    let task_guard = schedule_trash_task_count_sql();
+    assert!(task_guard.contains("FROM tasks"));
+    assert!(task_guard.contains("WHERE schedule = $1"));
+    assert!(task_guard.contains("schedule_location = 1"));
+    assert!(!task_guard.contains("hidden = 0"));
+
+    let live_tag_cleanup = schedule_trash_tag_delete_sql();
+    assert!(live_tag_cleanup.contains("DELETE FROM tag_resources"));
+    assert!(live_tag_cleanup.contains("resource_type = 'schedule'"));
+    assert!(live_tag_cleanup.contains("resource_location = 1"));
+
+    let trash_tag_cleanup = schedule_trash_tag_trash_delete_sql();
+    assert!(trash_tag_cleanup.contains("DELETE FROM tag_resources_trash"));
+    assert!(trash_tag_cleanup.contains("resource_type = 'schedule'"));
+    assert!(trash_tag_cleanup.contains("resource_location = 1"));
+
+    let metadata_delete = schedule_delete_trash_metadata_sql();
+    assert_eq!(
+        metadata_delete,
+        "DELETE FROM schedules_trash WHERE id = $1;"
+    );
+    assert!(!metadata_delete.contains("DELETE FROM schedules WHERE"));
+}
+
+#[test]
 fn schedule_create_plan_keeps_calendar_validation_before_insert() {
     assert_eq!(
         schedule_create_transaction_plan().steps,
@@ -67,6 +93,20 @@ fn schedule_create_plan_keeps_calendar_validation_before_insert() {
             ScheduleWriteStep::DeriveScheduleFields,
             ScheduleWriteStep::VerifyUniqueLiveName,
             ScheduleWriteStep::InsertSchedule,
+        ]
+    );
+}
+
+#[test]
+fn schedule_hard_delete_plan_keeps_trash_safety_and_side_effects_explicit() {
+    assert_eq!(
+        schedule_hard_delete_transaction_plan().steps,
+        vec![
+            ScheduleWriteStep::ResolveOperatorOwner,
+            ScheduleWriteStep::VerifyExistingScheduleMutable,
+            ScheduleWriteStep::VerifyTrashTaskDeleteSafety,
+            ScheduleWriteStep::RemoveTrashTagLinks,
+            ScheduleWriteStep::HardDeleteScheduleFromTrash,
         ]
     );
 }

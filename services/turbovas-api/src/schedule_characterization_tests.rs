@@ -244,11 +244,7 @@ fn openapi_documents_schedule_metadata_patch_and_trash_move_boundary() {
     assert!(list.contains("get:"));
     assert!(!list.contains("post:"));
     assert!(list.contains("x-turbovas-exposure: direct-read"));
-    assert!(
-        list.contains(
-            "x-turbovas-inherited-still-owns: schedule-create-calendar-export-hard-delete"
-        )
-    );
+    assert!(list.contains("x-turbovas-inherited-still-owns: schedule-create-calendar-export"));
 
     let detail = openapi_path_block("/schedules/{schedule_id}");
     assert!(detail.contains("get:"));
@@ -259,11 +255,7 @@ fn openapi_documents_schedule_metadata_patch_and_trash_move_boundary() {
     assert!(detail.contains("x-turbovas-replaces: schedule-metadata-modify"));
     assert!(detail.contains("x-turbovas-replaces: schedule-trash-move"));
     assert!(detail.contains("x-turbovas-safety-contract: write-control-v1"));
-    assert!(
-        detail.contains(
-            "x-turbovas-inherited-still-owns: schedule-create-calendar-export-hard-delete"
-        )
-    );
+    assert!(detail.contains("x-turbovas-inherited-still-owns: schedule-create-calendar-export"));
 
     let restore = openapi_path_block("/schedules/{schedule_id}/restore");
     assert!(restore.contains("post:"));
@@ -271,9 +263,16 @@ fn openapi_documents_schedule_metadata_patch_and_trash_move_boundary() {
     assert!(restore.contains("x-turbovas-exposure: direct-write"));
     assert!(restore.contains("x-turbovas-replaces: schedule-restore"));
     assert!(restore.contains("x-turbovas-safety-contract: write-control-v1"));
+    assert!(restore.contains("x-turbovas-inherited-still-owns: schedule-create-calendar-export"));
+
+    let hard_delete = openapi_path_block("/schedules/{schedule_id}/trash");
+    assert!(hard_delete.contains("delete:"));
+    assert!(hard_delete.contains("operationId: deleteSchedulesByScheduleIdTrash"));
+    assert!(hard_delete.contains("x-turbovas-direct: true"));
+    assert!(hard_delete.contains("x-turbovas-exposure: direct-write"));
+    assert!(hard_delete.contains("x-turbovas-replaces: schedule-hard-delete"));
+    assert!(hard_delete.contains("x-turbovas-safety-contract: write-control-v1"));
     assert!(
-        restore.contains(
-            "x-turbovas-inherited-still-owns: schedule-create-calendar-export-hard-delete"
-        )
+        hard_delete.contains("x-turbovas-inherited-still-owns: schedule-create-calendar-export")
     );
 }

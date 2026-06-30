@@ -145,6 +145,11 @@ const APPROVED_NATIVE_WRITE_ROUTE_CONTRACTS: &[NativeWriteRouteContract] = &[
         path: "/api/v1/schedules/:schedule_id/restore",
         safety_contract: "write-control-v1",
     },
+    NativeWriteRouteContract {
+        method: "delete",
+        path: "/api/v1/schedules/:schedule_id/trash",
+        safety_contract: "write-control-v1",
+    },
 ];
 
 #[test]

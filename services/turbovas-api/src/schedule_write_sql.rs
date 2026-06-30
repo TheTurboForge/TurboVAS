@@ -6,6 +6,13 @@ pub(crate) fn schedule_write_operator_owner_sql() -> &'static str {
     "SELECT id::integer FROM users WHERE uuid = $1;"
 }
 
+pub(crate) fn schedule_trash_task_count_sql() -> &'static str {
+    "SELECT count(*)::bigint
+       FROM tasks
+      WHERE schedule = $1
+        AND schedule_location = 1;"
+}
+
 pub(crate) fn schedule_live_task_count_sql() -> &'static str {
     "SELECT count(*)::bigint
        FROM tasks
@@ -135,4 +142,18 @@ pub(crate) fn schedule_trash_tag_locations_to_live_sql() -> &'static str {
 
 pub(crate) fn schedule_delete_trash_metadata_sql() -> &'static str {
     "DELETE FROM schedules_trash WHERE id = $1;"
+}
+
+pub(crate) fn schedule_trash_tag_delete_sql() -> &'static str {
+    "DELETE FROM tag_resources
+      WHERE resource_type = 'schedule'
+        AND resource = $1
+        AND resource_location = 1;"
+}
+
+pub(crate) fn schedule_trash_tag_trash_delete_sql() -> &'static str {
+    "DELETE FROM tag_resources_trash
+      WHERE resource_type = 'schedule'
+        AND resource = $1
+        AND resource_location = 1;"
 }
