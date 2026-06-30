@@ -196,6 +196,32 @@ fn port_list_restore_sql_moves_metadata_ranges_targets_and_tags_to_live() {
 }
 
 #[test]
+fn port_list_hard_delete_sql_deletes_only_trash_metadata_ranges_and_tags() {
+    let target_guard = port_list_trash_target_count_sql();
+    assert!(target_guard.contains("FROM targets_trash"));
+    assert!(target_guard.contains("WHERE port_list = $1"));
+    assert!(target_guard.contains("port_list_location = 1"));
+
+    let live_tag_cleanup = port_list_trash_tag_delete_sql();
+    assert!(live_tag_cleanup.contains("DELETE FROM tag_resources"));
+    assert!(live_tag_cleanup.contains("resource_type = 'port_list'"));
+    assert!(live_tag_cleanup.contains("resource_location = 1"));
+
+    let trash_tag_cleanup = port_list_trash_tag_trash_delete_sql();
+    assert!(trash_tag_cleanup.contains("DELETE FROM tag_resources_trash"));
+    assert!(trash_tag_cleanup.contains("resource_type = 'port_list'"));
+    assert!(trash_tag_cleanup.contains("resource_location = 1"));
+
+    let range_delete = port_list_delete_trash_ranges_sql();
+    assert!(range_delete.contains("DELETE FROM port_ranges_trash"));
+    assert!(!range_delete.contains("DELETE FROM port_ranges WHERE"));
+
+    let metadata_delete = port_list_delete_trash_metadata_sql();
+    assert!(metadata_delete.contains("DELETE FROM port_lists_trash"));
+    assert!(!metadata_delete.contains("DELETE FROM port_lists WHERE"));
+}
+
+#[test]
 fn port_list_patch_name_uniqueness_checks_live_and_trash_names() {
     let sql = port_list_unique_name_sql();
     assert!(sql.contains("FROM port_lists WHERE name = $1 AND id != $2"));
@@ -212,6 +238,21 @@ fn port_list_patch_plan_stays_metadata_only_and_blocks_predefined_lists() {
             PortListWriteStep::VerifyNotPredefined,
             PortListWriteStep::VerifyUniqueLiveAndTrashName,
             PortListWriteStep::UpdatePortListMetadata,
+        ]
+    );
+}
+
+#[test]
+fn port_list_hard_delete_plan_keeps_trash_safety_and_side_effects_explicit() {
+    assert_eq!(
+        port_list_hard_delete_transaction_plan().steps,
+        vec![
+            PortListWriteStep::ResolveOperatorOwner,
+            PortListWriteStep::VerifyExistingTrashedPortListRestorable,
+            PortListWriteStep::VerifyTrashTargetDeleteSafety,
+            PortListWriteStep::RemoveTrashTagLinks,
+            PortListWriteStep::DeletePortRangesFromTrash,
+            PortListWriteStep::HardDeletePortListFromTrash,
         ]
     );
 }

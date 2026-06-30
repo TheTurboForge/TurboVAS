@@ -1389,9 +1389,9 @@ paths:
       x-turbovas-exposure: direct-read
       x-turbovas-maturity: live-read
       x-turbovas-replaces: port-list-metadata-list-read
-      x-turbovas-inherited-still-owns: port-list-create-range-import-export-hard-delete
+      x-turbovas-inherited-still-owns: port-list-create-range-import-export
       summary: List port lists
-      description: Read-only port-list metadata backed by gvmd/PostgreSQL. Native direct write-control can patch port-list name/comment metadata, move live port lists to trash, and restore trashed port lists; create, range changes, import, export, and hard delete remain on inherited compatibility paths while native safety contracts are designed.
+      description: Read-only port-list metadata backed by gvmd/PostgreSQL. Native direct write-control can patch port-list name/comment metadata, move live port lists to trash, restore trashed port lists, and permanently delete trashed port-list metadata/ranges; create, range changes, import, and export remain on inherited compatibility paths while native safety contracts are designed.
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
@@ -1423,7 +1423,7 @@ paths:
       x-turbovas-exposure: direct-read
       x-turbovas-maturity: live-read
       x-turbovas-replaces: port-list-metadata-detail-read
-      x-turbovas-inherited-still-owns: port-list-create-range-import-export-hard-delete
+      x-turbovas-inherited-still-owns: port-list-create-range-import-export
       summary: Read one port list
       parameters:
         - $ref: '#/components/parameters/PortListId'
@@ -1454,13 +1454,13 @@ paths:
       x-turbovas-exposure: direct-write
       x-turbovas-maturity: live-write
       x-turbovas-replaces: port-list-metadata-modify
-      x-turbovas-inherited-still-owns: port-list-create-range-import-export-hard-delete
+      x-turbovas-inherited-still-owns: port-list-create-range-import-export
       x-turbovas-operator-identity: direct-token-operator
       x-turbovas-owner-semantics: preserve-existing-owner
       x-turbovas-safety-contract: write-control-v1
       x-turbovas-side-effect: metadata-write
       summary: Patch port-list metadata
-      description: Direct write-control endpoint for changing a port-list name or comment. Port ranges, predefined lists, create, import, export, hard delete, and scanner-facing range semantics remain inherited.
+      description: Direct write-control endpoint for changing a port-list name or comment. Port ranges, predefined lists, create, import, export, and scanner-facing range semantics remain inherited.
       parameters:
         - $ref: '#/components/parameters/PortListId'
       requestBody:
@@ -1498,13 +1498,13 @@ paths:
       x-turbovas-exposure: direct-write
       x-turbovas-maturity: live-write
       x-turbovas-replaces: port-list-trash-move
-      x-turbovas-inherited-still-owns: port-list-create-range-import-export-hard-delete
+      x-turbovas-inherited-still-owns: port-list-create-range-import-export
       x-turbovas-operator-identity: direct-token-operator
       x-turbovas-owner-semantics: preserve-existing-owner
       x-turbovas-safety-contract: write-control-v1
       x-turbovas-side-effect: metadata-delete
       summary: Move a port list to trash
-      description: Direct write-control endpoint for moving a non-predefined port list that is not referenced by live targets to the trashcan. The move preserves metadata, port ranges, trash-target references, and tag locations. Import, export, range changes, create, and hard delete remain inherited.
+      description: Direct write-control endpoint for moving a non-predefined port list that is not referenced by live targets to the trashcan. The move preserves metadata, port ranges, trash-target references, and tag locations. Import, export, range changes, and create remain inherited; permanent deletion requires the explicit trash hard-delete endpoint.
       parameters:
         - $ref: '#/components/parameters/PortListId'
       responses:
@@ -1533,13 +1533,13 @@ paths:
       x-turbovas-exposure: direct-write
       x-turbovas-maturity: live-write
       x-turbovas-replaces: port-list-restore
-      x-turbovas-inherited-still-owns: port-list-create-range-import-export-hard-delete
+      x-turbovas-inherited-still-owns: port-list-create-range-import-export
       x-turbovas-operator-identity: direct-token-operator
       x-turbovas-owner-semantics: preserve-existing-owner
       x-turbovas-safety-contract: write-control-v1
       x-turbovas-side-effect: metadata-write
       summary: Restore a trashed port list
-      description: Direct write-control endpoint for restoring a trashed port list, its port ranges, trash-target references, and tag locations back to live state. The restored port list keeps its original id and owner. Restore is rejected when a live port list with the same id already exists or when the original owner already has a live port list with the same name. Create, range mutation, import, export, and hard delete remain inherited.
+      description: Direct write-control endpoint for restoring a trashed port list, its port ranges, trash-target references, and tag locations back to live state. The restored port list keeps its original id and owner. Restore is rejected when a live port list with the same id already exists or when the original owner already has a live port list with the same name. Create, range mutation, import, and export remain inherited.
       parameters:
         - $ref: '#/components/parameters/PortListId'
       responses:
@@ -1553,6 +1553,43 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /port-lists/{port_list_id}/trash:
+    delete:
+      operationId: deletePortListsByPortListIdTrash
+      x-turbovas-direct: true
+      x-turbovas-exposure: direct-write
+      x-turbovas-maturity: live-write
+      x-turbovas-replaces: port-list-hard-delete
+      x-turbovas-inherited-still-owns: port-list-create-range-import-export
+      x-turbovas-operator-identity: direct-token-operator
+      x-turbovas-owner-semantics: preserve-existing-owner
+      x-turbovas-safety-contract: write-control-v1
+      x-turbovas-side-effect: metadata-delete
+      summary: Permanently delete trashed port list
+      description: Direct write-control endpoint for permanently deleting a trashed port list. The endpoint rejects port lists referenced by trash targets, then deletes active/trash tag links pointing at the trashed port-list id, trash ranges, and trash metadata only; live port lists are not deleted by this route. Create, range mutation, import, and export remain inherited.
+      parameters:
+        - $ref: '#/components/parameters/PortListId'
+      responses:
+        '204':
+          description: Trashed port list permanently deleted
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '405':

@@ -274,9 +274,7 @@ fn openapi_documents_port_list_metadata_patch_boundary() {
     assert!(list.contains("get:"));
     assert!(!list.contains("post:"));
     assert!(list.contains("x-turbovas-exposure: direct-read"));
-    assert!(list.contains(
-        "x-turbovas-inherited-still-owns: port-list-create-range-import-export-hard-delete"
-    ));
+    assert!(list.contains("x-turbovas-inherited-still-owns: port-list-create-range-import-export"));
 
     let detail = openapi_path_block("/port-lists/{port_list_id}");
     assert!(detail.contains("get:"));
@@ -287,16 +285,27 @@ fn openapi_documents_port_list_metadata_patch_boundary() {
     assert!(detail.contains("x-turbovas-replaces: port-list-metadata-modify"));
     assert!(detail.contains("x-turbovas-replaces: port-list-trash-move"));
     assert!(detail.contains("x-turbovas-safety-contract: write-control-v1"));
-    assert!(detail.contains(
-        "x-turbovas-inherited-still-owns: port-list-create-range-import-export-hard-delete"
-    ));
+    assert!(
+        detail.contains("x-turbovas-inherited-still-owns: port-list-create-range-import-export")
+    );
 
     let restore = openapi_path_block("/port-lists/{port_list_id}/restore");
     assert!(restore.contains("post:"));
     assert!(restore.contains("x-turbovas-exposure: direct-write"));
     assert!(restore.contains("x-turbovas-replaces: port-list-restore"));
     assert!(restore.contains("x-turbovas-safety-contract: write-control-v1"));
-    assert!(restore.contains(
-        "x-turbovas-inherited-still-owns: port-list-create-range-import-export-hard-delete"
-    ));
+    assert!(
+        restore.contains("x-turbovas-inherited-still-owns: port-list-create-range-import-export")
+    );
+
+    let hard_delete = openapi_path_block("/port-lists/{port_list_id}/trash");
+    assert!(hard_delete.contains("delete:"));
+    assert!(hard_delete.contains("operationId: deletePortListsByPortListIdTrash"));
+    assert!(hard_delete.contains("x-turbovas-direct: true"));
+    assert!(hard_delete.contains("x-turbovas-exposure: direct-write"));
+    assert!(hard_delete.contains("x-turbovas-replaces: port-list-hard-delete"));
+    assert!(
+        hard_delete
+            .contains("x-turbovas-inherited-still-owns: port-list-create-range-import-export")
+    );
 }

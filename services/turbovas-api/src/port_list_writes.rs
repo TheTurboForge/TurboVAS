@@ -53,6 +53,7 @@ pub(crate) enum PortListWriteOperation {
     Patch,
     Delete,
     Restore,
+    HardDelete,
 }
 
 #[cfg(test)]
@@ -70,6 +71,10 @@ pub(crate) enum PortListWriteStep {
     UpdatePortListMetadata,
     MovePortListToTrash,
     MovePortRangesToTrash,
+    VerifyTrashTargetDeleteSafety,
+    RemoveTrashTagLinks,
+    DeletePortRangesFromTrash,
+    HardDeletePortListFromTrash,
     RestorePortListFromTrash,
     RestorePortRangesFromTrash,
     RelocateTargets,
@@ -143,6 +148,32 @@ pub(crate) async fn delete_port_list(
     execute_port_list_trash_transaction(&tx, state.internal_id).await?;
     tx.commit().await.map_err(|error| {
         map_port_list_write_db_error(error, "commit delete port list transaction")
+    })?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+pub(crate) async fn hard_delete_port_list(
+    State(state): State<AppState>,
+    Path(port_list_id): Path<String>,
+    operator: Option<Extension<DirectApiOperator>>,
+) -> Result<StatusCode, ApiError> {
+    let operator = require_port_list_write_operator(operator)?;
+    let mut client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let tx = client.transaction().await.map_err(|error| {
+        map_port_list_write_db_error(error, "begin hard-delete port list transaction")
+    })?;
+    resolve_port_list_write_operator_owner(&tx, &operator).await?;
+    tx.batch_execute(
+        "LOCK TABLE port_lists_trash, port_ranges_trash, targets_trash, tag_resources, tag_resources_trash IN SHARE ROW EXCLUSIVE MODE;",
+    )
+    .await
+    .map_err(|error| map_port_list_write_db_error(error, "lock port list trash tables for hard delete"))?;
+    let trash = load_port_list_trash_state(&tx, &port_list_id).await?;
+    ensure_port_list_not_in_use_by_trash_targets(&tx, trash.internal_id).await?;
+    execute_port_list_hard_delete_transaction(&tx, trash.internal_id).await?;
+    tx.commit().await.map_err(|error| {
+        map_port_list_write_db_error(error, "commit hard-delete port list transaction")
     })?;
 
     Ok(StatusCode::NO_CONTENT)
@@ -422,6 +453,41 @@ pub(crate) async fn execute_port_list_restore_transaction(
     Ok(PortListWriteRecord { uuid: record.uuid })
 }
 
+pub(crate) async fn execute_port_list_hard_delete_transaction(
+    tx: &Transaction<'_>,
+    trash_port_list_internal_id: i32,
+) -> Result<(), ApiError> {
+    execute_port_list_write_sql(
+        tx,
+        port_list_trash_tag_delete_sql(),
+        &[&trash_port_list_internal_id],
+        "delete port list trash tag links",
+    )
+    .await?;
+    execute_port_list_write_sql(
+        tx,
+        port_list_trash_tag_trash_delete_sql(),
+        &[&trash_port_list_internal_id],
+        "delete trashed tag links to port list trash id",
+    )
+    .await?;
+    execute_port_list_write_sql(
+        tx,
+        port_list_delete_trash_ranges_sql(),
+        &[&trash_port_list_internal_id],
+        "delete port list trash ranges for hard delete",
+    )
+    .await?;
+    execute_port_list_write_sql(
+        tx,
+        port_list_delete_trash_metadata_sql(),
+        &[&trash_port_list_internal_id],
+        "delete port list trash metadata for hard delete",
+    )
+    .await?;
+    Ok(())
+}
+
 async fn ensure_port_list_not_in_use_by_live_targets(
     tx: &Transaction<'_>,
     port_list_internal_id: i32,
@@ -436,6 +502,27 @@ async fn ensure_port_list_not_in_use_by_live_targets(
     } else {
         Err(ApiError::Conflict(
             "port list is still referenced by a live target".to_string(),
+        ))
+    }
+}
+
+async fn ensure_port_list_not_in_use_by_trash_targets(
+    tx: &Transaction<'_>,
+    port_list_internal_id: i32,
+) -> Result<(), ApiError> {
+    let count: i64 = tx
+        .query_one(
+            port_list_trash_target_count_sql(),
+            &[&port_list_internal_id],
+        )
+        .await
+        .map_err(|error| map_port_list_write_db_error(error, "check port list trash target usage"))?
+        .get(0);
+    if count == 0 {
+        Ok(())
+    } else {
+        Err(ApiError::Conflict(
+            "port list is still referenced by a trash target".to_string(),
         ))
     }
 }
@@ -541,6 +628,21 @@ pub(crate) fn port_list_restore_transaction_plan() -> PortListWriteTransactionPl
             PortListWriteStep::RestorePortRangesFromTrash,
             PortListWriteStep::RelocateTargets,
             PortListWriteStep::RelocatePermissionsAndTags,
+        ],
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn port_list_hard_delete_transaction_plan() -> PortListWriteTransactionPlan {
+    PortListWriteTransactionPlan {
+        operation: PortListWriteOperation::HardDelete,
+        steps: vec![
+            PortListWriteStep::ResolveOperatorOwner,
+            PortListWriteStep::VerifyExistingTrashedPortListRestorable,
+            PortListWriteStep::VerifyTrashTargetDeleteSafety,
+            PortListWriteStep::RemoveTrashTagLinks,
+            PortListWriteStep::DeletePortRangesFromTrash,
+            PortListWriteStep::HardDeletePortListFromTrash,
         ],
     }
 }

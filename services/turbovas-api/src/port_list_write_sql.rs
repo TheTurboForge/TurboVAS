@@ -53,6 +53,13 @@ pub(crate) fn port_list_live_target_count_sql() -> &'static str {
       WHERE port_list = $1;"
 }
 
+pub(crate) fn port_list_trash_target_count_sql() -> &'static str {
+    "SELECT count(*)::bigint
+       FROM targets_trash
+      WHERE port_list = $1
+        AND port_list_location = 1;"
+}
+
 pub(crate) fn port_list_trash_insert_sql() -> &'static str {
     "INSERT INTO port_lists_trash
         (uuid, owner, name, comment, predefined, creation_time, modification_time)
@@ -149,6 +156,20 @@ pub(crate) fn port_list_trash_tag_locations_to_live_sql() -> &'static str {
 
 pub(crate) fn port_list_delete_trash_ranges_sql() -> &'static str {
     "DELETE FROM port_ranges_trash WHERE port_list = $1;"
+}
+
+pub(crate) fn port_list_trash_tag_delete_sql() -> &'static str {
+    "DELETE FROM tag_resources
+      WHERE resource_type = 'port_list'
+        AND resource = $1
+        AND resource_location = 1;"
+}
+
+pub(crate) fn port_list_trash_tag_trash_delete_sql() -> &'static str {
+    "DELETE FROM tag_resources_trash
+      WHERE resource_type = 'port_list'
+        AND resource = $1
+        AND resource_location = 1;"
 }
 
 pub(crate) fn port_list_delete_trash_metadata_sql() -> &'static str {
