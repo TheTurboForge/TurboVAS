@@ -4135,6 +4135,8 @@ components:
         modification_time:
           type: string
           format: date-time
+        metrics_summary:
+          $ref: '#/components/schemas/ReportMetricsSummary'
         sources:
           type: array
           items:
@@ -6079,6 +6081,27 @@ components:
         created_at:
           type: string
           format: date-time
+    ReportMetricsSummary:
+      type: object
+      properties:
+        total_system_cvss_load:
+          type: number
+        average_system_cvss_load:
+          type: number
+        authenticated_scan_coverage_percent:
+          type: number
+        alive_system_count:
+          type: integer
+        vulnerability_count:
+          type: integer
+        authenticated_system_count:
+          type: integer
+        authentication_failed_system_count:
+          type: integer
+        no_credential_path_system_count:
+          type: integer
+        unknown_authentication_system_count:
+          type: integer
     ReportMetrics:
       type: object
       required: [summary, systems, vulnerabilities]
@@ -6087,26 +6110,7 @@ components:
           type: string
           format: uuid
         summary:
-          type: object
-          properties:
-            total_system_cvss_load:
-              type: number
-            average_system_cvss_load:
-              type: number
-            authenticated_scan_coverage_percent:
-              type: number
-            alive_system_count:
-              type: integer
-            vulnerability_count:
-              type: integer
-            authenticated_system_count:
-              type: integer
-            authentication_failed_system_count:
-              type: integer
-            no_credential_path_system_count:
-              type: integer
-            unknown_authentication_system_count:
-              type: integer
+          $ref: '#/components/schemas/ReportMetricsSummary'
         systems:
           type: array
           items:

@@ -33,6 +33,20 @@ pub(crate) struct ScopeReportItem {
     pub(crate) excluded_candidate_host_count: i64,
     pub(crate) creation_time: Option<String>,
     pub(crate) modification_time: Option<String>,
+    pub(crate) metrics_summary: ScopeReportMetricsSummary,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct ScopeReportMetricsSummary {
+    pub(crate) total_system_cvss_load: f64,
+    pub(crate) average_system_cvss_load: f64,
+    pub(crate) authenticated_scan_coverage_percent: f64,
+    pub(crate) alive_system_count: i64,
+    pub(crate) vulnerability_count: i64,
+    pub(crate) authenticated_system_count: i64,
+    pub(crate) authentication_failed_system_count: i64,
+    pub(crate) no_credential_path_system_count: i64,
+    pub(crate) unknown_authentication_system_count: i64,
 }
 
 #[derive(Debug, Serialize)]
@@ -258,6 +272,17 @@ pub(crate) fn scope_report_from_row(row: &Row) -> ScopeReportItem {
         excluded_candidate_host_count: row.get(14),
         creation_time: unix_ts_to_rfc3339(row.get(15)),
         modification_time: unix_ts_to_rfc3339(row.get(16)),
+        metrics_summary: ScopeReportMetricsSummary {
+            total_system_cvss_load: row.get(22),
+            average_system_cvss_load: row.get(23),
+            authenticated_scan_coverage_percent: row.get(24),
+            alive_system_count: row.get(25),
+            vulnerability_count: row.get(26),
+            authenticated_system_count: row.get(27),
+            authentication_failed_system_count: row.get(28),
+            no_credential_path_system_count: row.get(29),
+            unknown_authentication_system_count: row.get(30),
+        },
     }
 }
 

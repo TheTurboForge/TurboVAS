@@ -31,6 +31,14 @@ pub(crate) async fn scope_reports(
                   sr.vulnerability_count::bigint, sr.max_severity::double precision,\n\
                   sr.latest_evidence_time::bigint, sr.excluded_candidate_host_count::bigint,\n\
                   sr.creation_time::bigint, sr.modification_time::bigint,\n\
+                  coalesce(sr.metric_total_system_cvss_load, 0)::double precision AS metric_total_system_cvss_load,\n\
+                  coalesce(sr.metric_average_system_cvss_load, 0)::double precision AS metric_average_system_cvss_load,\n\
+                  coalesce(sr.metric_authenticated_scan_coverage, 0)::double precision AS metric_authenticated_scan_coverage,\n\
+                  coalesce(sr.metric_alive_system_count, 0)::bigint AS metric_alive_system_count,\n\
+                  coalesce(sr.metric_authenticated_system_count, 0)::bigint AS metric_authenticated_system_count,\n\
+                  coalesce(sr.metric_auth_failed_system_count, 0)::bigint AS metric_auth_failed_system_count,\n\
+                  coalesce(sr.metric_no_credential_path_system_count, 0)::bigint AS metric_no_credential_path_system_count,\n\
+                  coalesce(sr.metric_unknown_authentication_system_count, 0)::bigint AS metric_unknown_authentication_system_count,\n\
                   coalesce(s.is_global, 0)::int AS is_global\n\
              FROM scope_reports sr\n\
              JOIN scopes s ON s.id = sr.scope\n\
@@ -93,7 +101,16 @@ pub(crate) async fn scope_reports(
                 coalesce(sc.severity_medium, 0)::bigint,\n\
                 coalesce(sc.severity_low, 0)::bigint,\n\
                 coalesce(sc.severity_log, 0)::bigint,\n\
-                coalesce(sc.severity_false_positive, 0)::bigint\n\
+                coalesce(sc.severity_false_positive, 0)::bigint,\n\
+                f.metric_total_system_cvss_load,\n\
+                f.metric_average_system_cvss_load,\n\
+                f.metric_authenticated_scan_coverage,\n\
+                f.metric_alive_system_count,\n\
+                (SELECT count(*) FROM scope_report_vulnerability_metrics srvm WHERE srvm.scope_report = f.id)::bigint,\n\
+                f.metric_authenticated_system_count,\n\
+                f.metric_auth_failed_system_count,\n\
+                f.metric_no_credential_path_system_count,\n\
+                f.metric_unknown_authentication_system_count\n\
            FROM filtered f\n\
            LEFT JOIN severity_counts sc ON sc.scope_report_id = f.id\n\
           ORDER BY {sort_sql}, uuid DESC LIMIT $2 OFFSET $3;"
@@ -130,6 +147,14 @@ pub(crate) async fn scope_report_detail(
                       sr.vulnerability_count::bigint, sr.max_severity::double precision,\n\
                       sr.latest_evidence_time::bigint, sr.excluded_candidate_host_count::bigint,\n\
                       sr.creation_time::bigint, sr.modification_time::bigint,\n\
+                      coalesce(sr.metric_total_system_cvss_load, 0)::double precision AS metric_total_system_cvss_load,\n\
+                      coalesce(sr.metric_average_system_cvss_load, 0)::double precision AS metric_average_system_cvss_load,\n\
+                      coalesce(sr.metric_authenticated_scan_coverage, 0)::double precision AS metric_authenticated_scan_coverage,\n\
+                      coalesce(sr.metric_alive_system_count, 0)::bigint AS metric_alive_system_count,\n\
+                      coalesce(sr.metric_authenticated_system_count, 0)::bigint AS metric_authenticated_system_count,\n\
+                      coalesce(sr.metric_auth_failed_system_count, 0)::bigint AS metric_auth_failed_system_count,\n\
+                      coalesce(sr.metric_no_credential_path_system_count, 0)::bigint AS metric_no_credential_path_system_count,\n\
+                      coalesce(sr.metric_unknown_authentication_system_count, 0)::bigint AS metric_unknown_authentication_system_count,\n\
                       coalesce(s.is_global, 0)::int AS is_global\n\
                  FROM scope_reports sr\n\
                  JOIN scopes s ON s.id = sr.scope\n\
@@ -190,7 +215,16 @@ pub(crate) async fn scope_report_detail(
                     coalesce(sc.severity_medium, 0)::bigint,\n\
                     coalesce(sc.severity_low, 0)::bigint,\n\
                     coalesce(sc.severity_log, 0)::bigint,\n\
-                    coalesce(sc.severity_false_positive, 0)::bigint\n\
+                    coalesce(sc.severity_false_positive, 0)::bigint,\n\
+                    f.metric_total_system_cvss_load,\n\
+                    f.metric_average_system_cvss_load,\n\
+                    f.metric_authenticated_scan_coverage,\n\
+                    f.metric_alive_system_count,\n\
+                    (SELECT count(*) FROM scope_report_vulnerability_metrics srvm WHERE srvm.scope_report = f.id)::bigint,\n\
+                    f.metric_authenticated_system_count,\n\
+                    f.metric_auth_failed_system_count,\n\
+                    f.metric_no_credential_path_system_count,\n\
+                    f.metric_unknown_authentication_system_count\n\
                FROM selected_scope_report f\n\
                LEFT JOIN severity_counts sc ON sc.scope_report_id = f.id;",
             &[&scope_report_id],

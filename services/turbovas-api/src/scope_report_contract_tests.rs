@@ -118,6 +118,34 @@ fn scope_report_metrics_reads_persisted_snapshot_tables_and_not_live_results() {
 }
 
 #[test]
+fn scope_report_list_and_detail_expose_persisted_metrics_summary() {
+    let source = include_str!("scope_reports.rs");
+
+    for required in [
+        "metric_total_system_cvss_load",
+        "metric_average_system_cvss_load",
+        "metric_authenticated_scan_coverage",
+        "metric_alive_system_count",
+        "metric_authenticated_system_count",
+        "metric_auth_failed_system_count",
+        "metric_no_credential_path_system_count",
+        "metric_unknown_authentication_system_count",
+    ] {
+        assert!(
+            source.contains(required),
+            "scope reports should expose {required}"
+        );
+    }
+    assert!(
+        source
+            .matches("SELECT count(*) FROM scope_report_vulnerability_metrics")
+            .count()
+            >= 2,
+        "list and detail should expose the same metrics vulnerability-count source"
+    );
+}
+
+#[test]
 fn scope_report_native_routes_remain_get_only_read_paths() {
     let source = include_str!("routes.rs");
     let start = ".route(\"/api/v1/scope-reports\", get(scope_reports))";

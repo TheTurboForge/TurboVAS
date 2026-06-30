@@ -1,13 +1,11 @@
 /* SPDX-FileCopyrightText: 2026 Robert Pelfrey <Robert@Pelfrey.de>
+ * TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
 import CollectionCounts from 'gmp/collection/collection-counts';
-import type {
-  ProtectionRequirement,
-  ScopeReport,
-} from 'gmp/commands/scopes';
+import type {ProtectionRequirement, ScopeReport} from 'gmp/commands/scopes';
 import type {UrlParams} from 'gmp/http/utils';
 
 interface NativeApiSession {
@@ -31,6 +29,18 @@ interface NativeScopeReportSeverityCounts {
   low?: number;
   log?: number;
   false_positive?: number;
+}
+
+interface NativeScopeReportMetricsSummary {
+  total_system_cvss_load?: number;
+  average_system_cvss_load?: number;
+  authenticated_scan_coverage_percent?: number;
+  alive_system_count?: number;
+  vulnerability_count?: number;
+  authenticated_system_count?: number;
+  authentication_failed_system_count?: number;
+  no_credential_path_system_count?: number;
+  unknown_authentication_system_count?: number;
 }
 
 interface NativeScopeReportSourceItem {
@@ -65,6 +75,7 @@ interface NativeScopeReportItem {
   excluded_candidate_host_count?: number;
   creation_time?: string;
   modification_time?: string;
+  metrics_summary?: NativeScopeReportMetricsSummary;
   sources?: NativeScopeReportSourceItem[];
 }
 
@@ -130,6 +141,33 @@ const protectionValue = (value: unknown): ProtectionRequirement => {
   }
 };
 
+const nativeMetricsSummaryToModel = (
+  summary: NativeScopeReportMetricsSummary | undefined,
+) => {
+  if (summary === undefined) {
+    return undefined;
+  }
+  return {
+    totalSystemCvssLoad: numberValue(summary.total_system_cvss_load),
+    averageSystemCvssLoad: numberValue(summary.average_system_cvss_load),
+    authenticatedScanCoveragePercent: numberValue(
+      summary.authenticated_scan_coverage_percent,
+    ),
+    aliveSystemCount: integerValue(summary.alive_system_count),
+    vulnerabilityCount: integerValue(summary.vulnerability_count),
+    authenticatedSystemCount: integerValue(summary.authenticated_system_count),
+    authenticationFailedSystemCount: integerValue(
+      summary.authentication_failed_system_count,
+    ),
+    noCredentialPathSystemCount: integerValue(
+      summary.no_credential_path_system_count,
+    ),
+    unknownAuthenticationSystemCount: integerValue(
+      summary.unknown_authentication_system_count,
+    ),
+  };
+};
+
 const booleanValue = (value: unknown, fallback = false): boolean => {
   if (typeof value === 'boolean') {
     return value;
@@ -192,6 +230,7 @@ export const nativeScopeReportToModel = (
     severityFalsePositive: integerValue(severity.false_positive),
     maxSeverity: numberValue(item.max_severity),
     excludedCandidateHosts: integerValue(item.excluded_candidate_host_count),
+    metricsSummary: nativeMetricsSummaryToModel(item.metrics_summary),
     scopeId: stringValue(scope.id),
     scopeName: stringValue(scope.name),
     protectionRequirement: protectionValue(item.protection_requirement),

@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2026 Robert Pelfrey <Robert@Pelfrey.de>
+ * TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -9,7 +10,10 @@ import {
   fetchNativeScopeReports,
 } from 'gmp/native-api/scope-reports';
 
-const createGmp = ({jwt, token = 'test-token'}: {jwt?: string; token?: string} = {}) => ({
+const createGmp = ({
+  jwt,
+  token = 'test-token',
+}: {jwt?: string; token?: string} = {}) => ({
   buildUrl: testing.fn((path: string) => `https://turbovas.example/${path}`),
   session: {jwt, token},
 });
@@ -35,6 +39,17 @@ describe('native API scope report list', () => {
         vulnerability_count: 3,
         severity: {high: 1, medium: 2, low: 0, log: 9, false_positive: 0},
         max_severity: 9.8,
+        metrics_summary: {
+          total_system_cvss_load: 21.5,
+          average_system_cvss_load: 7.2,
+          authenticated_scan_coverage_percent: 66.7,
+          alive_system_count: 3,
+          vulnerability_count: 8,
+          authenticated_system_count: 2,
+          authentication_failed_system_count: 1,
+          no_credential_path_system_count: 0,
+          unknown_authentication_system_count: 0,
+        },
         latest_evidence_time: '2026-06-21T10:00:00Z',
         excluded_candidate_host_count: 0,
         creation_time: '2026-06-21T10:00:00Z',
@@ -67,6 +82,10 @@ describe('native API scope report list', () => {
     expect(report.sources[0].targetName).toEqual('Target 1');
     expect(report.sources[0].taskName).toEqual('Task 1');
     expect(report.sources[0].selected).toEqual(true);
+    expect(report.metricsSummary?.authenticatedScanCoveragePercent).toEqual(
+      66.7,
+    );
+    expect(report.metricsSummary?.authenticatedSystemCount).toEqual(2);
     expect(report.topResults).toEqual([]);
     expect(gmp.buildUrl).toHaveBeenCalledWith(
       'api/v1/scope-reports/scope-report-1',
@@ -87,7 +106,13 @@ describe('native API scope report list', () => {
   test('fetches paginated scope reports through the same-origin native API', async () => {
     const fetchMock = testing.fn().mockResolvedValue({
       json: testing.fn().mockResolvedValue({
-        page: {page: 2, page_size: 25, total: 42, sort: '-creation_time', filter: 'org'},
+        page: {
+          page: 2,
+          page_size: 25,
+          total: 42,
+          sort: '-creation_time',
+          filter: 'org',
+        },
         items: [
           {
             id: 'scope-report-1',
@@ -101,8 +126,25 @@ describe('native API scope report list', () => {
             missing_host_count: 1,
             result_count: 799,
             vulnerability_count: 581,
-            severity: {high: 263, medium: 276, low: 42, log: 218, false_positive: 0},
+            severity: {
+              high: 263,
+              medium: 276,
+              low: 42,
+              log: 218,
+              false_positive: 0,
+            },
             max_severity: 10.0,
+            metrics_summary: {
+              total_system_cvss_load: 88.5,
+              average_system_cvss_load: 12.6,
+              authenticated_scan_coverage_percent: 71.4,
+              alive_system_count: 7,
+              vulnerability_count: 581,
+              authenticated_system_count: 5,
+              authentication_failed_system_count: 1,
+              no_credential_path_system_count: 1,
+              unknown_authentication_system_count: 0,
+            },
             latest_evidence_time: '2026-06-15T16:16:29Z',
             excluded_candidate_host_count: 3,
             creation_time: '2026-06-15T16:16:29Z',
@@ -128,6 +170,10 @@ describe('native API scope report list', () => {
     expect(response.reports[0].hostsWithEvidence).toEqual(6);
     expect(response.reports[0].severityHigh).toEqual(263);
     expect(response.reports[0].resultsTotal).toEqual(799);
+    expect(response.reports[0].metricsSummary?.aliveSystemCount).toEqual(7);
+    expect(response.reports[0].metricsSummary?.totalSystemCvssLoad).toEqual(
+      88.5,
+    );
     expect(gmp.buildUrl).toHaveBeenCalledWith('api/v1/scope-reports', {
       token: 'test-token',
       page: 2,
