@@ -175,6 +175,9 @@ pub(crate) fn tag_resource_direct_write_type_is_supported(resource_type: &str) -
     matches!(
         resource_type,
         "config"
+            | "cert_bund_adv"
+            | "cpe"
+            | "dfn_cert_adv"
             | "host"
             | "os"
             | "port_list"
@@ -186,6 +189,10 @@ pub(crate) fn tag_resource_direct_write_type_is_supported(resource_type: &str) -
             | "task"
             | "tls_certificate"
     )
+}
+
+pub(crate) fn tag_resource_direct_write_id_must_be_uuid(resource_type: &str) -> bool {
+    !matches!(resource_type, "cert_bund_adv" | "cpe" | "dfn_cert_adv")
 }
 
 pub(crate) fn tag_resource_active_lookup_sql(resource_type: &str) -> Result<String, ApiError> {
@@ -342,7 +349,24 @@ mod tests {
         assert!(task_sql.contains("coalesce(r.usage_type, 'scan') = 'scan'"));
         assert!(task_sql.contains("coalesce(r.hidden, 0) = 0"));
 
+        let cpe_sql = tag_resource_active_lookup_sql("cpe").unwrap();
+        assert!(cpe_sql.contains("FROM scap.cpes r"));
+        assert!(cpe_sql.contains("lower(r.uuid) = lower($1)"));
+        assert!(!tag_resource_direct_write_id_must_be_uuid("cpe"));
+
+        let cert_sql = tag_resource_active_lookup_sql("cert_bund_adv").unwrap();
+        assert!(cert_sql.contains("FROM cert.cert_bund_advs r"));
+        assert!(!tag_resource_direct_write_id_must_be_uuid("cert_bund_adv"));
+
+        let dfn_sql = tag_resource_active_lookup_sql("dfn_cert_adv").unwrap();
+        assert!(dfn_sql.contains("FROM cert.dfn_cert_advs r"));
+        assert!(!tag_resource_direct_write_id_must_be_uuid("dfn_cert_adv"));
+
+        assert!(tag_resource_direct_write_id_must_be_uuid("target"));
+        assert!(tag_resource_direct_write_id_must_be_uuid("task"));
+
         assert!(tag_resource_active_lookup_sql("cve").is_err());
+        assert!(tag_resource_active_lookup_sql("nvt").is_err());
         assert!(tag_resource_active_lookup_sql("alert").is_err());
         assert!(tag_resource_active_lookup_sql("credential").is_err());
     }

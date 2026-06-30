@@ -11777,7 +11777,7 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
         create_body = json.dumps(
             {
                 "name": tag_name,
-                "resource_type": "report_format",
+                "resource_type": "cpe",
                 "comment": "TurboVAS direct write smoke temporary tag",
                 "value": "initial",
                 "active": True,
@@ -11968,13 +11968,13 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
             findings.append(native_api_probe_finding("warn", "native-api-direct.port-list-predefined-patch-denied", "Direct write-control smoke could not find a predefined port-list fixture for the no-mutation patch guard.", port_list_fixture, direct_native_api_display_command("/api/v1/port-lists?page_size=1", token=token, env=env), port_list_fixture_json, {"http_status": port_list_fixture_status, "port_list_id": predefined_port_list_id, **summarize_native_api_response(port_list_fixture_json)}))
 
         if tag_id:
-            tag_resource = direct_native_api_curl(repo_root, "/api/v1/report-formats?page_size=1", token=token, env=env)
+            tag_resource = direct_native_api_curl(repo_root, "/api/v1/cpes?page_size=1", token=token, env=env)
             tag_resource_json, tag_resource_status = parse_json_output_with_http_status(tag_resource)
             tag_resource_items = tag_resource_json.get("items", []) if isinstance(tag_resource_json, dict) else []
             if tag_resource_items and isinstance(tag_resource_items[0], dict) and isinstance(tag_resource_items[0].get("id"), str):
                 tag_resource_id = tag_resource_items[0]["id"]
             tag_resource_ok = tag_resource.returncode == 0 and tag_resource_status == 200 and bool(tag_resource_id)
-            findings.append(native_api_probe_finding("pass" if tag_resource_ok else "fail", "native-api-direct.tag-resource-fixture", "Direct write-control smoke found a report-format resource fixture for tag assignment." if tag_resource_ok else "Direct write-control smoke could not find a report-format resource fixture for tag assignment.", tag_resource, direct_native_api_display_command("/api/v1/report-formats?page_size=1", token=token, env=env), tag_resource_json, {"http_status": tag_resource_status, "resource_id": tag_resource_id, **summarize_native_api_response(tag_resource_json)}))
+            findings.append(native_api_probe_finding("pass" if tag_resource_ok else "fail", "native-api-direct.tag-resource-fixture", "Direct write-control smoke found a CPE resource fixture for tag assignment." if tag_resource_ok else "Direct write-control smoke could not find a CPE resource fixture for tag assignment.", tag_resource, direct_native_api_display_command("/api/v1/cpes?page_size=1", token=token, env=env), tag_resource_json, {"http_status": tag_resource_status, "resource_id": tag_resource_id, **summarize_native_api_response(tag_resource_json)}))
 
             if tag_resource_id:
                 tag_resource_add_body = json.dumps(

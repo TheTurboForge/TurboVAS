@@ -4,7 +4,9 @@
 
 use super::*;
 use crate::tag_write_plans::*;
-use crate::tag_write_validation::{MAX_TAG_RESOURCE_WRITE_IDS, default_tag_active};
+use crate::tag_write_validation::{
+    MAX_TAG_RESOURCE_ID_BYTES, MAX_TAG_RESOURCE_WRITE_IDS, default_tag_active,
+};
 
 #[test]
 fn tag_create_request_normalizes_metadata_only_contract() {
@@ -103,7 +105,7 @@ fn tag_patch_request_is_metadata_only_and_requires_a_field() {
 #[test]
 fn tag_resource_update_request_is_explicit_ids_only() {
     let request: TagResourceUpdateRequest = serde_json::from_str(
-        r#"{"action":"add","resource_ids":["12345678-1234-1234-1234-123456789abc","12345678-1234-1234-1234-123456789abc","aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"]}"#,
+        r#"{"action":"add","resource_ids":["12345678-1234-1234-1234-123456789abc","12345678-1234-1234-1234-123456789abc","cpe:/a:example:product:1"]}"#,
     )
     .expect("valid tag resource update request");
     let validated = validate_tag_resource_update_request(request).expect("valid resource update");
@@ -112,7 +114,7 @@ fn tag_resource_update_request_is_explicit_ids_only() {
         validated.resource_ids,
         vec![
             "12345678-1234-1234-1234-123456789abc".to_string(),
-            "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee".to_string(),
+            "cpe:/a:example:product:1".to_string(),
         ]
     );
 
@@ -136,7 +138,7 @@ fn tag_resource_update_request_is_explicit_ids_only() {
     assert!(matches!(
         validate_tag_resource_update_request(TagResourceUpdateRequest {
             action: TagResourceUpdateAction::Remove,
-            resource_ids: vec!["not-a-uuid".to_string()],
+            resource_ids: vec!["bad\nresource".to_string()],
         }),
         Err(ApiError::BadRequest(_))
     ));
@@ -170,7 +172,14 @@ fn tag_resource_update_request_rejects_implicit_selection_and_bad_ids() {
     assert!(matches!(
         validate_tag_resource_update_request(TagResourceUpdateRequest {
             action: TagResourceUpdateAction::Add,
-            resource_ids: vec!["12345678-1234-1234-1234-123456789abc/../x".to_string()],
+            resource_ids: vec![" ".to_string()],
+        }),
+        Err(ApiError::BadRequest(_))
+    ));
+    assert!(matches!(
+        validate_tag_resource_update_request(TagResourceUpdateRequest {
+            action: TagResourceUpdateAction::Add,
+            resource_ids: vec!["x".repeat(MAX_TAG_RESOURCE_ID_BYTES + 1)],
         }),
         Err(ApiError::BadRequest(_))
     ));
@@ -180,8 +189,15 @@ fn tag_resource_update_request_rejects_implicit_selection_and_bad_ids() {
 fn tag_resource_direct_write_support_is_narrower_than_read_support() {
     assert!(ensure_tag_resource_direct_write_type_is_supported("target").is_ok());
     assert!(ensure_tag_resource_direct_write_type_is_supported("task").is_ok());
+    assert!(ensure_tag_resource_direct_write_type_is_supported("cpe").is_ok());
+    assert!(ensure_tag_resource_direct_write_type_is_supported("cert_bund_adv").is_ok());
+    assert!(ensure_tag_resource_direct_write_type_is_supported("dfn_cert_adv").is_ok());
     assert!(matches!(
         ensure_tag_resource_direct_write_type_is_supported("cve"),
+        Err(ApiError::BadRequest(_))
+    ));
+    assert!(matches!(
+        ensure_tag_resource_direct_write_type_is_supported("nvt"),
         Err(ApiError::BadRequest(_))
     ));
     assert!(matches!(

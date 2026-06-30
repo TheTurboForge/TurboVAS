@@ -4479,6 +4479,7 @@ class TurboVASCtlTests(unittest.TestCase):
         openapi = (root / "api" / "openapi" / "turbovas-v1.yaml").read_text(encoding="utf-8")
         route_source = (root / "services" / "turbovas-api" / "src" / "routes.rs").read_text(encoding="utf-8")
         tls_source = (root / "services" / "turbovas-api" / "src" / "tls_certificates.rs").read_text(encoding="utf-8")
+        tls_payload_source = (root / "services" / "turbovas-api" / "src" / "tls_certificate_payloads.rs").read_text(encoding="utf-8")
         native_tooling = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
         tls_detail_source = tls_source.split("async fn tls_certificate_asset_detail", 1)[1].split("fn tls_certificate_sources", 1)[0]
 
@@ -4486,7 +4487,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn('parse_uuid(&certificate_id)?;', tls_detail_source)
         self.assertIn('WHERE c.uuid = $1', tls_detail_source)
         self.assertIn('JOIN tls_certificate_sources src ON src.tls_certificate = c.id', tls_detail_source)
-        self.assertIn('TlsCertificateSourceItem', tls_source)
+        self.assertIn('TlsCertificateSourceItem', tls_payload_source)
         self.assertNotIn('c.certificate', tls_detail_source)
         self.assertIn('/tls-certificates/{certificate_id}:', openapi)
         self.assertIn("#/components/parameters/TlsCertificateId", openapi)
@@ -6002,7 +6003,7 @@ db2:keys=5,expires=0,avg_ttl=0
                     return turbovasctl.subprocess.CompletedProcess([], 0, '{"error":{"code":"not_found"}}\n404', "")
                 if method == "POST" and path == "/api/v1/tags":
                     payload = json.loads(body)
-                    self.assertEqual(payload["resource_type"], "report_format")
+                    self.assertEqual(payload["resource_type"], "cpe")
                     return turbovasctl.subprocess.CompletedProcess([], 0, json.dumps({"id": tag_uuid, "name": payload["name"], "value": "initial", "active": True}) + "\n201", "")
                 if method == "POST" and path == "/api/v1/report-configs":
                     payload = json.loads(body)
@@ -6030,8 +6031,8 @@ db2:keys=5,expires=0,avg_ttl=0
                     payload = json.loads(body)
                     self.assertIn("predefined port lists", payload["comment"])
                     return turbovasctl.subprocess.CompletedProcess([], 0, '{"error":{"code":"conflict","message":"predefined port lists cannot be patched"}}\n409', "")
-                if method == "GET" and path == "/api/v1/report-formats?page_size=1":
-                    return turbovasctl.subprocess.CompletedProcess([], 0, json.dumps({"items": [{"id": report_format_uuid, "name": "PDF"}], "page": {"total": 1}}) + "\n200", "")
+                if method == "GET" and path == "/api/v1/cpes?page_size=1":
+                    return turbovasctl.subprocess.CompletedProcess([], 0, json.dumps({"items": [{"id": report_format_uuid, "name": "cpe:/a:example:product:1"}], "page": {"total": 1}}) + "\n200", "")
                 if method == "POST" and path.endswith("/resources"):
                     payload = json.loads(body)
                     self.assertEqual(payload["resource_ids"], [report_format_uuid])

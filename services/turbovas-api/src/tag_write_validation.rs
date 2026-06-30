@@ -5,11 +5,10 @@
 use serde::Deserialize;
 use std::collections::BTreeSet;
 
-use crate::{
-    errors::ApiError, path_ids::parse_uuid, tag_resource_helpers::tag_resource_type_is_supported,
-};
+use crate::{errors::ApiError, tag_resource_helpers::tag_resource_type_is_supported};
 
 pub(crate) const MAX_TAG_TEXT_BYTES: usize = 4096;
+pub(crate) const MAX_TAG_RESOURCE_ID_BYTES: usize = 4096;
 pub(crate) const MAX_TAG_RESOURCE_WRITE_IDS: usize = 100;
 
 #[derive(Debug, Deserialize)]
@@ -96,15 +95,28 @@ pub(crate) fn validate_tag_resource_update_request(
     let mut seen = BTreeSet::new();
     let mut resource_ids = Vec::new();
     for resource_id in request.resource_ids {
-        let parsed = parse_uuid(&resource_id)?.to_string();
-        if seen.insert(parsed.clone()) {
-            resource_ids.push(parsed);
+        let normalized = normalize_tag_resource_id(resource_id)?;
+        if seen.insert(normalized.clone()) {
+            resource_ids.push(normalized);
         }
     }
     Ok(ValidatedTagResourceUpdate {
         action: request.action,
         resource_ids,
     })
+}
+
+fn normalize_tag_resource_id(value: String) -> Result<String, ApiError> {
+    let value = value.trim().to_string();
+    if value.is_empty() {
+        return Err(ApiError::BadRequest("resource id is required".to_string()));
+    }
+    if value.len() > MAX_TAG_RESOURCE_ID_BYTES || value.chars().any(char::is_control) {
+        return Err(ApiError::BadRequest(format!(
+            "resource id must be printable text up to {MAX_TAG_RESOURCE_ID_BYTES} bytes"
+        )));
+    }
+    Ok(value)
 }
 
 pub(crate) fn validate_tag_create_request(

@@ -16,7 +16,8 @@ use crate::{
     path_ids::parse_uuid,
     tag_payloads::{TagAssetItem, tag_asset_from_row},
     tag_resource_helpers::{
-        tag_resource_active_lookup_sql, tag_resource_direct_write_type_is_supported,
+        tag_resource_active_lookup_sql, tag_resource_direct_write_id_must_be_uuid,
+        tag_resource_direct_write_type_is_supported,
     },
     tag_write_validation::{
         TagCreateRequest, TagPatchRequest, TagResourceUpdateAction, TagResourceUpdateRequest,
@@ -322,7 +323,11 @@ async fn resolve_tag_resource_write_record(
     resource_type: &str,
     resource_id: &str,
 ) -> Result<TagResourceWriteRecord, ApiError> {
-    let resource_id = parse_uuid(resource_id)?.to_string();
+    let resource_id = if tag_resource_direct_write_id_must_be_uuid(resource_type) {
+        parse_uuid(resource_id)?.to_string()
+    } else {
+        resource_id.to_string()
+    };
     let sql = tag_resource_active_lookup_sql(resource_type)?;
     tx.query_opt(&sql, &[&resource_id])
         .await
