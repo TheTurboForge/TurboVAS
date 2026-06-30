@@ -1094,7 +1094,7 @@ fn collection_handlers_use_api_query_contract_extractor() {
         include_str!("scope_report_applications.rs"),
         include_str!("scope_report_cves.rs"),
         include_str!("scope_report_errors.rs"),
-        include_str!("scope_report_handlers.rs"),
+        include_str!("scope_reports.rs"),
         include_str!("scope_report_hosts.rs"),
         include_str!("scope_report_operating_systems.rs"),
         include_str!("scope_report_ports.rs"),
@@ -1506,13 +1506,13 @@ fn scope_report_native_routes_remain_get_only_read_paths() {
 }
 
 #[test]
-fn scope_report_handlers_do_not_trigger_scanner_or_task_control() {
+fn scope_reports_do_not_trigger_scanner_or_task_control() {
     let source = [
         include_str!("scope_report_results.rs"),
         include_str!("scope_report_applications.rs"),
         include_str!("scope_report_cves.rs"),
         include_str!("scope_report_errors.rs"),
-        include_str!("scope_report_handlers.rs"),
+        include_str!("scope_reports.rs"),
         include_str!("scope_report_hosts.rs"),
         include_str!("scope_report_operating_systems.rs"),
         include_str!("scope_report_ports.rs"),
