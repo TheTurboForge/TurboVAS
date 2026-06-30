@@ -90,6 +90,32 @@ fn direct_api_audit_logs_include_structured_reason_field() {
         );
     }
 }
+
+#[test]
+fn direct_api_auth_middleware_checks_write_only_routes_before_path_rejection() {
+    let source = include_str!("direct_api.rs");
+    let auth_block = source
+        .split_once("pub(crate) async fn require_direct_api_auth")
+        .expect("direct API auth middleware must exist")
+        .1
+        .split_once("fn attach_direct_api_operator_extension")
+        .expect("operator extension helper must follow auth middleware")
+        .0;
+    let approved_route_index = auth_block
+        .find("let approved_route = direct_api_v1_path_is_allowed(&path)")
+        .expect("auth middleware must compute an approved route before rejecting paths");
+    let method_aware_index = auth_block[approved_route_index..]
+        .find("direct_api_v1_method_is_allowed(&method, &path, true)")
+        .expect("auth middleware must treat approved write-only paths as known routes");
+    let route_rejection_index = auth_block
+        .find("route_not_allowlisted")
+        .expect("auth middleware must still reject unknown routes");
+    assert!(
+        approved_route_index + method_aware_index < route_rejection_index,
+        "write-only direct API routes must not be rejected by the read-path allowlist before method gating"
+    );
+}
+
 #[test]
 fn direct_api_security_headers_are_attached() {
     let mut response = ApiError::Unauthorized.into_response();

@@ -54,8 +54,6 @@ pub(crate) fn direct_api_v1_path_is_allowed(path: &str) -> bool {
             | ["", "api", "v1", "port-lists", _]
             | ["", "api", "v1", "schedules", _]
             | ["", "api", "v1", "report-configs", _]
-            | ["", "api", "v1", "report-configs", _, "clone"]
-            | ["", "api", "v1", "report-configs", _, "restore"]
             | ["", "api", "v1", "report-formats", _]
             | ["", "api", "v1", "reports", _]
             | ["", "api", "v1", "reports", _, "results"]
@@ -102,11 +100,10 @@ pub(crate) fn direct_api_v1_method_is_allowed(
     path: &str,
     write_control_enabled: bool,
 ) -> bool {
-    if !direct_api_v1_path_is_allowed(path) {
-        return false;
+    if write_control_enabled && direct_api_v1_write_method_path_is_allowed(method, path) {
+        return true;
     }
-    method == Method::GET
-        || (write_control_enabled && direct_api_v1_write_method_path_is_allowed(method, path))
+    method == Method::GET && direct_api_v1_path_is_allowed(path)
 }
 
 fn direct_api_v1_write_method_path_is_allowed(method: &Method, path: &str) -> bool {
@@ -146,6 +143,9 @@ fn direct_api_v1_write_method_path_is_allowed(method: &Method, path: &str) -> bo
             direct_api_write_id_segment_is_allowed(filter_id)
         }
         (&Method::PATCH | &Method::DELETE, ["", "api", "v1", "port-lists", port_list_id]) => {
+            direct_api_write_id_segment_is_allowed(port_list_id)
+        }
+        (&Method::POST, ["", "api", "v1", "port-lists", port_list_id, "restore"]) => {
             direct_api_write_id_segment_is_allowed(port_list_id)
         }
         (&Method::PATCH | &Method::DELETE, ["", "api", "v1", "schedules", schedule_id]) => {

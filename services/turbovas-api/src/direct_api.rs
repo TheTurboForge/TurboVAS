@@ -151,10 +151,14 @@ pub(crate) async fn require_direct_api_auth(
     let mut response = if !api_path {
         next.run(request).await
     } else if authenticated_api_path {
-        if !direct_api_v1_path_is_allowed(&path) {
+        let method_allowed =
+            direct_api_v1_method_is_allowed(&method, &path, auth.write_control_enabled());
+        let approved_route = direct_api_v1_path_is_allowed(&path)
+            || direct_api_v1_method_is_allowed(&method, &path, true);
+        if !approved_route {
             audit_reason = Some("route_not_allowlisted");
             ApiError::NotFound.into_response()
-        } else if direct_api_v1_method_is_allowed(&method, &path, auth.write_control_enabled()) {
+        } else if method_allowed {
             if direct_api_request_shape_is_allowed_for_method(&method, &request) {
                 if let Some(_slot) = auth.try_acquire_request_slot() {
                     attach_direct_api_operator_extension(&mut request, &auth);

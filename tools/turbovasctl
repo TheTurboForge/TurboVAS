@@ -510,6 +510,7 @@ OPENAPI_ALLOWED_REPLACES_VALUES = frozenset(
         "port-list-metadata-detail-read",
         "port-list-metadata-list-read",
         "port-list-metadata-modify",
+        "port-list-restore",
         "port-list-trash-move",
         "raw-report-application-evidence-read",
         "raw-report-cve-evidence-read",
@@ -585,8 +586,7 @@ OPENAPI_ALLOWED_INHERITED_STILL_OWNS_VALUES = frozenset(
         "nvt-rich-detail",
         "operating-system-writes-deletes-and-rich-history",
         "override-writes-exports-trash-and-result-expansion",
-        "port-list-create-range-import-export-restore-and-hard-delete",
-        "port-list-import-export-writes-and-deletes",
+        "port-list-create-range-import-export-hard-delete",
         "raw-report-generation-xml-export-retention-and-mutations",
         "report-config-hard-delete-export",
         "report-format-import-export-verify-writes-and-deletes",
@@ -681,6 +681,9 @@ OPENAPI_REQUIRED_EXPOSURE = {
     ("post", "/report-configs/{report_config_id}/restore"): "direct-write",
     ("patch", "/filters/{filter_id}"): "direct-write",
     ("delete", "/filters/{filter_id}"): "direct-write",
+    ("patch", "/port-lists/{port_list_id}"): "direct-write",
+    ("delete", "/port-lists/{port_list_id}"): "direct-write",
+    ("post", "/port-lists/{port_list_id}/restore"): "direct-write",
     ("post", "/tags"): "direct-write",
     ("patch", "/tags/{tag_id}"): "direct-write",
     ("delete", "/tags/{tag_id}"): "direct-write",
@@ -801,28 +804,37 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-replaces": "override-metadata-detail-read",
     },
     ("get", "/port-lists"): {
-        "x-turbovas-inherited-still-owns": "port-list-import-export-writes-and-deletes",
+        "x-turbovas-inherited-still-owns": "port-list-create-range-import-export-hard-delete",
         "x-turbovas-maturity": "live-read",
         "x-turbovas-replaces": "port-list-metadata-list-read",
     },
     ("get", "/port-lists/{port_list_id}"): {
-        "x-turbovas-inherited-still-owns": "port-list-import-export-writes-and-deletes",
+        "x-turbovas-inherited-still-owns": "port-list-create-range-import-export-hard-delete",
         "x-turbovas-maturity": "live-read",
         "x-turbovas-replaces": "port-list-metadata-detail-read",
     },
     ("patch", "/port-lists/{port_list_id}"): {
-        "x-turbovas-inherited-still-owns": "port-list-create-range-import-export-restore-and-hard-delete",
+        "x-turbovas-inherited-still-owns": "port-list-create-range-import-export-hard-delete",
         "x-turbovas-maturity": "live-write",
         "x-turbovas-replaces": "port-list-metadata-modify",
     },
     ("delete", "/port-lists/{port_list_id}"): {
-        "x-turbovas-inherited-still-owns": "port-list-create-range-import-export-restore-and-hard-delete",
+        "x-turbovas-inherited-still-owns": "port-list-create-range-import-export-hard-delete",
         "x-turbovas-maturity": "live-write",
         "x-turbovas-operator-identity": "direct-token-operator",
         "x-turbovas-owner-semantics": "preserve-existing-owner",
         "x-turbovas-replaces": "port-list-trash-move",
         "x-turbovas-safety-contract": "write-control-v1",
         "x-turbovas-side-effect": "metadata-delete",
+    },
+    ("post", "/port-lists/{port_list_id}/restore"): {
+        "x-turbovas-inherited-still-owns": "port-list-create-range-import-export-hard-delete",
+        "x-turbovas-maturity": "live-write",
+        "x-turbovas-operator-identity": "direct-token-operator",
+        "x-turbovas-owner-semantics": "preserve-existing-owner",
+        "x-turbovas-replaces": "port-list-restore",
+        "x-turbovas-safety-contract": "write-control-v1",
+        "x-turbovas-side-effect": "metadata-write",
     },
     ("get", "/hosts"): {
         "x-turbovas-inherited-still-owns": "host-target-creation-tags-writes-and-rich-history",
@@ -5976,8 +5988,8 @@ def rust_direct_api_allowed_endpoint_templates(repo_root: Path | None) -> list[s
     if not source:
         return []
 
-    function_body = rust_source_function_body(source, "direct_api_v1_path_is_allowed")
     templates: set[str] = set()
+    function_body = rust_source_function_body(source, "direct_api_v1_path_is_allowed")
     for match in re.finditer(r"\[([^\]]+)\]", function_body):
         pattern_source = match.group(1)
         if "section" in pattern_source:
@@ -5986,6 +5998,12 @@ def rust_direct_api_allowed_endpoint_templates(repo_root: Path | None) -> list[s
         if endpoint and endpoint.startswith("/api/v1"):
             templates.add(endpoint)
     templates.update(rust_direct_scope_report_section_templates(function_body))
+
+    write_function_body = rust_source_function_body(source, "direct_api_v1_write_method_path_is_allowed")
+    for match in re.finditer(r"\[([^\]]+)\]", write_function_body):
+        endpoint = rust_match_pattern_to_endpoint(match.group(1))
+        if endpoint and endpoint.startswith("/api/v1"):
+            templates.add(endpoint)
 
     wildcard_body = rust_source_function_body(source, "direct_api_wildcard_detail_path_is_allowed")
     for prefix in re.findall(r'"(/api/v1/[^"]+/)"', wildcard_body):
@@ -6575,6 +6593,13 @@ def summarize_native_tooling(items: list[dict[str, Any]], repo_root: Path | None
                 "status": "implemented_direct_write_control",
                 "direct_access": "direct_write_control",
                 "replacement_candidates": ["direct native port-list live-to-trash move"],
+            },
+            {
+                "method": "post",
+                "endpoint": "/api/v1/port-lists/{port_list_id}/restore",
+                "status": "implemented_direct_write_control",
+                "direct_access": "direct_write_control",
+                "replacement_candidates": ["direct native port-list restore from trash"],
             },
             {
                 "endpoint": "/api/v1/schedules",
@@ -11756,6 +11781,7 @@ def direct_smoke_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
             "native-api-direct.filter-delete-disabled",
             "native-api-direct.port-list-patch-disabled",
             "native-api-direct.port-list-delete-disabled",
+            "native-api-direct.port-list-restore-disabled",
             "native-api-direct.schedule-patch-disabled",
             "native-api-direct.schedule-delete-disabled",
             "native-api-direct.override-patch-disabled",
@@ -11797,6 +11823,12 @@ def direct_smoke_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
             "native-api-direct.schedule-write-post-cleanup",
             "native-api-direct.port-list-predefined-patch-denied",
             "native-api-direct.port-list-predefined-delete-denied",
+            "native-api-direct.port-list-fixture",
+            "native-api-direct.port-list-write-delete",
+            "native-api-direct.port-list-write-post-delete",
+            "native-api-direct.port-list-write-restore",
+            "native-api-direct.port-list-write-cleanup",
+            "native-api-direct.port-list-write-post-cleanup",
             "native-api-direct.tag-write-update",
             "native-api-direct.tag-resource-fixture",
             "native-api-direct.tag-resource-add",
@@ -11903,6 +11935,8 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
     report_config_format_fixture_created = False
     report_config_format_name = f"turbovas-direct-write-smoke-report-format-{int(time.time())}-{os.getpid()}"
     predefined_port_list_id: str | None = None
+    port_list_id: str | None = None
+    port_list_name = f"turbovas-direct-write-smoke-port-list-{int(time.time())}-{os.getpid()}"
     schedule_id: str | None = None
     schedule_original_comment = ""
     schedule_name = f"turbovas-direct-write-smoke-schedule-{int(time.time())}-{os.getpid()}"
@@ -12312,6 +12346,74 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
             findings.append(native_api_probe_finding("warn", "native-api-direct.port-list-predefined-patch-denied", "Direct write-control smoke could not find a predefined port-list fixture for the no-mutation patch guard.", port_list_fixture, direct_native_api_display_command("/api/v1/port-lists?page_size=1", token=token, env=env), port_list_fixture_json, {"http_status": port_list_fixture_status, "port_list_id": predefined_port_list_id, **summarize_native_api_response(port_list_fixture_json)}))
             findings.append(native_api_probe_finding("warn", "native-api-direct.port-list-predefined-delete-denied", "Direct write-control smoke could not find a predefined port-list fixture for the no-mutation delete guard.", port_list_fixture, direct_native_api_display_command("/api/v1/port-lists?page_size=1", token=token, env=env), port_list_fixture_json, {"http_status": port_list_fixture_status, "port_list_id": predefined_port_list_id, **summarize_native_api_response(port_list_fixture_json)}))
 
+        port_list_fixture_sql = (
+            "WITH owner_row AS (SELECT id FROM users WHERE uuid = "
+            f"{sql_literal(admin_uuid or '')}), "
+            "inserted_port_list AS (INSERT INTO port_lists "
+            "(uuid, owner, name, comment, predefined, creation_time, modification_time) "
+            "SELECT make_uuid(), id, "
+            f"{sql_literal(port_list_name)}, 'TurboVAS direct write smoke temporary port list', 0, m_now(), m_now() "
+            "FROM owner_row RETURNING id, uuid), "
+            "inserted_range AS (INSERT INTO port_ranges "
+            "(uuid, port_list, type, start, \"end\", comment, exclude) "
+            "SELECT make_uuid(), id, 0, 65000, 65001, 'TurboVAS direct write smoke temporary range', 0 "
+            "FROM inserted_port_list RETURNING port_list) "
+            "SELECT uuid FROM inserted_port_list;"
+        )
+        created_port_list = psql(repo_root, port_list_fixture_sql)
+        port_list_id = psql_value(created_port_list) or None
+        port_list_fixture_ok = created_port_list.returncode == 0 and bool(port_list_id)
+        port_list_fixture_finding = process_step_finding("pass" if port_list_fixture_ok else "fail", "native-api-direct.port-list-fixture", "Direct write-control smoke created a temporary non-predefined port-list fixture." if port_list_fixture_ok else "Direct write-control smoke failed to create a temporary non-predefined port-list fixture.", created_port_list, ["psql", "fixed-port-list-fixture"])
+        port_list_fixture_details = port_list_fixture_finding.setdefault("details", {})
+        if isinstance(port_list_fixture_details, dict):
+            port_list_fixture_details.update({"port_list_id": port_list_id, "port_list_name": port_list_name})
+        findings.append(port_list_fixture_finding)
+
+        if port_list_id:
+            port_list_delete = direct_native_api_curl(repo_root, f"/api/v1/port-lists/{urllib.parse.quote(port_list_id)}", token=token, env=env, method="DELETE")
+            port_list_delete_json, port_list_delete_status = parse_json_output_with_http_status(port_list_delete)
+            port_list_delete_ok = port_list_delete.returncode == 0 and port_list_delete_status == 204
+            findings.append(native_api_probe_finding("pass" if port_list_delete_ok else "fail", "native-api-direct.port-list-write-delete", "Direct write-control moved the temporary port list to trash." if port_list_delete_ok else "Direct write-control failed to move the temporary port list to trash.", port_list_delete, direct_native_api_display_command(f"/api/v1/port-lists/{urllib.parse.quote(port_list_id)}", token=token, env=env, method="DELETE"), port_list_delete_json, {"http_status": port_list_delete_status, "port_list_id": port_list_id, **summarize_native_api_response(port_list_delete_json)}))
+
+            port_list_after_delete = direct_native_api_curl(repo_root, f"/api/v1/port-lists/{urllib.parse.quote(port_list_id)}", token=token, env=env)
+            port_list_after_delete_json, port_list_after_delete_status = parse_json_output_with_http_status(port_list_after_delete)
+            port_list_after_delete_ok = port_list_after_delete.returncode == 0 and port_list_after_delete_status == 404 and isinstance(port_list_after_delete_json, dict) and port_list_after_delete_json.get("error", {}).get("code") == "not_found"
+            findings.append(native_api_probe_finding("pass" if port_list_after_delete_ok else "fail", "native-api-direct.port-list-write-post-delete", "Direct API confirms the temporary port list is gone from live detail after delete." if port_list_after_delete_ok else "Direct API still exposes the temporary port list as live after delete.", port_list_after_delete, direct_native_api_display_command(f"/api/v1/port-lists/{urllib.parse.quote(port_list_id)}", token=token, env=env), port_list_after_delete_json, {"http_status": port_list_after_delete_status, "port_list_id": port_list_id, **summarize_native_api_response(port_list_after_delete_json)}))
+
+            port_list_restore = direct_native_api_curl(repo_root, f"/api/v1/port-lists/{urllib.parse.quote(port_list_id)}/restore", token=token, env=env, method="POST")
+            port_list_restore_json, port_list_restore_status = parse_json_output_with_http_status(port_list_restore)
+            port_list_restore_ok = port_list_restore.returncode == 0 and port_list_restore_status == 200 and isinstance(port_list_restore_json, dict) and port_list_restore_json.get("id") == port_list_id and port_list_restore_json.get("name") == port_list_name
+            findings.append(native_api_probe_finding("pass" if port_list_restore_ok else "fail", "native-api-direct.port-list-write-restore", "Direct write-control restored the temporary port list from trash." if port_list_restore_ok else "Direct write-control failed to restore the temporary port list from trash.", port_list_restore, direct_native_api_display_command(f"/api/v1/port-lists/{urllib.parse.quote(port_list_id)}/restore", token=token, env=env, method="POST"), port_list_restore_json, {"http_status": port_list_restore_status, "port_list_id": port_list_id, **summarize_native_api_response(port_list_restore_json)}))
+
+            port_list_cleanup_sql = (
+                "WITH live_target AS (SELECT id FROM port_lists "
+                f"WHERE uuid = {sql_literal(port_list_id)} AND name = {sql_literal(port_list_name)}), "
+                "trash_target AS (SELECT id FROM port_lists_trash "
+                f"WHERE uuid = {sql_literal(port_list_id)} AND name = {sql_literal(port_list_name)}), "
+                "deleted_live_tags AS (DELETE FROM tag_resources WHERE resource_type = 'port_list' AND resource_location = 0 AND resource IN (SELECT id FROM live_target)), "
+                "deleted_trash_tags AS (DELETE FROM tag_resources WHERE resource_type = 'port_list' AND resource_location = 1 AND resource IN (SELECT id FROM trash_target)), "
+                "deleted_live_trash_tags AS (DELETE FROM tag_resources_trash WHERE resource_type = 'port_list' AND resource_location = 0 AND resource IN (SELECT id FROM live_target)), "
+                "deleted_trash_trash_tags AS (DELETE FROM tag_resources_trash WHERE resource_type = 'port_list' AND resource_location = 1 AND resource IN (SELECT id FROM trash_target)), "
+                "deleted_live_ranges AS (DELETE FROM port_ranges WHERE port_list IN (SELECT id FROM live_target)), "
+                "deleted_trash_ranges AS (DELETE FROM port_ranges_trash WHERE port_list IN (SELECT id FROM trash_target)), "
+                "deleted_live_port_list AS (DELETE FROM port_lists WHERE id IN (SELECT id FROM live_target) RETURNING id), "
+                "deleted_trash_port_list AS (DELETE FROM port_lists_trash WHERE id IN (SELECT id FROM trash_target) RETURNING id) "
+                "SELECT (SELECT count(*) FROM deleted_live_port_list) + (SELECT count(*) FROM deleted_trash_port_list);"
+            )
+            port_list_cleanup = psql(repo_root, port_list_cleanup_sql)
+            port_list_cleanup_deleted = psql_value(port_list_cleanup)
+            port_list_cleanup_ok = port_list_cleanup.returncode == 0 and port_list_cleanup_deleted == "1"
+            port_list_cleanup_finding = process_step_finding("pass" if port_list_cleanup_ok else "fail", "native-api-direct.port-list-write-cleanup", "Direct write-control smoke removed temporary port-list live/trash residue through fixed cleanup SQL." if port_list_cleanup_ok else "Direct write-control smoke failed to clean up temporary port-list live/trash residue.", port_list_cleanup, ["psql", "fixed-port-list-smoke-cleanup"])
+            port_list_cleanup_details = port_list_cleanup_finding.setdefault("details", {})
+            if isinstance(port_list_cleanup_details, dict):
+                port_list_cleanup_details.update({"port_list_id": port_list_id, "deleted_count": port_list_cleanup_deleted})
+            findings.append(port_list_cleanup_finding)
+
+            port_list_post_cleanup = direct_native_api_curl(repo_root, f"/api/v1/port-lists/{urllib.parse.quote(port_list_id)}", token=token, env=env)
+            port_list_post_cleanup_json, port_list_post_cleanup_status = parse_json_output_with_http_status(port_list_post_cleanup)
+            port_list_post_cleanup_ok = port_list_post_cleanup.returncode == 0 and port_list_post_cleanup_status == 404 and isinstance(port_list_post_cleanup_json, dict) and port_list_post_cleanup_json.get("error", {}).get("code") == "not_found"
+            findings.append(native_api_probe_finding("pass" if port_list_post_cleanup_ok else "fail", "native-api-direct.port-list-write-post-cleanup", "Direct API confirms the temporary port list is gone after cleanup." if port_list_post_cleanup_ok else "Direct API did not confirm the temporary port list was removed.", port_list_post_cleanup, direct_native_api_display_command(f"/api/v1/port-lists/{urllib.parse.quote(port_list_id)}", token=token, env=env), port_list_post_cleanup_json, {"http_status": port_list_post_cleanup_status, "port_list_id": port_list_id, **summarize_native_api_response(port_list_post_cleanup_json)}))
+
         if tag_id:
             tag_resource = direct_native_api_curl(repo_root, "/api/v1/cpes?page_size=1", token=token, env=env)
             tag_resource_json, tag_resource_status = parse_json_output_with_http_status(tag_resource)
@@ -12714,6 +12816,17 @@ def command_runtime_native_api_direct_smoke(repo_root: Path, status_only: bool =
     disabled_port_list_delete_json, disabled_port_list_delete_status = parse_json_output_with_http_status(disabled_port_list_delete)
     disabled_port_list_delete_ok = disabled_port_list_delete.returncode == 0 and disabled_port_list_delete_status == 405 and isinstance(disabled_port_list_delete_json, dict) and disabled_port_list_delete_json.get("error", {}).get("code") == "method_not_allowed"
     findings.append(native_api_probe_finding("pass" if disabled_port_list_delete_ok else "fail", "native-api-direct.port-list-delete-disabled", "Direct native API rejects port-list deletes while direct write-control is disabled." if disabled_port_list_delete_ok else "Direct native API did not reject a port-list delete while direct write-control is disabled.", disabled_port_list_delete, direct_native_api_display_command("/api/v1/port-lists/00000000-0000-0000-0000-000000000000", token=token, env=env, method="DELETE"), disabled_port_list_delete_json, {"http_status": disabled_port_list_delete_status, **summarize_native_api_response(disabled_port_list_delete_json)}))
+
+    disabled_port_list_restore = direct_native_api_curl(
+        repo_root,
+        "/api/v1/port-lists/00000000-0000-0000-0000-000000000000/restore",
+        token=token,
+        env=env,
+        method="POST",
+    )
+    disabled_port_list_restore_json, disabled_port_list_restore_status = parse_json_output_with_http_status(disabled_port_list_restore)
+    disabled_port_list_restore_ok = disabled_port_list_restore.returncode == 0 and disabled_port_list_restore_status == 405 and isinstance(disabled_port_list_restore_json, dict) and disabled_port_list_restore_json.get("error", {}).get("code") == "method_not_allowed"
+    findings.append(native_api_probe_finding("pass" if disabled_port_list_restore_ok else "fail", "native-api-direct.port-list-restore-disabled", "Direct native API rejects port-list restores while direct write-control is disabled." if disabled_port_list_restore_ok else "Direct native API did not reject a port-list restore while direct write-control is disabled.", disabled_port_list_restore, direct_native_api_display_command("/api/v1/port-lists/00000000-0000-0000-0000-000000000000/restore", token=token, env=env, method="POST"), disabled_port_list_restore_json, {"http_status": disabled_port_list_restore_status, **summarize_native_api_response(disabled_port_list_restore_json)}))
 
     disabled_schedule_patch = direct_native_api_curl(
         repo_root,

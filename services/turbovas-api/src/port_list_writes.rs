@@ -33,6 +33,14 @@ pub(crate) struct PortListTrashWriteRecord {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct PortListTrashWriteState {
+    internal_id: i32,
+    uuid: String,
+    name: String,
+    owner_id: i32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct PortListWriteState {
     internal_id: i32,
     predefined: bool,
@@ -140,6 +148,35 @@ pub(crate) async fn delete_port_list(
     Ok(StatusCode::NO_CONTENT)
 }
 
+pub(crate) async fn restore_port_list(
+    State(state): State<AppState>,
+    Path(port_list_id): Path<String>,
+    operator: Option<Extension<DirectApiOperator>>,
+) -> Result<Json<PortListAssetDetail>, ApiError> {
+    let operator = require_port_list_write_operator(operator)?;
+    let mut client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let tx = client.transaction().await.map_err(|error| {
+        map_port_list_write_db_error(error, "begin restore port list transaction")
+    })?;
+    resolve_port_list_write_operator_owner(&tx, &operator).await?;
+    tx.batch_execute(
+        "LOCK TABLE port_lists, port_lists_trash, port_ranges, port_ranges_trash, targets_trash, tag_resources, tag_resources_trash IN SHARE ROW EXCLUSIVE MODE;",
+    )
+    .await
+    .map_err(|error| map_port_list_write_db_error(error, "lock port list tables for restore"))?;
+    let trash = load_port_list_trash_state(&tx, &port_list_id).await?;
+    ensure_unique_live_port_list_name_for_owner(&tx, &trash.name, trash.owner_id).await?;
+    ensure_port_list_uuid_not_live(&tx, &trash.uuid).await?;
+    let record = execute_port_list_restore_transaction(&tx, trash.internal_id).await?;
+    tx.commit().await.map_err(|error| {
+        map_port_list_write_db_error(error, "commit restore port list transaction")
+    })?;
+
+    Ok(Json(
+        load_port_list_asset_detail(&client, &record.uuid).await?,
+    ))
+}
+
 fn require_port_list_write_operator(
     operator: Option<Extension<DirectApiOperator>>,
 ) -> Result<DirectApiOperator, ApiError> {
@@ -182,6 +219,23 @@ async fn load_port_list_write_state(
         .ok_or(ApiError::NotFound)
 }
 
+async fn load_port_list_trash_state(
+    tx: &Transaction<'_>,
+    port_list_id: &str,
+) -> Result<PortListTrashWriteState, ApiError> {
+    let port_list_id = crate::path_ids::parse_uuid(port_list_id)?.to_string();
+    tx.query_opt(port_list_trash_state_sql(), &[&port_list_id])
+        .await
+        .map_err(|error| map_port_list_write_db_error(error, "load port list trash state"))?
+        .map(|row| PortListTrashWriteState {
+            internal_id: row.get(0),
+            uuid: row.get(1),
+            name: row.get(2),
+            owner_id: row.get(3),
+        })
+        .ok_or(ApiError::NotFound)
+}
+
 async fn ensure_unique_port_list_name(
     tx: &Transaction<'_>,
     name: &str,
@@ -197,6 +251,47 @@ async fn ensure_unique_port_list_name(
     } else {
         Err(ApiError::Conflict(
             "port list with the same name already exists".to_string(),
+        ))
+    }
+}
+
+async fn ensure_unique_live_port_list_name_for_owner(
+    tx: &Transaction<'_>,
+    name: &str,
+    owner_id: i32,
+) -> Result<(), ApiError> {
+    let count: i64 = tx
+        .query_one(port_list_unique_live_owner_name_sql(), &[&name, &owner_id])
+        .await
+        .map_err(|error| {
+            map_port_list_write_db_error(error, "check port list restore name conflict")
+        })?
+        .get(0);
+    if count == 0 {
+        Ok(())
+    } else {
+        Err(ApiError::Conflict(
+            "port list with the same owner and name already exists".to_string(),
+        ))
+    }
+}
+
+async fn ensure_port_list_uuid_not_live(
+    tx: &Transaction<'_>,
+    port_list_id: &str,
+) -> Result<(), ApiError> {
+    let count: i64 = tx
+        .query_one(port_list_live_uuid_conflict_sql(), &[&port_list_id])
+        .await
+        .map_err(|error| {
+            map_port_list_write_db_error(error, "check port list restore UUID conflict")
+        })?
+        .get(0);
+    if count == 0 {
+        Ok(())
+    } else {
+        Err(ApiError::Conflict(
+            "live port list with the same id already exists".to_string(),
         ))
     }
 }
@@ -269,6 +364,62 @@ pub(crate) async fn execute_port_list_trash_transaction(
     )
     .await?;
     Ok(record)
+}
+
+pub(crate) async fn execute_port_list_restore_transaction(
+    tx: &Transaction<'_>,
+    trash_port_list_internal_id: i32,
+) -> Result<PortListWriteRecord, ApiError> {
+    let record = query_port_list_trash_write_record(
+        tx,
+        port_list_restore_metadata_sql(),
+        &[&trash_port_list_internal_id],
+        "restore port list metadata from trash",
+    )
+    .await?;
+    execute_port_list_write_sql(
+        tx,
+        port_list_restore_ranges_sql(),
+        &[&trash_port_list_internal_id, &record.internal_id],
+        "restore port list ranges from trash",
+    )
+    .await?;
+    execute_port_list_write_sql(
+        tx,
+        port_list_restore_target_relink_sql(),
+        &[&trash_port_list_internal_id, &record.internal_id],
+        "relink trash targets to restored port list",
+    )
+    .await?;
+    execute_port_list_write_sql(
+        tx,
+        port_list_tag_locations_to_live_sql(),
+        &[&trash_port_list_internal_id, &record.internal_id],
+        "restore live tag links from trash",
+    )
+    .await?;
+    execute_port_list_write_sql(
+        tx,
+        port_list_trash_tag_locations_to_live_sql(),
+        &[&trash_port_list_internal_id, &record.internal_id],
+        "restore trashed tag links from trash",
+    )
+    .await?;
+    execute_port_list_write_sql(
+        tx,
+        port_list_delete_trash_ranges_sql(),
+        &[&trash_port_list_internal_id],
+        "delete port list trash ranges after restore",
+    )
+    .await?;
+    execute_port_list_write_sql(
+        tx,
+        port_list_delete_trash_metadata_sql(),
+        &[&trash_port_list_internal_id],
+        "delete port list trash metadata after restore",
+    )
+    .await?;
+    Ok(PortListWriteRecord { uuid: record.uuid })
 }
 
 async fn ensure_port_list_not_in_use_by_live_targets(

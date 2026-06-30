@@ -148,6 +148,54 @@ fn port_list_delete_sql_moves_metadata_ranges_targets_and_tags_to_trash() {
 }
 
 #[test]
+fn port_list_restore_sql_moves_metadata_ranges_targets_and_tags_to_live() {
+    let state = port_list_trash_state_sql();
+    assert!(state.contains("FROM port_lists_trash"));
+    assert!(state.contains("owner::integer"));
+
+    let name_conflict = port_list_unique_live_owner_name_sql();
+    assert!(name_conflict.contains("FROM port_lists"));
+    assert!(name_conflict.contains("name = $1"));
+    assert!(name_conflict.contains("owner = $2"));
+
+    let uuid_conflict = port_list_live_uuid_conflict_sql();
+    assert!(uuid_conflict.contains("FROM port_lists"));
+    assert!(uuid_conflict.contains("uuid = $1"));
+
+    let restore = port_list_restore_metadata_sql();
+    assert!(restore.contains("INSERT INTO port_lists"));
+    assert!(restore.contains("FROM port_lists_trash"));
+    assert!(restore.contains("WHERE id = $1"));
+    assert!(restore.contains("RETURNING id::integer, uuid::text"));
+
+    let ranges = port_list_restore_ranges_sql();
+    assert!(ranges.contains("INSERT INTO port_ranges"));
+    assert!(ranges.contains("SELECT uuid, $2, type, start"));
+    assert!(ranges.contains("FROM port_ranges_trash"));
+    assert!(ranges.contains("WHERE port_list = $1"));
+
+    let targets = port_list_restore_target_relink_sql();
+    assert!(targets.contains("UPDATE targets_trash"));
+    assert!(targets.contains("port_list = $2"));
+    assert!(targets.contains("port_list_location = 0"));
+    assert!(targets.contains("WHERE port_list = $1"));
+    assert!(targets.contains("port_list_location = 1"));
+
+    let live_tags = port_list_tag_locations_to_live_sql();
+    assert!(live_tags.contains("UPDATE tag_resources"));
+    assert!(live_tags.contains("resource_type = 'port_list'"));
+    assert!(live_tags.contains("resource_location = 0"));
+
+    let trash_tags = port_list_trash_tag_locations_to_live_sql();
+    assert!(trash_tags.contains("UPDATE tag_resources_trash"));
+    assert!(trash_tags.contains("resource_type = 'port_list'"));
+    assert!(trash_tags.contains("resource_location = 0"));
+
+    assert!(port_list_delete_trash_ranges_sql().contains("DELETE FROM port_ranges_trash"));
+    assert!(port_list_delete_trash_metadata_sql().contains("DELETE FROM port_lists_trash"));
+}
+
+#[test]
 fn port_list_patch_name_uniqueness_checks_live_and_trash_names() {
     let sql = port_list_unique_name_sql();
     assert!(sql.contains("FROM port_lists WHERE name = $1 AND id != $2"));
