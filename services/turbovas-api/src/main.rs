@@ -65,6 +65,7 @@ mod row_helpers;
 mod runtime;
 mod scan_config_payloads;
 mod scan_configs;
+mod scanner_asset_payloads;
 mod scanner_assets;
 mod schedule_payloads;
 mod schedule_writes;

@@ -416,7 +416,7 @@ fn tls_certificate_detail_contract_excludes_certificate_bytes() {
 
 #[test]
 fn scanner_user_tags_are_detail_only_active_scanner_tags() {
-    let source = include_str!("scanner_assets.rs");
+    let source = include_str!("scanner_asset_payloads.rs");
     let scanner_list_payload = source
         .split_once("pub(crate) struct ScannerAssetItem {")
         .expect("scanner list payload struct must exist")
