@@ -96,3 +96,5 @@ mod port_list_characterization_tests;
 mod report_config_characterization_tests;
 #[cfg(test)]
 mod schedule_characterization_tests;
+#[cfg(test)]
+mod scope_report_contract_tests;
