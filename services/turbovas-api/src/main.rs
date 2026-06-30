@@ -101,6 +101,8 @@ mod tag_write_plans;
 mod tag_write_validation;
 mod tag_writes;
 mod tags;
+mod target_handlers;
+mod task_handlers;
 mod task_target_payloads;
 mod task_targets;
 mod tls_certificate_payloads;

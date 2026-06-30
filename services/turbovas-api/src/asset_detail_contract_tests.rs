@@ -71,7 +71,7 @@ fn cve_catalog_detail_reads_reference_context_without_mutation_workflows() {
 
 #[test]
 fn task_detail_contract_includes_db_owned_schedule_lifecycle_metadata() {
-    let task_source = include_str!("task_targets.rs");
+    let task_source = include_str!("task_handlers.rs");
     let payload_source = include_str!("task_target_payloads.rs");
 
     for column in [

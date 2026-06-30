@@ -45,8 +45,9 @@ fn collection_handlers_use_api_query_contract_extractor() {
         include_str!("scanner_assets.rs"),
         include_str!("schedules.rs"),
         include_str!("tags.rs"),
+        include_str!("target_handlers.rs"),
+        include_str!("task_handlers.rs"),
         include_str!("task_target_payloads.rs"),
-        include_str!("task_targets.rs"),
         include_str!("tls_certificates.rs"),
         include_str!("vulnerability_payloads.rs"),
     ]
