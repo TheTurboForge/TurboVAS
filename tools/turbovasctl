@@ -7463,10 +7463,14 @@ def native_api_migration_matrix_contract_summary(rows: list[dict[str, Any]]) -> 
     }
 
 
-def native_api_migration_matrix_filter_rows(rows: list[dict[str, Any]], focus: str | None = None) -> list[dict[str, Any]]:
+def native_api_migration_matrix_focus_terms(focus: str | None = None) -> list[str]:
     if not focus:
-        return rows
-    terms = [term.strip().lower() for term in focus.split(",") if term.strip()]
+        return []
+    return [term.strip().lower() for term in focus.split(",") if term.strip()]
+
+
+def native_api_migration_matrix_filter_rows(rows: list[dict[str, Any]], focus: str | None = None) -> list[dict[str, Any]]:
+    terms = native_api_migration_matrix_focus_terms(focus)
     if not terms:
         return rows
 
@@ -7560,6 +7564,9 @@ def native_api_migration_matrix_status_only_result(result: dict[str, Any]) -> di
     }
     if details.get("focus"):
         compact["details"]["focus"] = details["focus"]
+    if details.get("focus_terms") is not None:
+        compact["details"]["focus_terms"] = details["focus_terms"]
+        compact["details"]["focus_match_count"] = details.get("focus_match_count", 0)
     compact["findings"] = non_pass or [
         finding(
             "pass",
@@ -7571,12 +7578,16 @@ def native_api_migration_matrix_status_only_result(result: dict[str, Any]) -> di
 
 
 def command_native_api_migration_matrix(repo_root: Path, status_only: bool = False, focus: str | None = None) -> dict[str, Any]:
+    focus_terms = native_api_migration_matrix_focus_terms(focus)
     rows = native_api_migration_matrix_filter_rows(native_api_migration_matrix_rows(repo_root), focus)
     contract = native_api_migration_matrix_contract_summary(rows)
     summary = native_api_migration_matrix_summary(rows)
     details = {"summary": summary, "contract": contract, "items": rows}
     if focus:
         details["focus"] = focus
+    if focus_terms:
+        details["focus_terms"] = focus_terms
+        details["focus_match_count"] = len(rows)
     row_drift = contract["rows_missing_openapi"] or contract["rows_missing_inventory"]
     metadata_drift = (
         contract["rows_missing_migration_metadata"]
@@ -7619,6 +7630,15 @@ def command_native_api_migration_matrix(repo_root: Path, status_only: bool = Fal
             },
         ),
     ]
+    if focus_terms and not rows:
+        findings.append(
+            finding(
+                "warn",
+                "native-api-migration-matrix.focus",
+                "Native API migration matrix focus terms matched zero rows.",
+                details={"focus": focus, "focus_terms": focus_terms},
+            )
+        )
     result = make_result("native-api-migration-matrix", repo_root, "Native API migration matrix collected.", findings)
     result["details"] = details
     if status_only:

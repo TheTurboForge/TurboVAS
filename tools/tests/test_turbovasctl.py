@@ -704,33 +704,27 @@ class TurboVASCtlTests(unittest.TestCase):
 
     def test_scope_report_evidence_api_handlers_remain_scope_source_scoped(self):
         root = Path(__file__).resolve().parents[2]
-        source = (root / "services" / "turbovas-api" / "src" / "scope_report_handlers.rs").read_text(encoding="utf-8")
-
-        def section(start, end):
-            self.assertIn(start, source)
-            self.assertIn(end, source)
-            return source.split(start, 1)[1].split(end, 1)[0]
-
         handlers = [
-            ("async fn scope_report_results", "fn scope_report_retention_sources_sql", "srs.source_report_uuid AS source_report_id"),
-            ("async fn scope_report_errors", "async fn scope_reports", "srs.source_report_uuid AS source_report_id"),
-            ("async fn scope_report_hosts", "async fn scope_report_ports", "source_report_ids"),
-            ("async fn scope_report_ports", "async fn scope_report_applications", "source_report_ids"),
-            ("async fn scope_report_applications", "async fn scope_report_operating_systems", "source_report_ids"),
-            ("async fn scope_report_operating_systems", "async fn scope_report_tls_certificates", "source_report_ids"),
-            ("async fn scope_report_tls_certificates", "async fn scope_report_cves", "source_report_ids"),
-            ("async fn scope_report_cves", "async fn scope_report_exists", "source_report_ids"),
+            ("scope_report_results.rs", "pub(crate) async fn scope_report_results", "srs.source_report_uuid AS source_report_id"),
+            ("scope_report_errors.rs", "pub(crate) async fn scope_report_errors", "srs.source_report_uuid AS source_report_id"),
+            ("scope_report_hosts.rs", "pub(crate) async fn scope_report_hosts", "source_report_ids"),
+            ("scope_report_ports.rs", "pub(crate) async fn scope_report_ports", "source_report_ids"),
+            ("scope_report_applications.rs", "pub(crate) async fn scope_report_applications", "source_report_ids"),
+            ("scope_report_operating_systems.rs", "pub(crate) async fn scope_report_operating_systems", "source_report_ids"),
+            ("scope_report_tls_certificates.rs", "pub(crate) async fn scope_report_tls_certificates", "source_report_ids"),
+            ("scope_report_cves.rs", "pub(crate) async fn scope_report_cves", "source_report_ids"),
         ]
-        for start, end, source_identity in handlers:
-            with self.subTest(handler=start):
-                body = section(start, end)
-                self.assertIn("Path((scope_id, scope_report_id)): Path<(String, String)>", body)
-                self.assertIn("parse_uuid(&scope_id)?", body)
-                self.assertIn("parse_uuid(&scope_report_id)?", body)
-                self.assertIn("WHERE sr.uuid = $1 AND sr.scope_uuid = $2", body)
-                self.assertIn("JOIN scope_report_sources srs ON srs.scope_report = sr.id", body)
-                self.assertIn(source_identity, body)
-                self.assertIn("scope_report_exists(&client, &scope_report_id, &scope_id)", body)
+        for filename, handler, source_identity in handlers:
+            with self.subTest(handler=handler):
+                source = (root / "services" / "turbovas-api" / "src" / filename).read_text(encoding="utf-8")
+                self.assertIn(handler, source)
+                self.assertIn("Path((scope_id, scope_report_id)): Path<(String, String)>", source)
+                self.assertIn("parse_uuid(&scope_id)?", source)
+                self.assertIn("parse_uuid(&scope_report_id)?", source)
+                self.assertIn("WHERE sr.uuid = $1 AND sr.scope_uuid = $2", source)
+                self.assertIn("JOIN scope_report_sources srs ON srs.scope_report = sr.id", source)
+                self.assertIn(source_identity, source)
+                self.assertIn("scope_report_exists(&client, &scope_report_id, &scope_id)", source)
 
     def test_scope_report_source_reports_are_excluded_from_raw_report_deletion(self):
         root = Path(__file__).resolve().parents[2]
@@ -3047,10 +3041,46 @@ class TurboVASCtlTests(unittest.TestCase):
             compact = turbovasctl.command_native_api_migration_matrix(root, status_only=True, focus="schedule")
 
         self.assertEqual(result["details"]["focus"], "schedule")
+        self.assertEqual(result["details"]["focus_terms"], ["schedule"])
+        self.assertEqual(result["details"]["focus_match_count"], 1)
         self.assertEqual(result["details"]["summary"]["total_rows"], 1)
         self.assertEqual(result["details"]["items"][0]["endpoint"], "/api/v1/schedules")
         self.assertEqual(compact["details"]["focus"], "schedule")
+        self.assertEqual(compact["details"]["focus_terms"], ["schedule"])
+        self.assertEqual(compact["details"]["focus_match_count"], 1)
         self.assertNotIn("items", compact["details"])
+
+    def test_native_api_migration_matrix_focus_warns_on_zero_matches(self):
+        root = Path(__file__).resolve().parents[2]
+        rows = [
+            {
+                "endpoint": "/api/v1/reports",
+                "method": "get",
+                "inventory_endpoint": "/api/v1/reports",
+                "openapi_path": "/reports",
+                "direct_access": "scriptable_read",
+                "browser_access": "browser_proxied",
+                "openapi_direct_marker": True,
+                "x_turbovas_exposure": "direct-read",
+                "x_turbovas_maturity": "live-read",
+                "x_turbovas_replaces": "raw-report-list-read",
+                "x_turbovas_inherited_still_owns": "raw-report-generation-xml-export-retention-and-mutations",
+                "replacement_candidates": ["runtime-report-summary helper"],
+            }
+        ]
+
+        with unittest.mock.patch.object(turbovasctl, "native_api_migration_matrix_rows", return_value=rows):
+            compact = turbovasctl.command_native_api_migration_matrix(
+                root,
+                status_only=True,
+                focus=" schedule , no-such-term ",
+            )
+
+        self.assertEqual(compact["status"], "warn")
+        self.assertEqual(compact["details"]["focus"], " schedule , no-such-term ")
+        self.assertEqual(compact["details"]["focus_terms"], ["schedule", "no-such-term"])
+        self.assertEqual(compact["details"]["focus_match_count"], 0)
+        self.assertTrue(any(finding["check"] == "native-api-migration-matrix.focus" for finding in compact["findings"]))
 
     def test_native_api_migration_matrix_focus_parser_accepts_terms(self):
         args = turbovasctl.build_parser().parse_args(["--json", "native-api-migration-matrix", "--focus", "schedule,trash"])
@@ -4045,7 +4075,7 @@ class TurboVASCtlTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[2]
         openapi = (root / "api" / "openapi" / "turbovas-v1.yaml").read_text(encoding="utf-8")
         route_source = (root / "services" / "turbovas-api" / "src" / "routes.rs").read_text(encoding="utf-8")
-        handler_source = (root / "services" / "turbovas-api" / "src" / "scope_report_handlers.rs").read_text(encoding="utf-8")
+        handler_source = (root / "services" / "turbovas-api" / "src" / "scope_report_retention.rs").read_text(encoding="utf-8")
         smoke = (root / "tools" / "turbovasctl").read_text(encoding="utf-8")
         self.assertIn("/scopes/{scope_id}/reports/{scope_report_id}/retention-plan:", openapi)
         operations = {(item["method"], item["path"]): item for item in turbovasctl.openapi_contract_operations(root)}
@@ -4066,12 +4096,10 @@ class TurboVASCtlTests(unittest.TestCase):
 
     def test_scope_report_retention_source_sql_preserves_source_identity_contract(self):
         root = Path(__file__).resolve().parents[2]
-        source = (root / "services" / "turbovas-api" / "src" / "scope_report_handlers.rs").read_text(encoding="utf-8")
+        source = (root / "services" / "turbovas-api" / "src" / "scope_report_retention.rs").read_text(encoding="utf-8")
         start = "fn scope_report_retention_sources_sql() -> &'static str {"
-        end = "\n}\n\npub(crate) async fn scope_report_errors"
         self.assertIn(start, source)
-        self.assertIn(end, source)
-        body = source.split(start, 1)[1].split(end, 1)[0]
+        body = source.split(start, 1)[1]
         upper_body = body.upper()
 
         self.assertIn("SELECT DISTINCT ON (task.target)", body)
