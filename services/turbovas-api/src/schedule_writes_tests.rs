@@ -3,6 +3,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use super::*;
+use crate::errors::ApiError;
+
+fn patch_request(name: Option<&str>, comment: Option<&str>) -> SchedulePatchRequest {
+    SchedulePatchRequest {
+        name: name.map(str::to_string),
+        comment: comment.map(str::to_string),
+    }
+}
 
 #[test]
 fn schedule_create_plan_keeps_calendar_validation_before_insert() {
@@ -18,6 +26,81 @@ fn schedule_create_plan_keeps_calendar_validation_before_insert() {
             ScheduleWriteStep::InsertSchedule,
         ]
     );
+}
+
+#[test]
+fn schedule_patch_request_trims_metadata_fields() {
+    assert_eq!(
+        validate_schedule_patch_request(patch_request(
+            Some("  Weekday scan  "),
+            Some("  operator-visible note  "),
+        ))
+        .unwrap(),
+        ValidatedSchedulePatch {
+            name: Some("Weekday scan".to_string()),
+            comment: Some("operator-visible note".to_string()),
+        }
+    );
+}
+
+#[test]
+fn schedule_patch_request_requires_at_least_one_field() {
+    assert!(matches!(
+        validate_schedule_patch_request(patch_request(None, None)),
+        Err(ApiError::BadRequest(_))
+    ));
+}
+
+#[test]
+fn schedule_patch_request_rejects_blank_name() {
+    assert!(matches!(
+        validate_schedule_patch_request(patch_request(Some("   "), None)),
+        Err(ApiError::BadRequest(_))
+    ));
+}
+
+#[test]
+fn schedule_patch_request_allows_blank_comment_to_clear_comment() {
+    assert_eq!(
+        validate_schedule_patch_request(patch_request(None, Some("   "))).unwrap(),
+        ValidatedSchedulePatch {
+            name: None,
+            comment: Some(String::new()),
+        }
+    );
+}
+
+#[test]
+fn schedule_patch_request_rejects_control_characters() {
+    assert!(matches!(
+        validate_schedule_patch_request(patch_request(Some("bad\nname"), None)),
+        Err(ApiError::BadRequest(_))
+    ));
+    assert!(matches!(
+        validate_schedule_patch_request(patch_request(None, Some("bad\u{0}comment"))),
+        Err(ApiError::BadRequest(_))
+    ));
+}
+
+#[test]
+fn schedule_patch_request_rejects_unknown_calendar_fields() {
+    let request = serde_json::json!({
+        "name": "Weekday scan",
+        "icalendar": "BEGIN:VCALENDAR\nEND:VCALENDAR",
+    });
+    assert!(serde_json::from_value::<SchedulePatchRequest>(request).is_err());
+}
+
+#[test]
+fn schedule_patch_request_rejects_oversized_metadata_fields() {
+    let oversized = "a".repeat(MAX_SCHEDULE_TEXT_BYTES + 1);
+    assert!(matches!(
+        validate_schedule_patch_request(SchedulePatchRequest {
+            name: Some(oversized),
+            comment: None,
+        }),
+        Err(ApiError::BadRequest(_))
+    ));
 }
 
 #[test]
