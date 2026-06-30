@@ -1090,6 +1090,7 @@ fn collection_handlers_use_api_query_contract_extractor() {
         include_str!("report_cves.rs"),
         include_str!("report_errors.rs"),
         include_str!("report_formats.rs"),
+        include_str!("report_hosts.rs"),
         include_str!("report_operating_systems.rs"),
         include_str!("report_payloads.rs"),
         include_str!("report_ports.rs"),
@@ -1112,7 +1113,6 @@ fn collection_handlers_use_api_query_contract_extractor() {
         include_str!("tags.rs"),
         include_str!("task_targets.rs"),
         include_str!("tls_certificates.rs"),
-        include_str!("report_evidence_handlers.rs"),
         include_str!("vulnerability_payloads.rs"),
     ]
     .join("\n");
