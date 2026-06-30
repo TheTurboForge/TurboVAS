@@ -13,6 +13,7 @@ use crate::{
     app_state::{AppState, healthz},
     catalog_payloads::*,
     cert_advisories::*,
+    cpe_catalog::*,
     feeds::feeds,
     filters::*,
     host_assets::*,

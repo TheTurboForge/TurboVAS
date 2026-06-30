@@ -795,8 +795,8 @@ fn cve_catalog_detail_reads_reference_context_without_mutation_workflows() {
         .split_once("struct CatalogCveItem {")
         .expect("CVE catalog payload must exist")
         .1
-        .split_once("struct CatalogCpeCveItem")
-        .expect("CVE catalog payload must precede CPE CVE payload")
+        .split_once("pub(crate) async fn cve_catalog")
+        .expect("CVE catalog payload must precede CVE list handler")
         .0;
 
     assert!(payload_source.contains("cert_refs: Vec<CatalogCveCertReference>"));
@@ -832,6 +832,7 @@ fn cve_catalog_detail_reads_reference_context_without_mutation_workflows() {
 #[test]
 fn catalog_detail_user_tags_are_detail_only_active_info_tags() {
     let source = include_str!("catalog_payloads.rs");
+    let cpe_source = include_str!("cpe_catalog.rs");
     let catalog_payload_source = source;
     let cve_item_payload = catalog_payload_source
         .split_once("struct CatalogCveItem {")
@@ -840,7 +841,7 @@ fn catalog_detail_user_tags_are_detail_only_active_info_tags() {
         .split_once("struct CatalogCveDetail")
         .expect("CVE catalog payload must precede detail payload")
         .0;
-    let cpe_item_payload = catalog_payload_source
+    let cpe_item_payload = cpe_source
         .split_once("struct CatalogCpeItem {")
         .expect("CPE catalog payload must exist")
         .1
@@ -854,12 +855,12 @@ fn catalog_detail_user_tags_are_detail_only_active_info_tags() {
         .split_once("async fn cve_cert_refs")
         .expect("CVE catalog detail handler must precede reference helpers")
         .0;
-    let cpe_detail_source = source
+    let cpe_detail_source = cpe_source
         .split_once("async fn cpe_catalog_detail")
         .expect("CPE catalog detail handler must exist")
         .1
-        .split_once("async fn cve_catalog")
-        .expect("CPE catalog detail handler must precede CVE catalog list")
+        .split_once("async fn cpe_references")
+        .expect("CPE catalog detail handler must precede reference helper")
         .0;
     let cve_list_source = source
         .split_once("async fn cve_catalog(")
@@ -868,7 +869,7 @@ fn catalog_detail_user_tags_are_detail_only_active_info_tags() {
         .split_once("async fn cve_catalog_detail")
         .expect("CVE catalog list handler must precede detail handler")
         .0;
-    let cpe_list_source = source
+    let cpe_list_source = cpe_source
         .split_once("async fn cpe_catalog(")
         .expect("CPE catalog list handler must exist")
         .1
@@ -879,7 +880,7 @@ fn catalog_detail_user_tags_are_detail_only_active_info_tags() {
     assert!(!cve_item_payload.contains("user_tags"));
     assert!(!cpe_item_payload.contains("user_tags"));
     assert!(catalog_payload_source.contains("struct CatalogCveDetail"));
-    assert!(catalog_payload_source.contains("struct CatalogCpeDetail"));
+    assert!(cpe_source.contains("struct CatalogCpeDetail"));
     assert!(cve_detail_source.contains("catalog_user_tags(&client, \"cve\", &cve_id).await?"));
     assert!(cpe_detail_source.contains("catalog_user_tags_for_aliases_and_row_id("));
     assert!(cpe_detail_source.contains("Some(cpe_internal_id)"));
@@ -900,13 +901,13 @@ fn catalog_detail_user_tags_are_detail_only_active_info_tags() {
 
 #[test]
 fn cpe_catalog_detail_resolves_deprecated_by_by_cpe_name() {
-    let source = include_str!("catalog_payloads.rs");
+    let source = include_str!("cpe_catalog.rs");
     let cpe_detail_source = source
         .split_once("async fn cpe_catalog_detail")
         .expect("CPE catalog detail handler must exist")
         .1
-        .split_once("async fn cve_catalog")
-        .expect("CPE catalog detail handler must precede CVE catalog list")
+        .split_once("async fn cpe_references")
+        .expect("CPE catalog detail handler must precede reference helper")
         .0;
 
     assert!(cpe_detail_source.contains("let cpe_name: String = row.get(\"name\");"));
@@ -1076,6 +1077,7 @@ fn collection_handlers_use_api_query_contract_extractor() {
         include_str!("main.rs"),
         include_str!("alerts.rs"),
         include_str!("catalog_payloads.rs"),
+        include_str!("cpe_catalog.rs"),
         include_str!("cert_advisories.rs"),
         include_str!("filters.rs"),
         include_str!("host_assets.rs"),
