@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2026 Robert Pelfrey <Robert@Pelfrey.de>
+ * TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -37,6 +38,8 @@ describe('native API NVT catalog', () => {
             oid: '1.3.6.1.4.1.25623.1.0.10330',
             name: 'SSH Brute Force Logins With Default Credentials',
             family: 'Brute force attacks',
+            category: '3',
+            discovery: 1,
             severity: 7.5,
             qod: 80,
             qod_type: 'remote_banner',
@@ -84,6 +87,8 @@ describe('native API NVT catalog', () => {
     expect(nvt.id).toEqual('1.3.6.1.4.1.25623.1.0.10330');
     expect(nvt.name).toEqual('SSH Brute Force Logins With Default Credentials');
     expect(nvt.family).toEqual('Brute force attacks');
+    expect(nvt.category).toEqual('3');
+    expect(nvt.discovery).toEqual(1);
     expect(nvt.severity).toEqual(7.5);
     expect(nvt.qod?.value).toEqual(80);
     expect(nvt.qod?.type).toEqual('remote_banner');
@@ -122,6 +127,8 @@ describe('native API NVT catalog', () => {
         name: 'Fedora: Security Advisory',
         comment: 'Native detail comment',
         family: 'Fedora Local Security Checks',
+        category: '4',
+        discovery: 0,
         severity: 5.0,
         qod: 97,
         qod_type: 'package',
@@ -150,6 +157,8 @@ describe('native API NVT catalog', () => {
     const nvt = response.nvt;
     expect(nvt.id).toEqual(id);
     expect(nvt.comment).toEqual('Native detail comment');
+    expect(nvt.category).toEqual('4');
+    expect(nvt.discovery).toEqual(0);
     expect(nvt.tags.cvss_base_vector).toEqual('AV:N/AC:L/Au:N/C:P/I:N/A:N');
     expect(nvt.tags.summary).toEqual('Native summary');
     expect(nvt.tags.insight).toEqual('Native insight');
@@ -207,6 +216,8 @@ describe('native API NVT catalog', () => {
           name: 'Native NVT',
           comment: 'native comment',
           family: 'Native family',
+          category: '5',
+          discovery: 1,
           severity: 5.0,
           qod: 97,
           qod_type: 'package',
@@ -270,6 +281,8 @@ describe('native API NVT catalog', () => {
     expect(nvt?.name).toEqual('Native NVT');
     expect(nvt?.comment).toEqual('native comment');
     expect(nvt?.family).toEqual('Native family');
+    expect(nvt?.category).toEqual('5');
+    expect(nvt?.discovery).toEqual(1);
     expect(nvt?.severity).toEqual(5.0);
     expect(nvt?.qod?.value).toEqual(97);
     expect(nvt?.tags.summary).toEqual('Native summary');

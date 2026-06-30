@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2026 Robert Pelfrey <Robert@Pelfrey.de>
+ * TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -46,6 +47,8 @@ interface NativeNvtPayload {
   name?: string;
   comment?: string;
   family?: string;
+  category?: string;
+  discovery?: number;
   severity?: number;
   qod?: number;
   qod_type?: string;
@@ -265,6 +268,8 @@ const nativeNvtToModel = (
       _oid: oid,
       name: stringValue(item.name || oid),
       family: stringValue(item.family),
+      category: stringValue(item.category),
+      discovery: integerValue(item.discovery),
       cvss_base: numberValue(item.severity),
       tags: detailTagsFromNative(item),
       qod: {

@@ -5945,7 +5945,7 @@ components:
                 $ref: '#/components/schemas/UserTag'
     NvtCatalogItem:
       type: object
-      required: [id, oid, name, family, severity, qod, qod_type, solution_type, solution_method, solution, tags, cve_refs, cves, cert_refs, xrefs]
+      required: [id, oid, name, family, category, discovery, severity, qod, qod_type, solution_type, solution_method, solution, tags, cve_refs, cves, cert_refs, xrefs]
       properties:
         id:
           type: string
@@ -5955,6 +5955,12 @@ components:
           type: string
         family:
           type: string
+        category:
+          type: string
+          description: Inherited NVT category imported from feed metadata.
+        discovery:
+          type: integer
+          description: Numeric inherited NVT discovery flag imported from feed metadata.
         severity:
           type: number
         qod:

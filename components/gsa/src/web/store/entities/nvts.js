@@ -30,6 +30,8 @@ const mergeNativeInformation = (inherited, native) =>
     comment: native.comment,
     creationTime: native.creationTime,
     modificationTime: native.modificationTime,
+    category: native.category,
+    discovery: native.discovery,
     family: native.family,
     qod: native.qod,
     severity: native.severity,

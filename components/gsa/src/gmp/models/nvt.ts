@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -70,10 +71,11 @@ export interface NvtSeveritiesElement {
 
 export interface NvtNvtElement {
   _oid?: string;
-  category?: number;
+  category?: string;
   creation_time?: string;
   cvss_base?: number;
   default_timeout?: string | number;
+  discovery?: number;
   epss?: NvtEpssElement;
   family?: string;
   modification_time?: string;
@@ -143,9 +145,11 @@ interface Epss {
 }
 
 interface NvtProperties extends ModelProperties {
+  category?: string;
   certs?: Cert[];
   cves?: string[];
   defaultTimeout?: number;
+  discovery?: number;
   epss?: Epss;
   family?: string;
   oid?: string;
@@ -238,9 +242,11 @@ const getOtherRefs = (refs: NvtRefElement[]) => {
 class Nvt extends Model {
   static readonly entityType = 'nvt';
 
+  readonly category?: string;
   readonly certs: Cert[];
   readonly cves: string[];
   readonly defaultTimeout?: number;
+  readonly discovery?: number;
   readonly epss?: Epss;
   readonly family?: string;
   readonly oid?: string;
@@ -255,9 +261,11 @@ class Nvt extends Model {
   readonly xrefs: Reference[];
 
   constructor({
+    category,
     certs = [],
     cves = [],
     defaultTimeout,
+    discovery,
     epss,
     family,
     oid,
@@ -274,9 +282,11 @@ class Nvt extends Model {
   }: NvtProperties = {}) {
     super(other);
 
+    this.category = category;
     this.certs = certs;
     this.cves = cves;
     this.defaultTimeout = defaultTimeout;
+    this.discovery = discovery;
     this.epss = epss;
     this.family = family;
     this.oid = oid;
@@ -306,6 +316,8 @@ class Nvt extends Model {
     ret.family = isEmpty(nvtElement?.family)
       ? undefined
       : parseToString(nvtElement?.family);
+    ret.category = parseToString(nvtElement?.category);
+    ret.discovery = parseFloat(nvtElement?.discovery);
 
     if (isDefined(nvtElement?.epss)) {
       ret.epss = {};
