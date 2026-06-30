@@ -1352,20 +1352,21 @@ fn runtime_accepts_distinct_internal_and_direct_routers() {
     assert!(!runtime_source.contains("app.clone().layer"));
 
     let main_source = include_str!("main.rs");
-    let production_source = main_source
-        .split_once("#[cfg(test)]")
-        .expect("test module marker must exist")
-        .0;
-    assert!(main_source.contains("DirectApiListener {"));
-    assert!(main_source.contains("let base_router = native_api_router();"));
+    assert!(main_source.contains("startup::run().await"));
+    assert!(!main_source.contains("DirectApiListener {"));
+
+    let startup_source = include_str!("startup.rs");
+    assert!(startup_source.contains("DirectApiListener {"));
+    assert!(startup_source.contains("let base_router = native_api_router();"));
     assert!(
-        main_source.contains("let internal_app = base_router.clone().with_state(state.clone());")
+        startup_source
+            .contains("let internal_app = base_router.clone().with_state(state.clone());")
     );
-    assert!(main_source.contains(
+    assert!(startup_source.contains(
         "direct_native_api_router(base_router, auth.write_control_enabled()).with_state(state)"
     ));
-    assert!(main_source.contains("app: direct_app"));
-    assert!(!production_source.contains("app: app.clone()"));
+    assert!(startup_source.contains("app: direct_app"));
+    assert!(!startup_source.contains("app: app.clone()"));
 }
 
 fn app_route_registration_block(source: &str) -> &str {
