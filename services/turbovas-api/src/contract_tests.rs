@@ -1097,6 +1097,7 @@ fn collection_handlers_use_api_query_contract_extractor() {
         include_str!("report_ports.rs"),
         include_str!("report_tls_certificates.rs"),
         include_str!("result_payloads.rs"),
+        include_str!("scan_config_payloads.rs"),
         include_str!("scan_configs.rs"),
         include_str!("scope_payloads.rs"),
         include_str!("scope_report_applications.rs"),
@@ -1869,15 +1870,15 @@ fn scanner_detail_contract_excludes_certificate_and_secret_material() {
 
 #[test]
 fn scan_config_user_tags_are_detail_only_active_config_tags() {
-    let source = include_str!("scan_configs.rs");
-    let scan_config_list_payload = source
+    let payload_source = include_str!("scan_config_payloads.rs");
+    let scan_config_list_payload = payload_source
         .split_once("pub(crate) struct ScanConfigAssetItem {")
         .expect("scan config list payload struct must exist")
         .1
         .split_once("pub(crate) struct ScanConfigAssetDetail")
         .expect("scan config list payload struct must precede detail payload")
         .0;
-    let scan_config_detail_payload = source
+    let scan_config_detail_payload = payload_source
         .split_once("pub(crate) struct ScanConfigAssetDetail {")
         .expect("scan config detail payload struct must exist")
         .1

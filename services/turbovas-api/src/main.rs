@@ -45,6 +45,7 @@ mod result_payloads;
 mod routes;
 mod row_helpers;
 mod runtime;
+mod scan_config_payloads;
 mod scan_configs;
 mod scanner_assets;
 mod schedules;
