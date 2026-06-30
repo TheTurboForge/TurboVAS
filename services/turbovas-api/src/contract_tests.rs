@@ -1090,6 +1090,7 @@ fn collection_handlers_use_api_query_contract_extractor() {
         include_str!("report_configs.rs"),
         include_str!("report_cves.rs"),
         include_str!("report_errors.rs"),
+        include_str!("report_format_payloads.rs"),
         include_str!("report_formats.rs"),
         include_str!("report_hosts.rs"),
         include_str!("report_operating_systems.rs"),
