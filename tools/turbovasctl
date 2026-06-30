@@ -12589,7 +12589,35 @@ def native_api_expected_bad_request_finding(
     )
 
 
-def command_runtime_native_api_smoke(repo_root: Path) -> dict[str, Any]:
+def native_api_smoke_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
+    compact = dict(result)
+    findings = result.get("findings", [])
+    non_pass = [compact_doctor_finding(item) for item in findings if item.get("status") != "pass"]
+    details = result.get("details", {}) if isinstance(result.get("details"), dict) else {}
+    checks = {
+        item.get("check"): item.get("status")
+        for item in findings
+        if isinstance(item, dict) and item.get("check")
+    }
+    important_checks = {
+        check: status
+        for check, status in checks.items()
+        if status != "pass" or check in {"native-api.running", "native-api.healthz"}
+    }
+    compact["details"] = {
+        "service": details.get("service"),
+        "finding_count": len(findings),
+        "non_pass_count": len(non_pass),
+        "artifact_count": len(result.get("artifacts", [])) if isinstance(result.get("artifacts"), list) else 0,
+        "important_checks": important_checks,
+    }
+    compact["findings"] = non_pass or [
+        finding("pass", "runtime-native-api-smoke.status-only", "runtime-native-api-smoke passed; no non-pass findings.")
+    ]
+    return compact
+
+
+def command_runtime_native_api_smoke(repo_root: Path, status_only: bool = False) -> dict[str, Any]:
     artifact_dir = native_api_artifact_dir(repo_root)
     artifact_dir.mkdir(parents=True, exist_ok=True)
     findings: list[dict[str, Any]] = []
@@ -12608,6 +12636,8 @@ def command_runtime_native_api_smoke(repo_root: Path) -> dict[str, Any]:
         result = make_result("runtime-native-api-smoke", repo_root, "Native API smoke could not run because turbovas-api is not running.", findings, [str(artifact_dir)])
         result["details"] = details
         write_json_artifact(artifact_dir, "native-api-smoke.json", result)
+        if status_only:
+            result = native_api_smoke_status_only_result(result)
         return result
 
     health = native_api_curl(repo_root, "/healthz")
@@ -14088,6 +14118,8 @@ def command_runtime_native_api_smoke(repo_root: Path) -> dict[str, Any]:
     result = make_result("runtime-native-api-smoke", repo_root, "Native API smoke checks completed.", findings, [str(artifact_dir / "native-api-smoke.json")])
     result["details"] = details
     write_json_artifact(artifact_dir, "native-api-smoke.json", result)
+    if status_only:
+        result = native_api_smoke_status_only_result(result)
     return result
 
 
@@ -15094,7 +15126,8 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("runtime-app-up", parents=[common], help="start experimental application services")
     subparsers.add_parser("runtime-app-down", parents=[common], help="stop experimental application services")
     subparsers.add_parser("runtime-app-smoke", parents=[common], help="run experimental application service smoke checks")
-    subparsers.add_parser("runtime-native-api-smoke", parents=[common], help="verify the internal TurboVAS native API sidecar")
+    native_api_smoke = subparsers.add_parser("runtime-native-api-smoke", parents=[common], help="verify the internal TurboVAS native API sidecar")
+    native_api_smoke.add_argument("--status-only", action="store_true", help="emit compact native API smoke status and only non-pass findings for chat-safe validation")
     native_api_direct_smoke = subparsers.add_parser("runtime-native-api-direct-smoke", parents=[common], help="verify the opt-in direct bearer-auth native API listener")
     native_api_direct_smoke.add_argument("--status-only", action="store_true", help="emit compact direct-smoke status and only non-pass findings for chat-safe validation")
     native_api_direct_write_smoke = subparsers.add_parser("runtime-native-api-direct-write-smoke", parents=[common], help="verify guarded direct native API write-control with zero-residue tag metadata writes")
@@ -15264,7 +15297,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "runtime-app-smoke":
         result = command_runtime_app_smoke(repo_root)
     elif args.command == "runtime-native-api-smoke":
-        result = command_runtime_native_api_smoke(repo_root)
+        result = command_runtime_native_api_smoke(repo_root, status_only=args.status_only)
     elif args.command == "runtime-native-api-direct-smoke":
         result = command_runtime_native_api_direct_smoke(repo_root, status_only=args.status_only)
     elif args.command == "runtime-native-api-direct-write-smoke":

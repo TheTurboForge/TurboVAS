@@ -975,6 +975,8 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("def command_runtime_performance_snapshot", source)
         self.assertIn("def command_runtime_redis_state", source)
         self.assertIn("def command_runtime_native_api_smoke", source)
+        self.assertIn('native_api_smoke.add_argument("--status-only"', source)
+        self.assertIn("command_runtime_native_api_smoke(repo_root, status_only=args.status_only)", source)
         self.assertIn("def command_runtime_native_api_direct_smoke", source)
         self.assertIn("def command_runtime_native_api_direct_write_smoke", source)
         self.assertIn("def command_runtime_native_api_rebuild", source)
@@ -1367,6 +1369,36 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(len(summary["vulnerabilities_sample"]), 3)
         self.assertNotIn("systems", summary)
         self.assertNotIn("vulnerabilities", summary)
+
+    def test_native_api_smoke_status_only_keeps_only_compact_findings(self):
+        result = {
+            "status": "warn",
+            "summary": "Native API smoke checks completed.",
+            "details": {
+                "service": "turbovas-api",
+                "health": {"status": "ok"},
+                "large_probe_payload": {"items": list(range(100))},
+            },
+            "findings": [
+                turbovasctl.finding("pass", "native-api.running", "turbovas-api container is running."),
+                turbovasctl.finding("pass", "native-api.healthz", "Native API health probe passed."),
+                turbovasctl.finding("warn", "native-api.scope-report-cves", "No scope reports exist yet, so the CVE collection probe was skipped."),
+            ],
+            "artifacts": ["native-api-smoke.json"],
+        }
+
+        compact = turbovasctl.native_api_smoke_status_only_result(result)
+
+        self.assertEqual(compact["status"], "warn")
+        self.assertEqual(compact["details"]["service"], "turbovas-api")
+        self.assertEqual(compact["details"]["finding_count"], 3)
+        self.assertEqual(compact["details"]["non_pass_count"], 1)
+        self.assertEqual(compact["details"]["artifact_count"], 1)
+        self.assertEqual(compact["details"]["important_checks"]["native-api.running"], "pass")
+        self.assertEqual(compact["details"]["important_checks"]["native-api.healthz"], "pass")
+        self.assertEqual(compact["details"]["important_checks"]["native-api.scope-report-cves"], "warn")
+        self.assertEqual(compact["findings"], [turbovasctl.compact_doctor_finding(result["findings"][2])])
+        self.assertNotIn("large_probe_payload", compact["details"])
 
     def test_native_api_alert_summary_omits_delivery_payload_values(self):
         payload = {
