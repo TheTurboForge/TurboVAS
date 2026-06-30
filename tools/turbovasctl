@@ -5516,11 +5516,15 @@ def rust_collection_contract_constants(repo_root: Path | None) -> dict[str, int 
 def rust_collection_contract_paths(repo_root: Path | None) -> list[str]:
     if repo_root is None:
         return []
-    path = repo_root / "services" / "turbovas-api" / "src" / "main.rs"
-    try:
-        source = path.read_text(encoding="utf-8")
-    except OSError:
-        return []
+    source = ""
+    for relative_path in (
+        "services/turbovas-api/src/contract_tests.rs",
+        "services/turbovas-api/src/main.rs",
+    ):
+        try:
+            source += "\n" + (repo_root / relative_path).read_text(encoding="utf-8")
+        except OSError:
+            continue
     return sorted(
         {
             path
