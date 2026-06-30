@@ -21,7 +21,7 @@ use crate::{
     scanner_assets::{scanner_task_references_sql, scanner_user_tags_sql},
     schedules::schedule_user_tags_sql,
     scope_payloads::{scope_candidate_hosts_sql, scope_sql},
-    scope_report_handlers::scope_report_results_sql,
+    scope_report_results::scope_report_results_sql,
     scope_report_retention::scope_report_retention_sources_sql,
     tls_certificates::tls_certificate_user_tags_sql,
     user_tags::catalog_user_tags_sql,
@@ -1093,6 +1093,7 @@ fn collection_handlers_use_api_query_contract_extractor() {
         include_str!("scope_payloads.rs"),
         include_str!("scope_report_handlers.rs"),
         include_str!("scope_report_retention.rs"),
+        include_str!("scope_report_results.rs"),
         include_str!("scanner_assets.rs"),
         include_str!("schedules.rs"),
         include_str!("tags.rs"),
@@ -1499,9 +1500,13 @@ fn scope_report_native_routes_remain_get_only_read_paths() {
 
 #[test]
 fn scope_report_handlers_do_not_trigger_scanner_or_task_control() {
-    let source = include_str!("scope_report_handlers.rs");
+    let source = [
+        include_str!("scope_report_results.rs"),
+        include_str!("scope_report_handlers.rs"),
+    ]
+    .join("\n");
     let start = "pub(crate) async fn scope_report_results(";
-    let end = "\nasync fn scope_report_exists(";
+    let end = "\npub(crate) async fn scope_report_exists(";
     let handlers = source
         .split_once(start)
         .expect("scope report handlers must exist")
@@ -1532,7 +1537,7 @@ fn scope_report_handlers_do_not_trigger_scanner_or_task_control() {
 fn result_rows_expose_nvt_epss_context_without_mutation_workflows() {
     let source = include_str!("result_payloads.rs");
     let result_source = source;
-    let scope_report_source = include_str!("scope_report_handlers.rs");
+    let scope_report_results_source = include_str!("scope_report_results.rs");
     let result_payload = result_source
         .split_once("pub(crate) struct ResultItem {")
         .expect("result payload struct must exist")
@@ -1559,13 +1564,10 @@ fn result_rows_expose_nvt_epss_context_without_mutation_workflows() {
             .split_once("async fn report_results")
             .expect("report result list handler must exist")
             .1,
-        scope_report_source
+        scope_report_results_source
             .split_once("fn scope_report_results_sql")
             .expect("scope report result SQL helper must exist")
-            .1
-            .split_once("pub(crate) async fn scope_report_errors")
-            .expect("scope report result SQL helper must precede error handler")
-            .0,
+            .1,
     ];
     let row_mapper = result_source
         .split_once("pub(crate) fn result_from_row")
