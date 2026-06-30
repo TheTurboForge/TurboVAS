@@ -278,7 +278,7 @@ fn native_report_config_report_format_list_values_are_type_gated() {
 }
 
 #[test]
-fn native_direct_api_keeps_report_config_writes_closed_until_full_contract_lands() {
+fn native_direct_api_exposes_only_report_config_create_write_control() {
     assert!(direct_api_v1_method_is_allowed(
         &Method::GET,
         "/api/v1/report-configs",
@@ -289,7 +289,12 @@ fn native_direct_api_keeps_report_config_writes_closed_until_full_contract_lands
         "/api/v1/report-configs/12345678-1234-1234-1234-123456789abc",
         false
     ));
-    for method in [Method::POST, Method::PATCH, Method::DELETE, Method::PUT] {
+    assert!(direct_api_v1_method_is_allowed(
+        &Method::POST,
+        "/api/v1/report-configs",
+        true
+    ));
+    for method in [Method::PATCH, Method::DELETE, Method::PUT] {
         assert!(
             !direct_api_v1_method_is_allowed(&method, "/api/v1/report-configs", true),
             "{method} /api/v1/report-configs must remain closed"
@@ -308,13 +313,15 @@ fn native_direct_api_keeps_report_config_writes_closed_until_full_contract_lands
 }
 
 #[test]
-fn openapi_documents_report_configs_as_read_only_until_write_contract_lands() {
+fn openapi_documents_report_config_create_as_direct_write_control() {
     let list = openapi_path_block("/report-configs");
     assert!(list.contains("get:"));
-    assert!(!list.contains("post:"));
+    assert!(list.contains("post:"));
+    assert!(list.contains("x-turbovas-exposure: direct-write"));
+    assert!(list.contains("x-turbovas-safety-contract: write-control-v1"));
     assert!(list.contains("x-turbovas-exposure: direct-read"));
     assert!(
-        list.contains("x-turbovas-inherited-still-owns: report-config-export-writes-and-deletes")
+        list.contains("x-turbovas-inherited-still-owns: report-config-modify-delete-clone-export")
     );
 
     let detail = openapi_path_block("/report-configs/{report_config_id}");
@@ -323,6 +330,7 @@ fn openapi_documents_report_configs_as_read_only_until_write_contract_lands() {
     assert!(!detail.contains("delete:"));
     assert!(detail.contains("x-turbovas-exposure: direct-read"));
     assert!(
-        detail.contains("x-turbovas-inherited-still-owns: report-config-export-writes-and-deletes")
+        detail
+            .contains("x-turbovas-inherited-still-owns: report-config-modify-delete-clone-export")
     );
 }

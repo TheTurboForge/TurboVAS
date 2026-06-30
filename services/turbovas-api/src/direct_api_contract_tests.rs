@@ -65,6 +65,11 @@ const APPROVED_NATIVE_WRITE_ROUTE_CONTRACTS: &[NativeWriteRouteContract] = &[
         path: "/api/v1/tags/:tag_id/resources",
         safety_contract: "write-control-v1",
     },
+    NativeWriteRouteContract {
+        method: "post",
+        path: "/api/v1/report-configs",
+        safety_contract: "write-control-v1",
+    },
 ];
 
 #[test]

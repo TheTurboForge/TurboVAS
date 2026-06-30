@@ -1498,9 +1498,9 @@ paths:
       x-turbovas-exposure: direct-read
       x-turbovas-maturity: live-read
       x-turbovas-replaces: report-config-metadata-list-read
-      x-turbovas-inherited-still-owns: report-config-export-writes-and-deletes
+      x-turbovas-inherited-still-owns: report-config-modify-delete-clone-export
       summary: List report configs
-      description: Read-only report-config metadata backed by gvmd/PostgreSQL. Create, modify, clone, export, and delete operations remain on inherited compatibility paths while native write semantics are designed.
+      description: Read-only report-config metadata backed by gvmd/PostgreSQL. Native direct write-control can create report-config metadata and params; modify, clone, export, delete, trash, and restore operations remain on inherited compatibility paths while their native safety contracts are designed.
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
@@ -1525,6 +1525,53 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
+    post:
+      operationId: postReportConfigs
+      x-turbovas-direct: true
+      x-turbovas-exposure: direct-write
+      x-turbovas-maturity: live-write
+      x-turbovas-replaces: report-config-metadata-param-create
+      x-turbovas-inherited-still-owns: report-config-modify-delete-clone-export
+      x-turbovas-operator-identity: direct-token-operator
+      x-turbovas-owner-semantics: request-operator-owner
+      x-turbovas-safety-contract: write-control-v1
+      x-turbovas-side-effect: metadata-write
+      summary: Create report-config metadata and params
+      description: Direct write-control endpoint for creating report configs for an existing configurable report format. Modify, clone, export, delete, trash, restore, and report generation behavior remain on inherited compatibility paths.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportConfigCreateRequest'
+      responses:
+        '201':
+          description: Report config created
+          headers:
+            Location:
+              description: Path of the created report config resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportConfigAsset'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /report-configs/{report_config_id}:
     get:
       operationId: getReportConfigsByReportConfigId
@@ -1532,7 +1579,7 @@ paths:
       x-turbovas-exposure: direct-read
       x-turbovas-maturity: live-read
       x-turbovas-replaces: report-config-metadata-detail-read
-      x-turbovas-inherited-still-owns: report-config-export-writes-and-deletes
+      x-turbovas-inherited-still-owns: report-config-modify-delete-clone-export
       summary: Read one report config
       parameters:
         - $ref: '#/components/parameters/ReportConfigId'
@@ -3631,6 +3678,39 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ReportConfigAsset'
+    ReportConfigCreateRequest:
+      type: object
+      required: [name, report_format_id]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 4096
+        report_format_id:
+          type: string
+          format: uuid
+        comment:
+          type: string
+          maxLength: 4096
+        params:
+          type: array
+          maxItems: 256
+          items:
+            $ref: '#/components/schemas/ReportConfigParamWriteRequest'
+          uniqueItems: true
+    ReportConfigParamWriteRequest:
+      type: object
+      required: [name, value]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 4096
+        value:
+          type: string
+          maxLength: 65536
     ReportFormatAssetCollection:
       type: object
       required: [page, items]

@@ -6,6 +6,7 @@ use axum::{
     Json,
     extract::{Path, State},
 };
+use tokio_postgres::Client;
 
 use crate::{
     app_state::AppState,
@@ -71,8 +72,17 @@ pub(crate) async fn report_config_asset_detail(
     State(state): State<AppState>,
     Path(report_config_id): Path<String>,
 ) -> Result<Json<ReportConfigAssetItem>, ApiError> {
-    parse_uuid(&report_config_id)?;
     let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    Ok(Json(
+        load_report_config_asset_detail(&client, &report_config_id).await?,
+    ))
+}
+
+pub(crate) async fn load_report_config_asset_detail(
+    client: &Client,
+    report_config_id: &str,
+) -> Result<ReportConfigAssetItem, ApiError> {
+    parse_uuid(&report_config_id)?;
     let row = client
         .query_opt(
             r#"SELECT rc.id::bigint AS internal_id,
@@ -100,5 +110,5 @@ pub(crate) async fn report_config_asset_detail(
         })?
         .ok_or(ApiError::NotFound)?;
 
-    Ok(Json(report_config_asset_from_row(&client, &row).await?))
+    report_config_asset_from_row(client, &row).await
 }

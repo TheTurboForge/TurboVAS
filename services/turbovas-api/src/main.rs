@@ -30,7 +30,6 @@ mod port_lists;
 mod query;
 mod report_applications;
 mod report_config_payloads;
-#[cfg(test)]
 mod report_config_writes;
 mod report_configs;
 mod report_cves;
