@@ -553,6 +553,7 @@ OPENAPI_ALLOWED_REPLACES_VALUES = frozenset(
         "schedule-metadata-detail-read",
         "schedule-metadata-list-read",
         "schedule-metadata-modify",
+        "schedule-clone",
         "schedule-hard-delete",
         "schedule-restore",
         "schedule-trash-move",
@@ -705,6 +706,7 @@ OPENAPI_REQUIRED_EXPOSURE = {
     ("patch", "/schedules/{schedule_id}"): "direct-write",
     ("delete", "/schedules/{schedule_id}"): "direct-write",
     ("delete", "/schedules/{schedule_id}/trash"): "direct-write",
+    ("post", "/schedules/{schedule_id}/clone"): "direct-write",
     ("post", "/schedules/{schedule_id}/restore"): "direct-write",
     ("post", "/tags"): "direct-write",
     ("patch", "/tags/{tag_id}"): "direct-write",
@@ -1026,6 +1028,11 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-inherited-still-owns": "schedule-create-calendar-export",
         "x-turbovas-maturity": "live-write",
         "x-turbovas-replaces": "schedule-trash-move",
+    },
+    ("post", "/schedules/{schedule_id}/clone"): {
+        "x-turbovas-inherited-still-owns": "schedule-create-calendar-export",
+        "x-turbovas-maturity": "live-write",
+        "x-turbovas-replaces": "schedule-clone",
     },
     ("post", "/schedules/{schedule_id}/restore"): {
         "x-turbovas-inherited-still-owns": "schedule-create-calendar-export",
@@ -6776,6 +6783,13 @@ def summarize_native_tooling(items: list[dict[str, Any]], repo_root: Path | None
             },
             {
                 "method": "post",
+                "endpoint": "/api/v1/schedules/{schedule_id}/clone",
+                "status": "implemented_direct_write_control",
+                "direct_access": "direct_write_control",
+                "replacement_candidates": ["direct native schedule clone"],
+            },
+            {
+                "method": "post",
                 "endpoint": "/api/v1/schedules/{schedule_id}/restore",
                 "status": "implemented_direct_write_control",
                 "direct_access": "direct_write_control",
@@ -12013,6 +12027,10 @@ def direct_smoke_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
             "native-api-direct.schedule-fixture",
             "native-api-direct.schedule-write-update",
             "native-api-direct.schedule-write-restore",
+            "native-api-direct.schedule-write-clone",
+            "native-api-direct.schedule-write-delete-clone",
+            "native-api-direct.schedule-write-hard-delete-clone",
+            "native-api-direct.schedule-write-post-hard-delete-clone",
             "native-api-direct.schedule-write-delete",
             "native-api-direct.schedule-write-post-delete",
             "native-api-direct.schedule-write-trash-restore",
@@ -12147,8 +12165,10 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
     port_list_name = f"turbovas-direct-write-smoke-port-list-{int(time.time())}-{os.getpid()}"
     port_list_clone_name = f"{port_list_name}-clone"
     schedule_id: str | None = None
+    schedule_clone_id: str | None = None
     schedule_original_comment = ""
     schedule_name = f"turbovas-direct-write-smoke-schedule-{int(time.time())}-{os.getpid()}"
+    schedule_clone_name = f"{schedule_name}-clone"
     schedule_icalendar = "BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nDTSTART:20300101T000000Z\nDURATION:PT1H\nRRULE:FREQ=DAILY\nEND:VEVENT\nEND:VCALENDAR"
     scope_name = f"turbovas-direct-write-smoke-scope-{int(time.time())}-{os.getpid()}"
     filter_name = f"turbovas-direct-write-smoke-filter-{int(time.time())}-{os.getpid()}"
@@ -12576,6 +12596,32 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
             schedule_restore_ok = schedule_restore.returncode == 0 and schedule_restore_status == 200 and isinstance(schedule_restore_json, dict) and schedule_restore_json.get("id") == schedule_id and schedule_restore_json.get("comment") == schedule_original_comment
             findings.append(native_api_probe_finding("pass" if schedule_restore_ok else "fail", "native-api-direct.schedule-write-restore", "Direct write-control restored the schedule comment after reversible metadata patching." if schedule_restore_ok else "Direct write-control failed to restore the schedule comment after metadata patching.", schedule_restore, direct_native_api_display_command(f"/api/v1/schedules/{urllib.parse.quote(schedule_id)}", token=token, env=env, method="PATCH", body=schedule_restore_body, extra_headers=content_type), schedule_restore_json, {"http_status": schedule_restore_status, "schedule_id": schedule_id, **summarize_native_api_response(schedule_restore_json)}))
 
+            schedule_clone_body = json.dumps(
+                {"name": schedule_clone_name, "comment": "TurboVAS direct write smoke cloned schedule comment"},
+                separators=(",", ":"),
+            )
+            schedule_clone = direct_native_api_curl(repo_root, f"/api/v1/schedules/{urllib.parse.quote(schedule_id)}/clone", token=token, env=env, method="POST", body=schedule_clone_body, extra_headers=content_type)
+            schedule_clone_json, schedule_clone_status = parse_json_output_with_http_status(schedule_clone)
+            schedule_clone_id = schedule_clone_json.get("id") if isinstance(schedule_clone_json, dict) and isinstance(schedule_clone_json.get("id"), str) else None
+            schedule_clone_ok = schedule_clone.returncode == 0 and schedule_clone_status == 201 and bool(schedule_clone_id) and schedule_clone_id != schedule_id and schedule_clone_json.get("name") == schedule_clone_name and schedule_clone_json.get("comment") == "TurboVAS direct write smoke cloned schedule comment" and schedule_clone_json.get("icalendar") == schedule_icalendar
+            findings.append(native_api_probe_finding("pass" if schedule_clone_ok else "fail", "native-api-direct.schedule-write-clone", "Direct write-control cloned the temporary schedule fixture with copied calendar data." if schedule_clone_ok else "Direct write-control failed to clone the temporary schedule fixture with copied calendar data.", schedule_clone, direct_native_api_display_command(f"/api/v1/schedules/{urllib.parse.quote(schedule_id)}/clone", token=token, env=env, method="POST", body=schedule_clone_body, extra_headers=content_type), schedule_clone_json, {"http_status": schedule_clone_status, "schedule_id": schedule_id, "schedule_clone_id": schedule_clone_id, **summarize_native_api_response(schedule_clone_json)}))
+
+            if schedule_clone_id:
+                schedule_clone_delete = direct_native_api_curl(repo_root, f"/api/v1/schedules/{urllib.parse.quote(schedule_clone_id)}", token=token, env=env, method="DELETE")
+                schedule_clone_delete_json, schedule_clone_delete_status = parse_json_output_with_http_status(schedule_clone_delete)
+                schedule_clone_delete_ok = schedule_clone_delete.returncode == 0 and schedule_clone_delete_status == 204
+                findings.append(native_api_probe_finding("pass" if schedule_clone_delete_ok else "fail", "native-api-direct.schedule-write-delete-clone", "Direct write-control moved the temporary schedule clone to trash." if schedule_clone_delete_ok else "Direct write-control failed to move the temporary schedule clone to trash.", schedule_clone_delete, direct_native_api_display_command(f"/api/v1/schedules/{urllib.parse.quote(schedule_clone_id)}", token=token, env=env, method="DELETE"), schedule_clone_delete_json, {"http_status": schedule_clone_delete_status, "schedule_clone_id": schedule_clone_id, **summarize_native_api_response(schedule_clone_delete_json)}))
+
+                schedule_clone_hard_delete = direct_native_api_curl(repo_root, f"/api/v1/schedules/{urllib.parse.quote(schedule_clone_id)}/trash", token=token, env=env, method="DELETE")
+                schedule_clone_hard_delete_json, schedule_clone_hard_delete_status = parse_json_output_with_http_status(schedule_clone_hard_delete)
+                schedule_clone_hard_delete_ok = schedule_clone_hard_delete.returncode == 0 and schedule_clone_hard_delete_status == 204
+                findings.append(native_api_probe_finding("pass" if schedule_clone_hard_delete_ok else "fail", "native-api-direct.schedule-write-hard-delete-clone", "Direct write-control hard-deleted the temporary schedule clone from trash." if schedule_clone_hard_delete_ok else "Direct write-control failed to hard-delete the temporary schedule clone from trash.", schedule_clone_hard_delete, direct_native_api_display_command(f"/api/v1/schedules/{urllib.parse.quote(schedule_clone_id)}/trash", token=token, env=env, method="DELETE"), schedule_clone_hard_delete_json, {"http_status": schedule_clone_hard_delete_status, "schedule_clone_id": schedule_clone_id, **summarize_native_api_response(schedule_clone_hard_delete_json)}))
+
+                schedule_clone_post_hard_delete = direct_native_api_curl(repo_root, f"/api/v1/schedules/{urllib.parse.quote(schedule_clone_id)}", token=token, env=env)
+                schedule_clone_post_hard_delete_json, schedule_clone_post_hard_delete_status = parse_json_output_with_http_status(schedule_clone_post_hard_delete)
+                schedule_clone_post_hard_delete_ok = schedule_clone_post_hard_delete.returncode == 0 and schedule_clone_post_hard_delete_status == 404 and isinstance(schedule_clone_post_hard_delete_json, dict) and schedule_clone_post_hard_delete_json.get("error", {}).get("code") == "not_found"
+                findings.append(native_api_probe_finding("pass" if schedule_clone_post_hard_delete_ok else "fail", "native-api-direct.schedule-write-post-hard-delete-clone", "Direct API confirms the temporary schedule clone is gone after native hard delete." if schedule_clone_post_hard_delete_ok else "Direct API did not confirm the temporary schedule clone was removed by native hard delete.", schedule_clone_post_hard_delete, direct_native_api_display_command(f"/api/v1/schedules/{urllib.parse.quote(schedule_clone_id)}", token=token, env=env), schedule_clone_post_hard_delete_json, {"http_status": schedule_clone_post_hard_delete_status, "schedule_clone_id": schedule_clone_id, **summarize_native_api_response(schedule_clone_post_hard_delete_json)}))
+
             schedule_delete = direct_native_api_curl(repo_root, f"/api/v1/schedules/{urllib.parse.quote(schedule_id)}", token=token, env=env, method="DELETE")
             schedule_delete_json, schedule_delete_status = parse_json_output_with_http_status(schedule_delete)
             schedule_delete_ok = schedule_delete.returncode == 0 and schedule_delete_status == 204
@@ -12608,9 +12654,11 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
 
             schedule_cleanup_sql = (
                 "WITH deleted_live_schedule AS (DELETE FROM schedules "
-                f"WHERE uuid = {sql_literal(schedule_id)} AND name = {sql_literal(schedule_name)} RETURNING id), "
+                f"WHERE (uuid = {sql_literal(schedule_id)} AND name = {sql_literal(schedule_name)}) "
+                f"OR (uuid = {sql_literal(schedule_clone_id or '')} AND name = {sql_literal(schedule_clone_name)}) RETURNING id), "
                 "deleted_trash_schedule AS (DELETE FROM schedules_trash "
-                f"WHERE uuid = {sql_literal(schedule_id)} AND name = {sql_literal(schedule_name)} RETURNING id) "
+                f"WHERE (uuid = {sql_literal(schedule_id)} AND name = {sql_literal(schedule_name)}) "
+                f"OR (uuid = {sql_literal(schedule_clone_id or '')} AND name = {sql_literal(schedule_clone_name)}) RETURNING id) "
                 "SELECT ((SELECT count(*) FROM deleted_live_schedule) + (SELECT count(*) FROM deleted_trash_schedule));"
             )
             schedule_cleanup = psql(repo_root, schedule_cleanup_sql)
@@ -12619,7 +12667,7 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
             schedule_cleanup_finding = process_step_finding("pass" if schedule_cleanup_ok else "fail", "native-api-direct.schedule-write-cleanup", "Direct write-control smoke found no temporary schedule residue after native hard delete." if schedule_cleanup_ok else "Direct write-control smoke found temporary schedule residue after native hard delete.", schedule_cleanup, ["psql", "fixed-schedule-smoke-cleanup"])
             schedule_cleanup_details = schedule_cleanup_finding.setdefault("details", {})
             if isinstance(schedule_cleanup_details, dict):
-                schedule_cleanup_details.update({"schedule_id": schedule_id, "schedule_name": schedule_name, "deleted_count": schedule_cleanup_deleted})
+                schedule_cleanup_details.update({"schedule_id": schedule_id, "schedule_clone_id": schedule_clone_id, "schedule_name": schedule_name, "schedule_clone_name": schedule_clone_name, "deleted_count": schedule_cleanup_deleted})
             findings.append(schedule_cleanup_finding)
 
             schedule_post_cleanup = direct_native_api_curl(repo_root, f"/api/v1/schedules/{urllib.parse.quote(schedule_id)}", token=token, env=env)
@@ -12885,6 +12933,10 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
         "temporary_port_list_clone_id": port_list_clone_id,
         "temporary_port_list_name": port_list_name,
         "temporary_port_list_clone_name": port_list_clone_name,
+        "temporary_schedule_id": schedule_id,
+        "temporary_schedule_clone_id": schedule_clone_id,
+        "temporary_schedule_name": schedule_name,
+        "temporary_schedule_clone_name": schedule_clone_name,
         "temporary_tag_id": tag_id,
         "temporary_tag_name": tag_name,
         "temporary_tag_resource_id": tag_resource_id,

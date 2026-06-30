@@ -12,6 +12,89 @@ fn patch_request(name: Option<&str>, comment: Option<&str>) -> SchedulePatchRequ
     }
 }
 
+fn clone_request(name: Option<&str>, comment: Option<&str>) -> ScheduleCloneRequest {
+    ScheduleCloneRequest {
+        name: name.map(str::to_string),
+        comment: comment.map(str::to_string),
+    }
+}
+
+#[test]
+fn schedule_clone_request_accepts_default_or_metadata_override() {
+    let default =
+        validate_schedule_clone_request(clone_request(None, None)).expect("default clone metadata");
+    assert_eq!(default.name, None);
+    assert_eq!(default.comment, None);
+
+    let named = validate_schedule_clone_request(clone_request(
+        Some("  copied schedule  "),
+        Some("  copied comment  "),
+    ))
+    .expect("named clone");
+    assert_eq!(named.name.as_deref(), Some("copied schedule"));
+    assert_eq!(named.comment.as_deref(), Some("copied comment"));
+
+    let clear_comment =
+        validate_schedule_clone_request(clone_request(None, Some("   "))).expect("clear comment");
+    assert_eq!(clear_comment.comment.as_deref(), Some(""));
+}
+
+#[test]
+fn schedule_clone_request_rejects_blank_name_control_characters_and_calendar_fields() {
+    assert!(matches!(
+        validate_schedule_clone_request(clone_request(Some("   "), None)),
+        Err(ApiError::BadRequest(_))
+    ));
+    assert!(matches!(
+        validate_schedule_clone_request(clone_request(Some("bad\nname"), None)),
+        Err(ApiError::BadRequest(_))
+    ));
+    for request in [
+        serde_json::json!({"icalendar": "BEGIN:VCALENDAR\nEND:VCALENDAR"}),
+        serde_json::json!({"timezone": "UTC"}),
+        serde_json::json!({"period": 3600}),
+    ] {
+        assert!(serde_json::from_value::<ScheduleCloneRequest>(request).is_err());
+    }
+}
+
+#[test]
+fn schedule_clone_sql_copies_calendar_fields_without_recalculation() {
+    let metadata = schedule_clone_metadata_sql();
+    assert!(metadata.contains("INSERT INTO schedules"));
+    assert!(metadata.contains("make_uuid()"));
+    assert!(metadata.contains("coalesce($3, uniquify('schedule', name, $2, ' Clone'))"));
+    for copied in [
+        "first_time",
+        "period",
+        "period_months",
+        "byday",
+        "duration",
+        "timezone",
+        "icalendar",
+    ] {
+        assert!(
+            metadata.contains(copied),
+            "schedule clone must copy {copied}"
+        );
+    }
+    for forbidden in [
+        "UPDATE tasks",
+        "schedule_next_time",
+        "icalendar_from_string",
+    ] {
+        assert!(
+            !metadata.contains(forbidden),
+            "schedule clone SQL must not perform calendar edit side effect {forbidden}"
+        );
+    }
+
+    let tags = schedule_clone_tags_sql();
+    assert!(tags.contains("INSERT INTO tag_resources"));
+    assert!(tags.contains("resource_type = 'schedule'"));
+    assert!(tags.contains("resource_location = 0"));
+}
+
 #[test]
 fn schedule_restore_sql_moves_metadata_tasks_and_tags_to_live() {
     let state = schedule_trash_state_sql();
@@ -52,6 +135,34 @@ fn schedule_restore_sql_moves_metadata_tasks_and_tags_to_live() {
     assert_eq!(
         schedule_delete_trash_metadata_sql(),
         "DELETE FROM schedules_trash WHERE id = $1;"
+    );
+}
+
+#[test]
+fn schedule_clone_plan_copies_metadata_and_tags_without_calendar_edit_steps() {
+    let named = validate_schedule_clone_request(clone_request(Some("copy"), None))
+        .expect("valid named clone");
+    assert_eq!(
+        schedule_clone_transaction_plan(&named).steps,
+        vec![
+            ScheduleWriteStep::ResolveOperatorOwner,
+            ScheduleWriteStep::VerifyExistingScheduleMutable,
+            ScheduleWriteStep::VerifyUniqueLiveName,
+            ScheduleWriteStep::CloneScheduleMetadata,
+            ScheduleWriteStep::CloneScheduleTags,
+        ]
+    );
+
+    let default =
+        validate_schedule_clone_request(clone_request(None, None)).expect("valid default clone");
+    assert_eq!(
+        schedule_clone_transaction_plan(&default).steps,
+        vec![
+            ScheduleWriteStep::ResolveOperatorOwner,
+            ScheduleWriteStep::VerifyExistingScheduleMutable,
+            ScheduleWriteStep::CloneScheduleMetadata,
+            ScheduleWriteStep::CloneScheduleTags,
+        ]
     );
 }
 

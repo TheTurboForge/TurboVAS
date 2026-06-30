@@ -27,8 +27,23 @@ pub(crate) struct SchedulePatchRequest {
     comment: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ScheduleCloneRequest {
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    comment: Option<String>,
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct ValidatedSchedulePatch {
+    pub(crate) name: Option<String>,
+    pub(crate) comment: Option<String>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct ValidatedScheduleClone {
     pub(crate) name: Option<String>,
     pub(crate) comment: Option<String>,
 }
@@ -36,6 +51,40 @@ pub(crate) struct ValidatedSchedulePatch {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ScheduleWriteRecord {
     uuid: String,
+}
+
+pub(crate) async fn clone_schedule(
+    State(state): State<AppState>,
+    Path(schedule_id): Path<String>,
+    operator: Option<Extension<DirectApiOperator>>,
+    Json(request): Json<ScheduleCloneRequest>,
+) -> Result<(StatusCode, Json<ScheduleAssetDetail>), ApiError> {
+    let operator = require_schedule_write_operator(operator)?;
+    let request = validate_schedule_clone_request(request)?;
+    let mut client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let tx = client
+        .transaction()
+        .await
+        .map_err(|error| map_schedule_write_db_error(error, "begin clone schedule transaction"))?;
+    let owner_id = resolve_schedule_write_operator_owner(&tx, &operator).await?;
+    tx.batch_execute(
+        "LOCK TABLE schedules, schedules_trash, tag_resources IN SHARE ROW EXCLUSIVE MODE;",
+    )
+    .await
+    .map_err(|error| map_schedule_write_db_error(error, "lock schedule tables for clone"))?;
+    let source = load_schedule_write_state(&tx, &schedule_id).await?;
+    if let Some(name) = request.name.as_ref() {
+        ensure_unique_schedule_name(&tx, name, -1).await?;
+    }
+    let record =
+        execute_schedule_clone_transaction(&tx, source.internal_id, owner_id, &request).await?;
+    tx.commit()
+        .await
+        .map_err(|error| map_schedule_write_db_error(error, "commit clone schedule transaction"))?;
+    Ok((
+        StatusCode::CREATED,
+        Json(load_schedule_asset_detail(&client, &record.uuid).await?),
+    ))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -143,6 +192,7 @@ pub(crate) async fn restore_schedule(
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ScheduleWriteOperation {
     Create,
+    Clone,
     Patch,
     Delete,
     Restore,
@@ -222,6 +272,8 @@ pub(crate) enum ScheduleWriteStep {
     VerifyTaskDeleteSafety,
     VerifyTrashTaskDeleteSafety,
     InsertSchedule,
+    CloneScheduleMetadata,
+    CloneScheduleTags,
     UpdateScheduleMetadata,
     RefreshTaskNextTimes,
     MoveScheduleToTrash,
@@ -351,6 +403,15 @@ pub(crate) fn validate_schedule_patch_request(
         ));
     }
     Ok(validated)
+}
+
+pub(crate) fn validate_schedule_clone_request(
+    request: ScheduleCloneRequest,
+) -> Result<ValidatedScheduleClone, ApiError> {
+    Ok(ValidatedScheduleClone {
+        name: normalize_optional_required_schedule_text(request.name, "name")?,
+        comment: normalize_optional_schedule_text(request.comment, "comment")?,
+    })
 }
 
 fn normalize_optional_required_schedule_text(
@@ -494,6 +555,38 @@ pub(crate) async fn execute_schedule_patch_transaction(
     .await
 }
 
+pub(crate) async fn execute_schedule_clone_transaction(
+    tx: &Transaction<'_>,
+    source_schedule_internal_id: i32,
+    owner_id: i32,
+    request: &ValidatedScheduleClone,
+) -> Result<ScheduleWriteRecord, ApiError> {
+    let record = query_schedule_trash_write_record(
+        tx,
+        schedule_clone_metadata_sql(),
+        &[
+            &source_schedule_internal_id,
+            &owner_id,
+            &request.name,
+            &request.comment,
+        ],
+        "clone schedule metadata",
+    )
+    .await?;
+    execute_schedule_write_sql(
+        tx,
+        schedule_clone_tags_sql(),
+        &[
+            &source_schedule_internal_id,
+            &record.internal_id,
+            &record.uuid,
+        ],
+        "clone schedule tags",
+    )
+    .await?;
+    Ok(ScheduleWriteRecord { uuid: record.uuid })
+}
+
 pub(crate) async fn execute_schedule_restore_transaction(
     tx: &Transaction<'_>,
     schedule_trash_internal_id: i32,
@@ -534,6 +627,27 @@ pub(crate) async fn execute_schedule_restore_transaction(
     )
     .await?;
     Ok(ScheduleWriteRecord { uuid: record.uuid })
+}
+
+#[cfg(test)]
+pub(crate) fn schedule_clone_transaction_plan(
+    request: &ValidatedScheduleClone,
+) -> ScheduleWriteTransactionPlan {
+    let mut steps = vec![
+        ScheduleWriteStep::ResolveOperatorOwner,
+        ScheduleWriteStep::VerifyExistingScheduleMutable,
+    ];
+    if request.name.is_some() {
+        steps.push(ScheduleWriteStep::VerifyUniqueLiveName);
+    }
+    steps.extend([
+        ScheduleWriteStep::CloneScheduleMetadata,
+        ScheduleWriteStep::CloneScheduleTags,
+    ]);
+    ScheduleWriteTransactionPlan {
+        operation: ScheduleWriteOperation::Clone,
+        steps,
+    }
 }
 
 pub(crate) async fn execute_schedule_hard_delete_transaction(

@@ -47,7 +47,9 @@ use crate::{
     result_payloads::*,
     scan_configs::*,
     scanner_assets::*,
-    schedule_writes::{delete_schedule, hard_delete_schedule, patch_schedule, restore_schedule},
+    schedule_writes::{
+        clone_schedule, delete_schedule, hard_delete_schedule, patch_schedule, restore_schedule,
+    },
     schedules::*,
     scope_payloads::*,
     scope_report_applications::scope_report_applications,
@@ -276,6 +278,7 @@ pub(crate) fn direct_native_api_router(
             .route("/api/v1/port-lists", post(create_port_list))
             .route("/api/v1/schedules/:schedule_id", patch(patch_schedule))
             .route("/api/v1/schedules/:schedule_id", delete(delete_schedule))
+            .route("/api/v1/schedules/:schedule_id/clone", post(clone_schedule))
             .route(
                 "/api/v1/schedules/:schedule_id/restore",
                 post(restore_schedule),
