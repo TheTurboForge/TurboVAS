@@ -95,6 +95,8 @@ mod direct_api_contract_tests;
 #[cfg(test)]
 mod filter_characterization_tests;
 #[cfg(test)]
+mod gsa_sort_contract_tests;
+#[cfg(test)]
 mod port_list_characterization_tests;
 #[cfg(test)]
 mod report_config_characterization_tests;
