@@ -11,7 +11,6 @@ use axum::{
 use crate::{
     alerts::*,
     app_state::{AppState, healthz},
-    catalog_payloads::*,
     cert_advisories::*,
     cpe_catalog::*,
     cve_catalog::*,
@@ -19,6 +18,7 @@ use crate::{
     filters::*,
     host_assets::*,
     metrics_payloads::*,
+    nvt_catalog::*,
     operating_systems::*,
     overrides::*,
     port_lists::*,

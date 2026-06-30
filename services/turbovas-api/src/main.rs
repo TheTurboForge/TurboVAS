@@ -5,7 +5,6 @@
 mod alerts;
 mod app_state;
 mod auth;
-mod catalog_payloads;
 mod cert_advisories;
 mod collections;
 mod cpe_catalog;
@@ -17,6 +16,7 @@ mod filters;
 mod formatters;
 mod host_assets;
 mod metrics_payloads;
+mod nvt_catalog;
 mod nvt_payloads;
 mod operating_systems;
 mod operator_identity;

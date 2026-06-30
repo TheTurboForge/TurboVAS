@@ -924,8 +924,8 @@ fn cpe_catalog_detail_resolves_deprecated_by_by_cpe_name() {
 
 #[test]
 fn nvt_detail_user_tags_are_detail_only_active_info_tags() {
-    let source = include_str!("catalog_payloads.rs");
-    let catalog_payload_source = include_str!("catalog_payloads.rs");
+    let source = include_str!("nvt_catalog.rs");
+    let catalog_payload_source = include_str!("nvt_catalog.rs");
     let nvt_item_payload = catalog_payload_source
         .split_once("struct NvtCatalogItem {")
         .expect("NVT catalog item payload must exist")
@@ -1075,7 +1075,7 @@ fn collection_handlers_use_api_query_contract_extractor() {
     let source = [
         include_str!("main.rs"),
         include_str!("alerts.rs"),
-        include_str!("catalog_payloads.rs"),
+        include_str!("nvt_catalog.rs"),
         include_str!("cpe_catalog.rs"),
         include_str!("cve_catalog.rs"),
         include_str!("cert_advisories.rs"),
