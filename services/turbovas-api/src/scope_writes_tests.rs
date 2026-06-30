@@ -384,8 +384,8 @@ fn scope_write_handlers_require_operator_transactions_and_payload_reload() {
         .split_once("pub(crate) async fn delete_scope")
         .expect("delete handler must exist")
         .1
-        .split_once("pub(crate) fn validate_scope_create_request")
-        .expect("delete handler must precede DTO validation")
+        .split_once("fn require_scope_write_operator")
+        .expect("delete handler must precede operator guard")
         .0;
 
     for body in [create_body, patch_body, delete_body] {

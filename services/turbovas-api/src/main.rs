@@ -73,6 +73,7 @@ mod scope_report_results;
 mod scope_report_retention;
 mod scope_report_tls_certificates;
 mod scope_reports;
+mod scope_write_validation;
 mod scope_writes;
 mod startup;
 mod tag_payloads;
