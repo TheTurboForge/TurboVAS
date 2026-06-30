@@ -23,7 +23,7 @@ use crate::{
     overrides::*,
     port_lists::*,
     report_applications::report_applications,
-    report_config_writes::create_report_config,
+    report_config_writes::{create_report_config, patch_report_config},
     report_configs::*,
     report_cves::report_cves,
     report_errors::report_errors,
@@ -218,6 +218,10 @@ pub(crate) fn direct_native_api_router(
             .route("/api/v1/scopes/:scope_id", patch(patch_scope))
             .route("/api/v1/scopes/:scope_id", delete(delete_scope))
             .route("/api/v1/report-configs", post(create_report_config))
+            .route(
+                "/api/v1/report-configs/:report_config_id",
+                patch(patch_report_config),
+            )
             .route("/api/v1/tags", post(create_tag))
             .route("/api/v1/tags/:tag_id", patch(patch_tag))
             .route("/api/v1/tags/:tag_id", delete(delete_tag))

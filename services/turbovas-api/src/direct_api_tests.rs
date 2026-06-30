@@ -364,9 +364,14 @@ fn direct_api_method_classifier_gates_scope_writes_on_write_control_flag() {
         "/api/v1/report-configs",
         false
     ));
-    assert!(!direct_api_v1_method_is_allowed(
+    assert!(direct_api_v1_method_is_allowed(
         &Method::PATCH,
         "/api/v1/report-configs/12345678-1234-1234-1234-123456789abc",
+        true
+    ));
+    assert!(!direct_api_v1_method_is_allowed(
+        &Method::PATCH,
+        "/api/v1/report-configs/not-a-uuid",
         true
     ));
 }

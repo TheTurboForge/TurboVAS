@@ -4,7 +4,7 @@
 
 use axum::{
     Json,
-    extract::{Extension, State},
+    extract::{Extension, Path, State},
     http::{HeaderMap, HeaderValue, StatusCode, header},
 };
 use serde::Deserialize;
@@ -40,14 +40,11 @@ pub(crate) struct ReportConfigCreateRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-#[cfg(test)]
 pub(crate) struct ReportConfigPatchRequest {
     #[serde(default)]
     name: Option<String>,
     #[serde(default)]
     comment: Option<String>,
-    #[serde(default)]
-    report_format_id: Option<String>,
     #[serde(default)]
     params: Option<Vec<ReportConfigParamWriteRequest>>,
 }
@@ -67,11 +64,9 @@ pub(crate) struct ValidatedReportConfigCreate {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-#[cfg(test)]
 pub(crate) struct ValidatedReportConfigPatch {
     pub(crate) name: Option<String>,
     pub(crate) comment: Option<String>,
-    pub(crate) report_format_id: Option<String>,
     pub(crate) params: Option<Vec<ValidatedReportConfigParamWrite>>,
 }
 
@@ -79,6 +74,13 @@ pub(crate) struct ValidatedReportConfigPatch {
 pub(crate) struct ReportConfigWriteRecord {
     pub(crate) internal_id: i32,
     pub(crate) uuid: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ReportConfigWriteState {
+    internal_id: i32,
+    uuid: String,
+    report_format_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -156,6 +158,42 @@ pub(crate) async fn create_report_config(
     ))
 }
 
+pub(crate) async fn patch_report_config(
+    State(state): State<AppState>,
+    Path(report_config_id): Path<String>,
+    operator: Option<Extension<DirectApiOperator>>,
+    Json(request): Json<ReportConfigPatchRequest>,
+) -> Result<Json<ReportConfigAssetItem>, ApiError> {
+    let operator = require_report_config_write_operator(operator)?;
+    let request = validate_report_config_patch_request(request)?;
+    let mut client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let tx = client.transaction().await.map_err(|error| {
+        map_report_config_write_db_error(error, "begin patch report config transaction")
+    })?;
+    resolve_report_config_write_operator_owner(&tx, &operator).await?;
+    tx.batch_execute("LOCK TABLE report_configs IN SHARE ROW EXCLUSIVE MODE;")
+        .await
+        .map_err(|error| {
+            map_report_config_write_db_error(error, "lock report configs for patch")
+        })?;
+    let state = load_report_config_write_state(&tx, &report_config_id).await?;
+    if let Some(params) = request.params.as_ref() {
+        let format = load_report_config_format_state(&tx, &state.report_format_id).await?;
+        validate_report_config_param_values(params, &format)?;
+    }
+    if let Some(name) = request.name.as_ref() {
+        ensure_unique_live_report_config_name(&tx, name, Some(state.internal_id)).await?;
+    }
+    let record = execute_report_config_patch_transaction(&tx, state.internal_id, &request).await?;
+    tx.commit().await.map_err(|error| {
+        map_report_config_write_db_error(error, "commit patch report config transaction")
+    })?;
+
+    Ok(Json(
+        load_report_config_asset_detail(&client, &record.uuid).await?,
+    ))
+}
+
 fn require_report_config_write_operator(
     operator: Option<Extension<DirectApiOperator>>,
 ) -> Result<DirectApiOperator, ApiError> {
@@ -177,27 +215,18 @@ pub(crate) fn validate_report_config_create_request(
     })
 }
 
-#[cfg(test)]
 pub(crate) fn validate_report_config_patch_request(
     request: ReportConfigPatchRequest,
 ) -> Result<ValidatedReportConfigPatch, ApiError> {
     let validated = ValidatedReportConfigPatch {
         name: normalize_optional_required_report_config_text(request.name, "name")?,
         comment: normalize_optional_report_config_text(request.comment, "comment")?,
-        report_format_id: request
-            .report_format_id
-            .map(normalize_report_format_id)
-            .transpose()?,
         params: request
             .params
             .map(normalize_report_config_params)
             .transpose()?,
     };
-    if validated.name.is_none()
-        && validated.comment.is_none()
-        && validated.report_format_id.is_none()
-        && validated.params.is_none()
-    {
+    if validated.name.is_none() && validated.comment.is_none() && validated.params.is_none() {
         return Err(ApiError::BadRequest(
             "report config patch request must include at least one field".to_string(),
         ));
@@ -230,14 +259,15 @@ pub(crate) fn report_config_patch_transaction_plan(
         ReportConfigWriteStep::ResolveOperatorOwner,
         ReportConfigWriteStep::VerifyExistingReportConfigMutable,
     ];
-    if request.report_format_id.is_some() || request.params.is_some() {
-        steps.push(ReportConfigWriteStep::VerifyReportFormatVisible);
+    if request.params.is_some() {
         steps.push(ReportConfigWriteStep::VerifyReportFormatParams);
     }
     if request.name.is_some() {
         steps.push(ReportConfigWriteStep::VerifyUniqueLiveName);
     }
-    steps.push(ReportConfigWriteStep::UpdateReportConfigMetadata);
+    if request.name.is_some() || request.comment.is_some() {
+        steps.push(ReportConfigWriteStep::UpdateReportConfigMetadata);
+    }
     if request.params.is_some() {
         steps.push(ReportConfigWriteStep::ReplaceReportConfigParams);
     }
@@ -271,7 +301,6 @@ fn normalize_required_report_config_text(
     }
 }
 
-#[cfg(test)]
 fn normalize_optional_required_report_config_text(
     value: Option<String>,
     field_name: &str,
@@ -609,6 +638,42 @@ pub(crate) async fn execute_report_config_create_transaction(
     Ok(record)
 }
 
+pub(crate) async fn execute_report_config_patch_transaction(
+    tx: &Transaction<'_>,
+    report_config_internal_id: i32,
+    request: &ValidatedReportConfigPatch,
+) -> Result<ReportConfigWriteRecord, ApiError> {
+    let mut record = if request.name.is_some() || request.comment.is_some() {
+        query_report_config_write_record(
+            tx,
+            report_config_update_metadata_sql(),
+            &[&report_config_internal_id, &request.name, &request.comment],
+            "update report config metadata",
+        )
+        .await?
+    } else {
+        query_report_config_write_record(
+            tx,
+            report_config_by_internal_id_sql(),
+            &[&report_config_internal_id],
+            "load report config after params-only patch",
+        )
+        .await?
+    };
+
+    if let Some(params) = request.params.as_ref() {
+        replace_report_config_params(tx, record.internal_id, params).await?;
+        record = query_report_config_write_record(
+            tx,
+            report_config_touch_sql(),
+            &[&record.internal_id],
+            "touch report config after params patch",
+        )
+        .await?;
+    }
+    Ok(record)
+}
+
 async fn replace_report_config_params(
     tx: &Transaction<'_>,
     report_config_internal_id: i32,
@@ -633,6 +698,22 @@ async fn replace_report_config_params(
     Ok(())
 }
 
+async fn load_report_config_write_state(
+    tx: &Transaction<'_>,
+    report_config_id: &str,
+) -> Result<ReportConfigWriteState, ApiError> {
+    let report_config_id = parse_uuid(report_config_id)?.to_string();
+    tx.query_opt(report_config_write_state_sql(), &[&report_config_id])
+        .await
+        .map_err(|error| map_report_config_write_db_error(error, "load report config write state"))?
+        .map(|row| ReportConfigWriteState {
+            internal_id: row.get(0),
+            uuid: row.get(1),
+            report_format_id: row.get(2),
+        })
+        .ok_or(ApiError::NotFound)
+}
+
 async fn query_report_config_write_record(
     tx: &Transaction<'_>,
     sql: &str,
@@ -644,6 +725,14 @@ async fn query_report_config_write_record(
         .map_err(|error| map_report_config_write_db_error(error, action))?
         .map(|row| report_config_write_record_from_row(&row))
         .ok_or(ApiError::NotFound)
+}
+
+pub(crate) fn report_config_write_state_sql() -> &'static str {
+    "SELECT id::integer,
+            uuid::text,
+            coalesce(report_format_id, '')::text
+       FROM report_configs
+      WHERE uuid = $1;"
 }
 
 async fn execute_report_config_write_sql(
@@ -725,6 +814,28 @@ pub(crate) fn report_config_insert_sql() -> &'static str {
         (uuid, name, comment, report_format_id, owner, creation_time, modification_time)
      VALUES (make_uuid(), $1, $2, $3, $4, m_now(), m_now())
      RETURNING id::integer, uuid::text;"
+}
+
+pub(crate) fn report_config_update_metadata_sql() -> &'static str {
+    "UPDATE report_configs
+        SET name = coalesce($2, name),
+            comment = coalesce($3, comment),
+            modification_time = m_now()
+      WHERE id = $1
+      RETURNING id::integer, uuid::text;"
+}
+
+pub(crate) fn report_config_touch_sql() -> &'static str {
+    "UPDATE report_configs
+        SET modification_time = m_now()
+      WHERE id = $1
+      RETURNING id::integer, uuid::text;"
+}
+
+pub(crate) fn report_config_by_internal_id_sql() -> &'static str {
+    "SELECT id::integer, uuid::text
+       FROM report_configs
+      WHERE id = $1;"
 }
 
 pub(crate) fn report_config_delete_params_sql() -> &'static str {

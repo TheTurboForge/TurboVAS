@@ -339,6 +339,9 @@ fn direct_api_v1_write_method_path_is_allowed(method: &Method, path: &str) -> bo
             direct_api_write_id_segment_is_allowed(tag_id)
         }
         (&Method::POST, ["", "api", "v1", "report-configs"]) => true,
+        (&Method::PATCH, ["", "api", "v1", "report-configs", report_config_id]) => {
+            direct_api_write_id_segment_is_allowed(report_config_id)
+        }
         _ => false,
     }
 }

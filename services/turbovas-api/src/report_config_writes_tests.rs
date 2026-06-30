@@ -77,7 +77,6 @@ fn report_config_patch_request_requires_explicit_field_and_preserves_param_value
     let empty = ReportConfigPatchRequest {
         name: None,
         comment: None,
-        report_format_id: None,
         params: None,
     };
     assert!(matches!(
@@ -95,10 +94,17 @@ fn report_config_patch_request_requires_explicit_field_and_preserves_param_value
     let validated = validate_report_config_patch_request(patch).expect("valid patch");
 
     assert_eq!(validated.name.as_deref(), Some("Renamed"));
-    assert_eq!(validated.report_format_id, None);
     assert_eq!(
         validated.params.expect("params replacement")[0].value,
         "  keep outer spaces  "
+    );
+
+    assert!(
+        serde_json::from_str::<ReportConfigPatchRequest>(
+            r#"{"report_format_id":"12345678-1234-1234-1234-123456789abc"}"#,
+        )
+        .is_err(),
+        "patch deliberately does not change the report format"
     );
 }
 
@@ -162,7 +168,6 @@ fn report_config_write_transaction_plans_keep_validation_before_mutation() {
     let patch = validate_report_config_patch_request(ReportConfigPatchRequest {
         name: Some("renamed".to_string()),
         comment: None,
-        report_format_id: Some("12345678-1234-1234-1234-123456789abc".to_string()),
         params: Some(vec![ReportConfigParamWriteRequest {
             name: "timezone".to_string(),
             value: "CET".to_string(),
@@ -174,7 +179,6 @@ fn report_config_write_transaction_plans_keep_validation_before_mutation() {
         vec![
             ReportConfigWriteStep::ResolveOperatorOwner,
             ReportConfigWriteStep::VerifyExistingReportConfigMutable,
-            ReportConfigWriteStep::VerifyReportFormatVisible,
             ReportConfigWriteStep::VerifyReportFormatParams,
             ReportConfigWriteStep::VerifyUniqueLiveName,
             ReportConfigWriteStep::UpdateReportConfigMetadata,
