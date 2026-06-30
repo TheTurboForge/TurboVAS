@@ -230,6 +230,31 @@ class TurboVASCtlTests(unittest.TestCase):
             self.assertIn("artifacts", decoded)
             self.assertIn("metadata", decoded)
 
+    def test_command_logs_accepts_service_and_line_count(self):
+        commands: list[tuple[str, ...]] = []
+
+        def fake_run_command(command, *_args, **_kwargs):
+            commands.append(tuple(command))
+            return turbovasctl.subprocess.CompletedProcess(command, 0, "one\ntwo\nthree\n", "")
+
+        with tempfile.TemporaryDirectory() as tmp, unittest.mock.patch.object(turbovasctl, "run_command", side_effect=fake_run_command):
+            result = turbovasctl.command_logs(Path(tmp), service="turbovas-api", lines=2)
+
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(commands[0][-4:], ("logs", "--tail", "2", "turbovas-api"))
+        details = result["findings"][0]["details"]
+        self.assertEqual(details["service"], "turbovas-api")
+        self.assertEqual(details["lines"], 2)
+        self.assertEqual(details["output_tail"], ["two", "three"])
+
+    def test_command_logs_rejects_non_positive_line_count(self):
+        with tempfile.TemporaryDirectory() as tmp, unittest.mock.patch.object(turbovasctl, "run_command") as run_command:
+            result = turbovasctl.command_logs(Path(tmp), service="turbovas-api", lines=0)
+
+        self.assertEqual(result["status"], "fail")
+        self.assertEqual(result["findings"][0]["check"], "compose.logs.invalid_lines")
+        run_command.assert_not_called()
+
     def test_license_status_only_omits_pass_manifest_details(self):
         result = {
             "status": "pass",

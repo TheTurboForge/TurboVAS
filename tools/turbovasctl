@@ -15029,16 +15029,19 @@ def command_down(repo_root: Path) -> dict[str, Any]:
     return make_result("down", repo_root, "Runtime infrastructure shutdown attempted.", findings)
 
 
-def command_logs(repo_root: Path, service: str | None = None) -> dict[str, Any]:
-    command = compose_command(repo_root, "logs", "--tail", "120")
+def command_logs(repo_root: Path, service: str | None = None, lines: int = 120) -> dict[str, Any]:
+    if lines < 1:
+        findings = [finding("fail", "compose.logs.invalid_lines", "--lines must be 1 or greater.", details={"service": service, "lines": lines})]
+        return make_result("logs", repo_root, "Runtime logs were not collected.", findings)
+    command = compose_command(repo_root, "logs", "--tail", str(lines))
     if service:
         command.append(service)
     result = run_command(command, repo_root, env=runtime_env(repo_root))
-    output_tail = result.stdout.splitlines()[-120:]
+    output_tail = result.stdout.splitlines()[-lines:]
     message = f"docker compose logs exit code {result.returncode}."
     if output_tail:
         message += "\n" + "\n".join(output_tail)
-    findings = [finding("pass" if result.returncode == 0 else "fail", "compose.logs", message, details={"service": service, "output_tail": output_tail})]
+    findings = [finding("pass" if result.returncode == 0 else "fail", "compose.logs", message, details={"service": service, "lines": lines, "output_tail": output_tail})]
     return make_result("logs", repo_root, "Runtime logs collected.", findings)
 
 
@@ -15734,6 +15737,8 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("down", parents=[common], help="stop runtime infrastructure services")
     logs = subparsers.add_parser("logs", parents=[common], help="show runtime logs")
     logs.add_argument("service", nargs="?", help="optional Compose service name")
+    logs.add_argument("--service", dest="service_option", help="optional Compose service name; alias for the positional service argument")
+    logs.add_argument("--lines", type=int, default=120, help="number of log lines to request and retain; defaults to 120")
     subparsers.add_parser("runtime-init", parents=[common], help="initialize persistent runtime database prerequisites")
     subparsers.add_parser("runtime-certs-init", parents=[common], help="initialize persistent runtime certificates")
     subparsers.add_parser("runtime-manager-init", parents=[common], help="initialize persistent gvmd database/user prerequisites")
@@ -15885,7 +15890,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "down":
         result = command_down(repo_root)
     elif args.command == "logs":
-        result = command_logs(repo_root, args.service)
+        result = command_logs(repo_root, args.service_option or args.service, args.lines)
     elif args.command == "runtime-init":
         result = command_runtime_init(repo_root)
     elif args.command == "runtime-certs-init":
