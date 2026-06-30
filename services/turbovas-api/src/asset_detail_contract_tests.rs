@@ -200,7 +200,7 @@ fn cpe_catalog_detail_resolves_deprecated_by_by_cpe_name() {
 #[test]
 fn nvt_detail_user_tags_are_detail_only_active_info_tags() {
     let source = include_str!("nvt_catalog.rs");
-    let catalog_payload_source = include_str!("nvt_catalog.rs");
+    let catalog_payload_source = include_str!("nvt_catalog_payloads.rs");
     let nvt_item_payload = catalog_payload_source
         .split_once("struct NvtCatalogItem {")
         .expect("NVT catalog item payload must exist")
@@ -211,10 +211,7 @@ fn nvt_detail_user_tags_are_detail_only_active_info_tags() {
     let nvt_detail_source = source
         .split_once("pub(crate) async fn nvt_catalog_detail")
         .expect("NVT catalog detail handler must exist")
-        .1
-        .split_once("#[derive(Debug, Serialize)]")
-        .expect("NVT catalog detail handler must precede payload structs")
-        .0;
+        .1;
     let nvt_list_source = source
         .split_once("pub(crate) async fn nvt_catalog(")
         .expect("NVT catalog list handler must exist")
