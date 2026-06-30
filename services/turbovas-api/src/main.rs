@@ -14,6 +14,7 @@ mod errors;
 mod feeds;
 mod filters;
 mod formatters;
+mod host_asset_payloads;
 mod host_assets;
 mod metrics_payloads;
 mod nvt_catalog;

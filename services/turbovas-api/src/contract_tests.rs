@@ -1081,6 +1081,7 @@ fn collection_handlers_use_api_query_contract_extractor() {
         include_str!("cve_catalog.rs"),
         include_str!("cert_advisories.rs"),
         include_str!("filters.rs"),
+        include_str!("host_asset_payloads.rs"),
         include_str!("host_assets.rs"),
         include_str!("operating_systems.rs"),
         include_str!("overrides.rs"),
@@ -1731,15 +1732,15 @@ fn operating_system_user_tags_are_active_os_tags_only() {
 
 #[test]
 fn host_user_tags_are_detail_only_active_host_tags() {
-    let source = include_str!("host_assets.rs");
-    let host_list_payload = source
+    let payload_source = include_str!("host_asset_payloads.rs");
+    let host_list_payload = payload_source
         .split_once("pub(crate) struct HostAssetItem {")
         .expect("host list payload struct must exist")
         .1
         .split_once("pub(crate) struct HostAssetDetailIdentifier")
         .expect("host list payload struct must precede detail identifiers")
         .0;
-    let host_detail_payload = source
+    let host_detail_payload = payload_source
         .split_once("pub(crate) struct HostAssetDetail {")
         .expect("host detail payload struct must exist")
         .1
