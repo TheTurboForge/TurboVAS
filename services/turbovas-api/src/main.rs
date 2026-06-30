@@ -64,6 +64,7 @@ mod startup;
 mod tag_resource_helpers;
 mod tag_writes;
 mod tags;
+mod task_target_payloads;
 mod task_targets;
 mod tls_certificates;
 mod trashcan;
