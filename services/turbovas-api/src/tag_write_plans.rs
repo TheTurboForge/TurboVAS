@@ -12,7 +12,7 @@ pub(crate) enum TagWriteOperation {
     CreateMetadata,
     CloneMetadataAndAssignments,
     PatchMetadata,
-    DeleteMetadata,
+    MoveToTrash,
     UpdateResourceAssignments,
 }
 
@@ -21,12 +21,13 @@ pub(crate) enum TagWriteStep {
     ResolveOperatorOwner,
     VerifyResourceTypeSupported,
     VerifyTagExists,
-    VerifyTagUnassigned,
     VerifyResourceExists,
     InsertMetadata,
+    InsertTrashMetadata,
     CopyResourceAssignments,
+    MoveTagAsResourceLinks,
     UpdateMetadata,
-    DeleteMetadata,
+    DeleteLiveMetadata,
     InsertResourceAssignment,
     DeleteResourceAssignment,
     TouchMetadata,
@@ -96,12 +97,16 @@ pub(crate) fn tag_patch_transaction_plan(_request: &ValidatedTagPatch) -> TagWri
 
 pub(crate) fn tag_delete_transaction_plan() -> TagWriteTransactionPlan {
     TagWriteTransactionPlan {
-        operation: TagWriteOperation::DeleteMetadata,
+        operation: TagWriteOperation::MoveToTrash,
         steps: vec![
             TagWriteStep::ResolveOperatorOwner,
             TagWriteStep::VerifyTagExists,
-            TagWriteStep::VerifyTagUnassigned,
-            TagWriteStep::DeleteMetadata,
+            TagWriteStep::VerifyResourceTypeSupported,
+            TagWriteStep::InsertTrashMetadata,
+            TagWriteStep::CopyResourceAssignments,
+            TagWriteStep::MoveTagAsResourceLinks,
+            TagWriteStep::DeleteResourceAssignment,
+            TagWriteStep::DeleteLiveMetadata,
         ],
     }
 }

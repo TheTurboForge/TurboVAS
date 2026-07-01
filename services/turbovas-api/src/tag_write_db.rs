@@ -36,6 +36,13 @@ pub(crate) struct TagWriteState {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TagTrashWriteState {
+    pub(crate) internal_id: i32,
+    pub(crate) uuid: String,
+    pub(crate) resource_type: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct TagResourceWriteRecord {
     internal_id: i32,
     uuid: String,
@@ -99,13 +106,39 @@ pub(crate) async fn load_tag_write_state(
     })
 }
 
-pub(crate) async fn load_unassigned_tag_write_state(
+pub(crate) async fn load_tag_trash_state(
     tx: &Transaction<'_>,
     tag_id: &str,
-) -> Result<TagWriteState, ApiError> {
-    let state = load_tag_write_state(tx, tag_id).await?;
-    ensure_tag_is_unassigned(state.resource_count)?;
-    Ok(state)
+) -> Result<TagTrashWriteState, ApiError> {
+    let tag_id = parse_uuid(tag_id)?.to_string();
+    let row = tx
+        .query_opt(tag_trash_state_sql(), &[&tag_id])
+        .await
+        .map_err(|error| map_tag_write_db_error(error, "load tag trash state"))?
+        .ok_or(ApiError::NotFound)?;
+    Ok(TagTrashWriteState {
+        internal_id: row.get(0),
+        uuid: row.get(1),
+        resource_type: row.get(2),
+    })
+}
+
+pub(crate) async fn ensure_tag_uuid_not_live(
+    tx: &Transaction<'_>,
+    tag_uuid: &str,
+) -> Result<(), ApiError> {
+    let count: i64 = tx
+        .query_one(tag_live_uuid_conflict_sql(), &[&tag_uuid])
+        .await
+        .map_err(|error| map_tag_write_db_error(error, "check live tag uuid conflict"))?
+        .get(0);
+    if count == 0 {
+        Ok(())
+    } else {
+        Err(ApiError::Conflict(
+            "tag with the same id already exists".to_string(),
+        ))
+    }
 }
 
 pub(crate) fn ensure_tag_resource_direct_write_type_is_supported(
@@ -139,6 +172,113 @@ pub(crate) async fn execute_tag_create_transaction(
         "insert tag metadata",
     )
     .await
+}
+
+pub(crate) async fn execute_tag_trash_transaction(
+    tx: &Transaction<'_>,
+    tag_internal_id: i32,
+) -> Result<TagWriteRecord, ApiError> {
+    let record = query_tag_write_record(
+        tx,
+        tag_trash_insert_sql(),
+        &[&tag_internal_id],
+        "move tag metadata to trash",
+    )
+    .await?;
+    tx.execute(
+        tag_trash_resources_insert_sql(),
+        &[&tag_internal_id, &record.internal_id],
+    )
+    .await
+    .map_err(|error| map_tag_write_db_error(error, "move tag resources to trash"))?;
+    tx.execute(
+        tag_live_tag_locations_to_trash_sql(),
+        &[&tag_internal_id, &record.internal_id],
+    )
+    .await
+    .map_err(|error| map_tag_write_db_error(error, "move live tag-as-resource links to trash"))?;
+    tx.execute(
+        tag_trash_tag_locations_to_trash_sql(),
+        &[&tag_internal_id, &record.internal_id],
+    )
+    .await
+    .map_err(|error| {
+        map_tag_write_db_error(error, "move trashed tag-as-resource links to trash")
+    })?;
+    tx.execute(tag_delete_live_resources_sql(), &[&tag_internal_id])
+        .await
+        .map_err(|error| map_tag_write_db_error(error, "delete live tag resources"))?;
+    tx.execute(tag_delete_live_metadata_sql(), &[&tag_internal_id])
+        .await
+        .map_err(|error| map_tag_write_db_error(error, "delete live tag metadata"))?;
+    Ok(record)
+}
+
+pub(crate) async fn execute_tag_restore_transaction(
+    tx: &Transaction<'_>,
+    tag_trash_internal_id: i32,
+) -> Result<TagWriteRecord, ApiError> {
+    let record = query_tag_write_record(
+        tx,
+        tag_restore_metadata_sql(),
+        &[&tag_trash_internal_id],
+        "restore tag metadata from trash",
+    )
+    .await?;
+    tx.execute(
+        tag_restore_resources_sql(),
+        &[&tag_trash_internal_id, &record.internal_id],
+    )
+    .await
+    .map_err(|error| map_tag_write_db_error(error, "restore tag resources from trash"))?;
+    tx.execute(tag_delete_trash_resources_sql(), &[&tag_trash_internal_id])
+        .await
+        .map_err(|error| {
+            map_tag_write_db_error(error, "delete tag trash resources after restore")
+        })?;
+    tx.execute(
+        tag_live_tag_locations_to_live_sql(),
+        &[&tag_trash_internal_id, &record.internal_id],
+    )
+    .await
+    .map_err(|error| map_tag_write_db_error(error, "restore live tag-as-resource links"))?;
+    tx.execute(
+        tag_trash_tag_locations_to_live_sql(),
+        &[&tag_trash_internal_id, &record.internal_id],
+    )
+    .await
+    .map_err(|error| map_tag_write_db_error(error, "restore trashed tag-as-resource links"))?;
+    tx.execute(tag_delete_trash_metadata_sql(), &[&tag_trash_internal_id])
+        .await
+        .map_err(|error| {
+            map_tag_write_db_error(error, "delete tag trash metadata after restore")
+        })?;
+    Ok(record)
+}
+
+pub(crate) async fn execute_tag_hard_delete_transaction(
+    tx: &Transaction<'_>,
+    tag_trash_internal_id: i32,
+) -> Result<(), ApiError> {
+    tx.execute(tag_delete_trash_resources_sql(), &[&tag_trash_internal_id])
+        .await
+        .map_err(|error| map_tag_write_db_error(error, "delete tag trash resources"))?;
+    tx.execute(
+        tag_delete_live_tag_trash_links_sql(),
+        &[&tag_trash_internal_id],
+    )
+    .await
+    .map_err(|error| map_tag_write_db_error(error, "delete live tag-as-trash-resource links"))?;
+    tx.execute(
+        tag_delete_trash_tag_trash_links_sql(),
+        &[&tag_trash_internal_id],
+    )
+    .await
+    .map_err(|error| map_tag_write_db_error(error, "delete trashed tag-as-trash-resource links"))?;
+    tx.execute(tag_delete_trash_metadata_sql(), &[&tag_trash_internal_id])
+        .await
+        .map_err(|error| map_tag_write_db_error(error, "delete tag trash metadata"))?;
+    Ok(())
 }
 
 pub(crate) async fn execute_tag_resource_update_transaction(
@@ -212,19 +352,6 @@ pub(crate) async fn execute_tag_clone_transaction(
     .await
     .map_err(|error| map_tag_write_db_error(error, "clone tag resources"))?;
     Ok(record)
-}
-
-pub(crate) async fn execute_tag_delete_transaction(
-    tx: &Transaction<'_>,
-    tag_internal_id: i32,
-) -> Result<TagWriteRecord, ApiError> {
-    query_tag_write_record(
-        tx,
-        tag_delete_metadata_sql(),
-        &[&tag_internal_id],
-        "delete tag metadata",
-    )
-    .await
 }
 
 pub(crate) async fn execute_tag_patch_transaction(

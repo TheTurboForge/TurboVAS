@@ -575,8 +575,10 @@ OPENAPI_ALLOWED_REPLACES_VALUES = frozenset(
         "scope-report-tls-certificate-evidence-read",
         "tag-active-resource-assignment-write",
         "tag-clone",
+        "tag-hard-delete",
         "tag-metadata-read",
-        "tag-metadata-delete",
+        "tag-restore",
+        "tag-trash-move",
         "tag-metadata-write",
         "tag-resource-name-read",
         "tag-resource-reference-read",
@@ -614,7 +616,7 @@ OPENAPI_ALLOWED_INHERITED_STILL_OWNS_VALUES = frozenset(
         "schedule-create-calendar-export",
         "scope-report-generation",
         "scope-report-generation-retention-and-mutations",
-        "tag-security-info-filter-actions-export-trash",
+        "tag-security-info-filter-actions-export",
         "target-credential-secrets-writes-and-deletes",
         "task-scan-control-writes-and-deletes",
         "tls-certificate-export-delete-and-rich-history",
@@ -964,49 +966,59 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-replaces": "scan-config-family-summary-read",
     },
     ("get", "/tags/resource-names/{resource_type}"): {
-        "x-turbovas-inherited-still-owns": "tag-security-info-filter-actions-export-trash",
+        "x-turbovas-inherited-still-owns": "tag-security-info-filter-actions-export",
         "x-turbovas-maturity": "live-read",
         "x-turbovas-replaces": "tag-resource-name-read",
     },
     ("get", "/tags"): {
-        "x-turbovas-inherited-still-owns": "tag-security-info-filter-actions-export-trash",
+        "x-turbovas-inherited-still-owns": "tag-security-info-filter-actions-export",
         "x-turbovas-maturity": "live-read",
         "x-turbovas-replaces": "tag-metadata-read",
     },
     ("get", "/tags/{tag_id}"): {
-        "x-turbovas-inherited-still-owns": "tag-security-info-filter-actions-export-trash",
+        "x-turbovas-inherited-still-owns": "tag-security-info-filter-actions-export",
         "x-turbovas-maturity": "live-read",
         "x-turbovas-replaces": "tag-metadata-read",
     },
     ("post", "/tags"): {
-        "x-turbovas-inherited-still-owns": "tag-security-info-filter-actions-export-trash",
+        "x-turbovas-inherited-still-owns": "tag-security-info-filter-actions-export",
         "x-turbovas-maturity": "live-write",
         "x-turbovas-replaces": "tag-metadata-write",
     },
     ("patch", "/tags/{tag_id}"): {
-        "x-turbovas-inherited-still-owns": "tag-security-info-filter-actions-export-trash",
+        "x-turbovas-inherited-still-owns": "tag-security-info-filter-actions-export",
         "x-turbovas-maturity": "live-write",
         "x-turbovas-replaces": "tag-metadata-write",
     },
     ("delete", "/tags/{tag_id}"): {
-        "x-turbovas-inherited-still-owns": "tag-security-info-filter-actions-export-trash",
+        "x-turbovas-inherited-still-owns": "tag-security-info-filter-actions-export",
         "x-turbovas-maturity": "live-write",
-        "x-turbovas-replaces": "tag-metadata-delete",
+        "x-turbovas-replaces": "tag-trash-move",
     },
     ("get", "/tags/{tag_id}/resources"): {
-        "x-turbovas-inherited-still-owns": "tag-security-info-filter-actions-export-trash",
+        "x-turbovas-inherited-still-owns": "tag-security-info-filter-actions-export",
         "x-turbovas-maturity": "live-read",
         "x-turbovas-replaces": "tag-resource-reference-read",
     },
     ("post", "/tags/{tag_id}/resources"): {
-        "x-turbovas-inherited-still-owns": "tag-security-info-filter-actions-export-trash",
+        "x-turbovas-inherited-still-owns": "tag-security-info-filter-actions-export",
         "x-turbovas-maturity": "live-write",
         "x-turbovas-replaces": "tag-active-resource-assignment-write",
     },
     ("post", "/tags/{tag_id}/clone"): {
-        "x-turbovas-inherited-still-owns": "tag-security-info-filter-actions-export-trash",
+        "x-turbovas-inherited-still-owns": "tag-security-info-filter-actions-export",
         "x-turbovas-maturity": "live-write",
         "x-turbovas-replaces": "tag-clone",
+    },
+    ("post", "/tags/{tag_id}/restore"): {
+        "x-turbovas-inherited-still-owns": "tag-security-info-filter-actions-export",
+        "x-turbovas-maturity": "live-write",
+        "x-turbovas-replaces": "tag-restore",
+    },
+    ("delete", "/tags/{tag_id}/trash"): {
+        "x-turbovas-inherited-still-owns": "tag-security-info-filter-actions-export",
+        "x-turbovas-maturity": "live-write",
+        "x-turbovas-replaces": "tag-hard-delete",
     },
     ("get", "/trashcan/summary"): {
         "x-turbovas-inherited-still-owns": "trashcan-row-data-and-mutations",
@@ -7054,7 +7066,7 @@ def summarize_native_tooling(items: list[dict[str, Any]], repo_root: Path | None
                 "endpoint": "/api/v1/tags/{tag_id}",
                 "status": "implemented_direct_write_control",
                 "direct_access": "direct_write_control",
-                "replacement_candidates": ["direct native unassigned tag metadata deletion"],
+                "replacement_candidates": ["direct native tag live-to-trash move"],
             },
             {
                 "method": "post",
@@ -7069,6 +7081,20 @@ def summarize_native_tooling(items: list[dict[str, Any]], repo_root: Path | None
                 "status": "implemented_direct_write_control",
                 "direct_access": "direct_write_control",
                 "replacement_candidates": ["direct native tag clone with copied resource assignments"],
+            },
+            {
+                "method": "post",
+                "endpoint": "/api/v1/tags/{tag_id}/restore",
+                "status": "implemented_direct_write_control",
+                "direct_access": "direct_write_control",
+                "replacement_candidates": ["direct native tag restore from trash"],
+            },
+            {
+                "method": "delete",
+                "endpoint": "/api/v1/tags/{tag_id}/trash",
+                "status": "implemented_direct_write_control",
+                "direct_access": "direct_write_control",
+                "replacement_candidates": ["direct native tag hard delete from trash"],
             },
             {
                 "endpoint": "/api/v1/targets",
@@ -12076,6 +12102,8 @@ def direct_smoke_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
             "native-api-direct.override-patch-disabled",
             "native-api-direct.tag-write-disabled",
             "native-api-direct.tag-delete-disabled",
+            "native-api-direct.tag-restore-disabled",
+            "native-api-direct.tag-hard-delete-disabled",
             "native-api-direct.write-control-operator",
             "native-api-direct.write-control-up",
             "native-api-direct.scope-write-create",
@@ -12995,12 +13023,17 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
                     tag_clone_delete = direct_native_api_curl(repo_root, f"/api/v1/tags/{urllib.parse.quote(tag_clone_id)}", token=token, env=env, method="DELETE")
                     tag_clone_delete_json, tag_clone_delete_status = parse_json_output_with_http_status(tag_clone_delete)
                     tag_clone_delete_ok = tag_clone_delete.returncode == 0 and tag_clone_delete_status == 204
-                    findings.append(native_api_probe_finding("pass" if tag_clone_delete_ok else "fail", "native-api-direct.tag-clone-delete", "Direct write-control deleted the temporary tag clone after removing its copied assignment." if tag_clone_delete_ok else "Direct write-control failed to delete the temporary tag clone after removing its copied assignment.", tag_clone_delete, direct_native_api_display_command(f"/api/v1/tags/{urllib.parse.quote(tag_clone_id)}", token=token, env=env, method="DELETE"), tag_clone_delete_json, {"http_status": tag_clone_delete_status, "tag_clone_id": tag_clone_id, **summarize_native_api_response(tag_clone_delete_json)}))
+                    findings.append(native_api_probe_finding("pass" if tag_clone_delete_ok else "fail", "native-api-direct.tag-clone-delete", "Direct write-control moved the temporary tag clone to trash after removing its copied assignment." if tag_clone_delete_ok else "Direct write-control failed to move the temporary tag clone to trash after removing its copied assignment.", tag_clone_delete, direct_native_api_display_command(f"/api/v1/tags/{urllib.parse.quote(tag_clone_id)}", token=token, env=env, method="DELETE"), tag_clone_delete_json, {"http_status": tag_clone_delete_status, "tag_clone_id": tag_clone_id, **summarize_native_api_response(tag_clone_delete_json)}))
 
                     tag_clone_post_delete = direct_native_api_curl(repo_root, f"/api/v1/tags/{urllib.parse.quote(tag_clone_id)}", token=token, env=env)
                     tag_clone_post_delete_json, tag_clone_post_delete_status = parse_json_output_with_http_status(tag_clone_post_delete)
                     tag_clone_post_delete_ok = tag_clone_post_delete.returncode == 0 and tag_clone_post_delete_status == 404 and isinstance(tag_clone_post_delete_json, dict) and tag_clone_post_delete_json.get("error", {}).get("code") == "not_found"
-                    findings.append(native_api_probe_finding("pass" if tag_clone_post_delete_ok else "fail", "native-api-direct.tag-clone-post-delete", "Direct API confirms the temporary tag clone is gone after delete." if tag_clone_post_delete_ok else "Direct API did not confirm the temporary tag clone was deleted.", tag_clone_post_delete, direct_native_api_display_command(f"/api/v1/tags/{urllib.parse.quote(tag_clone_id)}", token=token, env=env), tag_clone_post_delete_json, {"http_status": tag_clone_post_delete_status, "tag_clone_id": tag_clone_id, **summarize_native_api_response(tag_clone_post_delete_json)}))
+                    findings.append(native_api_probe_finding("pass" if tag_clone_post_delete_ok else "fail", "native-api-direct.tag-clone-post-delete", "Direct API confirms the temporary tag clone is absent from live rows after trash move." if tag_clone_post_delete_ok else "Direct API did not confirm the temporary tag clone left live rows after trash move.", tag_clone_post_delete, direct_native_api_display_command(f"/api/v1/tags/{urllib.parse.quote(tag_clone_id)}", token=token, env=env), tag_clone_post_delete_json, {"http_status": tag_clone_post_delete_status, "tag_clone_id": tag_clone_id, **summarize_native_api_response(tag_clone_post_delete_json)}))
+
+                    tag_clone_hard_delete = direct_native_api_curl(repo_root, f"/api/v1/tags/{urllib.parse.quote(tag_clone_id)}/trash", token=token, env=env, method="DELETE")
+                    tag_clone_hard_delete_json, tag_clone_hard_delete_status = parse_json_output_with_http_status(tag_clone_hard_delete)
+                    tag_clone_hard_delete_ok = tag_clone_hard_delete.returncode == 0 and tag_clone_hard_delete_status == 204
+                    findings.append(native_api_probe_finding("pass" if tag_clone_hard_delete_ok else "fail", "native-api-direct.tag-clone-hard-delete", "Direct write-control hard-deleted the temporary tag clone from trash." if tag_clone_hard_delete_ok else "Direct write-control failed to hard-delete the temporary tag clone from trash.", tag_clone_hard_delete, direct_native_api_display_command(f"/api/v1/tags/{urllib.parse.quote(tag_clone_id)}/trash", token=token, env=env, method="DELETE"), tag_clone_hard_delete_json, {"http_status": tag_clone_hard_delete_status, "tag_clone_id": tag_clone_id, **summarize_native_api_response(tag_clone_hard_delete_json)}))
 
                 tag_resource_remove_body = json.dumps(
                     {"action": "remove", "resource_ids": [tag_resource_id]},
@@ -13145,12 +13178,27 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
             delete = direct_native_api_curl(repo_root, f"/api/v1/tags/{urllib.parse.quote(tag_id)}", token=token, env=env, method="DELETE")
             delete_json, delete_status = parse_json_output_with_http_status(delete)
             delete_ok = delete.returncode == 0 and delete_status == 204
-            findings.append(native_api_probe_finding("pass" if delete_ok else "fail", "native-api-direct.tag-write-delete", "Direct write-control deleted the temporary unassigned tag." if delete_ok else "Direct write-control failed to delete the temporary unassigned tag.", delete, direct_native_api_display_command(f"/api/v1/tags/{urllib.parse.quote(tag_id)}", token=token, env=env, method="DELETE"), delete_json, {"http_status": delete_status, "tag_id": tag_id, **summarize_native_api_response(delete_json)}))
+            findings.append(native_api_probe_finding("pass" if delete_ok else "fail", "native-api-direct.tag-write-delete", "Direct write-control moved the temporary tag to trash." if delete_ok else "Direct write-control failed to move the temporary tag to trash.", delete, direct_native_api_display_command(f"/api/v1/tags/{urllib.parse.quote(tag_id)}", token=token, env=env, method="DELETE"), delete_json, {"http_status": delete_status, "tag_id": tag_id, **summarize_native_api_response(delete_json)}))
 
             post_delete = direct_native_api_curl(repo_root, f"/api/v1/tags/{urllib.parse.quote(tag_id)}", token=token, env=env)
             post_delete_json, post_delete_status = parse_json_output_with_http_status(post_delete)
             post_delete_ok = post_delete.returncode == 0 and post_delete_status == 404 and isinstance(post_delete_json, dict) and post_delete_json.get("error", {}).get("code") == "not_found"
-            findings.append(native_api_probe_finding("pass" if post_delete_ok else "fail", "native-api-direct.tag-write-post-delete", "Direct API confirms the temporary tag is gone after delete." if post_delete_ok else "Direct API did not confirm the temporary tag was deleted.", post_delete, direct_native_api_display_command(f"/api/v1/tags/{urllib.parse.quote(tag_id)}", token=token, env=env), post_delete_json, {"http_status": post_delete_status, "tag_id": tag_id, **summarize_native_api_response(post_delete_json)}))
+            findings.append(native_api_probe_finding("pass" if post_delete_ok else "fail", "native-api-direct.tag-write-post-delete", "Direct API confirms the temporary tag is absent from live rows after trash move." if post_delete_ok else "Direct API did not confirm the temporary tag left live rows after trash move.", post_delete, direct_native_api_display_command(f"/api/v1/tags/{urllib.parse.quote(tag_id)}", token=token, env=env), post_delete_json, {"http_status": post_delete_status, "tag_id": tag_id, **summarize_native_api_response(post_delete_json)}))
+
+            restore = direct_native_api_curl(repo_root, f"/api/v1/tags/{urllib.parse.quote(tag_id)}/restore", token=token, env=env, method="POST")
+            restore_json, restore_status = parse_json_output_with_http_status(restore)
+            restore_ok = restore.returncode == 0 and restore_status == 200 and isinstance(restore_json, dict) and restore_json.get("id") == tag_id
+            findings.append(native_api_probe_finding("pass" if restore_ok else "fail", "native-api-direct.tag-write-restore", "Direct write-control restored the temporary tag from trash." if restore_ok else "Direct write-control failed to restore the temporary tag from trash.", restore, direct_native_api_display_command(f"/api/v1/tags/{urllib.parse.quote(tag_id)}/restore", token=token, env=env, method="POST"), restore_json, {"http_status": restore_status, "tag_id": tag_id, **summarize_native_api_response(restore_json)}))
+
+            delete_after_restore = direct_native_api_curl(repo_root, f"/api/v1/tags/{urllib.parse.quote(tag_id)}", token=token, env=env, method="DELETE")
+            delete_after_restore_json, delete_after_restore_status = parse_json_output_with_http_status(delete_after_restore)
+            delete_after_restore_ok = delete_after_restore.returncode == 0 and delete_after_restore_status == 204
+            findings.append(native_api_probe_finding("pass" if delete_after_restore_ok else "fail", "native-api-direct.tag-write-delete-after-restore", "Direct write-control moved the restored temporary tag back to trash." if delete_after_restore_ok else "Direct write-control failed to move the restored temporary tag back to trash.", delete_after_restore, direct_native_api_display_command(f"/api/v1/tags/{urllib.parse.quote(tag_id)}", token=token, env=env, method="DELETE"), delete_after_restore_json, {"http_status": delete_after_restore_status, "tag_id": tag_id, **summarize_native_api_response(delete_after_restore_json)}))
+
+            hard_delete = direct_native_api_curl(repo_root, f"/api/v1/tags/{urllib.parse.quote(tag_id)}/trash", token=token, env=env, method="DELETE")
+            hard_delete_json, hard_delete_status = parse_json_output_with_http_status(hard_delete)
+            hard_delete_ok = hard_delete.returncode == 0 and hard_delete_status == 204
+            findings.append(native_api_probe_finding("pass" if hard_delete_ok else "fail", "native-api-direct.tag-write-hard-delete", "Direct write-control hard-deleted the temporary trashed tag." if hard_delete_ok else "Direct write-control failed to hard-delete the temporary trashed tag.", hard_delete, direct_native_api_display_command(f"/api/v1/tags/{urllib.parse.quote(tag_id)}/trash", token=token, env=env, method="DELETE"), hard_delete_json, {"http_status": hard_delete_status, "tag_id": tag_id, **summarize_native_api_response(hard_delete_json)}))
 
     if started_write_control and aggregate_status(findings) == "fail":
         log_tail = service_log_tail(repo_root, "turbovas-api", lines=160)
@@ -13647,6 +13695,28 @@ def command_runtime_native_api_direct_smoke(repo_root: Path, status_only: bool =
     disabled_tag_delete_json, disabled_tag_delete_status = parse_json_output_with_http_status(disabled_tag_delete)
     disabled_tag_delete_ok = disabled_tag_delete.returncode == 0 and disabled_tag_delete_status == 405 and isinstance(disabled_tag_delete_json, dict) and disabled_tag_delete_json.get("error", {}).get("code") == "method_not_allowed"
     findings.append(native_api_probe_finding("pass" if disabled_tag_delete_ok else "fail", "native-api-direct.tag-delete-disabled", "Direct native API rejects tag metadata deletes while direct write-control is disabled." if disabled_tag_delete_ok else "Direct native API did not reject a tag metadata delete while direct write-control is disabled.", disabled_tag_delete, direct_native_api_display_command("/api/v1/tags/00000000-0000-0000-0000-000000000000", token=token, env=env, method="DELETE"), disabled_tag_delete_json, {"http_status": disabled_tag_delete_status, **summarize_native_api_response(disabled_tag_delete_json)}))
+
+    disabled_tag_restore = direct_native_api_curl(
+        repo_root,
+        "/api/v1/tags/00000000-0000-0000-0000-000000000000/restore",
+        token=token,
+        env=env,
+        method="POST",
+    )
+    disabled_tag_restore_json, disabled_tag_restore_status = parse_json_output_with_http_status(disabled_tag_restore)
+    disabled_tag_restore_ok = disabled_tag_restore.returncode == 0 and disabled_tag_restore_status == 405 and isinstance(disabled_tag_restore_json, dict) and disabled_tag_restore_json.get("error", {}).get("code") == "method_not_allowed"
+    findings.append(native_api_probe_finding("pass" if disabled_tag_restore_ok else "fail", "native-api-direct.tag-restore-disabled", "Direct native API rejects tag restores while direct write-control is disabled." if disabled_tag_restore_ok else "Direct native API did not reject a tag restore while direct write-control is disabled.", disabled_tag_restore, direct_native_api_display_command("/api/v1/tags/00000000-0000-0000-0000-000000000000/restore", token=token, env=env, method="POST"), disabled_tag_restore_json, {"http_status": disabled_tag_restore_status, **summarize_native_api_response(disabled_tag_restore_json)}))
+
+    disabled_tag_hard_delete = direct_native_api_curl(
+        repo_root,
+        "/api/v1/tags/00000000-0000-0000-0000-000000000000/trash",
+        token=token,
+        env=env,
+        method="DELETE",
+    )
+    disabled_tag_hard_delete_json, disabled_tag_hard_delete_status = parse_json_output_with_http_status(disabled_tag_hard_delete)
+    disabled_tag_hard_delete_ok = disabled_tag_hard_delete.returncode == 0 and disabled_tag_hard_delete_status == 405 and isinstance(disabled_tag_hard_delete_json, dict) and disabled_tag_hard_delete_json.get("error", {}).get("code") == "method_not_allowed"
+    findings.append(native_api_probe_finding("pass" if disabled_tag_hard_delete_ok else "fail", "native-api-direct.tag-hard-delete-disabled", "Direct native API rejects tag hard deletes while direct write-control is disabled." if disabled_tag_hard_delete_ok else "Direct native API did not reject a tag hard delete while direct write-control is disabled.", disabled_tag_hard_delete, direct_native_api_display_command("/api/v1/tags/00000000-0000-0000-0000-000000000000/trash", token=token, env=env, method="DELETE"), disabled_tag_hard_delete_json, {"http_status": disabled_tag_hard_delete_status, **summarize_native_api_response(disabled_tag_hard_delete_json)}))
 
     request_body = direct_native_api_curl(
         repo_root,

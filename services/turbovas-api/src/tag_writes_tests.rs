@@ -301,12 +301,16 @@ fn tag_write_plans_are_metadata_only() {
     assert_eq!(
         tag_delete_transaction_plan(),
         TagWriteTransactionPlan {
-            operation: TagWriteOperation::DeleteMetadata,
+            operation: TagWriteOperation::MoveToTrash,
             steps: vec![
                 TagWriteStep::ResolveOperatorOwner,
                 TagWriteStep::VerifyTagExists,
-                TagWriteStep::VerifyTagUnassigned,
-                TagWriteStep::DeleteMetadata,
+                TagWriteStep::VerifyResourceTypeSupported,
+                TagWriteStep::InsertTrashMetadata,
+                TagWriteStep::CopyResourceAssignments,
+                TagWriteStep::MoveTagAsResourceLinks,
+                TagWriteStep::DeleteResourceAssignment,
+                TagWriteStep::DeleteLiveMetadata,
             ],
         }
     );
@@ -348,10 +352,21 @@ fn tag_write_sql_uses_parameterized_metadata_queries_only() {
     assert!(delete_state.contains("tag_resources_count"));
     assert!(!delete_state.contains("DELETE"));
 
-    let delete = tag_delete_metadata_sql();
-    assert!(delete.contains("DELETE FROM tags"));
-    assert!(delete.contains("WHERE id = $1"));
-    assert!(!delete.contains("tag_resources"));
+    let trash = tag_trash_insert_sql();
+    assert!(trash.contains("INSERT INTO tags_trash"));
+    assert!(trash.contains("FROM tags"));
+
+    let trash_resources = tag_trash_resources_insert_sql();
+    assert!(trash_resources.contains("INSERT INTO tag_resources_trash"));
+    assert!(trash_resources.contains("FROM tag_resources"));
+
+    let restore = tag_restore_metadata_sql();
+    assert!(restore.contains("INSERT INTO tags"));
+    assert!(restore.contains("FROM tags_trash"));
+
+    let delete_live = tag_delete_live_metadata_sql();
+    assert!(delete_live.contains("DELETE FROM tags"));
+    assert!(delete_live.contains("WHERE id = $1"));
 
     let add_resource = tag_resource_insert_sql();
     assert!(add_resource.contains("INSERT INTO tag_resources"));

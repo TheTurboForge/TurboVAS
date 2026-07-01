@@ -47,6 +47,61 @@ pub(crate) async fn create_tag(
     ))
 }
 
+pub(crate) async fn restore_tag(
+    State(state): State<AppState>,
+    Path(tag_id): Path<String>,
+    operator: Option<Extension<DirectApiOperator>>,
+) -> Result<Json<TagAssetItem>, ApiError> {
+    let operator = require_tag_write_operator(operator)?;
+    let mut client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let tx = client
+        .transaction()
+        .await
+        .map_err(|error| map_tag_write_db_error(error, "begin restore tag transaction"))?;
+    resolve_tag_write_operator_owner(&tx, &operator).await?;
+    tx.batch_execute(
+        "LOCK TABLE tags, tags_trash, tag_resources, tag_resources_trash IN SHARE ROW EXCLUSIVE MODE;",
+    )
+    .await
+    .map_err(|error| map_tag_write_db_error(error, "lock tag tables for restore"))?;
+    let trash = load_tag_trash_state(&tx, &tag_id).await?;
+    ensure_tag_resource_direct_write_type_is_supported(&trash.resource_type)?;
+    ensure_tag_uuid_not_live(&tx, &trash.uuid).await?;
+    let record = execute_tag_restore_transaction(&tx, trash.internal_id).await?;
+    tx.commit()
+        .await
+        .map_err(|error| map_tag_write_db_error(error, "commit restore tag transaction"))?;
+
+    Ok(Json(load_tag_write_detail(&client, &record.uuid).await?))
+}
+
+pub(crate) async fn hard_delete_tag(
+    State(state): State<AppState>,
+    Path(tag_id): Path<String>,
+    operator: Option<Extension<DirectApiOperator>>,
+) -> Result<StatusCode, ApiError> {
+    let operator = require_tag_write_operator(operator)?;
+    let mut client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let tx = client
+        .transaction()
+        .await
+        .map_err(|error| map_tag_write_db_error(error, "begin hard-delete tag transaction"))?;
+    resolve_tag_write_operator_owner(&tx, &operator).await?;
+    tx.batch_execute(
+        "LOCK TABLE tags_trash, tag_resources, tag_resources_trash IN SHARE ROW EXCLUSIVE MODE;",
+    )
+    .await
+    .map_err(|error| map_tag_write_db_error(error, "lock tag trash tables for hard delete"))?;
+    let trash = load_tag_trash_state(&tx, &tag_id).await?;
+    ensure_tag_resource_direct_write_type_is_supported(&trash.resource_type)?;
+    execute_tag_hard_delete_transaction(&tx, trash.internal_id).await?;
+    tx.commit()
+        .await
+        .map_err(|error| map_tag_write_db_error(error, "commit hard-delete tag transaction"))?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
 pub(crate) async fn patch_tag(
     State(state): State<AppState>,
     Path(tag_id): Path<String>,
@@ -113,8 +168,14 @@ pub(crate) async fn delete_tag(
         .await
         .map_err(|error| map_tag_write_db_error(error, "begin delete tag transaction"))?;
     resolve_tag_write_operator_owner(&tx, &operator).await?;
-    let state = load_unassigned_tag_write_state(&tx, &tag_id).await?;
-    execute_tag_delete_transaction(&tx, state.internal_id).await?;
+    tx.batch_execute(
+        "LOCK TABLE tags, tags_trash, tag_resources, tag_resources_trash IN SHARE ROW EXCLUSIVE MODE;",
+    )
+    .await
+    .map_err(|error| map_tag_write_db_error(error, "lock tag tables for delete"))?;
+    let state = load_tag_write_state(&tx, &tag_id).await?;
+    ensure_tag_resource_direct_write_type_is_supported(&state.resource_type)?;
+    execute_tag_trash_transaction(&tx, state.internal_id).await?;
     tx.commit()
         .await
         .map_err(|error| map_tag_write_db_error(error, "commit delete tag transaction"))?;

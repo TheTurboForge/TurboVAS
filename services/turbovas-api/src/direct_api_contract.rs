@@ -72,6 +72,8 @@ pub(crate) fn direct_api_v1_path_is_allowed(path: &str) -> bool {
             | ["", "api", "v1", "scope-reports", _]
             | ["", "api", "v1", "tags", _, "resources"]
             | ["", "api", "v1", "tags", _, "clone"]
+            | ["", "api", "v1", "tags", _, "restore"]
+            | ["", "api", "v1", "tags", _, "trash"]
             | ["", "api", "v1", "tags", "resource-names", _]
             | ["", "api", "v1", "scan-configs", _, "families"]
             if direct_api_segments_are_nonempty(&parts)
@@ -123,6 +125,12 @@ fn direct_api_v1_write_method_path_is_allowed(method: &Method, path: &str) -> bo
             direct_api_write_id_segment_is_allowed(tag_id)
         }
         (&Method::POST, ["", "api", "v1", "tags", tag_id, "clone"]) => {
+            direct_api_write_id_segment_is_allowed(tag_id)
+        }
+        (&Method::POST, ["", "api", "v1", "tags", tag_id, "restore"]) => {
+            direct_api_write_id_segment_is_allowed(tag_id)
+        }
+        (&Method::DELETE, ["", "api", "v1", "tags", tag_id, "trash"]) => {
             direct_api_write_id_segment_is_allowed(tag_id)
         }
         (&Method::POST, ["", "api", "v1", "report-configs"]) => true,
