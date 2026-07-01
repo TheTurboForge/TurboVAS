@@ -8422,6 +8422,11 @@ NATIVE_API_MODULE_OWNERSHIP_CONTRACTS: tuple[dict[str, Any], ...] = (
         "symbols": ("pub(crate) fn report_errors_sql",),
     },
     {
+        "owner": "services/turbovas-api/src/report_host_query_sql.rs",
+        "forbidden": ("services/turbovas-api/src/report_hosts.rs",),
+        "symbols": ("pub(crate) fn report_hosts_sql",),
+    },
+    {
         "owner": "services/turbovas-api/src/tag_write_validation.rs",
         "forbidden": ("services/turbovas-api/src/tag_writes.rs",),
         "symbols": (

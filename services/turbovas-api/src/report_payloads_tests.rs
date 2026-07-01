@@ -4,7 +4,8 @@
 
 use crate::{
     report_cve_query_sql::report_cves_sql, report_error_query_sql::report_errors_sql,
-    report_payloads::raw_report_sql, report_port_query_sql::report_ports_sql,
+    report_host_query_sql::report_hosts_sql, report_payloads::raw_report_sql,
+    report_port_query_sql::report_ports_sql,
     report_tls_certificate_query_sql::report_tls_certificates_sql,
 };
 
@@ -48,6 +49,36 @@ fn raw_report_error_sql_is_report_scoped_error_message_read_only() {
         assert!(
             !upper_sql.contains(forbidden),
             "raw report error SQL must not include control/mutation path: {forbidden}"
+        );
+    }
+}
+
+#[test]
+fn raw_report_host_sql_is_report_scoped_auth_state_read_only() {
+    let sql = report_hosts_sql("host ASC");
+    let upper_sql = sql.to_ascii_uppercase();
+
+    for required in [
+        "SELECT id, uuid FROM reports WHERE lower(uuid) = lower($1)",
+        "JOIN report_hosts rh ON rh.report = sr.id",
+        "LEFT JOIN report_host_details rhd ON rhd.report_host = hb.report_host_id",
+        "JOIN results r ON r.report = sr.id",
+        "CASE WHEN coalesce(dr.auth_success, false) THEN 'authenticated'",
+        "WHEN coalesce(dr.auth_failure, false) THEN 'authentication_failed'",
+        "WHEN coalesce(dr.has_credential_path, false) THEN 'unknown'",
+        "ELSE 'no_credential_path' END AS authentication_state",
+        "count(*) OVER()::bigint AS total",
+        "ORDER BY host ASC, host ASC LIMIT $3 OFFSET $4",
+    ] {
+        assert!(
+            sql.contains(required),
+            "raw report host SQL missing {required}"
+        );
+    }
+    for forbidden in ["INSERT ", "UPDATE ", "DELETE ", "START_TASK", "STOP_TASK"] {
+        assert!(
+            !upper_sql.contains(forbidden),
+            "raw report host SQL must not include control/mutation path: {forbidden}"
         );
     }
 }

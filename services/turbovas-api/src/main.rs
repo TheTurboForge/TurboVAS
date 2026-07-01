@@ -88,6 +88,7 @@ mod report_format_payloads;
 mod report_format_query_sql;
 mod report_formats;
 mod report_helpers;
+mod report_host_query_sql;
 mod report_hosts;
 mod report_operating_systems;
 mod report_payloads;
