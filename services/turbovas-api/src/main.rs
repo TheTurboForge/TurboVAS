@@ -82,6 +82,7 @@ mod report_cves;
 mod report_errors;
 mod report_evidence_payloads;
 mod report_format_payloads;
+mod report_format_query_sql;
 mod report_formats;
 mod report_helpers;
 mod report_hosts;
