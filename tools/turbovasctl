@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import csv
 import fcntl
+import io
 import json
 import os
 import re
@@ -3984,6 +3985,13 @@ def write_json_artifact(artifact_dir: Path, name: str, payload: dict[str, Any]) 
     artifact_dir.mkdir(parents=True, exist_ok=True)
     path = artifact_dir / name
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return str(path)
+
+
+def write_text_artifact(artifact_dir: Path, name: str, text: str) -> str:
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    path = artifact_dir / name
+    path.write_text(text, encoding="utf-8")
     return str(path)
 
 
@@ -11354,7 +11362,11 @@ def command_runtime_report_export_native(repo_root: Path, report_id: str | None 
         "top_results": normalized_rows[:top_results],
         "results": normalized_rows,
     }
-    payload["artifacts"] = [write_json_artifact(artifact_dir, "export.json", payload)]
+    csv_text = runtime_report_results_csv(normalized_rows)
+    payload["artifacts"] = [
+        write_json_artifact(artifact_dir, "export.json", payload),
+        write_text_artifact(artifact_dir, "export-results.csv", csv_text),
+    ]
     return make_result("runtime-report-export", repo_root, payload["summary"], findings, payload["artifacts"])
 
 
@@ -11405,6 +11417,31 @@ def runtime_report_summary_row(row: dict[str, Any]) -> dict[str, Any]:
         "nvt_family": row.get("nvt_family"),
         "description_excerpt": row.get("description_excerpt"),
     }
+
+
+RUNTIME_REPORT_CSV_FIELDS = (
+    "id",
+    "host",
+    "hostname",
+    "port",
+    "severity",
+    "severity_score",
+    "threat",
+    "qod",
+    "name",
+    "nvt_oid",
+    "nvt_name",
+    "nvt_family",
+    "description_excerpt",
+)
+
+
+def runtime_report_results_csv(rows: list[dict[str, Any]]) -> str:
+    buffer = io.StringIO(newline="")
+    writer = csv.DictWriter(buffer, fieldnames=RUNTIME_REPORT_CSV_FIELDS, extrasaction="ignore")
+    writer.writeheader()
+    writer.writerows(rows)
+    return buffer.getvalue()
 
 
 def runtime_report_summary_severity_counts(rows: list[dict[str, Any]]) -> dict[str, int]:

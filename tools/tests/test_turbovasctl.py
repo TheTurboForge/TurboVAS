@@ -8454,6 +8454,19 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertEqual(normalized["severity_score"], 2.1)
         self.assertEqual(normalized["threat"], "Low")
         self.assertEqual(normalized["nvt_family"], "General")
+        csv_text = turbovasctl.runtime_report_results_csv(
+            [
+                normalized,
+                {
+                    **turbovasctl.runtime_report_summary_row(rows[1]),
+                    "description_excerpt": "Detected, with comma",
+                    "ignored_extra": "not exported",
+                },
+            ]
+        )
+        self.assertTrue(csv_text.startswith("id,host,hostname,port,severity,severity_score,threat,qod,name,"))
+        self.assertIn('"Detected, with comma"', csv_text)
+        self.assertNotIn("ignored_extra", csv_text)
         self.assertEqual(turbovasctl.runtime_report_summary_severity_counts(rows)["Low"], 1)
         self.assertEqual(turbovasctl.runtime_report_summary_severity_counts(rows)["Log"], 1)
         affected_hosts = turbovasctl.runtime_report_summary_affected_hosts(rows)
