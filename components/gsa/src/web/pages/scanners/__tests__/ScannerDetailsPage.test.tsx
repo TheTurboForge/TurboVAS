@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import {describe, test, expect, testing} from '@gsa/testing';
-import {rendererWith, fireEvent, screen} from 'web/testing';
+import {afterEach, describe, test, expect, testing} from '@gsa/testing';
+import {rendererWith, fireEvent, screen, wait} from 'web/testing';
 import Features from 'gmp/capabilities/features';
 import CollectionCounts from 'gmp/collection/collection-counts';
 import Filter from 'gmp/models/filter';
@@ -37,7 +37,9 @@ const createMockScanner = (
 };
 
 const createGmp = ({
+  buildUrl = undefined,
   scanner = createMockScanner(),
+  exportScanner = testing.fn().mockResolvedValue({data: '<scanner/>'}),
   getScanner = testing.fn().mockResolvedValue({data: scanner}),
   currentSettings = testing
     .fn()
@@ -49,8 +51,10 @@ const createGmp = ({
       counts: new CollectionCounts(),
     },
   }),
-} = {}) => ({
+}: any = {}) => ({
+  buildUrl,
   scanner: {
+    export: exportScanner,
     get: getScanner,
   },
   permissions: {
@@ -60,10 +64,18 @@ const createGmp = ({
     manualUrl,
     reloadInterval,
   },
-  session: createSession(),
+  session: {
+    ...createSession(),
+    token: 'test-token',
+    jwt: 'jwt-token',
+  },
   user: {
     currentSettings,
   },
+});
+
+afterEach(() => {
+  testing.unstubAllGlobals();
 });
 
 describe('ScannerDetailsPage tests', () => {
@@ -171,6 +183,53 @@ describe('ScannerDetailsPage tests', () => {
 
     expect(screen.getByTitle('Help: Scanners')).toBeInTheDocument();
     expect(screen.getByTitle('Scanner List')).toBeInTheDocument();
+  });
+
+  test('should use native metadata export for downloads', async () => {
+    const scanner = createMockScanner();
+    const nativePayload = {
+      id: scanner.id,
+      name: 'Test Scanner',
+      type: OPENVAS_SCANNER_TYPE,
+      host: 'localhost',
+      port: 9390,
+    };
+    const fetchMock = testing.fn().mockResolvedValue({
+      json: testing.fn().mockResolvedValue(nativePayload),
+      ok: true,
+      status: 200,
+    });
+    testing.stubGlobal('fetch', fetchMock);
+    const exportScanner = testing.fn().mockResolvedValue({data: '<scanner/>'});
+    const buildUrl = testing.fn(
+      (path, _params) => `https://turbovas.example/${path}`,
+    );
+    const gmp = createGmp({buildUrl, exportScanner, scanner});
+
+    const {render, store} = rendererWith({
+      capabilities: true,
+      gmp,
+      router: true,
+      store: true,
+    });
+
+    store.dispatch(entityLoadingActions.success(scanner.id, scanner));
+    render(<ScannerDetailsPage id={scanner.id} />);
+    await wait();
+
+    fetchMock.mockClear();
+    fireEvent.click(screen.getByTitle('Export Scanner as XML'));
+    await expect.poll(() => fetchMock.mock.calls.length).toBe(1);
+
+    expect(exportScanner).not.toHaveBeenCalled();
+    expect(buildUrl).toHaveBeenCalledWith(
+      `api/v1/scanners/${scanner.id}/export`,
+      {token: 'test-token'},
+    );
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
+      `https://turbovas.example/api/v1/scanners/${scanner.id}/export`,
+      expect.objectContaining({credentials: 'include'}),
+    );
   });
 
 });

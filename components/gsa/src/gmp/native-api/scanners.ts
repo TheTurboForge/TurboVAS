@@ -5,6 +5,7 @@
  */
 
 import CollectionCounts from 'gmp/collection/collection-counts';
+import Response from 'gmp/http/response';
 import type {UrlParams} from 'gmp/http/utils';
 import type Filter from 'gmp/models/filter';
 import Scanner from 'gmp/models/scanner';
@@ -243,4 +244,16 @@ export const fetchNativeScanner = async (
   return {
     scanner: nativeScannerToModel(payload, {detail: true}),
   };
+};
+
+export const exportNativeScannerMetadata = async (
+  gmp: NativeApiGmp,
+  id: string,
+): Promise<Response<string>> => {
+  const payload = await fetchNativeJson<NativeScannerPayload>(
+    gmp,
+    `api/v1/scanners/${encodeURIComponent(id)}/export`,
+    {token: gmp.session.token},
+  );
+  return new Response(`${JSON.stringify(payload, null, 2)}\n`);
 };

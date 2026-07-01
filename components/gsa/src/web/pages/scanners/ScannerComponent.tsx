@@ -5,6 +5,7 @@
  */
 
 import {useState} from 'react';
+import {type EntityCommandParams} from 'gmp/commands/entity';
 import {
   type ScannerCommandCreateParams,
   type ScannerCommandSaveParams,
@@ -22,6 +23,7 @@ import {
   OPENVASD_SCANNER_TYPE,
   OPENVASD_SENSOR_SCANNER_TYPE,
 } from 'gmp/models/scanner';
+import {exportNativeScannerMetadata} from 'gmp/native-api/scanners';
 import {hasId} from 'gmp/utils/id';
 import {isDefined} from 'gmp/utils/identity';
 import {shorten} from 'gmp/utils/string';
@@ -78,6 +80,16 @@ interface ScannerComponentProps {
 }
 
 const MIME_TYPE_PEM = 'application/x-pem-file';
+
+const canUseNativeApi = (gmp: {buildUrl?: unknown}) =>
+  typeof gmp?.buildUrl === 'function';
+
+const exportScanner = (gmp: any, scanner: EntityCommandParams) => {
+  if (canUseNativeApi(gmp)) {
+    return exportNativeScannerMetadata(gmp, scanner.id as string);
+  }
+  return gmp.scanner.export(scanner as Scanner);
+};
 
 const createCaCertificateFile = (name: string, certificate: string) =>
   new File([certificate], name, {type: MIME_TYPE_PEM});
@@ -316,7 +328,7 @@ const ScannerComponent = ({
   };
 
   const handleScannerDownload = useEntityDownload<Scanner>(
-    entity => gmp.scanner.export(entity),
+    entity => exportScanner(gmp, entity),
     {
       onDownloadError,
       onDownloaded,
