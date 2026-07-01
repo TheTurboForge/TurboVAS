@@ -1,9 +1,11 @@
 /* SPDX-FileCopyrightText: 2026 Robert Pelfrey <Robert@Pelfrey.de>
+ * TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
 import CollectionCounts from 'gmp/collection/collection-counts';
+import Response from 'gmp/http/response';
 import type {UrlParams} from 'gmp/http/utils';
 import Filter from 'gmp/models/filter';
 import type QueryFilter from 'gmp/models/filter';
@@ -201,4 +203,16 @@ export const fetchNativeFilter = async (
     {token: gmp.session.token},
   );
   return nativeFilterToModel(payload);
+};
+
+export const exportNativeFilterMetadata = async (
+  gmp: NativeApiGmp,
+  id: string,
+): Promise<Response<string>> => {
+  const payload = await fetchNativeJson<NativeFilterPayload>(
+    gmp,
+    `api/v1/filters/${encodeURIComponent(id)}/export`,
+    {token: gmp.session.token},
+  );
+  return new Response(`${JSON.stringify(payload, null, 2)}\n`);
 };

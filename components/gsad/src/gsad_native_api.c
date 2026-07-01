@@ -273,6 +273,7 @@ native_api_path_is_allowed (const gchar *path)
   const gchar *scan_config_families_suffix = "/families";
   const gchar *filters_path = "/api/v1/filters";
   const gchar *filter_prefix = "/api/v1/filters/";
+  const gchar *filter_export_suffix = "/export";
   const gchar *feeds_path = "/api/v1/feeds";
   const gchar *alerts_path = "/api/v1/alerts";
   const gchar *alert_prefix = "/api/v1/alerts/";
@@ -454,6 +455,10 @@ native_api_path_is_allowed (const gchar *path)
   if (g_str_has_prefix (path, filter_prefix))
     {
       const gchar *id = path + strlen (filter_prefix);
+      if (g_str_has_suffix (id, filter_export_suffix))
+        return is_uuid_segment (id,
+                                strlen (id)
+                                - strlen (filter_export_suffix));
       return is_uuid_segment (id, strlen (id));
     }
 

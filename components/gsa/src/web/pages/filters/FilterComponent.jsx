@@ -6,11 +6,13 @@
 
 import React, {useState} from 'react';
 import {_, _l} from 'gmp/locale/lang';
+import {exportNativeFilterMetadata} from 'gmp/native-api/filters';
 import {first} from 'gmp/utils/array';
 import {isDefined} from 'gmp/utils/identity';
 import {shorten} from 'gmp/utils/string';
 import EntityComponent from 'web/entity/EntityComponent';
 import useCapabilities from 'web/hooks/useCapabilities';
+import useGmp from 'web/hooks/useGmp';
 import FilterDialog from 'web/pages/filters/Dialog';
 import PropTypes from 'web/utils/PropTypes';
 
@@ -54,6 +56,15 @@ const includesType = (types, type) => {
   return false;
 };
 
+const canUseNativeApi = gmp => typeof gmp?.buildUrl === 'function';
+
+const exportFilter = (gmp, filterData) => {
+  if (canUseNativeApi(gmp)) {
+    return exportNativeFilterMetadata(gmp, filterData.id);
+  }
+  return gmp.filter.export(filterData);
+};
+
 const FilterComponent = ({
   children,
   onCloned,
@@ -69,6 +80,7 @@ const FilterComponent = ({
   onSaveError,
 }) => {
   const capabilities = useCapabilities();
+  const gmp = useGmp();
   const [dialogVisible, setDialogVisible] = useState(false);
   const [types, setTypes] = useState([]);
   const [comment, setComment] = useState();
@@ -128,6 +140,8 @@ const FilterComponent = ({
 
   return (
     <EntityComponent
+      download={entity => exportFilter(gmp, entity)}
+      downloadOptions={canUseNativeApi(gmp) ? {extension: 'json'} : undefined}
       name="filter"
       onCloneError={onCloneError}
       onCloned={onCloned}
