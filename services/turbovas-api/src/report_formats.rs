@@ -12,7 +12,10 @@ use crate::{
     collections::{REPORT_FORMAT_DEFAULT_SORT, REPORT_FORMAT_SORT_FIELDS},
     errors::ApiError,
     path_ids::parse_uuid,
-    query::{ApiQuery, Collection, CollectionQuery, normalize_collection_query, sort_clause},
+    query::{
+        ApiQuery, Collection, CollectionQuery, collection_total_with_empty_page_probe,
+        normalize_collection_query, sort_clause,
+    },
     report_format_payloads::{
         ReportFormatAssetItem, report_format_asset_from_row, report_format_param_from_row,
         report_format_param_option_from_row, report_format_reference_from_row,
@@ -72,10 +75,14 @@ pub(crate) async fn report_format_assets(
             tracing::warn!(%error, "report format asset list query failed");
             ApiError::Database
         })?;
-    let total = rows
-        .first()
-        .map(|row| row.get::<_, i64>("total"))
-        .unwrap_or(0);
+    let total = collection_total_with_empty_page_probe(
+        &client,
+        &rows,
+        &sql,
+        &params,
+        "report format asset list",
+    )
+    .await?;
     let items = rows
         .iter()
         .map(|row| report_format_asset_from_row(row, Vec::new(), Vec::new(), Vec::new()))

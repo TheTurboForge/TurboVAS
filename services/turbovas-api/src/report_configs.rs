@@ -13,7 +13,10 @@ use crate::{
     collections::{REPORT_CONFIG_DEFAULT_SORT, REPORT_CONFIG_SORT_FIELDS},
     errors::ApiError,
     path_ids::parse_uuid,
-    query::{ApiQuery, Collection, CollectionQuery, normalize_collection_query, sort_clause},
+    query::{
+        ApiQuery, Collection, CollectionQuery, collection_total_with_empty_page_probe,
+        normalize_collection_query, sort_clause,
+    },
     report_config_payloads::{ReportConfigAssetItem, report_config_asset_from_row},
 };
 
@@ -54,10 +57,14 @@ pub(crate) async fn report_config_assets(
             tracing::warn!(%error, "report config asset list query failed");
             ApiError::Database
         })?;
-    let total = rows
-        .first()
-        .map(|row| row.get::<_, i64>("total"))
-        .unwrap_or(0);
+    let total = collection_total_with_empty_page_probe(
+        &client,
+        &rows,
+        &sql,
+        &params,
+        "report config asset list",
+    )
+    .await?;
     let mut items = Vec::new();
     for row in &rows {
         items.push(report_config_asset_from_row(&client, row).await?);

@@ -16,7 +16,10 @@ use crate::{
         PortListAssetDetail, PortListAssetItem, port_list_asset_detail_payload,
         port_list_asset_from_row, port_list_target_from_row, port_range_from_row,
     },
-    query::{ApiQuery, Collection, CollectionQuery, normalize_collection_query, sort_clause},
+    query::{
+        ApiQuery, Collection, CollectionQuery, collection_total_with_empty_page_probe,
+        normalize_collection_query, sort_clause,
+    },
     user_tags::ReportUserTag,
 };
 
@@ -73,10 +76,14 @@ pub(crate) async fn port_list_assets(
             tracing::warn!(%error, "port list asset list query failed");
             ApiError::Database
         })?;
-    let total = rows
-        .first()
-        .map(|row| row.get::<_, i64>("total"))
-        .unwrap_or(0);
+    let total = collection_total_with_empty_page_probe(
+        &client,
+        &rows,
+        &sql,
+        &params,
+        "port list asset list",
+    )
+    .await?;
     let items = rows
         .iter()
         .map(|row| port_list_asset_from_row(row, Vec::new(), Vec::new()))

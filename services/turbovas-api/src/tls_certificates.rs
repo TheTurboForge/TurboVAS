@@ -12,7 +12,10 @@ use crate::{
     collections::{TLS_CERTIFICATE_ASSET_DEFAULT_SORT, TLS_CERTIFICATE_ASSET_SORT_FIELDS},
     errors::ApiError,
     path_ids::parse_uuid,
-    query::{ApiQuery, Collection, CollectionQuery, normalize_collection_query, sort_clause},
+    query::{
+        ApiQuery, Collection, CollectionQuery, collection_total_with_empty_page_probe,
+        normalize_collection_query, sort_clause,
+    },
     tls_certificate_payloads::{
         TlsCertificateAssetDetail, TlsCertificateAssetItem, tls_certificate_asset_from_row,
         tls_certificate_source_from_row,
@@ -74,10 +77,14 @@ pub(crate) async fn tls_certificate_assets(
             tracing::warn!(%error, "TLS certificate asset list query failed");
             ApiError::Database
         })?;
-    let total = rows
-        .first()
-        .map(|row| row.get::<_, i64>("total"))
-        .unwrap_or(0);
+    let total = collection_total_with_empty_page_probe(
+        &client,
+        &rows,
+        &sql,
+        &params,
+        "TLS certificate asset list",
+    )
+    .await?;
     let items = rows.iter().map(tls_certificate_asset_from_row).collect();
     Ok(Json(Collection {
         page: params.page_info(total),

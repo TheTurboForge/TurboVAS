@@ -23,7 +23,10 @@ use crate::{
     },
     errors::ApiError,
     path_ids::validate_cpe_id,
-    query::{ApiQuery, Collection, CollectionQuery, normalize_collection_query, sort_clause},
+    query::{
+        ApiQuery, Collection, CollectionQuery, collection_total_with_empty_page_probe,
+        normalize_collection_query, sort_clause,
+    },
     user_tags::catalog_user_tags_for_aliases_and_row_id,
 };
 
@@ -69,10 +72,9 @@ pub(crate) async fn cpe_catalog(
             tracing::warn!(%error, "CPE catalog list query failed");
             ApiError::Database
         })?;
-    let total = rows
-        .first()
-        .map(|row| row.get::<_, i64>("total"))
-        .unwrap_or(0);
+    let total =
+        collection_total_with_empty_page_probe(&client, &rows, &sql, &params, "CPE catalog list")
+            .await?;
     let items = rows
         .iter()
         .map(|row| catalog_cpe_from_row(row, Vec::new(), None))

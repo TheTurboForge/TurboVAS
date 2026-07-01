@@ -18,7 +18,10 @@ use crate::{
     },
     errors::ApiError,
     path_ids::validate_cve_id,
-    query::{ApiQuery, Collection, CollectionQuery, normalize_collection_query, sort_clause},
+    query::{
+        ApiQuery, Collection, CollectionQuery, collection_total_with_empty_page_probe,
+        normalize_collection_query, sort_clause,
+    },
     user_tags::catalog_user_tags,
 };
 
@@ -63,10 +66,9 @@ pub(crate) async fn cve_catalog(
             tracing::warn!(%error, "CVE catalog list query failed");
             ApiError::Database
         })?;
-    let total = rows
-        .first()
-        .map(|row| row.get::<_, i64>("total"))
-        .unwrap_or(0);
+    let total =
+        collection_total_with_empty_page_probe(&client, &rows, &sql, &params, "CVE catalog list")
+            .await?;
     let items = rows.iter().map(catalog_cve_from_row).collect();
     Ok(Json(Collection {
         page: params.page_info(total),
