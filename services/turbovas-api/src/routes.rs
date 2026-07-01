@@ -46,6 +46,7 @@ use crate::{
     report_tls_certificates::report_tls_certificates,
     request_shapes::MAX_DIRECT_API_WRITE_BODY_BYTES,
     result_payloads::*,
+    scan_config_writes::patch_scan_config,
     scan_configs::*,
     scanner_assets::*,
     schedule_writes::{
@@ -256,6 +257,10 @@ pub(crate) fn direct_native_api_router(
             .route(
                 "/api/v1/report-configs/:report_config_id/trash",
                 delete(hard_delete_report_config),
+            )
+            .route(
+                "/api/v1/scan-configs/:scan_config_id",
+                patch(patch_scan_config),
             )
             .route("/api/v1/filters", post(create_filter))
             .route("/api/v1/filters/:filter_id", patch(patch_filter))

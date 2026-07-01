@@ -6,6 +6,7 @@ use axum::{
     Json,
     extract::{Path, State},
 };
+use tokio_postgres::Client;
 
 use crate::{
     app_state::AppState,
@@ -105,8 +106,17 @@ pub(crate) async fn scan_config_asset_detail(
     State(state): State<AppState>,
     Path(scan_config_id): Path<String>,
 ) -> Result<Json<ScanConfigAssetDetail>, ApiError> {
-    parse_uuid(&scan_config_id)?;
     let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    Ok(Json(
+        load_scan_config_asset_detail(&client, &scan_config_id).await?,
+    ))
+}
+
+pub(crate) async fn load_scan_config_asset_detail(
+    client: &Client,
+    scan_config_id: &str,
+) -> Result<ScanConfigAssetDetail, ApiError> {
+    parse_uuid(scan_config_id)?;
     let row = client
         .query_opt(
             r#"SELECT c.id AS internal_id,
@@ -148,11 +158,11 @@ pub(crate) async fn scan_config_asset_detail(
 
     let tasks = scan_config_task_references(&client, &scan_config_id).await?;
     let user_tags = scan_config_user_tags(&client, &scan_config_id).await?;
-    Ok(Json(ScanConfigAssetDetail {
+    Ok(ScanConfigAssetDetail {
         asset: scan_config_asset_from_row(&row),
         tasks,
         user_tags,
-    }))
+    })
 }
 
 pub(crate) fn scan_config_task_references_sql() -> &'static str {

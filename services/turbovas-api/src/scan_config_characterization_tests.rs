@@ -302,10 +302,11 @@ fn inherited_scan_config_delete_and_restore_remain_trash_permissions_tags_and_ta
 }
 
 #[test]
-fn native_direct_api_keeps_scan_config_routes_read_only_under_write_control() {
+fn native_direct_api_allows_only_scan_config_metadata_patch_under_write_control() {
+    let detail_path = "/api/v1/scan-configs/12345678-1234-1234-1234-123456789abc";
     for path in [
         "/api/v1/scan-configs",
-        "/api/v1/scan-configs/12345678-1234-1234-1234-123456789abc",
+        detail_path,
         "/api/v1/scan-configs/12345678-1234-1234-1234-123456789abc/families",
     ] {
         assert!(
@@ -316,7 +317,7 @@ fn native_direct_api_keeps_scan_config_routes_read_only_under_write_control() {
             direct_api_v1_method_is_allowed(&Method::GET, path, true),
             "GET {path} must remain allowlisted under write control"
         );
-        for method in [Method::POST, Method::PATCH, Method::DELETE, Method::PUT] {
+        for method in [Method::POST, Method::DELETE, Method::PUT] {
             assert!(
                 !direct_api_v1_method_is_allowed(&method, path, true),
                 "{method} {path} must remain closed"
@@ -324,21 +325,43 @@ fn native_direct_api_keeps_scan_config_routes_read_only_under_write_control() {
         }
     }
 
-    for path in [
-        "/scan-configs",
-        "/scan-configs/{scan_config_id}",
-        "/scan-configs/{scan_config_id}/families",
-    ] {
-        let block = openapi_path_block(path);
-        assert!(block.contains("get:"), "{path} must expose GET");
-        assert!(!block.contains("\n  post:"), "{path} must not expose POST");
-        assert!(
-            !block.contains("\n  patch:"),
-            "{path} must not expose PATCH"
-        );
-        assert!(
-            !block.contains("\n  delete:"),
-            "{path} must not expose DELETE"
-        );
-    }
+    assert!(direct_api_v1_method_is_allowed(
+        &Method::PATCH,
+        detail_path,
+        true
+    ));
+    assert!(!direct_api_v1_method_is_allowed(
+        &Method::PATCH,
+        detail_path,
+        false
+    ));
+    assert!(!direct_api_v1_method_is_allowed(
+        &Method::PATCH,
+        "/api/v1/scan-configs/12345678-1234-1234-1234-123456789abc/families",
+        true
+    ));
+
+    let list = openapi_path_block("/scan-configs");
+    assert!(list.contains("get:"));
+    assert!(!list.contains("\n  post:"));
+    assert!(!list.contains("\n  patch:"));
+    assert!(!list.contains("\n  delete:"));
+
+    let detail = openapi_path_block("/scan-configs/{scan_config_id}");
+    assert!(detail.contains("get:"));
+    assert!(detail.contains("patch:"));
+    assert!(!detail.contains("\n  post:"));
+    assert!(!detail.contains("\n  delete:"));
+    assert!(detail.contains("x-turbovas-exposure: direct-write"));
+    assert!(detail.contains("x-turbovas-replaces: scan-config-metadata-modify"));
+    assert!(detail.contains("x-turbovas-safety-contract: write-control-v1"));
+    assert!(detail.contains(
+        "x-turbovas-inherited-still-owns: scan-config-preferences-selector-import-export-create-delete-trash"
+    ));
+
+    let families = openapi_path_block("/scan-configs/{scan_config_id}/families");
+    assert!(families.contains("get:"));
+    assert!(!families.contains("\n  post:"));
+    assert!(!families.contains("\n  patch:"));
+    assert!(!families.contains("\n  delete:"));
 }

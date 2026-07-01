@@ -81,6 +81,10 @@ mod routes;
 mod row_helpers;
 mod runtime;
 mod scan_config_payloads;
+mod scan_config_write_db;
+mod scan_config_write_sql;
+mod scan_config_write_validation;
+mod scan_config_writes;
 mod scan_configs;
 mod scanner_asset_payloads;
 mod scanner_assets;
@@ -161,6 +165,8 @@ mod report_config_characterization_tests;
 mod result_contract_tests;
 #[cfg(test)]
 mod scan_config_characterization_tests;
+#[cfg(test)]
+mod scan_config_writes_tests;
 #[cfg(test)]
 mod schedule_characterization_tests;
 #[cfg(test)]

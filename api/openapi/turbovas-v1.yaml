@@ -2193,9 +2193,9 @@ paths:
       x-turbovas-exposure: direct-read
       x-turbovas-maturity: live-read
       x-turbovas-replaces: scan-config-metadata-list-read
-      x-turbovas-inherited-still-owns: scan-config-preferences-export-import-writes-and-deletes
+      x-turbovas-inherited-still-owns: scan-config-preferences-selector-import-export-create-delete-trash
       summary: List scan configs
-      description: Read-only scan-config metadata backed by gvmd/PostgreSQL. Preference values, NVT selector expansion, family edit payloads, import/export, scanner control, and create/modify/delete operations remain on inherited compatibility paths while native write/resource semantics are designed.
+      description: Scan-config metadata backed by gvmd/PostgreSQL. Native direct write-control can patch name/comment metadata for non-predefined scan configs; preference values, NVT selector expansion, family edit payloads, import/export, scanner control, create, delete, restore, and selector/preference mutations remain inherited while native contracts are designed.
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
@@ -2234,9 +2234,9 @@ paths:
       x-turbovas-exposure: direct-read
       x-turbovas-maturity: live-read
       x-turbovas-replaces: scan-config-metadata-detail-info-tags-and-task-backlink-read
-      x-turbovas-inherited-still-owns: scan-config-preferences-export-import-writes-and-deletes
+      x-turbovas-inherited-still-owns: scan-config-preferences-selector-import-export-create-delete-trash
       summary: Read one scan config metadata record
-      description: Metadata-only detail for automation and proof probes, including active User Tags and shallow task backlinks. Preferences, import/export, scanner control, and write operations remain on inherited compatibility paths while native contracts are designed.
+      description: Metadata-only detail for automation and proof probes, including active User Tags and shallow task backlinks. Native direct write-control can patch name/comment metadata for non-predefined scan configs; preferences, import/export, scanner control, create, delete, restore, and selector/preference mutations remain inherited while native contracts are designed.
       parameters:
         - $ref: '#/components/parameters/ScanConfigId'
       responses:
@@ -2260,6 +2260,50 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
+    patch:
+      operationId: patchScanConfigsByScanConfigId
+      x-turbovas-direct: true
+      x-turbovas-exposure: direct-write
+      x-turbovas-maturity: live-write
+      x-turbovas-replaces: scan-config-metadata-modify
+      x-turbovas-inherited-still-owns: scan-config-preferences-selector-import-export-create-delete-trash
+      x-turbovas-operator-identity: direct-token-operator
+      x-turbovas-owner-semantics: preserve-existing-owner
+      x-turbovas-safety-contract: write-control-v1
+      x-turbovas-side-effect: metadata-write
+      summary: Patch scan-config metadata
+      description: Direct write-control endpoint for changing a non-predefined scan config name or comment. Preference values, NVT selector/family selection, import/export, create, delete, restore, scanner control, and cache recalculation remain inherited.
+      parameters:
+        - $ref: '#/components/parameters/ScanConfigId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScanConfigPatchRequest'
+      responses:
+        '200':
+          description: Scan-config metadata updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanConfigAssetDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /scan-configs/{scan_config_id}/families:
     get:
       operationId: getScanConfigsByScanConfigIdFamilies
@@ -2267,7 +2311,7 @@ paths:
       x-turbovas-exposure: direct-read
       x-turbovas-maturity: live-read
       x-turbovas-replaces: scan-config-family-summary-read
-      x-turbovas-inherited-still-owns: scan-config-preferences-export-import-writes-and-deletes
+      x-turbovas-inherited-still-owns: scan-config-preferences-selector-import-export-create-delete-trash
       summary: Read scan config NVT family selection summary
       description: Read-only expansion of the NVT Families detail tab. Scanner preferences, NVT preferences, selector edit payloads, import/export, and writes remain on inherited compatibility paths.
       parameters:
@@ -4829,6 +4873,18 @@ components:
           maxLength: 4096
           description: Optional saved-filter term stored as operator configuration data.
     SchedulePatchRequest:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 4096
+        comment:
+          type: string
+          maxLength: 4096
+    ScanConfigPatchRequest:
       type: object
       minProperties: 1
       additionalProperties: false
