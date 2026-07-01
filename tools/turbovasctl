@@ -592,6 +592,7 @@ OPENAPI_ALLOWED_REPLACES_VALUES = frozenset(
         "tag-metadata-write",
         "tag-resource-name-read",
         "tag-resource-reference-read",
+        "target-create",
         "target-detail-summary-read",
         "target-clone",
         "target-hard-delete",
@@ -634,7 +635,7 @@ OPENAPI_ALLOWED_INHERITED_STILL_OWNS_VALUES = frozenset(
         "scope-report-generation",
         "scope-report-generation-retention-and-mutations",
         "tag-security-info-filter-actions-export",
-        "target-create-export-credential-link-and-secret-mutation",
+        "target-export-credential-link-and-secret-mutation",
         "target-credential-secrets-create-delete-restore-export-and-credential-link-mutation",
         "target-credential-secrets-writes-and-deletes",
         "task-scan-control-writes-and-deletes",
@@ -678,6 +679,7 @@ OPENAPI_REQUIRED_EXPOSURE = {
     ("get", "/credentials"): "direct-read",
     ("get", "/credentials/{credential_id}"): "direct-read",
     ("patch", "/credentials/{credential_id}"): "direct-write",
+    ("post", "/targets"): "direct-write",
     ("patch", "/targets/{target_id}"): "direct-write",
     ("delete", "/targets/{target_id}"): "direct-write",
     ("post", "/targets/{target_id}/clone"): "direct-write",
@@ -1328,17 +1330,26 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-replaces": "scope-metadata-membership-write",
     },
     ("get", "/targets"): {
-        "x-turbovas-inherited-still-owns": "target-create-export-credential-link-and-secret-mutation",
+        "x-turbovas-inherited-still-owns": "target-export-credential-link-and-secret-mutation",
         "x-turbovas-maturity": "live-read",
         "x-turbovas-replaces": "target-list-read",
     },
+    ("post", "/targets"): {
+        "x-turbovas-inherited-still-owns": "target-export-credential-link-and-secret-mutation",
+        "x-turbovas-maturity": "live-write",
+        "x-turbovas-operator-identity": "direct-token-operator",
+        "x-turbovas-owner-semantics": "request-operator-owner",
+        "x-turbovas-replaces": "target-create",
+        "x-turbovas-safety-contract": "write-control-v1",
+        "x-turbovas-side-effect": "metadata-write",
+    },
     ("get", "/targets/{target_id}"): {
-        "x-turbovas-inherited-still-owns": "target-create-export-credential-link-and-secret-mutation",
+        "x-turbovas-inherited-still-owns": "target-export-credential-link-and-secret-mutation",
         "x-turbovas-maturity": "live-read",
         "x-turbovas-replaces": "target-detail-summary-read",
     },
     ("patch", "/targets/{target_id}"): {
-        "x-turbovas-inherited-still-owns": "target-create-export-credential-link-and-secret-mutation",
+        "x-turbovas-inherited-still-owns": "target-export-credential-link-and-secret-mutation",
         "x-turbovas-maturity": "live-write",
         "x-turbovas-operator-identity": "direct-token-operator",
         "x-turbovas-owner-semantics": "preserve-existing-owner",
@@ -1347,7 +1358,7 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-side-effect": "metadata-write",
     },
     ("delete", "/targets/{target_id}"): {
-        "x-turbovas-inherited-still-owns": "target-create-export-credential-link-and-secret-mutation",
+        "x-turbovas-inherited-still-owns": "target-export-credential-link-and-secret-mutation",
         "x-turbovas-maturity": "live-write",
         "x-turbovas-operator-identity": "direct-token-operator",
         "x-turbovas-owner-semantics": "preserve-existing-owner",
@@ -1356,7 +1367,7 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-side-effect": "metadata-delete",
     },
     ("post", "/targets/{target_id}/clone"): {
-        "x-turbovas-inherited-still-owns": "target-create-export-credential-link-and-secret-mutation",
+        "x-turbovas-inherited-still-owns": "target-export-credential-link-and-secret-mutation",
         "x-turbovas-maturity": "live-write",
         "x-turbovas-operator-identity": "direct-token-operator",
         "x-turbovas-owner-semantics": "request-operator-owner",
@@ -1365,7 +1376,7 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-side-effect": "metadata-write",
     },
     ("post", "/targets/{target_id}/restore"): {
-        "x-turbovas-inherited-still-owns": "target-create-export-credential-link-and-secret-mutation",
+        "x-turbovas-inherited-still-owns": "target-export-credential-link-and-secret-mutation",
         "x-turbovas-maturity": "live-write",
         "x-turbovas-operator-identity": "direct-token-operator",
         "x-turbovas-owner-semantics": "preserve-existing-owner",
@@ -1374,7 +1385,7 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-side-effect": "metadata-write",
     },
     ("delete", "/targets/{target_id}/trash"): {
-        "x-turbovas-inherited-still-owns": "target-create-export-credential-link-and-secret-mutation",
+        "x-turbovas-inherited-still-owns": "target-export-credential-link-and-secret-mutation",
         "x-turbovas-maturity": "live-write",
         "x-turbovas-operator-identity": "direct-token-operator",
         "x-turbovas-owner-semantics": "preserve-existing-owner",
@@ -7438,6 +7449,13 @@ def summarize_native_tooling(items: list[dict[str, Any]], repo_root: Path | None
                 "replacement_candidates": ["GSA target list reads (migrated through gsad same-origin proxy)", "read-only target automation", "native-api-request helper"],
             },
             {
+                "method": "post",
+                "endpoint": "/api/v1/targets",
+                "status": "implemented_direct_write_control",
+                "direct_access": "direct_write_control",
+                "replacement_candidates": ["direct native target create with bounded metadata and explicit scan inputs"],
+            },
+            {
                 "endpoint": "/api/v1/targets/{target_id}",
                 "status": "implemented_internal_and_browser_proxied",
                 "replacement_candidates": ["GSA target detail reads (migrated through gsad same-origin proxy)", "read-only target automation"],
@@ -12499,6 +12517,7 @@ def direct_smoke_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
             "native-api-direct.scan-config-patch-disabled",
             "native-api-direct.scan-config-clone-disabled",
             "native-api-direct.scan-config-hard-delete-disabled",
+            "native-api-direct.target-create-disabled",
             "native-api-direct.target-patch-disabled",
             "native-api-direct.override-patch-disabled",
             "native-api-direct.tag-write-disabled",
@@ -12602,7 +12621,7 @@ def direct_smoke_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
             "native-api-direct.credential-fixture",
             "native-api-direct.credential-write-update",
             "native-api-direct.credential-fixture-cleanup",
-            "native-api-direct.target-fixture",
+            "native-api-direct.target-write-create",
             "native-api-direct.target-write-update",
             "native-api-direct.target-write-clone",
             "native-api-direct.target-write-delete-clone",
@@ -13825,24 +13844,29 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
                     credential_cleanup_details.update({"credential_id": credential_id, "credential_name": credential_name, "deleted_count": credential_cleanup_deleted})
                 findings.append(credential_cleanup_finding)
 
-            target_fixture_sql = (
-                "WITH inserted AS (INSERT INTO targets "
-                "(uuid, owner, name, hosts, exclude_hosts, reverse_lookup_only, "
-                "reverse_lookup_unify, comment, port_list, alive_test, creation_time, "
-                "modification_time, allow_simultaneous_ips) "
-                f"SELECT make_uuid(), id, {sql_literal(target_name)}, '192.0.2.42', '', 0, 0, "
-                "'TurboVAS direct write smoke temporary target', NULL, 1, m_now(), m_now(), 1 "
-                f"FROM users WHERE uuid = {sql_literal(admin_uuid or '')} RETURNING id, uuid) "
-                "SELECT uuid FROM inserted;"
-            )
-            target_fixture = psql(repo_root, target_fixture_sql)
-            target_id = psql_value(target_fixture)
-            target_fixture_ok = target_fixture.returncode == 0 and bool(target_id)
-            target_fixture_finding = process_step_finding("pass" if target_fixture_ok else "fail", "native-api-direct.target-fixture", "Direct write-control smoke created a temporary target fixture without credential or port-list links." if target_fixture_ok else "Direct write-control smoke failed to create a temporary target fixture.", target_fixture, ["psql", "fixed-target-smoke-fixture"])
-            target_fixture_details = target_fixture_finding.setdefault("details", {})
-            if isinstance(target_fixture_details, dict):
-                target_fixture_details.update({"target_id": target_id, "target_name": target_name})
-            findings.append(target_fixture_finding)
+            if predefined_port_list_id:
+                target_create_body = json.dumps(
+                    {
+                        "name": target_name,
+                        "comment": "TurboVAS direct write smoke temporary target",
+                        "port_list_id": predefined_port_list_id,
+                        "hosts": ["192.0.2.42"],
+                        "exclude_hosts": [],
+                        "alive_tests": ["TCP-ACK Service Ping"],
+                        "allow_simultaneous_ips": True,
+                        "reverse_lookup_only": False,
+                        "reverse_lookup_unify": False,
+                    },
+                    separators=(",", ":"),
+                )
+                target_create = direct_native_api_curl(repo_root, "/api/v1/targets", token=token, env=env, method="POST", body=target_create_body, extra_headers=content_type)
+                target_create_json, target_create_status = parse_json_output_with_http_status(target_create)
+                target_id = target_create_json.get("id") if isinstance(target_create_json, dict) and isinstance(target_create_json.get("id"), str) else None
+                target_login_data_count = psql_value(psql(repo_root, f"SELECT count(*)::text FROM targets_login_data WHERE target = (SELECT id FROM targets WHERE uuid = {sql_literal(target_id or '')});")) if target_id else None
+                target_create_ok = target_create.returncode == 0 and target_create_status == 201 and bool(target_id) and isinstance(target_create_json, dict) and target_create_json.get("name") == target_name and target_login_data_count == "0"
+                findings.append(native_api_probe_finding("pass" if target_create_ok else "fail", "native-api-direct.target-write-create", "Direct write-control created a temporary target through the native API without credential links." if target_create_ok else "Direct write-control failed to create a temporary target through the native API or created credential links.", target_create, direct_native_api_display_command("/api/v1/targets", token=token, env=env, method="POST", body=target_create_body, extra_headers=content_type), target_create_json, {"http_status": target_create_status, "target_id": target_id, "target_name": target_name, "port_list_id": predefined_port_list_id, "credential_link_count": target_login_data_count, **summarize_native_api_response(target_create_json)}))
+            else:
+                findings.append(native_api_probe_finding("warn", "native-api-direct.target-write-create", "Direct write-control smoke could not find a predefined port-list fixture for target creation.", port_list_fixture, direct_native_api_display_command("/api/v1/port-lists?page_size=1", token=token, env=env), port_list_fixture_json, {"http_status": port_list_fixture_status, "target_id": target_id, **summarize_native_api_response(port_list_fixture_json)}))
 
             if target_id:
                 target_state_sql = (
@@ -14669,6 +14693,32 @@ def command_runtime_native_api_direct_smoke(repo_root: Path, status_only: bool =
     disabled_scan_config_hard_delete_json, disabled_scan_config_hard_delete_status = parse_json_output_with_http_status(disabled_scan_config_hard_delete)
     disabled_scan_config_hard_delete_ok = disabled_scan_config_hard_delete.returncode == 0 and disabled_scan_config_hard_delete_status == 405 and isinstance(disabled_scan_config_hard_delete_json, dict) and disabled_scan_config_hard_delete_json.get("error", {}).get("code") == "method_not_allowed"
     findings.append(native_api_probe_finding("pass" if disabled_scan_config_hard_delete_ok else "fail", "native-api-direct.scan-config-hard-delete-disabled", "Direct native API rejects scan-config hard deletes while direct write-control is disabled." if disabled_scan_config_hard_delete_ok else "Direct native API did not reject a scan-config hard delete while direct write-control is disabled.", disabled_scan_config_hard_delete, direct_native_api_display_command("/api/v1/scan-configs/00000000-0000-0000-0000-000000000000/trash", token=token, env=env, method="DELETE"), disabled_scan_config_hard_delete_json, {"http_status": disabled_scan_config_hard_delete_status, **summarize_native_api_response(disabled_scan_config_hard_delete_json)}))
+
+    disabled_target_create_body = json.dumps(
+        {
+            "name": "disabled target create",
+            "port_list_id": "00000000-0000-0000-0000-000000000000",
+            "hosts": ["192.0.2.42"],
+            "exclude_hosts": [],
+            "alive_tests": ["TCP-ACK Service Ping"],
+            "allow_simultaneous_ips": True,
+            "reverse_lookup_only": False,
+            "reverse_lookup_unify": False,
+        },
+        separators=(",", ":"),
+    )
+    disabled_target_create = direct_native_api_curl(
+        repo_root,
+        "/api/v1/targets",
+        token=token,
+        env=env,
+        method="POST",
+        body=disabled_target_create_body,
+        extra_headers=content_type,
+    )
+    disabled_target_create_json, disabled_target_create_status = parse_json_output_with_http_status(disabled_target_create)
+    disabled_target_create_ok = disabled_target_create.returncode == 0 and disabled_target_create_status == 405 and isinstance(disabled_target_create_json, dict) and disabled_target_create_json.get("error", {}).get("code") == "method_not_allowed"
+    findings.append(native_api_probe_finding("pass" if disabled_target_create_ok else "fail", "native-api-direct.target-create-disabled", "Direct native API rejects target creates while direct write-control is disabled." if disabled_target_create_ok else "Direct native API did not reject a target create while direct write-control is disabled.", disabled_target_create, direct_native_api_display_command("/api/v1/targets", token=token, env=env, method="POST", body=disabled_target_create_body, extra_headers=content_type), disabled_target_create_json, {"http_status": disabled_target_create_status, **summarize_native_api_response(disabled_target_create_json)}))
 
     disabled_target_patch = direct_native_api_curl(
         repo_root,

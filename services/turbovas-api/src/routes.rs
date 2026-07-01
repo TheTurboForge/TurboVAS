@@ -78,7 +78,8 @@ use crate::{
     },
     tags::*,
     target_writes::{
-        clone_target, delete_target, hard_delete_target, patch_target, restore_target,
+        clone_target, create_target, delete_target, hard_delete_target, patch_target,
+        restore_target,
     },
     task_targets::*,
     task_writes::patch_task,
@@ -313,6 +314,7 @@ pub(crate) fn direct_native_api_router(
                 patch(patch_credential),
             )
             .route("/api/v1/targets/:target_id", patch(patch_target))
+            .route("/api/v1/targets", post(create_target))
             .route("/api/v1/targets/:target_id", delete(delete_target))
             .route("/api/v1/targets/:target_id/clone", post(clone_target))
             .route("/api/v1/targets/:target_id/restore", post(restore_target))

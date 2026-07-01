@@ -21,6 +21,22 @@ pub(crate) struct TargetCloneRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub(crate) struct TargetCreateRequest {
+    pub(crate) name: String,
+    #[serde(default)]
+    pub(crate) comment: Option<String>,
+    pub(crate) alive_tests: Vec<String>,
+    pub(crate) allow_simultaneous_ips: bool,
+    pub(crate) reverse_lookup_only: bool,
+    pub(crate) reverse_lookup_unify: bool,
+    pub(crate) port_list_id: String,
+    pub(crate) hosts: Vec<String>,
+    #[serde(default)]
+    pub(crate) exclude_hosts: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct TargetPatchRequest {
     #[serde(default)]
     pub(crate) name: Option<String>,
@@ -40,6 +56,19 @@ pub(crate) struct TargetPatchRequest {
     pub(crate) hosts: Option<Vec<String>>,
     #[serde(default)]
     pub(crate) exclude_hosts: Option<Vec<String>>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct ValidatedTargetCreate {
+    pub(crate) name: String,
+    pub(crate) comment: Option<String>,
+    pub(crate) alive_test: i32,
+    pub(crate) allow_simultaneous_ips: i32,
+    pub(crate) reverse_lookup_only: i32,
+    pub(crate) reverse_lookup_unify: i32,
+    pub(crate) port_list_id: String,
+    pub(crate) hosts: String,
+    pub(crate) exclude_hosts: String,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -70,6 +99,26 @@ pub(crate) fn validate_target_clone_request(
     })
 }
 
+pub(crate) fn validate_target_create_request(
+    request: TargetCreateRequest,
+) -> Result<ValidatedTargetCreate, ApiError> {
+    let (hosts, exclude_hosts) =
+        validate_target_host_lists(Some(request.hosts), request.exclude_hosts)?;
+    let alive_test = validate_alive_tests(Some(request.alive_tests))?
+        .ok_or_else(|| ApiError::BadRequest("alive_tests is required".to_string()))?;
+    Ok(ValidatedTargetCreate {
+        name: normalize_required_target_text(request.name, "name")?,
+        comment: normalize_optional_target_text(request.comment, "comment")?,
+        alive_test,
+        allow_simultaneous_ips: i32::from(request.allow_simultaneous_ips),
+        reverse_lookup_only: i32::from(request.reverse_lookup_only),
+        reverse_lookup_unify: i32::from(request.reverse_lookup_unify),
+        port_list_id: validate_uuid(request.port_list_id, "port_list_id")?,
+        hosts: hosts.ok_or_else(|| ApiError::BadRequest("hosts is required".to_string()))?,
+        exclude_hosts: exclude_hosts.unwrap_or_default(),
+    })
+}
+
 impl ValidatedTargetPatch {
     pub(crate) fn changes_task_in_use_guarded_scan_inputs(&self) -> bool {
         self.allow_simultaneous_ips.is_some()
@@ -78,6 +127,14 @@ impl ValidatedTargetPatch {
             || self.port_list_id.is_some()
             || self.hosts.is_some()
     }
+}
+
+fn validate_uuid(value: String, field_name: &str) -> Result<String, ApiError> {
+    let value = value.trim();
+    if value.is_empty() {
+        return Err(ApiError::BadRequest(format!("{field_name} is required")));
+    }
+    Ok(parse_uuid(value)?.to_string())
 }
 
 pub(crate) fn validate_target_patch_request(

@@ -17,11 +17,43 @@ use crate::{
     target_write_db::*,
     target_write_sql::*,
     target_write_validation::{
-        TargetCloneRequest, TargetPatchRequest, ValidatedTargetClone, ValidatedTargetPatch,
-        validate_target_clone_request, validate_target_patch_request,
+        TargetCloneRequest, TargetCreateRequest, TargetPatchRequest, ValidatedTargetClone,
+        ValidatedTargetCreate, ValidatedTargetPatch, validate_target_clone_request,
+        validate_target_create_request, validate_target_patch_request,
     },
     task_target_payloads::TargetItem,
 };
+
+pub(crate) async fn create_target(
+    State(state): State<AppState>,
+    operator: Option<Extension<DirectApiOperator>>,
+    Json(request): Json<TargetCreateRequest>,
+) -> Result<(StatusCode, HeaderMap, Json<TargetItem>), ApiError> {
+    let operator = require_target_write_operator(operator)?;
+    let request = validate_target_create_request(request)?;
+    let mut client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let tx = client
+        .transaction()
+        .await
+        .map_err(|error| map_target_write_db_error(error, "begin create target transaction"))?;
+    let owner_id = resolve_target_write_operator_owner(&tx, &operator).await?;
+    tx.batch_execute("LOCK TABLE targets, port_lists IN SHARE ROW EXCLUSIVE MODE;")
+        .await
+        .map_err(|error| map_target_write_db_error(error, "lock targets for create"))?;
+    ensure_unique_target_name(&tx, &request.name, -1, owner_id).await?;
+    let port_list = load_assignable_target_port_list(&tx, &request.port_list_id, owner_id).await?;
+    let record =
+        execute_target_create_transaction(&tx, owner_id, port_list.internal_id, &request).await?;
+    tx.commit()
+        .await
+        .map_err(|error| map_target_write_db_error(error, "commit create target transaction"))?;
+
+    Ok((
+        StatusCode::CREATED,
+        target_write_location_headers(&record.uuid)?,
+        Json(load_target_detail(&client, &record.uuid).await?),
+    ))
+}
 
 pub(crate) async fn clone_target(
     State(state): State<AppState>,
@@ -221,6 +253,33 @@ pub(crate) async fn execute_target_patch_transaction(
         "update target metadata",
     )
     .await
+}
+
+pub(crate) async fn execute_target_create_transaction(
+    tx: &Transaction<'_>,
+    owner_id: i32,
+    port_list_internal_id: i32,
+    request: &ValidatedTargetCreate,
+) -> Result<TargetWriteRecord, ApiError> {
+    let record = query_target_write_record_with_internal_id(
+        tx,
+        target_create_metadata_sql(),
+        &[
+            &owner_id,
+            &request.name,
+            &request.hosts,
+            &request.exclude_hosts,
+            &request.reverse_lookup_only,
+            &request.reverse_lookup_unify,
+            &request.comment,
+            &port_list_internal_id,
+            &request.alive_test,
+            &request.allow_simultaneous_ips,
+        ],
+        "create target metadata",
+    )
+    .await?;
+    Ok(TargetWriteRecord { uuid: record.uuid })
 }
 
 pub(crate) async fn execute_target_clone_transaction(

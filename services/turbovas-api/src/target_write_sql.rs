@@ -116,6 +116,16 @@ pub(crate) fn target_update_metadata_sql() -> &'static str {
       RETURNING uuid::text;"
 }
 
+pub(crate) fn target_create_metadata_sql() -> &'static str {
+    "INSERT INTO targets
+        (uuid, owner, name, hosts, exclude_hosts, reverse_lookup_only,
+         reverse_lookup_unify, comment, port_list, alive_test, creation_time,
+         modification_time, allow_simultaneous_ips)
+     VALUES (make_uuid(), $1, $2, $3, $4, $5, $6, coalesce($7, ''), $8, $9,
+             m_now(), m_now(), $10)
+     RETURNING id::integer, uuid::text;"
+}
+
 pub(crate) fn target_clone_metadata_sql() -> &'static str {
     "INSERT INTO targets
         (uuid, owner, name, hosts, exclude_hosts, reverse_lookup_only,

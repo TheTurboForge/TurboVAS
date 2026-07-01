@@ -7,10 +7,25 @@ use crate::{
     target_write_db::ensure_target_owner_matches_operator,
     target_write_sql::*,
     target_write_validation::{
-        MAX_TARGET_HOSTS, MAX_TARGET_TEXT_BYTES, TargetCloneRequest, TargetPatchRequest,
-        validate_alive_tests, validate_target_clone_request, validate_target_patch_request,
+        MAX_TARGET_HOSTS, MAX_TARGET_TEXT_BYTES, TargetCloneRequest, TargetCreateRequest,
+        TargetPatchRequest, validate_alive_tests, validate_target_clone_request,
+        validate_target_create_request, validate_target_patch_request,
     },
 };
+
+fn create_request() -> TargetCreateRequest {
+    TargetCreateRequest {
+        name: "target-one".to_string(),
+        comment: Some("temporary target".to_string()),
+        alive_tests: vec!["ICMP Ping".to_string()],
+        allow_simultaneous_ips: true,
+        reverse_lookup_only: false,
+        reverse_lookup_unify: true,
+        port_list_id: "12345678-1234-1234-1234-123456789abc".to_string(),
+        hosts: vec!["192.0.2.42".to_string(), "host-one".to_string()],
+        exclude_hosts: Some(vec!["192.0.2.43".to_string()]),
+    }
+}
 
 fn patch_request(name: Option<&str>, comment: Option<&str>) -> TargetPatchRequest {
     TargetPatchRequest {
@@ -26,6 +41,48 @@ fn patch_request(name: Option<&str>, comment: Option<&str>) -> TargetPatchReques
     }
 }
 
+#[test]
+fn target_create_request_requires_explicit_safe_scan_inputs() {
+    let validated = validate_target_create_request(create_request()).expect("valid create target");
+    assert_eq!(validated.name, "target-one");
+    assert_eq!(validated.comment.as_deref(), Some("temporary target"));
+    assert_eq!(validated.alive_test, 2);
+    assert_eq!(validated.allow_simultaneous_ips, 1);
+    assert_eq!(validated.reverse_lookup_only, 0);
+    assert_eq!(validated.reverse_lookup_unify, 1);
+    assert_eq!(
+        validated.port_list_id,
+        "12345678-1234-1234-1234-123456789abc"
+    );
+    assert_eq!(validated.hosts, "192.0.2.42, host-one");
+    assert_eq!(validated.exclude_hosts, "192.0.2.43");
+}
+
+#[test]
+fn target_create_request_rejects_unsafe_or_missing_inputs() {
+    let mut request = create_request();
+    request.hosts = vec!["192.0.2.0/24".to_string()];
+    assert!(matches!(
+        validate_target_create_request(request),
+        Err(ApiError::BadRequest(_))
+    ));
+
+    let mut request = create_request();
+    request.port_list_id = "not-a-uuid".to_string();
+    assert!(matches!(
+        validate_target_create_request(request),
+        Err(ApiError::BadRequest(_))
+    ));
+
+    let request = serde_json::json!({
+        "name": "target-one",
+        "hosts": ["192.0.2.42"],
+        "port_list_id": "12345678-1234-1234-1234-123456789abc",
+        "credential_id": "12345678-1234-1234-1234-123456789abc"
+    });
+    assert!(serde_json::from_value::<TargetCreateRequest>(request).is_err());
+}
+
 fn alive_patch_request(values: &[&str]) -> TargetPatchRequest {
     TargetPatchRequest {
         name: None,
@@ -38,6 +95,17 @@ fn alive_patch_request(values: &[&str]) -> TargetPatchRequest {
         hosts: None,
         exclude_hosts: None,
     }
+}
+
+#[test]
+fn target_create_sql_is_metadata_only_and_credential_free() {
+    let sql = target_create_metadata_sql();
+    assert!(sql.contains("INSERT INTO targets"));
+    assert!(sql.contains("make_uuid()"));
+    assert!(sql.contains("port_list"));
+    assert!(sql.contains("alive_test"));
+    assert!(!sql.contains("targets_login_data"));
+    assert!(!sql.contains("credentials_data"));
 }
 
 fn scan_settings_patch_request(
