@@ -5,6 +5,7 @@
  */
 
 import CollectionCounts from 'gmp/collection/collection-counts';
+import Response from 'gmp/http/response';
 import type {UrlParams} from 'gmp/http/utils';
 import type Filter from 'gmp/models/filter';
 import TlsCertificate from 'gmp/models/tls-certificate';
@@ -316,4 +317,16 @@ export const fetchNativeTlsCertificate = async (
   return {
     tlsCertificate: nativeTlsCertificateToModel(payload, {detail: true}),
   };
+};
+
+export const exportNativeTlsCertificateMetadata = async (
+  gmp: NativeApiGmp,
+  id: string,
+): Promise<Response<string>> => {
+  const payload = await fetchNativeJson<NativeTlsCertificatePayload>(
+    gmp,
+    `api/v1/tls-certificates/${encodeURIComponent(id)}/export`,
+    {token: gmp.session.token},
+  );
+  return new Response(`${JSON.stringify(payload, null, 2)}\n`);
 };

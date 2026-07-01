@@ -1,9 +1,11 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
 import React from 'react';
+import {exportNativeTlsCertificateMetadata} from 'gmp/native-api/tls-certificates';
 import EntityComponent from 'web/entity/EntityComponent';
 import useGmp from 'web/hooks/useGmp';
 import useShallowEqualSelector from 'web/hooks/useShallowEqualSelector';
@@ -12,6 +14,15 @@ import {getUserSettingsDefaults} from 'web/store/usersettings/defaults/selectors
 import {create_pem_certificate} from 'web/utils/Cert';
 import PropTypes from 'web/utils/PropTypes';
 import {generateFilename} from 'web/utils/Render';
+
+const canUseNativeApi = gmp => typeof gmp?.buildUrl === 'function';
+
+const exportTlsCertificate = (gmp, cert) => {
+  if (canUseNativeApi(gmp)) {
+    return exportNativeTlsCertificateMetadata(gmp, cert.id);
+  }
+  return gmp.tlscertificate.export(cert);
+};
 
 const TlsCertificateComponent = ({
   children,
@@ -61,6 +72,8 @@ const TlsCertificateComponent = ({
 
   return (
     <EntityComponent
+      download={cert => exportTlsCertificate(gmp, cert)}
+      downloadOptions={canUseNativeApi(gmp) ? {extension: 'json'} : undefined}
       name="tlscertificate"
       onDeleteError={onDeleteError}
       onDeleted={onDeleted}

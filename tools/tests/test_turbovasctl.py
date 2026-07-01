@@ -5090,6 +5090,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn('TlsCertificateSourceLocation', openapi)
         self.assertIn('/api/v1/tls-certificates/{certificate_id}', native_tooling)
         self.assertIn('/api/v1/tls-certificates/{certificate_id}/export', native_tooling)
+        self.assertIn('GSA top-level TLS Certificate metadata export', native_tooling)
         self.assertIn('native-api.tls-certificate-detail', native_tooling)
 
     def test_scanner_asset_detail_contract_is_internal_metadata_only(self):
