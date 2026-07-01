@@ -5,6 +5,7 @@
 use axum::http::Method;
 
 use crate::direct_api::direct_api_v1_method_is_allowed;
+use crate::scan_config_query_sql::{scan_config_families_exists_sql, scan_config_families_sql};
 
 const GMP_CONFIGS: &str = include_str!("../../../components/gvmd/src/gmp_configs.c");
 const MANAGE_SQL: &str = include_str!("../../../components/gvmd/src/manage_sql.c");
@@ -424,4 +425,35 @@ fn native_direct_api_allows_scan_config_write_control_paths() {
     assert!(!families.contains("\n  post:"));
     assert!(!families.contains("\n  patch:"));
     assert!(!families.contains("\n  delete:"));
+}
+
+#[test]
+fn native_scan_config_family_query_is_family_context_only() {
+    let list_sql = scan_config_families_sql();
+    let exists_sql = scan_config_families_exists_sql();
+    let combined = format!("{list_sql}\n{exists_sql}");
+
+    for required in [
+        "WITH config_row AS (",
+        "coalesce(c.nvt_selector, '') AS nvt_selector",
+        "coalesce(c.family_count, 0)::bigint AS family_count",
+        "coalesce(c.families_growing, 0)::integer AS families_growing",
+        "FROM nvts n",
+        "FROM nvt_selectors ns",
+        "ORDER BY lower(name), name",
+        "SELECT EXISTS (SELECT 1 FROM configs",
+    ] {
+        assert!(
+            combined.contains(required),
+            "scan-config family SQL missing {required}"
+        );
+    }
+
+    let combined_lower = combined.to_ascii_lowercase();
+    for forbidden in ["insert ", "update ", "delete ", "grant ", "drop "] {
+        assert!(
+            !combined_lower.contains(forbidden),
+            "scan-config family SQL must not include {forbidden}"
+        );
+    }
 }
