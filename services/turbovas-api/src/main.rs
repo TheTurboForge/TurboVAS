@@ -48,6 +48,7 @@ mod nvt_catalog;
 mod nvt_catalog_payloads;
 mod nvt_payloads;
 mod operating_system_payloads;
+mod operating_system_query_sql;
 mod operating_systems;
 mod operator_identity;
 #[cfg(test)]

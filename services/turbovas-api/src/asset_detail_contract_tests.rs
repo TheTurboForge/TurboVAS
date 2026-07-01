@@ -10,6 +10,7 @@ use crate::{
         tls_certificate_user_tags_sql,
     },
     collections::{ALERT_DEFAULT_SORT, ALERT_SORT_FIELDS},
+    operating_system_query_sql::{operating_system_asset_detail_sql, operating_system_assets_sql},
     port_list_query_sql::{
         port_list_asset_detail_sql, port_list_assets_sql, port_list_ranges_sql,
         port_list_targets_sql,
@@ -372,6 +373,40 @@ fn operating_system_user_tags_are_active_os_tags_only() {
     assert!(!sql.contains("credentials"));
     assert!(!sql.contains("reports"));
     assert!(!sql.contains("results"));
+}
+
+#[test]
+fn operating_system_read_sql_is_os_metadata_and_host_counts_only() {
+    let list = operating_system_assets_sql("name ASC");
+    let detail = operating_system_asset_detail_sql();
+    let combined = format!("{list}\n{detail}");
+
+    for required in [
+        "FROM oss",
+        "host_details hd",
+        "hd.name = 'best_os_cpe'",
+        "host_max_severities hms",
+        "FROM host_oss ho_all",
+        "cpe_title(oss.name)",
+    ] {
+        assert!(
+            combined.contains(required),
+            "operating-system SQL missing {required}"
+        );
+    }
+    for forbidden in [
+        "INSERT INTO",
+        "UPDATE ",
+        "DELETE FROM",
+        "credentials",
+        "password",
+        "secret",
+    ] {
+        assert!(
+            !combined.contains(forbidden),
+            "operating-system read SQL must not contain {forbidden}"
+        );
+    }
 }
 
 #[test]

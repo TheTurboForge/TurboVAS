@@ -8273,6 +8273,14 @@ NATIVE_API_MODULE_OWNERSHIP_CONTRACTS: tuple[dict[str, Any], ...] = (
         ),
     },
     {
+        "owner": "services/turbovas-api/src/operating_system_query_sql.rs",
+        "forbidden": ("services/turbovas-api/src/operating_systems.rs",),
+        "symbols": (
+            "pub(crate) fn operating_system_assets_sql",
+            "pub(crate) fn operating_system_asset_detail_sql",
+        ),
+    },
+    {
         "owner": "services/turbovas-api/src/scanner_asset_query_sql.rs",
         "forbidden": ("services/turbovas-api/src/scanner_assets.rs",),
         "symbols": (
