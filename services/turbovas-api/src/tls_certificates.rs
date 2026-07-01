@@ -188,6 +188,13 @@ pub(crate) async fn tls_certificate_asset_detail(
     }))
 }
 
+pub(crate) async fn tls_certificate_asset_export(
+    state: State<AppState>,
+    path: Path<String>,
+) -> Result<Json<TlsCertificateAssetDetail>, ApiError> {
+    tls_certificate_asset_detail(state, path).await
+}
+
 pub(crate) fn tls_certificate_user_tags_sql() -> &'static str {
     r#"SELECT t.uuid AS id,
               coalesce(t.name, '') AS name,

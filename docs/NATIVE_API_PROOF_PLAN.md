@@ -96,7 +96,8 @@ User Tags.
 TLS Certificate detail Information fields, active User Tags, validity/trust
 status, and source provenance now read native metadata through the authenticated
 `gsad` proxy while inherited GMP context still owns certificate download bytes,
-export, delete, tag writes/actions, and retained actions. The native detail
+legacy export, delete, tag writes/actions, and retained actions. Direct TLS
+certificate metadata export reuses the same read-only detail JSON. The native detail
 remains read-only metadata/source provenance and intentionally excludes stored
 certificate bytes and file-transfer semantics.
 Scanner detail now reads native metadata, active User Tags, and non-hidden task
@@ -178,6 +179,7 @@ where it exists:
 - `GET /api/v1/operating-systems/{os_id}/export` metadata JSON only
 - `GET /api/v1/tls-certificates`
 - `GET /api/v1/tls-certificates/{certificate_id}` metadata/source detail only
+- `GET /api/v1/tls-certificates/{certificate_id}/export` metadata JSON only
 - `GET /api/v1/targets`
 - `GET /api/v1/targets/{target_id}`
 - `GET /api/v1/tasks`

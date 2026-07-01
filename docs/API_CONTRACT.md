@@ -287,6 +287,9 @@ locations, resolved host asset IDs when available, and origins. It intentionally
 excludes stored certificate bytes, export/delete behavior, tag writes/actions,
 and other asset writes until native write and file-transfer semantics are
 designed.
+Direct scriptable `GET /api/v1/tls-certificates/{certificate_id}/export`
+returns the same native detail JSON for metadata export; it does not replace
+legacy certificate byte export/download or delete/tag-action behavior.
 
 Native saved filter rows include filter identity, type, term, timestamps, and
 alert backlink references. Filter terms can reveal operator search logic,

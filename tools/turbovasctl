@@ -620,6 +620,7 @@ OPENAPI_ALLOWED_REPLACES_VALUES = frozenset(
         "task-list-read",
         "tls-certificate-asset-detail-info-read",
         "tls-certificate-asset-list-read",
+        "tls-certificate-asset-metadata-export-read",
         "trashcan-count-summary-read",
         "vulnerability-list-read",
     }
@@ -1037,6 +1038,11 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-inherited-still-owns": "tls-certificate-export-delete-and-rich-history",
         "x-turbovas-maturity": "live-read",
         "x-turbovas-replaces": "tls-certificate-asset-detail-info-read",
+    },
+    ("get", "/tls-certificates/{certificate_id}/export"): {
+        "x-turbovas-inherited-still-owns": "tls-certificate-export-delete-and-rich-history",
+        "x-turbovas-maturity": "live-read",
+        "x-turbovas-replaces": "tls-certificate-asset-metadata-export-read",
     },
     ("get", "/scanners"): {
         "x-turbovas-inherited-still-owns": "scanner-control-credentials-writes-and-deletes",
@@ -1599,6 +1605,7 @@ DIRECT_API_SCRIPTABLE_ENDPOINTS = frozenset(
         "/api/v1/hosts/{}/export",
         "/api/v1/tls-certificates",
         "/api/v1/tls-certificates/{}",
+        "/api/v1/tls-certificates/{}/export",
         "/api/v1/scanners",
         "/api/v1/scanners/{}",
         "/api/v1/scanners/{}/export",
@@ -7034,6 +7041,12 @@ def summarize_native_tooling(items: list[dict[str, Any]], repo_root: Path | None
                 "endpoint": "/api/v1/tls-certificates/{certificate_id}",
                 "status": "implemented_internal_and_browser_proxied",
                 "replacement_candidates": ["GSA top-level TLS Certificate detail Information fields, active User Tags, and source provenance (migrated through gsad same-origin proxy)", "read-only TLS certificate asset automation", "native-api-request helper"],
+            },
+            {
+                "endpoint": "/api/v1/tls-certificates/{certificate_id}/export",
+                "status": "implemented_internal_and_scriptable_read",
+                "direct_access": "scriptable_read",
+                "replacement_candidates": ["direct native JSON TLS certificate metadata export", "read-only TLS certificate asset automation"],
             },
             {
                 "endpoint": "/api/v1/scanners",

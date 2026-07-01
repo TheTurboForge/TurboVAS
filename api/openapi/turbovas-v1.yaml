@@ -716,6 +716,39 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
+  /tls-certificates/{certificate_id}/export:
+    get:
+      operationId: getTlsCertificatesByCertificateIdExport
+      x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: tls-certificate-asset-metadata-export-read
+      x-turbovas-inherited-still-owns: tls-certificate-export-delete-and-rich-history
+      summary: Export TLS certificate metadata JSON
+      description: Direct scriptable TLS certificate metadata export backed by gvmd/PostgreSQL. This returns the same native TLS certificate detail JSON with source provenance and active user tags. Certificate bytes, legacy export/download, delete, tag writes/actions, scanner-control, feed-control, and write behavior remain inherited.
+      parameters:
+        - $ref: '#/components/parameters/TlsCertificateId'
+      responses:
+        '200':
+          description: TLS certificate metadata export
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TlsCertificateAssetDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '413':
+          $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /scanners:
     get:
       operationId: getScanners
