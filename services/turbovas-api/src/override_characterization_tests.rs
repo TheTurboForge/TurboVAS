@@ -11,6 +11,7 @@ const MANAGE_SQL_OVERRIDES: &str =
     include_str!("../../../components/gvmd/src/manage_sql_overrides.c");
 const OPENAPI: &str = include_str!("../../../api/openapi/turbovas-v1.yaml");
 const OVERRIDES_RS: &str = include_str!("overrides.rs");
+const OVERRIDE_QUERY_SQL_RS: &str = include_str!("override_query_sql.rs");
 
 fn inherited_function(source: &str, name: &str) -> String {
     let marker = format!("\n{name} (");
@@ -158,8 +159,8 @@ fn native_override_reads_are_metadata_only_and_do_not_touch_report_cache_or_scan
         "orphan_int",
     ] {
         assert!(
-            OVERRIDES_RS.contains(required),
-            "overrides.rs missing {required}"
+            OVERRIDE_QUERY_SQL_RS.contains(required),
+            "override_query_sql.rs missing {required}"
         );
     }
     for forbidden in [
@@ -178,6 +179,10 @@ fn native_override_reads_are_metadata_only_and_do_not_touch_report_cache_or_scan
         assert!(
             !OVERRIDES_RS.contains(forbidden),
             "native override reads must not contain {forbidden}"
+        );
+        assert!(
+            !OVERRIDE_QUERY_SQL_RS.contains(forbidden),
+            "native override query SQL must not contain {forbidden}"
         );
     }
 }
