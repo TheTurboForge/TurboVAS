@@ -7714,6 +7714,78 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertEqual(compact["findings"][0]["check"], "runtime-db-introspect.status-only")
         self.assertLess(len(json.dumps(compact)), len(json.dumps(full)))
 
+    def test_runtime_db_introspect_columns_for_uses_safe_information_schema_lookup(self):
+        calls = []
+        original_psql = turbovasctl.psql
+        original_running = turbovasctl.container_running
+
+        def fake_psql(_root, sql, database=None):
+            calls.append(sql)
+            if "current_database()" in sql:
+                return turbovasctl.subprocess.CompletedProcess([], 0, "turbovas|turbovas|turbovas\n", "")
+            if "database_version" in sql:
+                return turbovasctl.subprocess.CompletedProcess([], 0, "283\n", "")
+            if "information_schema.schemata" in sql:
+                return turbovasctl.subprocess.CompletedProcess([], 0, "cert\npublic\n", "")
+            if "information_schema.tables" in sql:
+                rows = "\n".join(f"{schema}.{table}|t" for schema, table in turbovasctl.DB_INTROSPECT_TABLES)
+                return turbovasctl.subprocess.CompletedProcess([], 0, rows + "\n", "")
+            if "column_name || '|' || data_type" in sql:
+                return turbovasctl.subprocess.CompletedProcess([], 0, "id|integer|NO\nowner|integer|YES\n", "")
+            if "information_schema.columns" in sql:
+                rows = "\n".join(f"{schema}.{table}.{column}|t" for schema, table, column in turbovasctl.DB_INTROSPECT_COLUMNS)
+                return turbovasctl.subprocess.CompletedProcess([], 0, rows + "\n", "")
+            if "SELECT count(*)" in sql:
+                return turbovasctl.subprocess.CompletedProcess([], 0, "7\n", "")
+            return turbovasctl.subprocess.CompletedProcess([], 1, "unexpected\n", "")
+
+        try:
+            turbovasctl.psql = fake_psql
+            turbovasctl.container_running = lambda _root, service: service == "postgres"
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp) / "TurboVAS"
+                root.mkdir()
+                result = turbovasctl.command_runtime_db_introspect(
+                    root,
+                    columns_for=["public.targets", "public.targets"],
+                )
+        finally:
+            turbovasctl.psql = original_psql
+            turbovasctl.container_running = original_running
+
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(len(result["details"]["requested_columns"]), 1)
+        requested = result["details"]["requested_columns"][0]
+        self.assertEqual(requested["table"], "public.targets")
+        self.assertEqual([column["name"] for column in requested["columns"]], ["id", "owner"])
+        requested_queries = [sql for sql in calls if "column_name || '|' || data_type" in sql]
+        self.assertEqual(len(requested_queries), 1)
+        self.assertIn("table_schema = 'public'", requested_queries[0])
+        self.assertIn("table_name = 'targets'", requested_queries[0])
+        self.assertNotIn("DROP", requested_queries[0])
+
+    def test_runtime_db_introspect_columns_for_rejects_unsafe_identifiers(self):
+        original_running = turbovasctl.container_running
+        original_psql = turbovasctl.psql
+        try:
+            turbovasctl.container_running = lambda _root, service: service == "postgres"
+            turbovasctl.psql = lambda *_args, **_kwargs: turbovasctl.subprocess.CompletedProcess([], 1, "unexpected\n", "")
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp) / "TurboVAS"
+                root.mkdir()
+                result = turbovasctl.command_runtime_db_introspect(
+                    root,
+                    columns_for=["public.targets;DROP", "private.targets", "targets"],
+                )
+        finally:
+            turbovasctl.container_running = original_running
+            turbovasctl.psql = original_psql
+
+        self.assertEqual(result["status"], "fail")
+        failures = [finding for finding in result["findings"] if finding["check"] == "db-introspect.columns-for-shape"]
+        self.assertEqual(len(failures), 3)
+        self.assertEqual(result["details"]["requested_columns"], [])
+
     def test_runtime_db_introspect_status_only_keeps_postgres_warning(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "TurboVAS"

@@ -23,7 +23,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, Sequence
 
 try:
     import tomllib
@@ -1716,6 +1716,7 @@ DB_INTROSPECT_COLUMNS = (
     ("cert", "cert_bund_advs", "uuid"),
     ("cert", "dfn_cert_advs", "uuid"),
 )
+DB_INTROSPECT_ALLOWED_SCHEMAS = frozenset({"public", "cert", "scap"})
 DATA_STATE_ARTIFACT_PATHS = (
     ("reports", "db_owned_export", ("artifacts", "reports"), True),
     ("scope-reports", "db_owned_export", ("artifacts", "scope-reports"), True),
@@ -3303,6 +3304,33 @@ def introspection_table_presence(repo_root: Path) -> tuple[subprocess.CompletedP
     return result, rows
 
 
+def introspection_table_columns(repo_root: Path, requests: Iterable[tuple[str, str]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    results: list[dict[str, Any]] = []
+    findings: list[dict[str, Any]] = []
+    for schema, table in requests:
+        query = (
+            "SELECT column_name || '|' || data_type || '|' || is_nullable "
+            "FROM information_schema.columns "
+            f"WHERE table_schema = {sql_literal(schema)} AND table_name = {sql_literal(table)} "
+            "ORDER BY ordinal_position;"
+        )
+        result = psql(repo_root, query)
+        key = f"{schema}.{table}"
+        columns: list[dict[str, str]] = []
+        if result.returncode == 0:
+            for line in result.stdout.splitlines():
+                parts = line.split("|", 2)
+                if len(parts) != 3:
+                    continue
+                columns.append({"name": parts[0], "data_type": parts[1], "is_nullable": parts[2]})
+            results.append({"table": key, "exists": bool(columns), "columns": columns})
+            findings.append(finding("pass" if columns else "warn", "db-introspect.requested-columns", f"Column catalog captured for {key}." if columns else f"No columns found for {key}.", details={"table": key, "column_count": len(columns)}))
+        else:
+            results.append({"table": key, "exists": False, "columns": []})
+            findings.append(finding("fail", "db-introspect.requested-columns", f"Column catalog query failed for {key}.", details={"table": key, "output_tail": output_tail(result.stdout, 80)}))
+    return results, findings
+
+
 def introspection_column_presence(repo_root: Path) -> tuple[subprocess.CompletedProcess[str], dict[str, bool]]:
     values = ",".join(f"({sql_literal(schema)}, {sql_literal(table)}, {sql_literal(column)})" for schema, table, column in DB_INTROSPECT_COLUMNS)
     query = (
@@ -4653,6 +4681,19 @@ def sql_identifier(identifier: str) -> str:
 
 def sql_literal(value: str) -> str:
     return "'" + value.replace("'", "''") + "'"
+
+
+def parse_safe_schema_table(value: str) -> tuple[str, str]:
+    parts = value.split(".")
+    if len(parts) != 2:
+        raise ValueError("expected schema.table")
+    schema, table = (part.strip() for part in parts)
+    identifier_pattern = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+    if schema not in DB_INTROSPECT_ALLOWED_SCHEMAS:
+        raise ValueError(f"schema {schema!r} is not allowed")
+    if not identifier_pattern.fullmatch(table):
+        raise ValueError("table must be a simple SQL identifier")
+    return schema, table
 
 
 def postgres_ready(repo_root: Path) -> subprocess.CompletedProcess[str]:
@@ -16848,6 +16889,7 @@ def runtime_db_introspect_status_only_result(result: dict[str, Any]) -> dict[str
     schemas = details.get("schemas", {}) if isinstance(details.get("schemas"), dict) else {}
     tables = details.get("tables", {}) if isinstance(details.get("tables"), dict) else {}
     columns = details.get("columns", {}) if isinstance(details.get("columns"), dict) else {}
+    requested_columns = details.get("requested_columns", []) if isinstance(details.get("requested_columns"), list) else []
     compact["details"] = {
         "database_name": database.get("name"),
         "manager_database_version": database.get("manager_database_version"),
@@ -16857,6 +16899,7 @@ def runtime_db_introspect_status_only_result(result: dict[str, Any]) -> dict[str
         "existing_table_count": sum(1 for item in tables.values() if isinstance(item, dict) and item.get("exists")),
         "column_count": len(columns),
         "existing_column_count": sum(1 for item in columns.values() if isinstance(item, dict) and item.get("exists")),
+        "requested_column_table_count": len(requested_columns),
         "finding_count": len(findings),
         "non_pass_count": len(non_pass),
     }
@@ -16870,9 +16913,18 @@ def runtime_db_introspect_status_only_result(result: dict[str, Any]) -> dict[str
     return compact
 
 
-def command_runtime_db_introspect(repo_root: Path, status_only: bool = False) -> dict[str, Any]:
+def command_runtime_db_introspect(repo_root: Path, status_only: bool = False, columns_for: Sequence[str] = ()) -> dict[str, Any]:
     findings: list[dict[str, Any]] = []
-    details: dict[str, Any] = {"database": {}, "schemas": {}, "tables": {}, "columns": {}}
+    details: dict[str, Any] = {"database": {}, "schemas": {}, "tables": {}, "columns": {}, "requested_columns": []}
+    requested_column_tables: list[tuple[str, str]] = []
+    for request in columns_for:
+        try:
+            parsed = parse_safe_schema_table(request)
+        except ValueError as error:
+            findings.append(finding("fail", "db-introspect.columns-for-shape", str(error), details={"input": request}))
+            continue
+        if parsed not in requested_column_tables:
+            requested_column_tables.append(parsed)
     if not container_running(repo_root, "postgres"):
         findings.append(finding("warn", "db-introspect.postgres", "Postgres is not running; database introspection is unavailable."))
         result = make_result("runtime-db-introspect", repo_root, "Runtime database introspection could not inspect Postgres.", findings)
@@ -16918,6 +16970,11 @@ def command_runtime_db_introspect(repo_root: Path, status_only: bool = False) ->
         findings.append(finding("pass", "db-introspect.columns", "Fixed database column catalog captured.", details={"column_count": len(details["columns"])}))
     else:
         findings.append(finding("fail", "db-introspect.columns", "Fixed database column catalog query failed.", details={"output_tail": output_tail(column_query.stdout, 80)}))
+
+    if requested_column_tables:
+        requested_columns, requested_findings = introspection_table_columns(repo_root, requested_column_tables)
+        details["requested_columns"] = requested_columns
+        findings.extend(requested_findings)
 
     result = make_result("runtime-db-introspect", repo_root, "Runtime database introspection completed.", findings)
     result["details"] = details
@@ -17474,6 +17531,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("runtime-data-state", parents=[common], help="inspect database-centered runtime data state")
     db_introspect = subparsers.add_parser("runtime-db-introspect", parents=[common], help="inspect fixed read-only database catalog facts")
     db_introspect.add_argument("--status-only", action="store_true", help="emit compact catalog counts and only non-pass findings for chat-safe DB scouting")
+    db_introspect.add_argument("--columns-for", action="append", default=[], metavar="SCHEMA.TABLE", help="include read-only information_schema columns for a safe schema.table identifier")
     subparsers.add_parser("runtime-performance-snapshot", parents=[common], help="capture a lightweight runtime performance snapshot")
     subparsers.add_parser("runtime-redis-state", parents=[common], help="inspect Redis dependency and runtime boundary state")
     security_policy = subparsers.add_parser("security-policy-check", parents=[common], help="validate security-sensitive path policy scaffolding")
@@ -17638,7 +17696,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "runtime-data-state":
         result = command_runtime_data_state(repo_root)
     elif args.command == "runtime-db-introspect":
-        result = command_runtime_db_introspect(repo_root, status_only=args.status_only)
+        result = command_runtime_db_introspect(repo_root, status_only=args.status_only, columns_for=args.columns_for)
     elif args.command == "runtime-performance-snapshot":
         result = command_runtime_performance_snapshot(repo_root)
     elif args.command == "runtime-redis-state":
