@@ -32,7 +32,11 @@ const createGmp = ({
   savePortListResponse = {id: '123'},
   clonePortListResponse = {id: '123'},
   createPortRangeResponse = {id: '1234'},
+  currentSettings: userCurrentSettings = currentSettings,
   getPortList = testing.fn().mockResolvedValue(getPortListResponse),
+  exportPortList = testing.fn().mockResolvedValue({
+    data: '<port_list id="123"/>',
+  }),
   createPortList = testing.fn().mockResolvedValue(createPortListResponse),
   deletePortList = testing.fn().mockResolvedValue(deletePortListResponse),
   savePortList = testing.fn().mockResolvedValue(savePortListResponse),
@@ -44,6 +48,7 @@ const createGmp = ({
 } = {}) => ({
   portlist: {
     get: getPortList,
+    export: exportPortList,
     create: createPortList,
     delete: deletePortList,
     save: savePortList,
@@ -51,7 +56,7 @@ const createGmp = ({
     createPortRange,
     deletePortRange,
   },
-  user: {currentSettings},
+  user: {currentSettings: userCurrentSettings},
   session: createSession(),
 });
 
@@ -298,6 +303,73 @@ describe('PortListComponent tests', () => {
       screen.getByText('Edit Port List Native Port List'),
     ).toBeInTheDocument();
     expect(screen.getAllByText('22')).toHaveLength(2);
+  });
+
+  test('should use native metadata export for downloads', async () => {
+    const nativePayload = {
+      id: '123',
+      name: 'Native Port List',
+      comment: 'native metadata',
+      port_count: {all: 1, tcp: 1, udp: 0},
+    };
+    const fetchMock = testing.fn().mockResolvedValue({
+      json: testing.fn().mockResolvedValue(nativePayload),
+      ok: true,
+      status: 200,
+    });
+    testing.stubGlobal('fetch', fetchMock);
+    const gmp = {
+      ...createGmp({
+        currentSettings: testing.fn().mockResolvedValue({
+          data: {
+            detailsexportfilename: {
+              id: 'details-export-filename',
+              name: 'Details Export File Name',
+              value: '%T-%U',
+            },
+          },
+        }),
+      }),
+      buildUrl: testing.fn(
+        (path: string) => `https://turbovas.example/${path}`,
+      ),
+      session: createSession({token: 'test-token'}),
+    };
+    let downloadClick: ((entity: PortList) => void) | undefined;
+    const onDownloaded = testing.fn();
+    const onDownloadError = testing.fn();
+    const {render} = rendererWith({gmp});
+
+    render(
+      <PortListComponent
+        onDownloadError={onDownloadError}
+        onDownloaded={onDownloaded}
+      >
+        {({download}) => {
+          downloadClick = download;
+          return <div>Some Content</div>;
+        }}
+      </PortListComponent>,
+    );
+
+    await wait();
+    downloadClick?.(PortList.fromElement({_id: '123', name: 'Native Port List'}));
+    await wait();
+
+    expect(gmp.portlist.export).not.toHaveBeenCalled();
+    expect(gmp.buildUrl).toHaveBeenCalledWith(
+      'api/v1/port-lists/123/export',
+      {token: 'test-token'},
+    );
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
+      'https://turbovas.example/api/v1/port-lists/123/export',
+      expect.objectContaining({credentials: 'include'}),
+    );
+    expect(onDownloaded).toHaveBeenCalledWith({
+      filename: 'portlist-123.json',
+      data: `${JSON.stringify(nativePayload, null, 2)}\n`,
+    });
+    expect(onDownloadError).not.toHaveBeenCalled();
   });
 
   test('should allow editing a port list to add a port range', async () => {

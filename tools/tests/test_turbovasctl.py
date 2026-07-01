@@ -3062,7 +3062,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(hard_delete_port_list["x_turbovas_replaces"], "port-list-hard-delete")
 
         export_port_list = rows[("get", "/api/v1/port-lists/{port_list_id}/export")]
-        self.assertEqual(export_port_list["status"], "implemented_internal_and_scriptable_read")
+        self.assertEqual(export_port_list["status"], "implemented_internal_browser_proxied_and_scriptable_read")
         self.assertEqual(export_port_list["direct_access"], "scriptable_read")
         self.assertEqual(export_port_list["x_turbovas_maturity"], "live-read")
         self.assertEqual(export_port_list["x_turbovas_exposure"], "direct-read")

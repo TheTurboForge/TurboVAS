@@ -18,7 +18,10 @@ import {
   type default as PortList,
   type ProtocolType,
 } from 'gmp/models/port-list';
-import {fetchNativePortList} from 'gmp/native-api/port-lists';
+import {
+  exportNativePortListMetadata,
+  fetchNativePortList,
+} from 'gmp/native-api/port-lists';
 import {isDefined} from 'gmp/utils/identity';
 import {shorten} from 'gmp/utils/string';
 import useEntityClone, {
@@ -95,6 +98,13 @@ const loadPortList = async (
   return response.data;
 };
 
+const exportPortList = (gmp: ReturnType<typeof useGmp>, entity: PortList) => {
+  if (canUseNativeApi(gmp)) {
+    return exportNativePortListMetadata(gmp, entity.id as string);
+  }
+  return gmp.portlist.export(entity as EntityCommandParams);
+};
+
 const PortListComponent = ({
   children,
   onCloned,
@@ -145,7 +155,7 @@ const PortListComponent = ({
     },
   );
   const handleDownload = useEntityDownload<PortList>(
-    entity => gmp.portlist.export(entity),
+    entity => exportPortList(gmp, entity as PortList),
     {
       onDownloadError,
       onDownloaded,
@@ -377,7 +387,11 @@ const PortListComponent = ({
     <>
       {children({
         clone: handleClone,
-        download: handleDownload,
+        download: entity =>
+          handleDownload(
+            entity,
+            canUseNativeApi(gmp) ? {extension: 'json'} : undefined,
+          ),
         delete: handleDelete,
         create: openPortListDialog,
         edit: openPortListDialog,
