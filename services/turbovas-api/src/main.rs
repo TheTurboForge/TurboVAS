@@ -71,6 +71,7 @@ mod port_lists;
 mod query;
 mod report_applications;
 mod report_config_payloads;
+mod report_config_query_sql;
 mod report_config_write_db;
 #[cfg(test)]
 mod report_config_write_plans;

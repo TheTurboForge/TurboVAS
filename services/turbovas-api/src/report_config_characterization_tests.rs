@@ -4,7 +4,10 @@
 
 use axum::http::Method;
 
-use crate::direct_api::direct_api_v1_method_is_allowed;
+use crate::{
+    direct_api::direct_api_v1_method_is_allowed,
+    report_config_query_sql::{report_config_asset_detail_sql, report_config_assets_sql},
+};
 
 const MANAGE_PG: &str = include_str!("../../../components/gvmd/src/manage_pg.c");
 const MANAGE_SQL_REPORT_CONFIGS: &str =
@@ -24,6 +27,43 @@ fn inherited_function(source: &str, name: &str) -> String {
     let tail = &source[start..];
     let end = tail.find("\n/**").unwrap_or(tail.len());
     tail[..end].to_string()
+}
+
+#[test]
+fn native_report_config_read_sql_is_metadata_and_format_context_only() {
+    let list_sql = report_config_assets_sql("name ASC");
+    let detail_sql = report_config_asset_detail_sql();
+    let combined = format!("{list_sql}\n{detail_sql}");
+    let upper_sql = combined.to_ascii_uppercase();
+
+    for required in [
+        "FROM report_configs rc",
+        "LEFT JOIN users u ON u.id = rc.owner",
+        "LEFT JOIN report_formats rf ON rf.uuid = rc.report_format_id",
+        "coalesce(rc.report_format_id, '') AS report_format_id",
+        "coalesce(rf.name, '') AS report_format_name",
+    ] {
+        assert!(
+            combined.contains(required),
+            "report-config read SQL missing {required}"
+        );
+    }
+    assert!(list_sql.contains("count(*) OVER()::bigint AS total"));
+    assert!(list_sql.contains("ORDER BY name ASC, name ASC, id ASC LIMIT $2 OFFSET $3"));
+    for forbidden in [
+        "INSERT ",
+        "UPDATE ",
+        "DELETE ",
+        "TRASH",
+        "credentials",
+        "password",
+        "secret",
+    ] {
+        assert!(
+            !upper_sql.contains(&forbidden.to_ascii_uppercase()),
+            "report-config read SQL must not include write or secret path: {forbidden}"
+        );
+    }
 }
 
 fn openapi_path_block(path: &str) -> String {
