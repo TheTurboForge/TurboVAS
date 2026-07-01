@@ -26,8 +26,8 @@ fn result_rows_expose_nvt_epss_context_without_mutation_workflows() {
             .split_once("async fn result_detail")
             .expect("result detail handler must exist")
             .1
-            .split_once("async fn report_results")
-            .expect("result detail handler must precede report result list")
+            .split_once("async fn result_export")
+            .expect("result detail handler must precede result export wrapper")
             .0,
         source
             .split_once("async fn report_results")
@@ -44,6 +44,20 @@ fn result_rows_expose_nvt_epss_context_without_mutation_workflows() {
         .1
         .split_once("pub(crate) fn result_override_from_row")
         .expect("result row mapper must precede override row mapper")
+        .0;
+    let result_user_tag_source = source
+        .split_once("async fn result_user_tags")
+        .expect("result user-tag loader must exist")
+        .1
+        .split_once("async fn result_effective_overrides")
+        .expect("result user-tag loader must precede override loader")
+        .0;
+    let result_override_source = source
+        .split_once("async fn result_effective_overrides")
+        .expect("result override loader must exist")
+        .1
+        .split_once("pub(crate) async fn report_results")
+        .expect("result override loader must precede report result list")
         .0;
 
     for expected in [
@@ -77,10 +91,10 @@ fn result_rows_expose_nvt_epss_context_without_mutation_workflows() {
     assert!(result_sql_sources[0].contains("override_active_ints"));
     assert!(result_sql_sources[1].contains("result_user_tags(&client, &result_id)"));
     assert!(result_sql_sources[1].contains("result_effective_overrides(&client, &result_id)"));
-    assert!(result_sql_sources[1].contains("tr.resource_type = 'result'"));
-    assert!(result_sql_sources[1].contains("coalesce(t.active, 0) = 1"));
-    assert!(result_sql_sources[1].contains("FROM result_overrides ro"));
-    assert!(result_sql_sources[1].contains("JOIN overrides o ON o.id = ro.override"));
+    assert!(result_user_tag_source.contains("tr.resource_type = 'result'"));
+    assert!(result_user_tag_source.contains("coalesce(t.active, 0) = 1"));
+    assert!(result_override_source.contains("FROM result_overrides ro"));
+    assert!(result_override_source.contains("JOIN overrides o ON o.id = ro.override"));
     for list_source in [
         result_sql_sources[0],
         result_sql_sources[2],
@@ -96,5 +110,29 @@ fn result_rows_expose_nvt_epss_context_without_mutation_workflows() {
         "delete_override",
     ] {
         assert!(!result_sql_sources[1].contains(inherited_workflow));
+    }
+}
+
+#[test]
+fn result_export_reuses_native_detail_without_inherited_actions() {
+    let source = include_str!("result_payloads.rs");
+    let export_source = source
+        .split_once("async fn result_export")
+        .expect("result export wrapper must exist")
+        .1
+        .split_once("async fn result_user_tags")
+        .expect("result export wrapper must precede user-tag loader")
+        .0;
+
+    assert!(export_source.contains("result_detail(state, path).await"));
+    for inherited_workflow in [
+        "export_result_gmp",
+        "export_results_gmp",
+        "create_override",
+        "modify_override",
+        "delete_override",
+        "delete_result",
+    ] {
+        assert!(!export_source.contains(inherited_workflow));
     }
 }

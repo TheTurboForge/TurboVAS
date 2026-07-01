@@ -274,6 +274,13 @@ pub(crate) async fn result_detail(
     Ok(Json(item))
 }
 
+pub(crate) async fn result_export(
+    state: State<AppState>,
+    path: Path<String>,
+) -> Result<Json<ResultItem>, ApiError> {
+    result_detail(state, path).await
+}
+
 async fn result_user_tags(
     client: &tokio_postgres::Client,
     result_id: &str,

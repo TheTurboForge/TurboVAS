@@ -551,6 +551,7 @@ OPENAPI_ALLOWED_REPLACES_VALUES = frozenset(
         "report-config-restore",
         "report-config-trash-move",
         "result-detail-metadata-tags-and-overrides-read",
+        "result-metadata-export-read",
         "report-format-metadata-detail-read",
         "report-format-metadata-export-read",
         "report-format-metadata-list-read",
@@ -644,6 +645,7 @@ OPENAPI_ALLOWED_INHERITED_STILL_OWNS_VALUES = frozenset(
         "report-config-export",
         "report-format-import-export-verify-writes-and-deletes",
         "result-tags-exports-and-actions",
+        "result-actions-bulk-export-tag-and-override-workflows",
         "result-exports-and-actions",
         "retention-mutations",
         "saved-filter-export-and-alert-linkage",
@@ -729,6 +731,7 @@ OPENAPI_REQUIRED_EXPOSURE = {
     ("get", "/trashcan/summary"): "direct-read",
     ("get", "/reports"): "direct-read",
     ("get", "/reports/{report_id}"): "direct-read",
+    ("get", "/results/{result_id}/export"): "direct-read",
     ("get", "/reports/{report_id}/results"): "direct-read",
     ("get", "/reports/{report_id}/hosts"): "direct-read",
     ("get", "/reports/{report_id}/ports"): "direct-read",
@@ -1613,6 +1616,7 @@ DIRECT_API_SCRIPTABLE_ENDPOINTS = frozenset(
     {
         "/api/v1/results",
         "/api/v1/results/{}",
+        "/api/v1/results/{}/export",
         "/api/v1/vulnerabilities",
         "/api/v1/cves",
         "/api/v1/cves/{}",
@@ -6968,6 +6972,11 @@ def summarize_native_tooling(items: list[dict[str, Any]], repo_root: Path | None
                 "endpoint": "/api/v1/results/{result_id}",
                 "status": "implemented_internal_and_browser_proxied",
                 "replacement_candidates": ["GSA Result detail metadata overlay (migrated through gsad same-origin proxy)", "read-only result automation", "native-api-request helper"],
+            },
+            {
+                "endpoint": "/api/v1/results/{result_id}/export",
+                "status": "implemented_internal_and_scriptable_read",
+                "replacement_candidates": ["direct native result metadata export", "native-api-request helper"],
             },
             {
                 "endpoint": "/api/v1/vulnerabilities",
