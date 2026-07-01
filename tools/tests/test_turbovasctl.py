@@ -2685,7 +2685,7 @@ class TurboVASCtlTests(unittest.TestCase):
          'port-list-import-export',
          'raw-report-generation-xml-export-retention-and-mutations',
          'remote-scanner-certificate-context-control-credentials-writes-downloads-and-deletes',
-         'report-config-export',
+         'report-config-file-export',
          'report-format-import-export-verify-writes-and-deletes',
          'result-actions-bulk-export-tag-and-override-workflows',
          'result-exports-and-actions',
@@ -3146,7 +3146,7 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertEqual(hard_delete_report_config["x_turbovas_replaces"], "report-config-hard-delete")
 
         export_report_config = rows[("get", "/api/v1/report-configs/{report_config_id}/export")]
-        self.assertEqual(export_report_config["status"], "implemented_internal_and_scriptable_read")
+        self.assertEqual(export_report_config["status"], "implemented_internal_and_browser_proxied")
         self.assertEqual(export_report_config["direct_access"], "scriptable_read")
         self.assertEqual(export_report_config["x_turbovas_maturity"], "live-read")
         self.assertEqual(export_report_config["x_turbovas_exposure"], "direct-read")

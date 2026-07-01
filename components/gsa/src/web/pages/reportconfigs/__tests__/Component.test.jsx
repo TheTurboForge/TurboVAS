@@ -132,6 +132,9 @@ const createGmp = ({
   createReportConfig = testing.fn().mockResolvedValue({
     data: {},
   }),
+  exportReportConfig = testing.fn().mockResolvedValue({
+    data: '<report_config id="rc123"/>',
+  }),
 } = {}) => ({
   buildUrl: testing.fn((path, _params) => `https://turbovas.example/${path}`),
   session: {...createSession(), token: 'test-token', jwt: 'jwt-token'},
@@ -140,6 +143,7 @@ const createGmp = ({
   },
   reportconfig: {
     get: getReportConfig,
+    export: exportReportConfig,
     save: saveReportConfig,
     create: createReportConfig,
   },
@@ -156,6 +160,59 @@ afterEach(() => {
 });
 
 describe('Report Config Component tests', () => {
+  test('should use native metadata export for downloads', async () => {
+    const fetchMock = stubNativeFetch(nativeReportConfigPayload);
+    let downloadClick;
+    const children = testing.fn(({download}) => {
+      downloadClick = download;
+    });
+    const onDownloaded = testing.fn();
+    const onDownloadError = testing.fn();
+
+    const gmp = createGmp({
+      currentSettings: testing.fn().mockResolvedValue({
+        data: {
+          detailsexportfilename: {
+            id: 'details-export-filename',
+            name: 'Details Export File Name',
+            value: '%T-%U',
+          },
+        },
+      }),
+    });
+
+    const {render} = rendererWith({
+      gmp,
+      router: true,
+      store: true,
+    });
+
+    render(
+      <ReportFormatComponent
+        onDownloadError={onDownloadError}
+        onDownloaded={onDownloaded}
+      >
+        {children}
+      </ReportFormatComponent>,
+    );
+
+    await wait();
+    downloadClick(mockReportConfig);
+    await wait();
+
+    expect(gmp.reportconfig.export).not.toHaveBeenCalled();
+    expect(gmp.buildUrl).toHaveBeenCalledWith(
+      'api/v1/report-configs/rc123/export',
+      {token: 'test-token'},
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(onDownloaded).toHaveBeenCalledWith({
+      filename: 'reportconfig-rc123.json',
+      data: `${JSON.stringify(nativeReportConfigPayload, null, 2)}\n`,
+    });
+    expect(onDownloadError).not.toHaveBeenCalled();
+  });
+
   test('should open edit dialog and call GMP save', async () => {
     const fetchMock = stubNativeFetch(
       nativeReportConfigPayload,

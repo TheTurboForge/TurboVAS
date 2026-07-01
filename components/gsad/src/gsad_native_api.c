@@ -246,6 +246,7 @@ native_api_path_is_allowed (const gchar *path)
   const gchar *raw_reports_path = "/api/v1/reports";
   const gchar *raw_report_prefix = "/api/v1/reports/";
   const gchar *results_path = "/api/v1/results";
+  const gchar *result_export_suffix = "/export";
   const gchar *vulnerabilities_path = "/api/v1/vulnerabilities";
   const gchar *cpes_path = "/api/v1/cpes";
   const gchar *cpe_prefix = "/api/v1/cpes/";
@@ -289,6 +290,7 @@ native_api_path_is_allowed (const gchar *path)
   const gchar *timezones_path = "/api/v1/timezones";
   const gchar *report_configs_path = "/api/v1/report-configs";
   const gchar *report_config_prefix = "/api/v1/report-configs/";
+  const gchar *report_config_export_suffix = "/export";
   const gchar *report_formats_path = "/api/v1/report-formats";
   const gchar *report_format_prefix = "/api/v1/report-formats/";
   const gchar *trashcan_summary_path = "/api/v1/trashcan/summary";
@@ -333,6 +335,10 @@ native_api_path_is_allowed (const gchar *path)
       && path[strlen (results_path)] == '/')
     {
       const gchar *id = path + strlen (results_path) + 1;
+      if (g_str_has_suffix (id, result_export_suffix))
+        return is_uuid_segment (id,
+                                strlen (id)
+                                - strlen (result_export_suffix));
       return is_uuid_segment (id, strlen (id));
     }
 
@@ -528,6 +534,10 @@ native_api_path_is_allowed (const gchar *path)
   if (g_str_has_prefix (path, report_config_prefix))
     {
       const gchar *id = path + strlen (report_config_prefix);
+      if (g_str_has_suffix (id, report_config_export_suffix))
+        return is_uuid_segment (id,
+                                strlen (id)
+                                - strlen (report_config_export_suffix));
       return is_uuid_segment (id, strlen (id));
     }
 

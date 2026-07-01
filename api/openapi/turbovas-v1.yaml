@@ -3293,9 +3293,9 @@ paths:
       x-turbovas-exposure: direct-read
       x-turbovas-maturity: live-read
       x-turbovas-replaces: report-config-metadata-list-read
-      x-turbovas-inherited-still-owns: report-config-export
+      x-turbovas-inherited-still-owns: report-config-file-export
       summary: List report configs
-      description: Read-only report-config metadata backed by gvmd/PostgreSQL. Native direct write-control can create, patch, clone, restore, move live report configs to trash, and permanently delete trashed report configs; export remains on inherited compatibility paths while its native contract is designed.
+      description: Read-only report-config metadata backed by gvmd/PostgreSQL. Native direct write-control can create, patch, clone, restore, move live report configs to trash, permanently delete trashed report configs, and export native JSON metadata; inherited file export remains on compatibility paths while its native contract is designed.
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
@@ -3326,13 +3326,13 @@ paths:
       x-turbovas-exposure: direct-write
       x-turbovas-maturity: live-write
       x-turbovas-replaces: report-config-metadata-param-create
-      x-turbovas-inherited-still-owns: report-config-export
+      x-turbovas-inherited-still-owns: report-config-file-export
       x-turbovas-operator-identity: direct-token-operator
       x-turbovas-owner-semantics: request-operator-owner
       x-turbovas-safety-contract: write-control-v1
       x-turbovas-side-effect: metadata-write
       summary: Create report-config metadata and params
-      description: Direct write-control endpoint for creating report configs for an existing configurable report format. Patch can update metadata and params, clone can copy an existing report config, restore can move a trashed report config back to live state, delete can move a live report config to trash, and trash hard-delete can permanently delete trashed metadata; export remains inherited.
+      description: Direct write-control endpoint for creating report configs for an existing configurable report format. Patch can update metadata and params, clone can copy an existing report config, restore can move a trashed report config back to live state, delete can move a live report config to trash, and trash hard-delete can permanently delete trashed metadata; inherited file export remains on compatibility paths.
       requestBody:
         required: true
         content:
@@ -3374,7 +3374,7 @@ paths:
       x-turbovas-exposure: direct-read
       x-turbovas-maturity: live-read
       x-turbovas-replaces: report-config-metadata-detail-read
-      x-turbovas-inherited-still-owns: report-config-export
+      x-turbovas-inherited-still-owns: report-config-file-export
       summary: Read one report config
       parameters:
         - $ref: '#/components/parameters/ReportConfigId'
@@ -3405,13 +3405,13 @@ paths:
       x-turbovas-exposure: direct-write
       x-turbovas-maturity: live-write
       x-turbovas-replaces: report-config-metadata-param-modify
-      x-turbovas-inherited-still-owns: report-config-export
+      x-turbovas-inherited-still-owns: report-config-file-export
       x-turbovas-operator-identity: direct-token-operator
       x-turbovas-owner-semantics: preserve-existing-owner
       x-turbovas-safety-contract: write-control-v1
       x-turbovas-side-effect: metadata-write
       summary: Patch report-config metadata and params
-      description: Direct write-control endpoint for changing a report config name, comment, or full explicit parameter override set. The report format itself is immutable through this endpoint; export remains inherited.
+      description: Direct write-control endpoint for changing a report config name, comment, or full explicit parameter override set. The report format itself is immutable through this endpoint; inherited file export remains on compatibility paths.
       parameters:
         - $ref: '#/components/parameters/ReportConfigId'
       requestBody:
@@ -3449,7 +3449,7 @@ paths:
       x-turbovas-exposure: direct-write
       x-turbovas-maturity: live-write
       x-turbovas-replaces: report-config-trash-move
-      x-turbovas-inherited-still-owns: report-config-export
+      x-turbovas-inherited-still-owns: report-config-file-export
       x-turbovas-operator-identity: direct-token-operator
       x-turbovas-owner-semantics: preserve-existing-owner
       x-turbovas-safety-contract: write-control-v1
@@ -3484,9 +3484,9 @@ paths:
       x-turbovas-exposure: direct-read
       x-turbovas-maturity: live-read
       x-turbovas-replaces: report-config-metadata-export-read
-      x-turbovas-inherited-still-owns: report-config-export
+      x-turbovas-inherited-still-owns: report-config-file-export
       summary: Export report-config metadata
-      description: Read-only metadata export for one live report config, backed by the same PostgreSQL loader as report-config detail. This endpoint returns the native JSON metadata/parameter payload only; inherited compatibility paths still own XML/file export and any broader report-config export semantics.
+      description: Read-only metadata export for one live report config, backed by the same PostgreSQL loader as report-config detail. This endpoint returns the native JSON metadata/parameter payload used by GSA downloads; inherited compatibility paths still own file export semantics beyond this native JSON contract.
       parameters:
         - $ref: '#/components/parameters/ReportConfigId'
       responses:
@@ -3517,7 +3517,7 @@ paths:
       x-turbovas-exposure: direct-write
       x-turbovas-maturity: live-write
       x-turbovas-replaces: report-config-clone
-      x-turbovas-inherited-still-owns: report-config-export
+      x-turbovas-inherited-still-owns: report-config-file-export
       x-turbovas-operator-identity: direct-token-operator
       x-turbovas-owner-semantics: request-operator-owner
       x-turbovas-safety-contract: write-control-v1
@@ -3567,7 +3567,7 @@ paths:
       x-turbovas-exposure: direct-write
       x-turbovas-maturity: live-write
       x-turbovas-replaces: report-config-restore
-      x-turbovas-inherited-still-owns: report-config-export
+      x-turbovas-inherited-still-owns: report-config-file-export
       x-turbovas-operator-identity: direct-token-operator
       x-turbovas-owner-semantics: preserve-existing-owner
       x-turbovas-safety-contract: write-control-v1
@@ -3606,7 +3606,7 @@ paths:
       x-turbovas-exposure: direct-write
       x-turbovas-maturity: live-write
       x-turbovas-replaces: report-config-hard-delete
-      x-turbovas-inherited-still-owns: report-config-export
+      x-turbovas-inherited-still-owns: report-config-file-export
       x-turbovas-operator-identity: direct-token-operator
       x-turbovas-owner-semantics: preserve-existing-owner
       x-turbovas-safety-contract: write-control-v1

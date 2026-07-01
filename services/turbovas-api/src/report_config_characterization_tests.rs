@@ -520,7 +520,7 @@ fn openapi_documents_report_config_create_and_patch_as_direct_write_control() {
     assert!(list.contains("x-turbovas-exposure: direct-write"));
     assert!(list.contains("x-turbovas-safety-contract: write-control-v1"));
     assert!(list.contains("x-turbovas-exposure: direct-read"));
-    assert!(list.contains("x-turbovas-inherited-still-owns: report-config-export"));
+    assert!(list.contains("x-turbovas-inherited-still-owns: report-config-file-export"));
 
     let detail = openapi_path_block("/report-configs/{report_config_id}");
     assert!(detail.contains("get:"));
@@ -530,14 +530,14 @@ fn openapi_documents_report_config_create_and_patch_as_direct_write_control() {
     assert!(detail.contains("x-turbovas-replaces: report-config-metadata-param-modify"));
     assert!(detail.contains("x-turbovas-replaces: report-config-trash-move"));
     assert!(detail.contains("x-turbovas-safety-contract: write-control-v1"));
-    assert!(detail.contains("x-turbovas-inherited-still-owns: report-config-export"));
+    assert!(detail.contains("x-turbovas-inherited-still-owns: report-config-file-export"));
 
     let clone = openapi_path_block("/report-configs/{report_config_id}/clone");
     assert!(clone.contains("post:"));
     assert!(clone.contains("x-turbovas-exposure: direct-write"));
     assert!(clone.contains("x-turbovas-replaces: report-config-clone"));
     assert!(clone.contains("x-turbovas-safety-contract: write-control-v1"));
-    assert!(clone.contains("x-turbovas-inherited-still-owns: report-config-export"));
+    assert!(clone.contains("x-turbovas-inherited-still-owns: report-config-file-export"));
     let restore = openapi_path_block("/report-configs/{report_config_id}/restore");
     assert!(restore.contains("post:"));
     assert!(restore.contains("x-turbovas-exposure: direct-write"));
@@ -548,5 +548,5 @@ fn openapi_documents_report_config_create_and_patch_as_direct_write_control() {
     assert!(hard_delete.contains("x-turbovas-exposure: direct-write"));
     assert!(hard_delete.contains("x-turbovas-replaces: report-config-hard-delete"));
     assert!(hard_delete.contains("x-turbovas-safety-contract: write-control-v1"));
-    assert!(hard_delete.contains("x-turbovas-inherited-still-owns: report-config-export"));
+    assert!(hard_delete.contains("x-turbovas-inherited-still-owns: report-config-file-export"));
 }

@@ -5,7 +5,10 @@
  */
 
 import React, {useState} from 'react';
-import {fetchNativeReportConfig} from 'gmp/native-api/report-configs';
+import {
+  exportNativeReportConfigMetadata,
+  fetchNativeReportConfig,
+} from 'gmp/native-api/report-configs';
 import {fetchNativeReportFormats} from 'gmp/native-api/report-formats';
 import {isDefined} from 'gmp/utils/identity';
 import EntityComponent from 'web/entity/EntityComponent';
@@ -21,6 +24,13 @@ const fetchReportConfig = (gmp, reportConfigData) => {
     return fetchNativeReportConfig(gmp, reportConfigData.id);
   }
   return gmp.reportconfig.get(reportConfigData).then(response => response.data);
+};
+
+const exportReportConfig = (gmp, reportConfigData) => {
+  if (canUseNativeApi(gmp)) {
+    return exportNativeReportConfigMetadata(gmp, reportConfigData.id);
+  }
+  return gmp.reportconfig.export(reportConfigData);
 };
 
 const fetchAllReportFormats = async gmp => {
@@ -124,6 +134,8 @@ const ReportConfigComponent = ({
 
   return (
     <EntityComponent
+      download={entity => exportReportConfig(gmp, entity)}
+      downloadOptions={canUseNativeApi(gmp) ? {extension: 'json'} : undefined}
       name="reportconfig"
       onCloneError={onCloneError}
       onCloned={onCloned}

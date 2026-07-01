@@ -1,8 +1,11 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
+import type Response from 'gmp/http/response';
+import type {Meta} from 'gmp/http/response';
 import type Model from 'gmp/models/model';
 import {type EntityType} from 'gmp/utils/entity-type';
 import useEntityClone, {
@@ -19,6 +22,11 @@ import useEntitySave, {
   type EntitySaveResponse,
 } from 'web/entity/hooks/useEntitySave';
 import useGmp from 'web/hooks/useGmp';
+import type {GenerateFilenameParams} from 'web/utils/Render';
+
+type EntityDownloadOverride<TEntity> = (
+  entity: TEntity,
+) => Promise<Response<string | ArrayBuffer, Meta>>;
 
 interface EntityComponentRenderProps<
   TEntity,
@@ -52,6 +60,8 @@ interface EntityComponentProps<
       TSaveResponse
     >,
   ) => React.ReactNode;
+  download?: EntityDownloadOverride<TEntity>;
+  downloadOptions?: GenerateFilenameParams;
   onDownloaded?: OnDownloadedFunc;
   onDownloadError?: (error: Error) => void;
   onSaved?: (response: TSaveResponse) => void;
@@ -73,6 +83,8 @@ const EntityComponent = <
   TCloneResponse = EntityCloneResponse,
 >({
   children,
+  download,
+  downloadOptions,
   name,
   onDownloaded,
   onDownloadError,
@@ -95,7 +107,7 @@ const EntityComponent = <
   const gmp = useGmp();
   const cmd = gmp[name];
   const handleEntityDownload = useEntityDownload<TEntity>(
-    entity => cmd.export(entity),
+    entity => (download ?? cmd.export)(entity),
     {
       onDownloadError,
       onDownloaded,
@@ -139,7 +151,7 @@ const EntityComponent = <
     clone: handleEntityClone,
     delete: handleEntityDelete,
     save: handleEntitySave,
-    download: handleEntityDownload,
+    download: entity => handleEntityDownload(entity, downloadOptions),
   });
 };
 
