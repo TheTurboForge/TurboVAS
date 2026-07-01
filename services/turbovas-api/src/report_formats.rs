@@ -212,3 +212,10 @@ pub(crate) async fn report_format_asset_detail(
         params,
     )))
 }
+
+pub(crate) async fn export_report_format_metadata(
+    state: State<AppState>,
+    path: Path<String>,
+) -> Result<Json<ReportFormatAssetItem>, ApiError> {
+    report_format_asset_detail(state, path).await
+}

@@ -344,8 +344,11 @@ Native report-format rows include report-format identity, summary/description,
 extension/content type, trust state, active/predefined/configurable/deprecated
 flags, alert/report-config backlinks, parameters, and timestamps. Report formats
 are scanner output configuration, so these endpoints stay inside the
-authenticated operator boundary. Import/export/verification, edits, and deletion
-remain inherited until native write semantics are designed.
+authenticated operator boundary. Direct scriptable
+`GET /api/v1/report-formats/{report_format_id}/export` returns the same native
+detail JSON for metadata export; it does not replace legacy report-format file
+export/import, verification, edits, or deletion, which remain inherited until
+native write semantics are designed.
 
 Native Security Information CVE catalog rows include the CVE identifier,
 description, CVSS vector, severity, vulnerable product strings, optional EPSS

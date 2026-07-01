@@ -196,6 +196,10 @@ pub(crate) fn native_api_router() -> Router<AppState> {
             "/api/v1/report-formats/:report_format_id",
             get(report_format_asset_detail),
         )
+        .route(
+            "/api/v1/report-formats/:report_format_id/export",
+            get(export_report_format_metadata),
+        )
         .route("/api/v1/trashcan/summary", get(trashcan_summary))
         .route("/api/v1/reports", get(reports))
         .route("/api/v1/reports/:report_id", get(report_detail))

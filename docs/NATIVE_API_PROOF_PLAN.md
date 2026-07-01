@@ -198,6 +198,7 @@ where it exists:
 - `GET /api/v1/schedules/{schedule_id}`
 - `GET /api/v1/report-formats`
 - `GET /api/v1/report-formats/{report_format_id}`
+- `GET /api/v1/report-formats/{report_format_id}/export` metadata JSON only
 - `GET /api/v1/nvts`
 - `GET /api/v1/nvts/{nvt_id}` catalog metadata only
 - `GET /api/v1/cert-bund-advisories`

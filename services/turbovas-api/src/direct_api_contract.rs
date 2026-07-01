@@ -63,6 +63,7 @@ pub(crate) fn direct_api_v1_path_is_allowed(path: &str) -> bool {
             | ["", "api", "v1", "report-configs", _]
             | ["", "api", "v1", "report-configs", _, "export"]
             | ["", "api", "v1", "report-formats", _]
+            | ["", "api", "v1", "report-formats", _, "export"]
             | ["", "api", "v1", "reports", _]
             | ["", "api", "v1", "reports", _, "results"]
             | ["", "api", "v1", "reports", _, "hosts"]

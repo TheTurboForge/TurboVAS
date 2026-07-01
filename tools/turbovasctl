@@ -546,6 +546,7 @@ OPENAPI_ALLOWED_REPLACES_VALUES = frozenset(
         "report-config-trash-move",
         "result-detail-metadata-tags-and-overrides-read",
         "report-format-metadata-detail-read",
+        "report-format-metadata-export-read",
         "report-format-metadata-list-read",
         "result-list-and-effective-overrides-read",
         "saved-filter-create",
@@ -1273,6 +1274,11 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-maturity": "live-read",
         "x-turbovas-replaces": "report-format-metadata-detail-read",
     },
+    ("get", "/report-formats/{report_format_id}/export"): {
+        "x-turbovas-inherited-still-owns": "report-format-import-export-verify-writes-and-deletes",
+        "x-turbovas-maturity": "live-read",
+        "x-turbovas-replaces": "report-format-metadata-export-read",
+    },
     ("get", "/reports"): {
         "x-turbovas-inherited-still-owns": "raw-report-generation-xml-export-retention-and-mutations",
         "x-turbovas-maturity": "live-read",
@@ -1613,6 +1619,7 @@ DIRECT_API_SCRIPTABLE_ENDPOINTS = frozenset(
         "/api/v1/report-configs/{}/export",
         "/api/v1/report-formats",
         "/api/v1/report-formats/{}",
+        "/api/v1/report-formats/{}/export",
         "/api/v1/trashcan/summary",
         "/api/v1/reports",
         "/api/v1/reports/{}",
@@ -7410,6 +7417,12 @@ def summarize_native_tooling(items: list[dict[str, Any]], repo_root: Path | None
                 "endpoint": "/api/v1/report-formats/{report_format_id}",
                 "status": "implemented_internal_and_browser_proxied",
                 "replacement_candidates": ["GSA Report Format detail (migrated through gsad same-origin proxy)", "read-only report-format automation"],
+            },
+            {
+                "endpoint": "/api/v1/report-formats/{report_format_id}/export",
+                "status": "implemented_internal_and_scriptable_read",
+                "direct_access": "scriptable_read",
+                "replacement_candidates": ["direct native JSON report-format metadata export", "read-only report-format automation"],
             },
             {
                 "endpoint": "/api/v1/trashcan/summary",
