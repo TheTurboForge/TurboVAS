@@ -5,6 +5,7 @@
 #[test]
 fn result_rows_expose_nvt_epss_context_without_mutation_workflows() {
     let source = include_str!("result_payloads.rs");
+    let result_query_sql_source = include_str!("result_query_sql.rs");
     let result_row_source = include_str!("result_payload_rows.rs");
     let scope_report_results_source = include_str!("scope_report_results.rs");
     let result_payload = result_row_source
@@ -14,29 +15,40 @@ fn result_rows_expose_nvt_epss_context_without_mutation_workflows() {
         .split_once("pub(crate) fn result_from_row")
         .expect("result payload must precede row mapper")
         .0;
+    let result_list_sql_source = source
+        .split_once("async fn results")
+        .expect("result list handler must exist")
+        .1
+        .split_once("async fn result_detail")
+        .expect("result list handler must precede result detail")
+        .0;
+    let result_detail_handler_source = source
+        .split_once("async fn result_detail")
+        .expect("result detail handler must exist")
+        .1
+        .split_once("async fn result_export")
+        .expect("result detail handler must precede result export wrapper")
+        .0;
+    let result_detail_sql_source = result_query_sql_source
+        .split_once("pub(crate) fn result_detail_sql")
+        .expect("result detail SQL helper must exist")
+        .1
+        .split_once("pub(crate) fn result_user_tags_sql")
+        .expect("result detail SQL helper must precede user-tag SQL helper")
+        .0;
+    let report_result_sql_source = source
+        .split_once("async fn report_results")
+        .expect("report result list handler must exist")
+        .1;
+    let scope_report_result_sql_source = scope_report_results_source
+        .split_once("fn scope_report_results_sql")
+        .expect("scope report result SQL helper must exist")
+        .1;
     let result_sql_sources = [
-        source
-            .split_once("async fn results")
-            .expect("result list handler must exist")
-            .1
-            .split_once("async fn result_detail")
-            .expect("result list handler must precede result detail")
-            .0,
-        source
-            .split_once("async fn result_detail")
-            .expect("result detail handler must exist")
-            .1
-            .split_once("async fn result_export")
-            .expect("result detail handler must precede result export wrapper")
-            .0,
-        source
-            .split_once("async fn report_results")
-            .expect("report result list handler must exist")
-            .1,
-        scope_report_results_source
-            .split_once("fn scope_report_results_sql")
-            .expect("scope report result SQL helper must exist")
-            .1,
+        result_list_sql_source,
+        result_detail_sql_source,
+        report_result_sql_source,
+        scope_report_result_sql_source,
     ];
     let row_mapper = result_row_source
         .split_once("pub(crate) fn result_from_row")
@@ -45,20 +57,17 @@ fn result_rows_expose_nvt_epss_context_without_mutation_workflows() {
         .split_once("pub(crate) fn result_override_from_row")
         .expect("result row mapper must precede override row mapper")
         .0;
-    let result_user_tag_source = source
-        .split_once("async fn result_user_tags")
-        .expect("result user-tag loader must exist")
+    let result_user_tag_source = result_query_sql_source
+        .split_once("pub(crate) fn result_user_tags_sql")
+        .expect("result user-tag SQL helper must exist")
         .1
-        .split_once("async fn result_effective_overrides")
-        .expect("result user-tag loader must precede override loader")
+        .split_once("pub(crate) fn result_effective_overrides_sql")
+        .expect("result user-tag SQL helper must precede override SQL helper")
         .0;
-    let result_override_source = source
-        .split_once("async fn result_effective_overrides")
-        .expect("result override loader must exist")
-        .1
-        .split_once("pub(crate) async fn report_results")
-        .expect("result override loader must precede report result list")
-        .0;
+    let result_override_source = result_query_sql_source
+        .split_once("pub(crate) fn result_effective_overrides_sql")
+        .expect("result override SQL helper must exist")
+        .1;
 
     for expected in [
         "max_epss: Option<NvtEpssItem>",
@@ -89,8 +98,11 @@ fn result_rows_expose_nvt_epss_context_without_mutation_workflows() {
     assert!(result_sql_sources[0].contains("ro.result = p.result_internal_id"));
     assert!(result_sql_sources[0].contains("array_agg(m.id ORDER BY"));
     assert!(result_sql_sources[0].contains("override_active_ints"));
-    assert!(result_sql_sources[1].contains("result_user_tags(&client, &result_id)"));
-    assert!(result_sql_sources[1].contains("result_effective_overrides(&client, &result_id)"));
+    assert!(result_detail_handler_source.contains("result_detail_sql()"));
+    assert!(result_detail_handler_source.contains("result_user_tags(&client, &result_id)"));
+    assert!(
+        result_detail_handler_source.contains("result_effective_overrides(&client, &result_id)")
+    );
     assert!(result_user_tag_source.contains("tr.resource_type = 'result'"));
     assert!(result_user_tag_source.contains("coalesce(t.active, 0) = 1"));
     assert!(result_override_source.contains("FROM result_overrides ro"));
@@ -109,7 +121,7 @@ fn result_rows_expose_nvt_epss_context_without_mutation_workflows() {
         "modify_override",
         "delete_override",
     ] {
-        assert!(!result_sql_sources[1].contains(inherited_workflow));
+        assert!(!result_detail_handler_source.contains(inherited_workflow));
     }
 }
 

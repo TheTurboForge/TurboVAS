@@ -91,6 +91,7 @@ mod request_ids;
 mod request_shapes;
 mod result_payload_rows;
 mod result_payloads;
+mod result_query_sql;
 mod routes;
 mod row_helpers;
 mod runtime;
