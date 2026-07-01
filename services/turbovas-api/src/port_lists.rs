@@ -97,6 +97,16 @@ pub(crate) async fn port_list_asset_detail(
     ))
 }
 
+pub(crate) async fn export_port_list_metadata(
+    State(state): State<AppState>,
+    Path(port_list_id): Path<String>,
+) -> Result<Json<PortListAssetDetail>, ApiError> {
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    Ok(Json(
+        load_port_list_asset_detail(&client, &port_list_id).await?,
+    ))
+}
+
 pub(crate) async fn load_port_list_asset_detail(
     client: &tokio_postgres::Client,
     port_list_id: &str,

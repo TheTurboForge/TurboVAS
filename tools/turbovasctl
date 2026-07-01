@@ -514,6 +514,7 @@ OPENAPI_ALLOWED_REPLACES_VALUES = frozenset(
         "port-list-clone",
         "port-list-create",
         "port-list-metadata-detail-read",
+        "port-list-metadata-export-read",
         "port-list-hard-delete",
         "port-list-metadata-list-read",
         "port-list-metadata-and-range-modify",
@@ -743,6 +744,7 @@ OPENAPI_REQUIRED_EXPOSURE = {
     ("delete", "/filters/{filter_id}/trash"): "direct-write",
     ("post", "/port-lists"): "direct-write",
     ("patch", "/port-lists/{port_list_id}"): "direct-write",
+    ("get", "/port-lists/{port_list_id}/export"): "direct-read",
     ("delete", "/port-lists/{port_list_id}"): "direct-write",
     ("delete", "/port-lists/{port_list_id}/trash"): "direct-write",
     ("post", "/port-lists/{port_list_id}/clone"): "direct-write",
@@ -940,6 +942,11 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-inherited-still-owns": "port-list-import-export",
         "x-turbovas-maturity": "live-read",
         "x-turbovas-replaces": "port-list-metadata-detail-read",
+    },
+    ("get", "/port-lists/{port_list_id}/export"): {
+        "x-turbovas-inherited-still-owns": "port-list-import-export",
+        "x-turbovas-maturity": "live-read",
+        "x-turbovas-replaces": "port-list-metadata-export-read",
     },
     ("patch", "/port-lists/{port_list_id}"): {
         "x-turbovas-inherited-still-owns": "port-list-import-export",
@@ -1545,6 +1552,7 @@ DIRECT_API_SCRIPTABLE_ENDPOINTS = frozenset(
         "/api/v1/overrides/{}",
         "/api/v1/port-lists",
         "/api/v1/port-lists/{}",
+        "/api/v1/port-lists/{}/export",
         "/api/v1/schedules",
         "/api/v1/schedules/{}",
         "/api/v1/timezones",
@@ -7152,6 +7160,12 @@ def summarize_native_tooling(items: list[dict[str, Any]], repo_root: Path | None
                 "endpoint": "/api/v1/port-lists/{port_list_id}",
                 "status": "implemented_internal_and_browser_proxied",
                 "replacement_candidates": ["GSA Port List detail (migrated through gsad same-origin proxy)", "read-only port-list automation"],
+            },
+            {
+                "endpoint": "/api/v1/port-lists/{port_list_id}/export",
+                "status": "implemented_internal_and_scriptable_read",
+                "direct_access": "scriptable_read",
+                "replacement_candidates": ["direct native JSON port-list metadata export", "read-only port-list automation"],
             },
             {
                 "method": "post",

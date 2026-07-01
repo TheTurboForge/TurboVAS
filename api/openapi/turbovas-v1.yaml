@@ -1990,6 +1990,39 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
+  /port-lists/{port_list_id}/export:
+    get:
+      operationId: getPortListsByPortListIdExport
+      x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: port-list-metadata-export-read
+      x-turbovas-inherited-still-owns: port-list-import-export
+      summary: Export port-list metadata
+      description: Scriptable JSON metadata export for a port list, including ranges, target backlinks, and user tags. Inherited import and file-format export remain compatibility paths.
+      parameters:
+        - $ref: '#/components/parameters/PortListId'
+      responses:
+        '200':
+          description: Port-list metadata export
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortListAssetDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '413':
+          $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /port-lists/{port_list_id}/clone:
     post:
       operationId: postPortListsByPortListIdClone

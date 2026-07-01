@@ -162,6 +162,10 @@ pub(crate) fn native_api_router() -> Router<AppState> {
             "/api/v1/port-lists/:port_list_id",
             get(port_list_asset_detail),
         )
+        .route(
+            "/api/v1/port-lists/:port_list_id/export",
+            get(export_port_list_metadata),
+        )
         .route("/api/v1/schedules", get(schedule_assets))
         .route("/api/v1/schedules/:schedule_id", get(schedule_asset_detail))
         .route("/api/v1/timezones", get(timezones))
