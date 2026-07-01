@@ -12,7 +12,10 @@ use crate::{
     collections::{TARGET_DEFAULT_SORT, TARGET_SORT_FIELDS},
     errors::ApiError,
     path_ids::parse_uuid,
-    query::{ApiQuery, Collection, CollectionQuery, normalize_collection_query, sort_clause},
+    query::{
+        ApiQuery, Collection, CollectionQuery, collection_total_with_empty_page_probe,
+        normalize_collection_query, sort_clause,
+    },
     target_query_sql::target_sql,
     task_target_payloads::{TargetItem, target_from_row},
 };
@@ -41,10 +44,9 @@ pub(crate) async fn targets(
             tracing::warn!(%error, "target list query failed");
             ApiError::Database
         })?;
-    let total = rows
-        .first()
-        .map(|row| row.get::<_, i64>("total"))
-        .unwrap_or(0);
+    let total =
+        collection_total_with_empty_page_probe(&client, &rows, &sql, &params, "target list")
+            .await?;
     let items = rows.iter().map(target_from_row).collect();
     Ok(Json(Collection {
         page: params.page_info(total),

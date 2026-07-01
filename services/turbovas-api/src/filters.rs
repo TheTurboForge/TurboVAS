@@ -15,7 +15,10 @@ use crate::{
     errors::ApiError,
     filter_payloads::{FilterAssetItem, filter_alert_from_row, filter_asset_from_row},
     path_ids::parse_uuid,
-    query::{ApiQuery, Collection, CollectionQuery, normalize_collection_query, sort_clause},
+    query::{
+        ApiQuery, Collection, CollectionQuery, collection_total_with_empty_page_probe_params,
+        normalize_collection_query, sort_clause,
+    },
 };
 
 pub(crate) async fn filter_assets(
@@ -83,10 +86,22 @@ pub(crate) async fn filter_assets(
             tracing::warn!(%error, "filter asset list query failed");
             ApiError::Database
         })?;
-    let total = rows
-        .first()
-        .map(|row| row.get::<_, i64>("total"))
-        .unwrap_or(0);
+    let probe_page_size = 1_i64;
+    let probe_offset = 0_i64;
+    let total = collection_total_with_empty_page_probe_params(
+        &client,
+        &rows,
+        &sql,
+        &params,
+        &[
+            &params.filter,
+            &filter_type,
+            &probe_page_size,
+            &probe_offset,
+        ],
+        "filter asset list",
+    )
+    .await?;
     let items = rows
         .iter()
         .map(|row| filter_asset_from_row(row, Vec::new()))

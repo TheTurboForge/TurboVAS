@@ -14,7 +14,10 @@ use crate::{
     collections::{SCHEDULE_DEFAULT_SORT, SCHEDULE_SORT_FIELDS},
     errors::ApiError,
     path_ids::parse_uuid,
-    query::{ApiQuery, Collection, CollectionQuery, normalize_collection_query, sort_clause},
+    query::{
+        ApiQuery, Collection, CollectionQuery, collection_total_with_empty_page_probe,
+        normalize_collection_query, sort_clause,
+    },
     schedule_payloads::{
         ScheduleAssetDetail, ScheduleAssetItem, schedule_asset_detail_payload,
         schedule_asset_from_row, schedule_task_from_row,
@@ -69,10 +72,14 @@ pub(crate) async fn schedule_assets(
             tracing::warn!(%error, "schedule asset list query failed");
             ApiError::Database
         })?;
-    let total = rows
-        .first()
-        .map(|row| row.get::<_, i64>("total"))
-        .unwrap_or(0);
+    let total = collection_total_with_empty_page_probe(
+        &client,
+        &rows,
+        &sql,
+        &params,
+        "schedule asset list",
+    )
+    .await?;
     let items = rows
         .iter()
         .map(|row| schedule_asset_from_row(row, Vec::new()))

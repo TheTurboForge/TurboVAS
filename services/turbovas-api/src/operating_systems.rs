@@ -13,7 +13,10 @@ use crate::{
     errors::ApiError,
     operating_system_payloads::{OperatingSystemAssetItem, operating_system_asset_from_row},
     path_ids::parse_uuid,
-    query::{ApiQuery, Collection, CollectionQuery, normalize_collection_query, sort_clause},
+    query::{
+        ApiQuery, Collection, CollectionQuery, collection_total_with_empty_page_probe,
+        normalize_collection_query, sort_clause,
+    },
     user_tags::ReportUserTag,
 };
 
@@ -94,10 +97,14 @@ pub(crate) async fn operating_system_assets(
             tracing::warn!(%error, "operating system asset list query failed");
             ApiError::Database
         })?;
-    let total = rows
-        .first()
-        .map(|row| row.get::<_, i64>("total"))
-        .unwrap_or(0);
+    let total = collection_total_with_empty_page_probe(
+        &client,
+        &rows,
+        &sql,
+        &params,
+        "operating system asset list",
+    )
+    .await?;
     let items = rows.iter().map(operating_system_asset_from_row).collect();
     Ok(Json(Collection {
         page: params.page_info(total),

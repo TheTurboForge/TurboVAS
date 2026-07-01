@@ -13,7 +13,10 @@ use crate::{
     errors::ApiError,
     override_payloads::{OverrideAssetItem, override_asset_from_row},
     path_ids::parse_uuid,
-    query::{ApiQuery, Collection, CollectionQuery, normalize_collection_query, sort_clause},
+    query::{
+        ApiQuery, Collection, CollectionQuery, collection_total_with_empty_page_probe_params,
+        normalize_collection_query, sort_clause,
+    },
 };
 
 pub(crate) async fn override_assets(
@@ -101,10 +104,24 @@ pub(crate) async fn override_assets(
             tracing::warn!(%error, "override asset list query failed");
             ApiError::Database
         })?;
-    let total = rows
-        .first()
-        .map(|row| row.get::<_, i64>("total"))
-        .unwrap_or(0);
+    let probe_page_size = 1_i64;
+    let probe_offset = 0_i64;
+    let total = collection_total_with_empty_page_probe_params(
+        &client,
+        &rows,
+        &sql,
+        &params,
+        &[
+            &params.filter,
+            &probe_page_size,
+            &probe_offset,
+            &text_filter,
+            &task_name_filter,
+            &active_filter,
+        ],
+        "override asset list",
+    )
+    .await?;
     let items = rows.iter().map(override_asset_from_row).collect();
     Ok(Json(Collection {
         page: params.page_info(total),

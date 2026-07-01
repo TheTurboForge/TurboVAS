@@ -15,7 +15,10 @@ use crate::{
         NvtCatalogDetail, NvtCatalogItem, nvt_catalog_detail_from_row, nvt_catalog_from_row,
     },
     path_ids::validate_nvt_oid,
-    query::{ApiQuery, Collection, CollectionQuery, normalize_collection_query, sort_clause},
+    query::{
+        ApiQuery, Collection, CollectionQuery, collection_total_with_empty_page_probe_params,
+        normalize_collection_query, sort_clause,
+    },
     user_tags::catalog_user_tags,
 };
 
@@ -119,10 +122,17 @@ pub(crate) async fn nvt_catalog(
             tracing::warn!(%error, "NVT catalog list query failed");
             ApiError::Database
         })?;
-    let total = rows
-        .first()
-        .map(|row| row.get::<_, i64>("total"))
-        .unwrap_or(0);
+    let probe_page_size = 1_i64;
+    let probe_offset = 0_i64;
+    let total = collection_total_with_empty_page_probe_params(
+        &client,
+        &rows,
+        &sql,
+        &params,
+        &[&filter_mode, &filter_value, &probe_page_size, &probe_offset],
+        "NVT catalog list",
+    )
+    .await?;
     let items = rows.iter().map(nvt_catalog_from_row).collect();
     Ok(Json(Collection {
         page: params.page_info(total),

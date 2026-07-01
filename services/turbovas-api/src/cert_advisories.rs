@@ -16,7 +16,10 @@ use crate::{
     collections::{CERT_ADVISORY_DEFAULT_SORT, CERT_ADVISORY_SORT_FIELDS},
     errors::ApiError,
     path_ids::validate_advisory_id,
-    query::{ApiQuery, Collection, CollectionQuery, normalize_collection_query, sort_clause},
+    query::{
+        ApiQuery, Collection, CollectionQuery, collection_total_with_empty_page_probe,
+        normalize_collection_query, sort_clause,
+    },
     user_tags::catalog_user_tags,
 };
 
@@ -67,10 +70,14 @@ pub(crate) async fn dfn_cert_advisories(
             tracing::warn!(%error, "DFN-CERT advisory list query failed");
             ApiError::Database
         })?;
-    let total = rows
-        .first()
-        .map(|row| row.get::<_, i64>("total"))
-        .unwrap_or(0);
+    let total = collection_total_with_empty_page_probe(
+        &client,
+        &rows,
+        &sql,
+        &params,
+        "DFN-CERT advisory list",
+    )
+    .await?;
     let items = rows.iter().map(dfn_cert_advisory_from_row).collect();
     Ok(Json(Collection {
         page: params.page_info(total),
@@ -166,10 +173,14 @@ pub(crate) async fn cert_bund_advisories(
             tracing::warn!(%error, "CERT-Bund advisory list query failed");
             ApiError::Database
         })?;
-    let total = rows
-        .first()
-        .map(|row| row.get::<_, i64>("total"))
-        .unwrap_or(0);
+    let total = collection_total_with_empty_page_probe(
+        &client,
+        &rows,
+        &sql,
+        &params,
+        "CERT-Bund advisory list",
+    )
+    .await?;
     let items = rows.iter().map(cert_bund_advisory_from_row).collect();
     Ok(Json(Collection {
         page: params.page_info(total),

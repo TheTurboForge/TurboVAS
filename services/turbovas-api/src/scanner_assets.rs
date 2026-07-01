@@ -12,7 +12,10 @@ use crate::{
     collections::{SCANNER_ASSET_DEFAULT_SORT, SCANNER_ASSET_SORT_FIELDS},
     errors::ApiError,
     path_ids::parse_uuid,
-    query::{ApiQuery, Collection, CollectionQuery, normalize_collection_query, sort_clause},
+    query::{
+        ApiQuery, Collection, CollectionQuery, collection_total_with_empty_page_probe,
+        normalize_collection_query, sort_clause,
+    },
     scanner_asset_payloads::{
         ScannerAssetDetail, ScannerAssetItem, ScannerTaskReference, scanner_asset_from_row,
     },
@@ -63,10 +66,9 @@ pub(crate) async fn scanner_assets(
             tracing::warn!(%error, "scanner asset list query failed");
             ApiError::Database
         })?;
-    let total = rows
-        .first()
-        .map(|row| row.get::<_, i64>("total"))
-        .unwrap_or(0);
+    let total =
+        collection_total_with_empty_page_probe(&client, &rows, &sql, &params, "scanner asset list")
+            .await?;
     let items = rows.iter().map(scanner_asset_from_row).collect();
     Ok(Json(Collection {
         page: params.page_info(total),

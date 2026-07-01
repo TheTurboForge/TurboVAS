@@ -12,7 +12,10 @@ use crate::{
     collections::{TASK_DEFAULT_SORT, TASK_SORT_FIELDS},
     errors::ApiError,
     path_ids::parse_uuid,
-    query::{ApiQuery, Collection, CollectionQuery, normalize_collection_query, sort_clause},
+    query::{
+        ApiQuery, Collection, CollectionQuery, collection_total_with_empty_page_probe,
+        normalize_collection_query, sort_clause,
+    },
     task_query_sql::task_sql,
     task_target_payloads::{TaskItem, task_from_row},
 };
@@ -43,10 +46,8 @@ pub(crate) async fn tasks(
             tracing::warn!(%error, "task list query failed");
             ApiError::Database
         })?;
-    let total = rows
-        .first()
-        .map(|row| row.get::<_, i64>("total"))
-        .unwrap_or(0);
+    let total =
+        collection_total_with_empty_page_probe(&client, &rows, &sql, &params, "task list").await?;
     let items = rows.iter().map(task_from_row).collect();
     Ok(Json(Collection {
         page: params.page_info(total),
