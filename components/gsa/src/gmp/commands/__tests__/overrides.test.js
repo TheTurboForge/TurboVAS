@@ -1,0 +1,152 @@
+/* SPDX-FileCopyrightText: 2026 Robert Pelfrey <Robert@Pelfrey.de>
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+import {afterEach, describe, expect, test, testing} from '@gsa/testing';
+import {OverridesCommand} from 'gmp/commands/overrides';
+import {createEntitiesResponse, createHttp} from 'gmp/commands/testing';
+import Override from 'gmp/models/override';
+import {createSession} from 'gmp/testing';
+
+afterEach(() => {
+  testing.unstubAllGlobals();
+});
+
+describe('OverridesCommand tests', () => {
+  test('should fetch overrides with inherited GMP fallback', async () => {
+    const response = createEntitiesResponse('override', [
+      {_id: 'override-1', text: 'Inherited override'},
+    ]);
+    const fakeHttp = createHttp(response);
+
+    const cmd = new OverridesCommand(fakeHttp);
+    const result = await cmd.get({filter: 'first=1 rows=25'});
+
+    expect(fakeHttp.request).toHaveBeenCalledWith('get', {
+      args: {cmd: 'get_overrides', details: 1, filter: 'first=1 rows=25'},
+    });
+    expect(result.data).toEqual([
+      new Override({id: 'override-1', text: 'Inherited override'}),
+    ]);
+  });
+
+  test('should fetch overrides through native API when available', async () => {
+    const fetchMock = testing.fn().mockResolvedValue({
+      json: testing.fn().mockResolvedValue({
+        page: {page: 1, page_size: 25, total: 1, sort: 'text', filter: 'control'},
+        items: [
+          {
+            id: '9f6c71ce-4f9c-41e2-8c8d-74b8a1aef001',
+            owner: {name: 'admin'},
+            nvt: {
+              id: '1.3.6.1.4.1.25623.1.0.999999',
+              name: 'Example NVT',
+            },
+            text: 'Accepted compensating control',
+            hosts: '192.0.2.10',
+            port: '443/tcp',
+            severity: 7.5,
+            new_severity: -1,
+            active: true,
+            permissions: ['get_overrides', 'modify_override'],
+          },
+        ],
+      }),
+      ok: true,
+      status: 200,
+    });
+    testing.stubGlobal('fetch', fetchMock);
+    const fakeHttp = createHttp(undefined);
+    fakeHttp.buildUrl = testing.fn(path => `https://turbovas.example/${path}`);
+    fakeHttp.session = createSession();
+    fakeHttp.session.token = 'test-token';
+    fakeHttp.session.jwt = 'jwt-token';
+
+    const cmd = new OverridesCommand(fakeHttp);
+    const result = await cmd.get({filter: 'first=1 rows=25 search=control'});
+
+    expect(fakeHttp.request).not.toHaveBeenCalled();
+    expect(result.data[0].id).toEqual('9f6c71ce-4f9c-41e2-8c8d-74b8a1aef001');
+    expect(result.data[0].text).toEqual('Accepted compensating control');
+    expect(result.data[0].hosts).toEqual(['192.0.2.10']);
+    expect(result.data[0].newSeverity).toEqual(-1);
+    expect(fakeHttp.buildUrl).toHaveBeenCalledWith('api/v1/overrides', {
+      token: 'test-token',
+      page: 1,
+      page_size: 25,
+      sort: 'text',
+      filter: 'control',
+      active: '',
+      text: '',
+      task_name: '',
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://turbovas.example/api/v1/overrides',
+      {
+        credentials: 'include',
+        headers: {
+          Accept: 'application/json',
+          Authorization: 'Bearer jwt-token',
+        },
+      },
+    );
+  });
+
+  test('should page through native API for getAll', async () => {
+    const responses = [
+      {
+        page: {page: 1, page_size: 2, total: 3, sort: 'text', filter: ''},
+        items: [
+          {id: 'override-1', nvt: {id: 'nvt-1', name: 'NVT 1'}, text: 'One'},
+          {id: 'override-2', nvt: {id: 'nvt-2', name: 'NVT 2'}, text: 'Two'},
+        ],
+      },
+      {
+        page: {page: 2, page_size: 2, total: 3, sort: 'text', filter: ''},
+        items: [
+          {id: 'override-3', nvt: {id: 'nvt-3', name: 'NVT 3'}, text: 'Three'},
+        ],
+      },
+    ];
+    const fetchMock = testing.fn().mockImplementation(() =>
+      Promise.resolve({
+        json: testing.fn().mockResolvedValue(responses.shift()),
+        ok: true,
+        status: 200,
+      }),
+    );
+    testing.stubGlobal('fetch', fetchMock);
+    const fakeHttp = createHttp(undefined);
+    fakeHttp.buildUrl = testing.fn(path => `https://turbovas.example/${path}`);
+    fakeHttp.session = createSession();
+    fakeHttp.session.token = 'test-token';
+    fakeHttp.session.jwt = 'jwt-token';
+
+    const cmd = new OverridesCommand(fakeHttp);
+    const result = await cmd.getAll();
+
+    expect(fakeHttp.request).not.toHaveBeenCalled();
+    expect(result.data).toHaveLength(3);
+    expect(fakeHttp.buildUrl).toHaveBeenNthCalledWith(1, 'api/v1/overrides', {
+      token: 'test-token',
+      page: 1,
+      page_size: 500,
+      sort: 'text',
+      filter: '',
+      active: '',
+      text: '',
+      task_name: '',
+    });
+    expect(fakeHttp.buildUrl).toHaveBeenNthCalledWith(2, 'api/v1/overrides', {
+      token: 'test-token',
+      page: 2,
+      page_size: 500,
+      sort: 'text',
+      filter: '',
+      active: '',
+      text: '',
+      task_name: '',
+    });
+  });
+});
