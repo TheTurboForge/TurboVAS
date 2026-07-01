@@ -17,12 +17,40 @@ use crate::{
     filter_write_db::*,
     filter_write_sql::*,
     filter_write_validation::{
-        FilterCloneRequest, FilterPatchRequest, ValidatedFilterClone, ValidatedFilterPatch,
-        validate_filter_clone_request, validate_filter_patch_request,
+        FilterCloneRequest, FilterCreateRequest, FilterPatchRequest, ValidatedFilterClone,
+        ValidatedFilterCreate, ValidatedFilterPatch, validate_filter_clone_request,
+        validate_filter_create_request, validate_filter_patch_request,
     },
     filters::load_filter_asset_detail,
     path_ids::parse_uuid,
 };
+
+pub(crate) async fn create_filter(
+    State(state): State<AppState>,
+    operator: Option<Extension<DirectApiOperator>>,
+    Json(request): Json<FilterCreateRequest>,
+) -> Result<(StatusCode, Json<FilterAssetItem>), ApiError> {
+    let operator = require_filter_write_operator(operator)?;
+    let request = validate_filter_create_request(request)?;
+    let mut client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let tx = client
+        .transaction()
+        .await
+        .map_err(|error| map_filter_write_db_error(error, "begin create filter transaction"))?;
+    let owner_id = resolve_filter_write_operator_owner(&tx, &operator).await?;
+    tx.batch_execute("LOCK TABLE filters, filters_trash IN SHARE ROW EXCLUSIVE MODE;")
+        .await
+        .map_err(|error| map_filter_write_db_error(error, "lock filters for create"))?;
+    ensure_unique_filter_name(&tx, &request.name, -1).await?;
+    let record = execute_filter_create_transaction(&tx, owner_id, &request).await?;
+    tx.commit()
+        .await
+        .map_err(|error| map_filter_write_db_error(error, "commit create filter transaction"))?;
+    Ok((
+        StatusCode::CREATED,
+        Json(load_filter_asset_detail(&client, &record.uuid).await?),
+    ))
+}
 
 pub(crate) async fn delete_filter(
     State(state): State<AppState>,
@@ -290,6 +318,26 @@ pub(crate) async fn execute_filter_clone_transaction(
     )
     .await?;
     Ok(FilterWriteRecord { uuid: record.uuid })
+}
+
+pub(crate) async fn execute_filter_create_transaction(
+    tx: &Transaction<'_>,
+    owner_id: i32,
+    request: &ValidatedFilterCreate,
+) -> Result<FilterWriteRecord, ApiError> {
+    query_filter_write_record(
+        tx,
+        filter_insert_metadata_sql(),
+        &[
+            &owner_id,
+            &request.name,
+            &request.comment,
+            &request.filter_type,
+            &request.term,
+        ],
+        "insert filter metadata",
+    )
+    .await
 }
 
 pub(crate) async fn patch_filter(

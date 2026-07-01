@@ -108,6 +108,13 @@ pub(crate) fn filter_update_metadata_sql() -> &'static str {
       RETURNING uuid::text;"
 }
 
+pub(crate) fn filter_insert_metadata_sql() -> &'static str {
+    "INSERT INTO filters
+        (uuid, owner, name, comment, type, term, creation_time, modification_time)
+     VALUES (make_uuid(), $1, $2, $3, lower($4), $5, m_now(), m_now())
+     RETURNING uuid::text;"
+}
+
 pub(crate) fn filter_clone_metadata_sql() -> &'static str {
     "INSERT INTO filters
         (uuid, owner, name, comment, type, term, creation_time, modification_time)

@@ -16,7 +16,8 @@ use crate::{
     cve_catalog::*,
     feeds::feeds,
     filter_writes::{
-        clone_filter, delete_filter, hard_delete_filter, patch_filter, restore_filter,
+        clone_filter, create_filter, delete_filter, hard_delete_filter, patch_filter,
+        restore_filter,
     },
     filters::*,
     host_assets::*,
@@ -256,6 +257,7 @@ pub(crate) fn direct_native_api_router(
                 "/api/v1/report-configs/:report_config_id/trash",
                 delete(hard_delete_report_config),
             )
+            .route("/api/v1/filters", post(create_filter))
             .route("/api/v1/filters/:filter_id", patch(patch_filter))
             .route("/api/v1/filters/:filter_id", delete(delete_filter))
             .route("/api/v1/filters/:filter_id/clone", post(clone_filter))
