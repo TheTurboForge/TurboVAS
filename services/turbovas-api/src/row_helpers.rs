@@ -33,16 +33,29 @@ pub(crate) fn task_has_active_current_report(status: &str) -> bool {
 }
 
 pub(crate) fn alive_test_labels(value: i64) -> Vec<String> {
-    let label = match value {
-        0 => "Scan Config Default",
-        1 => "ICMP Ping",
-        2 => "TCP-ACK Service Ping",
-        3 => "TCP-SYN Service Ping",
-        4 => "ARP Ping",
-        5 => "Consider Alive",
-        _ => "Unknown",
-    };
-    vec![label.to_string()]
+    if value == 0 {
+        return vec!["Scan Config Default".to_string()];
+    }
+    if value & 8 != 0 {
+        return vec!["Consider Alive".to_string()];
+    }
+    let mut labels = Vec::new();
+    if value & 4 != 0 {
+        labels.push("ARP Ping".to_string());
+    }
+    if value & 2 != 0 {
+        labels.push("ICMP Ping".to_string());
+    }
+    if value & 1 != 0 {
+        labels.push("TCP-ACK Service Ping".to_string());
+    }
+    if value & 16 != 0 {
+        labels.push("TCP-SYN Service Ping".to_string());
+    }
+    if labels.is_empty() {
+        labels.push("Unknown".to_string());
+    }
+    labels
 }
 
 #[cfg(test)]
@@ -84,11 +97,29 @@ mod tests {
     #[test]
     fn alive_test_labels_match_public_target_contract() {
         assert_eq!(alive_test_labels(0), vec!["Scan Config Default"]);
-        assert_eq!(alive_test_labels(1), vec!["ICMP Ping"]);
-        assert_eq!(alive_test_labels(2), vec!["TCP-ACK Service Ping"]);
-        assert_eq!(alive_test_labels(3), vec!["TCP-SYN Service Ping"]);
+        assert_eq!(alive_test_labels(1), vec!["TCP-ACK Service Ping"]);
+        assert_eq!(alive_test_labels(2), vec!["ICMP Ping"]);
+        assert_eq!(
+            alive_test_labels(3),
+            vec!["ICMP Ping", "TCP-ACK Service Ping"]
+        );
         assert_eq!(alive_test_labels(4), vec!["ARP Ping"]);
-        assert_eq!(alive_test_labels(5), vec!["Consider Alive"]);
-        assert_eq!(alive_test_labels(99), vec!["Unknown"]);
+        assert_eq!(
+            alive_test_labels(5),
+            vec!["ARP Ping", "TCP-ACK Service Ping"]
+        );
+        assert_eq!(alive_test_labels(8), vec!["Consider Alive"]);
+        assert_eq!(alive_test_labels(16), vec!["TCP-SYN Service Ping"]);
+        assert_eq!(
+            alive_test_labels(23),
+            vec![
+                "ARP Ping",
+                "ICMP Ping",
+                "TCP-ACK Service Ping",
+                "TCP-SYN Service Ping"
+            ]
+        );
+        assert_eq!(alive_test_labels(24), vec!["Consider Alive"]);
+        assert_eq!(alive_test_labels(32), vec!["Unknown"]);
     }
 }
