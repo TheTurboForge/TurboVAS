@@ -3,6 +3,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::errors::ApiError;
+use crate::scan_config_write_db::{
+    ScanConfigWriteState, ensure_scan_config_not_predefined,
+    ensure_scan_config_owner_matches_operator,
+};
 use crate::scan_config_write_sql::*;
 use crate::scan_config_write_validation::*;
 
@@ -11,6 +15,34 @@ fn patch_request(name: Option<&str>, comment: Option<&str>) -> ScanConfigPatchRe
         name: name.map(str::to_string),
         comment: comment.map(str::to_string),
     }
+}
+
+#[test]
+fn scan_config_write_rejects_operator_owner_mismatch() {
+    assert!(ensure_scan_config_owner_matches_operator(7, 7).is_ok());
+    assert!(matches!(
+        ensure_scan_config_owner_matches_operator(7, 8),
+        Err(ApiError::Forbidden)
+    ));
+}
+
+#[test]
+fn scan_config_write_blocks_predefined_live_mutations() {
+    let mutable = ScanConfigWriteState {
+        internal_id: 1,
+        owner_id: 7,
+        predefined: false,
+    };
+    assert!(ensure_scan_config_not_predefined(&mutable).is_ok());
+
+    let predefined = ScanConfigWriteState {
+        predefined: true,
+        ..mutable
+    };
+    assert!(matches!(
+        ensure_scan_config_not_predefined(&predefined),
+        Err(ApiError::Conflict(_))
+    ));
 }
 
 #[test]
@@ -101,6 +133,7 @@ fn scan_config_patch_sql_is_metadata_only() {
 #[test]
 fn scan_config_patch_state_blocks_predefined_and_non_scan_configs() {
     let state = scan_config_write_state_sql();
+    assert!(state.contains("owner::integer"));
     assert!(state.contains("coalesce(predefined, 0)::integer"));
     assert!(state.contains("coalesce(usage_type, 'scan') = 'scan'"));
 }
@@ -149,6 +182,7 @@ fn scan_config_trash_sql_copies_metadata_preferences_and_relinks_dependents() {
 fn scan_config_restore_sql_copies_metadata_preferences_and_relinks_dependents() {
     let state = scan_config_trash_state_sql();
     assert!(state.contains("FROM configs_trash"));
+    assert!(state.contains("owner::integer"));
     assert!(state.contains("coalesce(scanner_location, 0)::integer"));
     assert!(state.contains("coalesce(usage_type, 'scan') = 'scan'"));
 

@@ -6605,6 +6605,8 @@ db2:keys=5,expires=0,avg_ttl=0
                     return turbovasctl.subprocess.CompletedProcess([], 0, '{"error":{"code":"not_found"}}\n404', "")
                 if method == "PATCH" and path.startswith(f"/api/v1/scan-configs/{turbovasctl.FULL_AND_FAST_SCAN_CONFIG_ID}"):
                     return turbovasctl.subprocess.CompletedProcess([], 0, '{"error":{"code":"conflict","message":"predefined scan configs cannot be patched"}}\n409', "")
+                if method == "DELETE" and path.startswith(f"/api/v1/scan-configs/{turbovasctl.FULL_AND_FAST_SCAN_CONFIG_ID}"):
+                    return turbovasctl.subprocess.CompletedProcess([], 0, '{"error":{"code":"conflict","message":"predefined scan configs cannot be modified"}}\n409', "")
                 if method == "PATCH" and path.startswith(f"/api/v1/scan-configs/{scan_config_uuid}"):
                     payload = json.loads(body)
                     return turbovasctl.subprocess.CompletedProcess([], 0, json.dumps({"id": scan_config_uuid, "comment": payload["comment"]}) + "\n200", "")
@@ -6766,6 +6768,7 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertEqual(checks["native-api-direct.schedule-write-cleanup"], "pass")
         self.assertEqual(checks["native-api-direct.schedule-write-post-cleanup"], "pass")
         self.assertEqual(checks["native-api-direct.scan-config-predefined-patch-denied"], "pass")
+        self.assertEqual(checks["native-api-direct.scan-config-predefined-delete-denied"], "pass")
         self.assertEqual(checks["native-api-direct.scan-config-fixture"], "pass")
         self.assertEqual(checks["native-api-direct.scan-config-write-update"], "pass")
         self.assertEqual(checks["native-api-direct.scan-config-write-delete"], "pass")

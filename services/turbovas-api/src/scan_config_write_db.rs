@@ -18,6 +18,7 @@ pub(crate) struct ScanConfigWriteRecord {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ScanConfigWriteState {
     pub(crate) internal_id: i32,
+    pub(crate) owner_id: i32,
     pub(crate) predefined: bool,
 }
 
@@ -26,6 +27,7 @@ pub(crate) struct ScanConfigTrashState {
     pub(crate) internal_id: i32,
     pub(crate) uuid: String,
     pub(crate) name: String,
+    pub(crate) owner_id: i32,
     pub(crate) scanner_location: i32,
 }
 
@@ -66,7 +68,8 @@ pub(crate) async fn load_scan_config_write_state(
         .map_err(|error| map_scan_config_write_db_error(error, "load scan-config write state"))?
         .map(|row| ScanConfigWriteState {
             internal_id: row.get(0),
-            predefined: row.get::<_, i32>(1) != 0,
+            owner_id: row.get(1),
+            predefined: row.get::<_, i32>(2) != 0,
         })
         .ok_or(ApiError::NotFound)
 }
@@ -83,9 +86,38 @@ pub(crate) async fn load_scan_config_trash_state(
             internal_id: row.get(0),
             uuid: row.get(1),
             name: row.get(2),
-            scanner_location: row.get(3),
+            owner_id: row.get(3),
+            scanner_location: row.get(4),
         })
         .ok_or(ApiError::NotFound)
+}
+
+pub(crate) fn ensure_scan_config_owner_matches_operator(
+    scan_config_owner_id: i32,
+    operator_owner_id: i32,
+) -> Result<(), ApiError> {
+    if scan_config_owner_id == operator_owner_id {
+        Ok(())
+    } else {
+        tracing::warn!(
+            scan_config_owner_id,
+            operator_owner_id,
+            "direct API scan-config write owner mismatch"
+        );
+        Err(ApiError::Forbidden)
+    }
+}
+
+pub(crate) fn ensure_scan_config_not_predefined(
+    state: &ScanConfigWriteState,
+) -> Result<(), ApiError> {
+    if state.predefined {
+        Err(ApiError::Conflict(
+            "predefined scan configs cannot be modified".to_string(),
+        ))
+    } else {
+        Ok(())
+    }
 }
 
 pub(crate) async fn ensure_unique_scan_config_name(

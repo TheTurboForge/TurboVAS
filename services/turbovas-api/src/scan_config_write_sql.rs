@@ -7,14 +7,14 @@ pub(crate) fn scan_config_write_operator_owner_sql() -> &'static str {
 }
 
 pub(crate) fn scan_config_write_state_sql() -> &'static str {
-    "SELECT id::integer, coalesce(predefined, 0)::integer
+    "SELECT id::integer, owner::integer, coalesce(predefined, 0)::integer
        FROM configs
       WHERE uuid = $1
         AND coalesce(usage_type, 'scan') = 'scan';"
 }
 
 pub(crate) fn scan_config_trash_state_sql() -> &'static str {
-    "SELECT id::integer, uuid::text, name, coalesce(scanner_location, 0)::integer
+    "SELECT id::integer, uuid::text, name, owner::integer, coalesce(scanner_location, 0)::integer
        FROM configs_trash
       WHERE uuid = $1
         AND coalesce(usage_type, 'scan') = 'scan';"

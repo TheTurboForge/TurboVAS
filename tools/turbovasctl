@@ -12338,6 +12338,7 @@ def direct_smoke_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
             "native-api-direct.schedule-write-cleanup",
             "native-api-direct.schedule-write-post-cleanup",
             "native-api-direct.scan-config-predefined-patch-denied",
+            "native-api-direct.scan-config-predefined-delete-denied",
             "native-api-direct.scan-config-fixture",
             "native-api-direct.scan-config-write-update",
             "native-api-direct.scan-config-write-delete",
@@ -12786,6 +12787,11 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
         predefined_scan_config_patch_json, predefined_scan_config_patch_status = parse_json_output_with_http_status(predefined_scan_config_patch)
         predefined_scan_config_patch_ok = predefined_scan_config_patch.returncode == 0 and predefined_scan_config_patch_status == 409 and isinstance(predefined_scan_config_patch_json, dict) and predefined_scan_config_patch_json.get("error", {}).get("code") == "conflict"
         findings.append(native_api_probe_finding("pass" if predefined_scan_config_patch_ok else "fail", "native-api-direct.scan-config-predefined-patch-denied", "Direct write-control rejects predefined scan-config metadata patches." if predefined_scan_config_patch_ok else "Direct write-control did not reject a predefined scan-config metadata patch.", predefined_scan_config_patch, direct_native_api_display_command(f"/api/v1/scan-configs/{urllib.parse.quote(FULL_AND_FAST_SCAN_CONFIG_ID)}", token=token, env=env, method="PATCH", body=predefined_scan_config_patch_body, extra_headers=content_type), predefined_scan_config_patch_json, {"http_status": predefined_scan_config_patch_status, "scan_config_id": FULL_AND_FAST_SCAN_CONFIG_ID, **summarize_native_api_response(predefined_scan_config_patch_json)}))
+
+        predefined_scan_config_delete = direct_native_api_curl(repo_root, f"/api/v1/scan-configs/{urllib.parse.quote(FULL_AND_FAST_SCAN_CONFIG_ID)}", token=token, env=env, method="DELETE")
+        predefined_scan_config_delete_json, predefined_scan_config_delete_status = parse_json_output_with_http_status(predefined_scan_config_delete)
+        predefined_scan_config_delete_ok = predefined_scan_config_delete.returncode == 0 and predefined_scan_config_delete_status == 409 and isinstance(predefined_scan_config_delete_json, dict) and predefined_scan_config_delete_json.get("error", {}).get("code") == "conflict"
+        findings.append(native_api_probe_finding("pass" if predefined_scan_config_delete_ok else "fail", "native-api-direct.scan-config-predefined-delete-denied", "Direct write-control rejects predefined scan-config delete." if predefined_scan_config_delete_ok else "Direct write-control did not reject a predefined scan-config delete.", predefined_scan_config_delete, direct_native_api_display_command(f"/api/v1/scan-configs/{urllib.parse.quote(FULL_AND_FAST_SCAN_CONFIG_ID)}", token=token, env=env, method="DELETE"), predefined_scan_config_delete_json, {"http_status": predefined_scan_config_delete_status, "scan_config_id": FULL_AND_FAST_SCAN_CONFIG_ID, **summarize_native_api_response(predefined_scan_config_delete_json)}))
 
         scan_config_fixture_sql = (
             "WITH inserted_config AS (INSERT INTO configs "
