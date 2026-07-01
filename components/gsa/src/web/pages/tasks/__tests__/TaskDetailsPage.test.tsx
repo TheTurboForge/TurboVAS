@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import {describe, test, expect, testing} from '@gsa/testing';
+import {afterEach, describe, test, expect, testing} from '@gsa/testing';
 import {rendererWith, fireEvent, screen} from 'web/testing';
 import Features from 'gmp/capabilities/features';
 import CollectionCounts from 'gmp/collection/collection-counts';
@@ -162,6 +162,7 @@ const currentSettings = testing
   .mockResolvedValue(currentSettingsDefaultResponse);
 
 const createGmp = ({
+  buildUrl = undefined,
   getTask = testing.fn().mockResolvedValue({
     data: task,
   }),
@@ -200,7 +201,8 @@ const createGmp = ({
   resumeTask = testing.fn().mockResolvedValue({
     foo: 'bar',
   }),
-} = {}) => ({
+}: any = {}) => ({
+  buildUrl,
   task: {
     get: getTask,
     clone: cloneTask,
@@ -231,10 +233,18 @@ const createGmp = ({
   settings: {
     manualUrl,
   },
-  session: createSession({timezone: 'CET'}),
+  session: {
+    ...createSession({timezone: 'CET'}),
+    token: 'test-token',
+    jwt: 'jwt-token',
+  },
   user: {
     currentSettings,
   },
+});
+
+afterEach(() => {
+  testing.unstubAllGlobals();
 });
 
 describe('TaskDetailsPage tests', () => {
@@ -388,5 +398,49 @@ describe('TaskDetailsPage tests', () => {
     fireEvent.click(startIcon);
     expect(gmp.task.start).toHaveBeenCalledWith(task5);
 
+  });
+
+  test('should use native metadata export for downloads', async () => {
+    const nativePayload = {
+      id: '12345',
+      name: 'foo',
+      comment: 'bar',
+    };
+    const fetchMock = testing.fn().mockResolvedValue({
+      json: testing.fn().mockResolvedValue(nativePayload),
+      ok: true,
+      status: 200,
+    });
+    testing.stubGlobal('fetch', fetchMock);
+    const exportTask = testing.fn().mockResolvedValue({foo: 'bar'});
+    const buildUrl = testing.fn(
+      (path, _params) => `https://turbovas.example/${path}`,
+    );
+    const gmp = createGmp({buildUrl, exportTask});
+
+    const {render, store} = rendererWith({
+      gmp,
+      capabilities: true,
+      router: true,
+      store: true,
+      features: new Features(['ENABLE_CREDENTIAL_STORES']),
+    });
+
+    store.dispatch(entityLoadingActions.success('12345', task));
+    render(<TaskDetailsPage id="12345" />);
+
+    fetchMock.mockClear();
+    const exportIcon = screen.getByTestId('export-icon');
+    fireEvent.click(exportIcon);
+    await expect.poll(() => fetchMock.mock.calls.length).toBe(1);
+
+    expect(exportTask).not.toHaveBeenCalled();
+    expect(buildUrl).toHaveBeenCalledWith('api/v1/tasks/12345/export', {
+      token: 'test-token',
+    });
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
+      'https://turbovas.example/api/v1/tasks/12345/export',
+      expect.objectContaining({credentials: 'include'}),
+    );
   });
 });

@@ -5,6 +5,7 @@
  */
 
 import CollectionCounts from 'gmp/collection/collection-counts';
+import Response from 'gmp/http/response';
 import type {UrlParams} from 'gmp/http/utils';
 import type Filter from 'gmp/models/filter';
 import Task from 'gmp/models/task';
@@ -306,4 +307,16 @@ export const fetchNativeTask = async (
     {token: gmp.session.token},
   );
   return {task: nativeTaskToModel(payload)};
+};
+
+export const exportNativeTaskMetadata = async (
+  gmp: NativeApiGmp,
+  id: string,
+): Promise<Response<string>> => {
+  const payload = await fetchNativeJson<NativeTaskItem>(
+    gmp,
+    `api/v1/tasks/${encodeURIComponent(id)}/export`,
+    {token: gmp.session.token},
+  );
+  return new Response(`${JSON.stringify(payload, null, 2)}\n`);
 };

@@ -6,8 +6,10 @@
 
 import React, {useState, useEffect, useCallback} from 'react';
 import {useDispatch} from 'react-redux';
+import {type EntityCommandParams} from 'gmp/commands/entity';
 import {isTaskStartManagerResponseFailure} from 'gmp/commands/task';
 import type Rejection from 'gmp/http/rejection';
+import {exportNativeTaskMetadata} from 'gmp/native-api/tasks';
 import {ALL_FILTER} from 'gmp/models/filter';
 import {FULL_AND_FAST_SCAN_CONFIG_ID} from 'gmp/models/scan-config';
 import {OPENVAS_DEFAULT_SCANNER_ID} from 'gmp/models/scanner';
@@ -88,6 +90,16 @@ interface TaskComponentProps {
 }
 
 const TAGS_FILTER = ALL_FILTER.copy().set('resource_type', 'task');
+
+const canUseNativeApi = (gmp: {buildUrl?: unknown}) =>
+  typeof gmp?.buildUrl === 'function';
+
+const exportTask = (gmp: any, task: EntityCommandParams) => {
+  if (canUseNativeApi(gmp)) {
+    return exportNativeTaskMetadata(gmp, task.id as string);
+  }
+  return gmp.task.export(task);
+};
 
 const TaskComponent = ({
   children,
@@ -452,7 +464,7 @@ const TaskComponent = ({
   };
 
   const handleEntityDownload = useEntityDownload<Task>(
-    entity => gmp.task.export(entity),
+    entity => exportTask(gmp, entity),
     {
       onDownloadError,
       onDownloaded,
