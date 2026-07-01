@@ -58,13 +58,14 @@ pub(crate) async fn restore_tag(
         .transaction()
         .await
         .map_err(|error| map_tag_write_db_error(error, "begin restore tag transaction"))?;
-    resolve_tag_write_operator_owner(&tx, &operator).await?;
+    let operator_owner_id = resolve_tag_write_operator_owner(&tx, &operator).await?;
     tx.batch_execute(
         "LOCK TABLE tags, tags_trash, tag_resources, tag_resources_trash IN SHARE ROW EXCLUSIVE MODE;",
     )
     .await
     .map_err(|error| map_tag_write_db_error(error, "lock tag tables for restore"))?;
     let trash = load_tag_trash_state(&tx, &tag_id).await?;
+    ensure_tag_owner_matches_operator(trash.owner_id, operator_owner_id)?;
     ensure_tag_resource_direct_write_type_is_supported(&trash.resource_type)?;
     ensure_tag_uuid_not_live(&tx, &trash.uuid).await?;
     let record = execute_tag_restore_transaction(&tx, trash.internal_id).await?;
@@ -86,13 +87,14 @@ pub(crate) async fn hard_delete_tag(
         .transaction()
         .await
         .map_err(|error| map_tag_write_db_error(error, "begin hard-delete tag transaction"))?;
-    resolve_tag_write_operator_owner(&tx, &operator).await?;
+    let operator_owner_id = resolve_tag_write_operator_owner(&tx, &operator).await?;
     tx.batch_execute(
         "LOCK TABLE tags_trash, tag_resources, tag_resources_trash IN SHARE ROW EXCLUSIVE MODE;",
     )
     .await
     .map_err(|error| map_tag_write_db_error(error, "lock tag trash tables for hard delete"))?;
     let trash = load_tag_trash_state(&tx, &tag_id).await?;
+    ensure_tag_owner_matches_operator(trash.owner_id, operator_owner_id)?;
     ensure_tag_resource_direct_write_type_is_supported(&trash.resource_type)?;
     execute_tag_hard_delete_transaction(&tx, trash.internal_id).await?;
     tx.commit()
@@ -115,8 +117,11 @@ pub(crate) async fn patch_tag(
         .transaction()
         .await
         .map_err(|error| map_tag_write_db_error(error, "begin patch tag transaction"))?;
-    resolve_tag_write_operator_owner(&tx, &operator).await?;
-    let record = execute_tag_patch_transaction(&tx, &tag_id, &request).await?;
+    let operator_owner_id = resolve_tag_write_operator_owner(&tx, &operator).await?;
+    let state = load_tag_write_state(&tx, &tag_id).await?;
+    ensure_tag_owner_matches_operator(state.owner_id, operator_owner_id)?;
+    ensure_tag_resource_direct_write_type_is_supported(&state.resource_type)?;
+    let record = execute_tag_patch_transaction(&tx, state.internal_id, &request).await?;
     tx.commit()
         .await
         .map_err(|error| map_tag_write_db_error(error, "commit patch tag transaction"))?;
@@ -142,6 +147,7 @@ pub(crate) async fn clone_tag(
         .await
         .map_err(|error| map_tag_write_db_error(error, "lock tag tables for clone"))?;
     let source = load_tag_write_state(&tx, &tag_id).await?;
+    ensure_tag_owner_matches_operator(source.owner_id, owner_id)?;
     ensure_tag_resource_direct_write_type_is_supported(&source.resource_type)?;
     let record = execute_tag_clone_transaction(&tx, source.internal_id, owner_id, &request).await?;
     tx.commit()
@@ -167,13 +173,14 @@ pub(crate) async fn delete_tag(
         .transaction()
         .await
         .map_err(|error| map_tag_write_db_error(error, "begin delete tag transaction"))?;
-    resolve_tag_write_operator_owner(&tx, &operator).await?;
+    let operator_owner_id = resolve_tag_write_operator_owner(&tx, &operator).await?;
     tx.batch_execute(
         "LOCK TABLE tags, tags_trash, tag_resources, tag_resources_trash IN SHARE ROW EXCLUSIVE MODE;",
     )
     .await
     .map_err(|error| map_tag_write_db_error(error, "lock tag tables for delete"))?;
     let state = load_tag_write_state(&tx, &tag_id).await?;
+    ensure_tag_owner_matches_operator(state.owner_id, operator_owner_id)?;
     ensure_tag_resource_direct_write_type_is_supported(&state.resource_type)?;
     execute_tag_trash_transaction(&tx, state.internal_id).await?;
     tx.commit()
@@ -196,8 +203,9 @@ pub(crate) async fn update_tag_resources(
         .transaction()
         .await
         .map_err(|error| map_tag_write_db_error(error, "begin tag resource transaction"))?;
-    resolve_tag_write_operator_owner(&tx, &operator).await?;
+    let operator_owner_id = resolve_tag_write_operator_owner(&tx, &operator).await?;
     let state = load_tag_write_state(&tx, &tag_id).await?;
+    ensure_tag_owner_matches_operator(state.owner_id, operator_owner_id)?;
     ensure_tag_resource_direct_write_type_is_supported(&state.resource_type)?;
     execute_tag_resource_update_transaction(&tx, &state, &request).await?;
     tx.commit()

@@ -11,6 +11,7 @@ pub(crate) fn tag_write_operator_owner_sql() -> &'static str {
 pub(crate) fn tag_trash_state_sql() -> &'static str {
     "SELECT id::integer,
             uuid::text,
+            owner::integer,
             coalesce(resource_type, '')::text
        FROM tags_trash
       WHERE uuid = $1;"
@@ -60,7 +61,7 @@ pub(crate) fn tag_update_metadata_sql() -> &'static str {
             value = coalesce($4, value),
             active = coalesce($5, active),
             modification_time = m_now()
-      WHERE uuid = $1
+      WHERE id = $1
       RETURNING id::integer, uuid::text;"
 }
 
@@ -72,6 +73,7 @@ pub(crate) fn tag_write_unassigned_state_sql() -> &'static str {
 pub(crate) fn tag_write_state_sql() -> &'static str {
     "SELECT id::integer,
             uuid::text,
+            owner::integer,
             coalesce(resource_type, '')::text,
             coalesce(tag_resources_count(id, resource_type), 0)::bigint AS resource_count
        FROM tags

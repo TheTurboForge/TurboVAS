@@ -36,6 +36,15 @@ fn tag_create_request_normalizes_metadata_only_contract() {
 }
 
 #[test]
+fn tag_write_rejects_operator_owner_mismatch() {
+    assert!(ensure_tag_owner_matches_operator(7, 7).is_ok());
+    assert!(matches!(
+        ensure_tag_owner_matches_operator(7, 8),
+        Err(ApiError::Forbidden)
+    ));
+}
+
+#[test]
 fn tag_clone_request_accepts_optional_metadata_overrides() {
     let request: TagCloneRequest =
         serde_json::from_str(r#"{"name":"  cloned tag  ","comment":" copied "}"#)
@@ -92,6 +101,7 @@ fn tag_create_request_rejects_unknown_fields_bad_text_and_unsupported_types() {
             steps: vec![
                 TagWriteStep::ResolveOperatorOwner,
                 TagWriteStep::VerifyTagExists,
+                TagWriteStep::VerifyOwnerMatch,
                 TagWriteStep::VerifyResourceTypeSupported,
                 TagWriteStep::InsertMetadata,
                 TagWriteStep::CopyResourceAssignments,
@@ -293,6 +303,7 @@ fn tag_write_plans_are_metadata_only() {
             steps: vec![
                 TagWriteStep::ResolveOperatorOwner,
                 TagWriteStep::VerifyTagExists,
+                TagWriteStep::VerifyOwnerMatch,
                 TagWriteStep::UpdateMetadata,
             ],
         }
@@ -305,6 +316,7 @@ fn tag_write_plans_are_metadata_only() {
             steps: vec![
                 TagWriteStep::ResolveOperatorOwner,
                 TagWriteStep::VerifyTagExists,
+                TagWriteStep::VerifyOwnerMatch,
                 TagWriteStep::VerifyResourceTypeSupported,
                 TagWriteStep::InsertTrashMetadata,
                 TagWriteStep::CopyResourceAssignments,
@@ -326,6 +338,7 @@ fn tag_write_plans_are_metadata_only() {
             steps: vec![
                 TagWriteStep::ResolveOperatorOwner,
                 TagWriteStep::VerifyTagExists,
+                TagWriteStep::VerifyOwnerMatch,
                 TagWriteStep::VerifyResourceTypeSupported,
                 TagWriteStep::VerifyResourceExists,
                 TagWriteStep::DeleteResourceAssignment,
@@ -345,12 +358,18 @@ fn tag_write_sql_uses_parameterized_metadata_queries_only() {
     let update = tag_update_metadata_sql();
     assert!(update.contains("UPDATE tags"));
     assert!(update.contains("coalesce($2, name)"));
+    assert!(update.contains("WHERE id = $1"));
     assert!(!update.contains("resource_type ="));
     assert!(!update.contains("tag_resources"));
 
     let delete_state = tag_write_unassigned_state_sql();
+    assert!(delete_state.contains("owner::integer"));
     assert!(delete_state.contains("tag_resources_count"));
     assert!(!delete_state.contains("DELETE"));
+
+    let trash_state = tag_trash_state_sql();
+    assert!(trash_state.contains("owner::integer"));
+    assert!(trash_state.contains("FROM tags_trash"));
 
     let trash = tag_trash_insert_sql();
     assert!(trash.contains("INSERT INTO tags_trash"));

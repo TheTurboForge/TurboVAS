@@ -19,6 +19,7 @@ pub(crate) enum TagWriteOperation {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TagWriteStep {
     ResolveOperatorOwner,
+    VerifyOwnerMatch,
     VerifyResourceTypeSupported,
     VerifyTagExists,
     VerifyResourceExists,
@@ -47,6 +48,7 @@ pub(crate) fn tag_resource_update_transaction_plan(
         steps: vec![
             TagWriteStep::ResolveOperatorOwner,
             TagWriteStep::VerifyTagExists,
+            TagWriteStep::VerifyOwnerMatch,
             TagWriteStep::VerifyResourceTypeSupported,
             TagWriteStep::VerifyResourceExists,
             match request.action {
@@ -77,6 +79,7 @@ pub(crate) fn tag_clone_transaction_plan(_request: &ValidatedTagClone) -> TagWri
         steps: vec![
             TagWriteStep::ResolveOperatorOwner,
             TagWriteStep::VerifyTagExists,
+            TagWriteStep::VerifyOwnerMatch,
             TagWriteStep::VerifyResourceTypeSupported,
             TagWriteStep::InsertMetadata,
             TagWriteStep::CopyResourceAssignments,
@@ -90,6 +93,7 @@ pub(crate) fn tag_patch_transaction_plan(_request: &ValidatedTagPatch) -> TagWri
         steps: vec![
             TagWriteStep::ResolveOperatorOwner,
             TagWriteStep::VerifyTagExists,
+            TagWriteStep::VerifyOwnerMatch,
             TagWriteStep::UpdateMetadata,
         ],
     }
@@ -101,6 +105,7 @@ pub(crate) fn tag_delete_transaction_plan() -> TagWriteTransactionPlan {
         steps: vec![
             TagWriteStep::ResolveOperatorOwner,
             TagWriteStep::VerifyTagExists,
+            TagWriteStep::VerifyOwnerMatch,
             TagWriteStep::VerifyResourceTypeSupported,
             TagWriteStep::InsertTrashMetadata,
             TagWriteStep::CopyResourceAssignments,
