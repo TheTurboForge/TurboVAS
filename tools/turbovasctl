@@ -332,7 +332,7 @@ NATIVE_TOOLING_RESIDUE_KINDS = (
     "gsa-session-http-transport",
     "report-export-delete-or-rich-context",
     "report-format-config-write-or-export",
-    "saved-filter-term-type-delete-or-alert-linkage",
+    "saved-filter-gsa-filter-actions-or-alert-linkage",
     "scan-config-preference-write-or-export",
     "scanner-control-or-credential",
     "scope-report-generation",
@@ -609,7 +609,7 @@ OPENAPI_ALLOWED_INHERITED_STILL_OWNS_VALUES = frozenset(
         "result-tags-exports-and-actions",
         "result-exports-and-actions",
         "retention-mutations",
-        "saved-filter-term-type-alert-linkage",
+        "saved-filter-export-and-alert-linkage",
         "scanner-control-credentials-writes-and-deletes",
         "remote-scanner-certificate-context-control-credentials-writes-downloads-and-deletes",
         "scan-config-preferences-export-import-writes-and-deletes",
@@ -737,17 +737,17 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-replaces": "feed-status-read",
     },
     ("get", "/filters"): {
-        "x-turbovas-inherited-still-owns": "saved-filter-term-type-alert-linkage",
+        "x-turbovas-inherited-still-owns": "saved-filter-export-and-alert-linkage",
         "x-turbovas-maturity": "live-read",
         "x-turbovas-replaces": "saved-filter-metadata-list-read",
     },
     ("get", "/filters/{filter_id}"): {
-        "x-turbovas-inherited-still-owns": "saved-filter-term-type-alert-linkage",
+        "x-turbovas-inherited-still-owns": "saved-filter-export-and-alert-linkage",
         "x-turbovas-maturity": "live-read",
         "x-turbovas-replaces": "saved-filter-metadata-detail-read",
     },
     ("post", "/filters"): {
-        "x-turbovas-inherited-still-owns": "saved-filter-term-type-alert-linkage",
+        "x-turbovas-inherited-still-owns": "saved-filter-export-and-alert-linkage",
         "x-turbovas-maturity": "live-write",
         "x-turbovas-operator-identity": "direct-token-operator",
         "x-turbovas-owner-semantics": "request-operator-owner",
@@ -756,7 +756,7 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-side-effect": "metadata-write",
     },
     ("patch", "/filters/{filter_id}"): {
-        "x-turbovas-inherited-still-owns": "saved-filter-term-type-alert-linkage",
+        "x-turbovas-inherited-still-owns": "saved-filter-export-and-alert-linkage",
         "x-turbovas-maturity": "live-write",
         "x-turbovas-operator-identity": "direct-token-operator",
         "x-turbovas-owner-semantics": "preserve-existing-owner",
@@ -765,7 +765,7 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-side-effect": "metadata-write",
     },
     ("delete", "/filters/{filter_id}"): {
-        "x-turbovas-inherited-still-owns": "saved-filter-term-type-alert-linkage",
+        "x-turbovas-inherited-still-owns": "saved-filter-export-and-alert-linkage",
         "x-turbovas-maturity": "live-write",
         "x-turbovas-operator-identity": "direct-token-operator",
         "x-turbovas-owner-semantics": "preserve-existing-owner",
@@ -774,7 +774,7 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-side-effect": "metadata-delete",
     },
     ("post", "/filters/{filter_id}/clone"): {
-        "x-turbovas-inherited-still-owns": "saved-filter-term-type-alert-linkage",
+        "x-turbovas-inherited-still-owns": "saved-filter-export-and-alert-linkage",
         "x-turbovas-maturity": "live-write",
         "x-turbovas-operator-identity": "direct-token-operator",
         "x-turbovas-owner-semantics": "request-operator-owner",
@@ -783,7 +783,7 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-side-effect": "metadata-write",
     },
     ("post", "/filters/{filter_id}/restore"): {
-        "x-turbovas-inherited-still-owns": "saved-filter-term-type-alert-linkage",
+        "x-turbovas-inherited-still-owns": "saved-filter-export-and-alert-linkage",
         "x-turbovas-maturity": "live-write",
         "x-turbovas-operator-identity": "direct-token-operator",
         "x-turbovas-owner-semantics": "preserve-existing-owner",
@@ -792,7 +792,7 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-side-effect": "metadata-write",
     },
     ("delete", "/filters/{filter_id}/trash"): {
-        "x-turbovas-inherited-still-owns": "saved-filter-term-type-alert-linkage",
+        "x-turbovas-inherited-still-owns": "saved-filter-export-and-alert-linkage",
         "x-turbovas-maturity": "live-write",
         "x-turbovas-operator-identity": "direct-token-operator",
         "x-turbovas-owner-semantics": "preserve-existing-owner",
@@ -2746,7 +2746,7 @@ def native_tooling_residue(relative_path: str, category: str) -> tuple[str, str]
     if name == "schedules.js":
         return "schedule-write-or-export", "GSA schedule writes, calendar changes, exports, and deletes remain inherited."
     if name == "filter.ts":
-        return "saved-filter-term-type-delete-or-alert-linkage", "Saved-filter term/type changes, create/delete/trash behavior, settings cleanup, and alert linkage remain inherited."
+        return "saved-filter-gsa-filter-actions-or-alert-linkage", "GSA saved-filter dialog actions, export/settings behavior, and alert linkage remain inherited outside the bounded direct write-control contract."
     if name == "tag.ts":
         return "tag-write-or-resource-actions", "Tag writes and unsupported resource actions remain inherited."
     if name == "user.ts":
@@ -12613,22 +12613,22 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
         if filter_id:
             filter_patch_comment = "TurboVAS direct write smoke updated saved-filter comment"
             filter_patch_body = json.dumps(
-                {"comment": filter_patch_comment},
+                {"comment": filter_patch_comment, "filter_type": "result", "term": "rows=1 sort=name"},
                 separators=(",", ":"),
             )
             filter_patch = direct_native_api_curl(repo_root, f"/api/v1/filters/{urllib.parse.quote(filter_id)}", token=token, env=env, method="PATCH", body=filter_patch_body, extra_headers=content_type)
             filter_patch_json, filter_patch_status = parse_json_output_with_http_status(filter_patch)
-            filter_patch_ok = filter_patch.returncode == 0 and filter_patch_status == 200 and isinstance(filter_patch_json, dict) and filter_patch_json.get("id") == filter_id and filter_patch_json.get("comment") == filter_patch_comment
-            findings.append(native_api_probe_finding("pass" if filter_patch_ok else "fail", "native-api-direct.filter-write-update", "Direct write-control patched saved-filter comment metadata." if filter_patch_ok else "Direct write-control failed to patch saved-filter comment metadata.", filter_patch, direct_native_api_display_command(f"/api/v1/filters/{urllib.parse.quote(filter_id)}", token=token, env=env, method="PATCH", body=filter_patch_body, extra_headers=content_type), filter_patch_json, {"http_status": filter_patch_status, "filter_id": filter_id, **summarize_native_api_response(filter_patch_json)}))
+            filter_patch_ok = filter_patch.returncode == 0 and filter_patch_status == 200 and isinstance(filter_patch_json, dict) and filter_patch_json.get("id") == filter_id and filter_patch_json.get("comment") == filter_patch_comment and filter_patch_json.get("filter_type") == "result" and filter_patch_json.get("term") == "rows=1 sort=name"
+            findings.append(native_api_probe_finding("pass" if filter_patch_ok else "fail", "native-api-direct.filter-write-update", "Direct write-control patched saved-filter comment, type, and term metadata." if filter_patch_ok else "Direct write-control failed to patch saved-filter comment/type/term metadata.", filter_patch, direct_native_api_display_command(f"/api/v1/filters/{urllib.parse.quote(filter_id)}", token=token, env=env, method="PATCH", body=filter_patch_body, extra_headers=content_type), filter_patch_json, {"http_status": filter_patch_status, "filter_id": filter_id, **summarize_native_api_response(filter_patch_json)}))
 
             filter_restore_body = json.dumps(
-                {"comment": filter_original_comment},
+                {"comment": filter_original_comment, "filter_type": "task", "term": ""},
                 separators=(",", ":"),
             )
             filter_restore = direct_native_api_curl(repo_root, f"/api/v1/filters/{urllib.parse.quote(filter_id)}", token=token, env=env, method="PATCH", body=filter_restore_body, extra_headers=content_type)
             filter_restore_json, filter_restore_status = parse_json_output_with_http_status(filter_restore)
-            filter_restore_ok = filter_restore.returncode == 0 and filter_restore_status == 200 and isinstance(filter_restore_json, dict) and filter_restore_json.get("id") == filter_id and filter_restore_json.get("comment") == filter_original_comment
-            findings.append(native_api_probe_finding("pass" if filter_restore_ok else "fail", "native-api-direct.filter-write-restore", "Direct write-control restored the saved-filter comment after reversible metadata patching." if filter_restore_ok else "Direct write-control failed to restore the saved-filter comment after metadata patching.", filter_restore, direct_native_api_display_command(f"/api/v1/filters/{urllib.parse.quote(filter_id)}", token=token, env=env, method="PATCH", body=filter_restore_body, extra_headers=content_type), filter_restore_json, {"http_status": filter_restore_status, "filter_id": filter_id, **summarize_native_api_response(filter_restore_json)}))
+            filter_restore_ok = filter_restore.returncode == 0 and filter_restore_status == 200 and isinstance(filter_restore_json, dict) and filter_restore_json.get("id") == filter_id and filter_restore_json.get("comment") == filter_original_comment and filter_restore_json.get("filter_type") == "task" and filter_restore_json.get("term") == ""
+            findings.append(native_api_probe_finding("pass" if filter_restore_ok else "fail", "native-api-direct.filter-write-restore", "Direct write-control restored the saved-filter comment/type/term after reversible metadata patching." if filter_restore_ok else "Direct write-control failed to restore the saved-filter comment/type/term after metadata patching.", filter_restore, direct_native_api_display_command(f"/api/v1/filters/{urllib.parse.quote(filter_id)}", token=token, env=env, method="PATCH", body=filter_restore_body, extra_headers=content_type), filter_restore_json, {"http_status": filter_restore_status, "filter_id": filter_id, **summarize_native_api_response(filter_restore_json)}))
 
             filter_clone_body = json.dumps(
                 {

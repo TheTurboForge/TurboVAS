@@ -23,6 +23,22 @@ fn patch_request(name: Option<&str>, comment: Option<&str>) -> FilterPatchReques
     FilterPatchRequest {
         name: name.map(str::to_string),
         comment: comment.map(str::to_string),
+        filter_type: None,
+        term: None,
+    }
+}
+
+fn patch_request_with_term_type(
+    name: Option<&str>,
+    comment: Option<&str>,
+    filter_type: Option<&str>,
+    term: Option<&str>,
+) -> FilterPatchRequest {
+    FilterPatchRequest {
+        name: name.map(str::to_string),
+        comment: comment.map(str::to_string),
+        filter_type: filter_type.map(str::to_string),
+        term: term.map(str::to_string),
     }
 }
 
@@ -245,6 +261,8 @@ fn filter_patch_request_trims_metadata_fields() {
         ValidatedFilterPatch {
             name: Some("Results filter".to_string()),
             comment: Some("operator-visible note".to_string()),
+            filter_type: None,
+            term: None,
         }
     );
 }
@@ -272,6 +290,8 @@ fn filter_patch_request_allows_blank_comment_to_clear_comment() {
         ValidatedFilterPatch {
             name: None,
             comment: Some(String::new()),
+            filter_type: None,
+            term: None,
         }
     );
 }
@@ -289,9 +309,28 @@ fn filter_patch_request_rejects_control_characters() {
 }
 
 #[test]
-fn filter_patch_request_rejects_term_type_and_unknown_fields() {
+fn filter_patch_request_accepts_term_type_and_rejects_unknown_fields() {
+    let validated = validate_filter_patch_request(patch_request_with_term_type(
+        None,
+        Some("  updated note  "),
+        Some("scan config"),
+        Some("  rows=100 sort=name  "),
+    ))
+    .expect("valid term/type patch");
+    assert_eq!(validated.comment.as_deref(), Some("updated note"));
+    assert_eq!(validated.filter_type.as_deref(), Some("config"));
+    assert_eq!(validated.term.as_deref(), Some("rows=100 sort=name"));
+
+    assert!(matches!(
+        validate_filter_patch_request(patch_request_with_term_type(
+            None,
+            None,
+            Some("banana"),
+            None
+        )),
+        Err(ApiError::BadRequest(_))
+    ));
     for request in [
-        serde_json::json!({"name": "Results filter", "term": "rows=100"}),
         serde_json::json!({"name": "Results filter", "type": "result"}),
         serde_json::json!({"name": "Results filter", "trash": true}),
     ] {
@@ -306,19 +345,23 @@ fn filter_patch_request_rejects_oversized_metadata_fields() {
         validate_filter_patch_request(FilterPatchRequest {
             name: Some(oversized),
             comment: None,
+            filter_type: None,
+            term: None,
         }),
         Err(ApiError::BadRequest(_))
     ));
 }
 
 #[test]
-fn filter_patch_sql_is_metadata_only() {
+fn filter_patch_sql_updates_metadata_term_and_type_only() {
     let sql = filter_update_metadata_sql();
     assert!(sql.contains("UPDATE filters"));
     assert!(sql.contains("name = coalesce($2, name)"));
     assert!(sql.contains("comment = coalesce($3, comment)"));
+    assert!(sql.contains("type = coalesce(lower($4), type)"));
+    assert!(sql.contains("term = coalesce($5, term)"));
     assert!(sql.contains("modification_time = m_now()"));
-    for forbidden in ["term", "type", "alert", "settings", "filters_trash"] {
+    for forbidden in ["alert", "settings", "filters_trash"] {
         assert!(
             !sql.contains(forbidden),
             "filter metadata patch SQL must not touch {forbidden}"
@@ -334,7 +377,7 @@ fn filter_patch_uniqueness_checks_live_and_trash_names() {
 }
 
 #[test]
-fn filter_patch_plan_adds_alert_guard_only_for_type_changes() {
+fn filter_patch_plan_adds_alert_guard_for_alert_sensitive_metadata_changes() {
     assert_eq!(
         filter_patch_transaction_plan(false).steps,
         vec![

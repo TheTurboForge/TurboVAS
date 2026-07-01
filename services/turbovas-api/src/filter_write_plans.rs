@@ -105,7 +105,7 @@ pub(crate) fn filter_create_transaction_plan() -> FilterWriteTransactionPlan {
 }
 
 pub(crate) fn filter_patch_transaction_plan(
-    changes_filter_type: bool,
+    changes_alert_sensitive_metadata: bool,
 ) -> FilterWriteTransactionPlan {
     let mut steps = vec![
         FilterWriteStep::ResolveOperatorOwner,
@@ -114,7 +114,7 @@ pub(crate) fn filter_patch_transaction_plan(
         FilterWriteStep::ValidateFilterSubtype,
         FilterWriteStep::CleanFilterTerm,
     ];
-    if changes_filter_type {
+    if changes_alert_sensitive_metadata {
         steps.push(FilterWriteStep::VerifyAlertLinkedTypeChangeAllowed);
     }
     steps.extend([

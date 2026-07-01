@@ -361,6 +361,9 @@ pub(crate) async fn patch_filter(
     if let Some(name) = request.name.as_ref() {
         ensure_unique_filter_name(&tx, name, state.internal_id).await?;
     }
+    if request.filter_type.is_some() || request.term.is_some() {
+        ensure_filter_not_in_use_by_alerts(&tx, state.internal_id).await?;
+    }
     let record = execute_filter_patch_transaction(&tx, state.internal_id, &request).await?;
     tx.commit()
         .await
@@ -376,7 +379,13 @@ pub(crate) async fn execute_filter_patch_transaction(
     query_filter_write_record(
         tx,
         filter_update_metadata_sql(),
-        &[&filter_internal_id, &request.name, &request.comment],
+        &[
+            &filter_internal_id,
+            &request.name,
+            &request.comment,
+            &request.filter_type,
+            &request.term,
+        ],
         "update filter metadata",
     )
     .await

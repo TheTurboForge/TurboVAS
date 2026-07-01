@@ -294,7 +294,9 @@ fn openapi_documents_filter_metadata_patch_and_trash_move_boundary() {
     let list = openapi_path_block("/filters");
     assert!(list.contains("get:"));
     assert!(list.contains("x-turbovas-exposure: direct-read"));
-    assert!(list.contains("x-turbovas-inherited-still-owns: saved-filter-term-type-alert-linkage"));
+    assert!(
+        list.contains("x-turbovas-inherited-still-owns: saved-filter-export-and-alert-linkage")
+    );
     assert!(list.contains("post:"));
     assert!(list.contains("x-turbovas-replaces: saved-filter-create"));
 
@@ -308,7 +310,7 @@ fn openapi_documents_filter_metadata_patch_and_trash_move_boundary() {
     assert!(detail.contains("x-turbovas-replaces: saved-filter-trash-move"));
     assert!(detail.contains("x-turbovas-safety-contract: write-control-v1"));
     assert!(
-        detail.contains("x-turbovas-inherited-still-owns: saved-filter-term-type-alert-linkage")
+        detail.contains("x-turbovas-inherited-still-owns: saved-filter-export-and-alert-linkage")
     );
 
     let restore = openapi_path_block("/filters/{filter_id}/restore");
@@ -317,7 +319,7 @@ fn openapi_documents_filter_metadata_patch_and_trash_move_boundary() {
     assert!(restore.contains("x-turbovas-replaces: saved-filter-restore"));
     assert!(restore.contains("x-turbovas-safety-contract: write-control-v1"));
     assert!(
-        restore.contains("x-turbovas-inherited-still-owns: saved-filter-term-type-alert-linkage")
+        restore.contains("x-turbovas-inherited-still-owns: saved-filter-export-and-alert-linkage")
     );
 
     let hard_delete = openapi_path_block("/filters/{filter_id}/trash");
@@ -328,6 +330,6 @@ fn openapi_documents_filter_metadata_patch_and_trash_move_boundary() {
     assert!(hard_delete.contains("x-turbovas-safety-contract: write-control-v1"));
     assert!(
         hard_delete
-            .contains("x-turbovas-inherited-still-owns: saved-filter-term-type-alert-linkage")
+            .contains("x-turbovas-inherited-still-owns: saved-filter-export-and-alert-linkage")
     );
 }

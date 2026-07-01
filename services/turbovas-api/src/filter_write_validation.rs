@@ -27,6 +27,10 @@ pub(crate) struct FilterPatchRequest {
     pub(crate) name: Option<String>,
     #[serde(default)]
     pub(crate) comment: Option<String>,
+    #[serde(default)]
+    pub(crate) filter_type: Option<String>,
+    #[serde(default)]
+    pub(crate) term: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -42,6 +46,8 @@ pub(crate) struct FilterCloneRequest {
 pub(crate) struct ValidatedFilterPatch {
     pub(crate) name: Option<String>,
     pub(crate) comment: Option<String>,
+    pub(crate) filter_type: Option<String>,
+    pub(crate) term: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -75,8 +81,14 @@ pub(crate) fn validate_filter_patch_request(
     let validated = ValidatedFilterPatch {
         name: normalize_optional_required_filter_text(request.name, "name")?,
         comment: normalize_optional_filter_text(request.comment, "comment")?,
+        filter_type: normalize_optional_filter_type(request.filter_type)?,
+        term: normalize_optional_filter_text(request.term, "term")?,
     };
-    if validated.name.is_none() && validated.comment.is_none() {
+    if validated.name.is_none()
+        && validated.comment.is_none()
+        && validated.filter_type.is_none()
+        && validated.term.is_none()
+    {
         return Err(ApiError::BadRequest(
             "filter patch request must include at least one field".to_string(),
         ));
@@ -173,4 +185,10 @@ fn normalize_filter_type(value: Option<String>) -> Result<String, ApiError> {
         }
     };
     Ok(normalized.to_string())
+}
+
+fn normalize_optional_filter_type(value: Option<String>) -> Result<Option<String>, ApiError> {
+    value
+        .map(|value| normalize_filter_type(Some(value)))
+        .transpose()
 }

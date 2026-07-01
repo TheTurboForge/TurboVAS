@@ -2622,7 +2622,7 @@ class TurboVASCtlTests(unittest.TestCase):
             "result-exports-and-actions",
             "result-tags-exports-and-actions",
             "retention-mutations",
-            "saved-filter-term-type-alert-linkage",
+            "saved-filter-export-and-alert-linkage",
             "scan-config-preferences-export-import-writes-and-deletes",
             "scanner-control-credentials-writes-and-deletes",
             "scap-rich-context",
@@ -6490,10 +6490,10 @@ db2:keys=5,expires=0,avg_ttl=0
                         return turbovasctl.subprocess.CompletedProcess([], 0, '{"error":{"code":"method_not_allowed"}}\n405', "")
                     payload = json.loads(body)
                     self.assertEqual(payload["filter_type"], "task")
-                    return turbovasctl.subprocess.CompletedProcess([], 0, json.dumps({"id": filter_uuid, "name": payload["name"], "comment": payload["comment"], "filter_type": "task"}) + "\n201", "")
+                    return turbovasctl.subprocess.CompletedProcess([], 0, json.dumps({"id": filter_uuid, "name": payload["name"], "comment": payload["comment"], "filter_type": "task", "term": payload.get("term", "")}) + "\n201", "")
                 if method == "PATCH" and path.startswith("/api/v1/filters/"):
                     payload = json.loads(body)
-                    return turbovasctl.subprocess.CompletedProcess([], 0, json.dumps({"id": filter_uuid, "comment": payload["comment"]}) + "\n200", "")
+                    return turbovasctl.subprocess.CompletedProcess([], 0, json.dumps({"id": filter_uuid, "comment": payload["comment"], "filter_type": payload.get("filter_type", "task"), "term": payload.get("term", "")}) + "\n200", "")
                 if method == "POST" and path.startswith(f"/api/v1/filters/{filter_uuid}/clone"):
                     payload = json.loads(body)
                     return turbovasctl.subprocess.CompletedProcess([], 0, json.dumps({"id": filter_clone_uuid, "name": payload["name"], "comment": payload["comment"]}) + "\n201", "")

@@ -103,6 +103,8 @@ pub(crate) fn filter_update_metadata_sql() -> &'static str {
     "UPDATE filters
         SET name = coalesce($2, name),
             comment = coalesce($3, comment),
+            type = coalesce(lower($4), type),
+            term = coalesce($5, term),
             modification_time = m_now()
       WHERE id = $1
       RETURNING uuid::text;"
