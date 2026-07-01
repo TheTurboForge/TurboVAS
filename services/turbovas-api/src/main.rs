@@ -140,6 +140,7 @@ mod tag_write_validation;
 mod tag_writes;
 mod tags;
 mod target_handlers;
+mod target_query_sql;
 #[cfg(test)]
 mod target_write_characterization_tests;
 mod target_write_db;
