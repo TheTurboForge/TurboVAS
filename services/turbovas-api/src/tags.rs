@@ -23,6 +23,7 @@ use crate::{
         TagAssetItem, TagResourceCollection, TagResourceItem, tag_asset_from_row,
         tag_resource_from_row,
     },
+    tag_query_sql::{tag_asset_detail_sql, tag_assets_sql, tag_resource_lookup_sql},
     tag_resource_helpers::{
         normalize_tag_resource_type, tag_resource_collection_sql, tag_resource_name_collection_sql,
         tag_resource_name_filter,
@@ -38,39 +39,7 @@ pub(crate) async fn tag_assets(
     let value_filter = query.value.clone().unwrap_or_default();
     let params = normalize_collection_query(query, TAG_DEFAULT_SORT)?;
     let sort_sql = sort_clause(&params.sort, TAG_SORT_FIELDS)?;
-    let sql = format!(
-        r#"WITH tag_rows AS (
-             SELECT t.uuid AS id,
-                    coalesce(t.name, '') AS name,
-                    coalesce(t.comment, '') AS comment,
-                    coalesce(u.name, '') AS owner_name,
-                    coalesce(t.resource_type, '') AS resource_type,
-                    coalesce(tag_resources_count(t.id, t.resource_type), 0)::bigint AS resource_count,
-                    coalesce(t.active, 0)::integer AS active_int,
-                    coalesce(t.value, '') AS value,
-                    coalesce(t.creation_time, 0)::bigint AS created_at_unix,
-                    coalesce(t.modification_time, 0)::bigint AS modified_at_unix
-               FROM tags t
-          LEFT JOIN users u ON u.id = t.owner
-         ),
-         filtered AS (
-             SELECT * FROM tag_rows
-              WHERE ($1 = ''
-                     OR lower(id) LIKE '%' || lower($1) || '%'
-                     OR lower(name) LIKE '%' || lower($1) || '%'
-                     OR lower(comment) LIKE '%' || lower($1) || '%'
-                     OR lower(owner_name) LIKE '%' || lower($1) || '%'
-                     OR lower(resource_type) LIKE '%' || lower($1) || '%'
-                     OR lower(value) LIKE '%' || lower($1) || '%')
-                AND ($4 = ''
-                     OR ($4 = '1' AND active_int = 1)
-                     OR ($4 = '0' AND active_int = 0))
-                AND ($5 = '' OR lower(resource_type) = lower($5))
-                AND ($6 = '' OR lower(value) LIKE '%' || lower($6) || '%')
-         )
-         SELECT count(*) OVER()::bigint AS total, * FROM filtered
-          ORDER BY {sort_sql}, name ASC, id ASC LIMIT $2 OFFSET $3;"#,
-    );
+    let sql = tag_assets_sql(&sort_sql);
     let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
     let rows = client
         .query(
@@ -136,23 +105,7 @@ pub(crate) async fn load_tag_asset_detail(
 ) -> Result<TagAssetItem, ApiError> {
     parse_uuid(&tag_id)?;
     let row = client
-        .query_opt(
-            r#"SELECT t.uuid AS id,
-                      coalesce(t.name, '') AS name,
-                      coalesce(t.comment, '') AS comment,
-                      coalesce(u.name, '') AS owner_name,
-                      coalesce(t.resource_type, '') AS resource_type,
-                      coalesce(tag_resources_count(t.id, t.resource_type), 0)::bigint AS resource_count,
-                      coalesce(t.active, 0)::integer AS active_int,
-                      coalesce(t.value, '') AS value,
-                      coalesce(t.creation_time, 0)::bigint AS created_at_unix,
-                      coalesce(t.modification_time, 0)::bigint AS modified_at_unix
-                 FROM tags t
-            LEFT JOIN users u ON u.id = t.owner
-                WHERE t.uuid = $1
-                LIMIT 1;"#,
-            &[&tag_id],
-        )
+        .query_opt(tag_asset_detail_sql(), &[&tag_id])
         .await
         .map_err(|error| {
             tracing::warn!(%error, "tag asset detail query failed");
@@ -172,13 +125,7 @@ pub(crate) async fn tag_asset_resources(
     let sort_sql = sort_clause(&params.sort, TAG_RESOURCE_SORT_FIELDS)?;
     let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
     let tag_row = client
-        .query_opt(
-            r#"SELECT id, uuid, coalesce(resource_type, '') AS resource_type
-                 FROM tags
-                WHERE uuid = $1
-                LIMIT 1;"#,
-            &[&tag_id],
-        )
+        .query_opt(tag_resource_lookup_sql(), &[&tag_id])
         .await
         .map_err(|error| {
             tracing::warn!(%error, "tag lookup for resource expansion failed");

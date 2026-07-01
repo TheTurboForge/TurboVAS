@@ -150,6 +150,7 @@ mod startup;
 #[cfg(test)]
 mod tag_characterization_tests;
 mod tag_payloads;
+mod tag_query_sql;
 mod tag_resource_helpers;
 mod tag_write_db;
 #[cfg(test)]

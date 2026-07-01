@@ -29,6 +29,7 @@ use crate::{
     },
     scanner_asset_query_sql::{scanner_asset_detail_sql, scanner_task_references_sql},
     schedule_query_sql::{schedule_asset_detail_sql, schedule_assets_sql, schedule_tasks_sql},
+    tag_query_sql::{tag_asset_detail_sql, tag_assets_sql, tag_resource_lookup_sql},
     tls_certificate_query_sql::{
         tls_certificate_asset_detail_sql, tls_certificate_assets_sql, tls_certificate_sources_sql,
     },
@@ -776,6 +777,39 @@ fn schedule_user_tags_are_detail_only_active_schedule_tags() {
     assert!(!sql.contains("credential"));
     assert!(!sql.contains("reports"));
     assert!(!sql.contains("results"));
+}
+
+#[test]
+fn tag_asset_read_sql_is_metadata_and_resource_count_only() {
+    let list_sql = tag_assets_sql("name ASC");
+    let detail_sql = tag_asset_detail_sql();
+    let lookup_sql = tag_resource_lookup_sql();
+    for required in [
+        "FROM tags t",
+        "LEFT JOIN users u ON u.id = t.owner",
+        "tag_resources_count(t.id, t.resource_type)",
+        "active_int",
+        "ORDER BY name ASC, name ASC, id ASC LIMIT $2 OFFSET $3",
+    ] {
+        assert!(
+            list_sql.contains(required),
+            "tag list SQL missing {required}"
+        );
+    }
+    assert!(detail_sql.contains("FROM tags t"));
+    assert!(detail_sql.contains("WHERE t.uuid = $1"));
+    assert!(lookup_sql.contains("FROM tags"));
+    assert!(lookup_sql.contains("coalesce(resource_type, '') AS resource_type"));
+    for sql in [list_sql.as_str(), detail_sql, lookup_sql] {
+        for forbidden in ["INSERT", "UPDATE", "DELETE", "CREATE", "DROP"] {
+            assert!(
+                !sql.contains(forbidden),
+                "tag read SQL must not mutate with {forbidden}"
+            );
+        }
+        assert!(!sql.contains("tag_resources_trash"));
+        assert!(!sql.contains("permissions"));
+    }
 }
 
 #[test]
