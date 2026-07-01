@@ -170,6 +170,29 @@ pub(crate) async fn ensure_scan_config_not_in_use_by_live_tasks(
     }
 }
 
+pub(crate) async fn ensure_scan_config_not_in_use_by_trash_tasks(
+    tx: &Transaction<'_>,
+    scan_config_internal_id: i32,
+) -> Result<(), ApiError> {
+    let count: i64 = tx
+        .query_one(
+            scan_config_trash_task_count_sql(),
+            &[&scan_config_internal_id],
+        )
+        .await
+        .map_err(|error| {
+            map_scan_config_write_db_error(error, "check trashed scan-config task usage")
+        })?
+        .get(0);
+    if count == 0 {
+        Ok(())
+    } else {
+        Err(ApiError::Conflict(
+            "scan config is still referenced by a trash task".to_string(),
+        ))
+    }
+}
+
 pub(crate) fn ensure_scan_config_trash_scanner_is_live(
     trash: &ScanConfigTrashState,
 ) -> Result<(), ApiError> {

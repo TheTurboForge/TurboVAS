@@ -187,6 +187,30 @@ fn scan_config_restore_sql_copies_metadata_preferences_and_relinks_dependents() 
 }
 
 #[test]
+fn scan_config_hard_delete_sql_is_trash_only_and_preserves_shared_selector() {
+    let task_guard = scan_config_trash_task_count_sql();
+    assert!(task_guard.contains("FROM tasks"));
+    assert!(task_guard.contains("config_location = 1"));
+    assert!(!task_guard.contains("hidden = 0"));
+
+    let selector = scan_config_delete_trash_selector_sql();
+    assert!(selector.contains("DELETE FROM nvt_selectors"));
+    assert!(selector.contains("configs_trash"));
+    assert!(selector.contains("54b45713-d4f4-4435-b20d-304c175ed8c5"));
+    assert!(!selector.contains("configs WHERE"));
+
+    let live_tags = scan_config_trash_tag_delete_sql();
+    assert!(live_tags.contains("DELETE FROM tag_resources"));
+    assert!(live_tags.contains("resource_type = 'config'"));
+    assert!(live_tags.contains("resource_location = 1"));
+
+    let trash_tags = scan_config_trash_tag_trash_delete_sql();
+    assert!(trash_tags.contains("DELETE FROM tag_resources_trash"));
+    assert!(trash_tags.contains("resource_type = 'config'"));
+    assert!(trash_tags.contains("resource_location = 1"));
+}
+
+#[test]
 fn scan_config_delete_guard_blocks_live_task_references_only() {
     let sql = scan_config_live_task_count_sql();
     assert!(sql.contains("FROM tasks"));

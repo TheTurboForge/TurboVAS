@@ -302,10 +302,10 @@ fn inherited_scan_config_delete_and_restore_remain_trash_permissions_tags_and_ta
 }
 
 #[test]
-fn native_direct_api_allows_scan_config_metadata_patch_trash_move_and_restore_under_write_control()
-{
+fn native_direct_api_allows_scan_config_write_control_paths() {
     let detail_path = "/api/v1/scan-configs/12345678-1234-1234-1234-123456789abc";
     let restore_path = "/api/v1/scan-configs/12345678-1234-1234-1234-123456789abc/restore";
+    let hard_delete_path = "/api/v1/scan-configs/12345678-1234-1234-1234-123456789abc/trash";
     for path in [
         "/api/v1/scan-configs",
         "/api/v1/scan-configs/12345678-1234-1234-1234-123456789abc/families",
@@ -356,6 +356,16 @@ fn native_direct_api_allows_scan_config_metadata_patch_trash_move_and_restore_un
         restore_path,
         false
     ));
+    assert!(direct_api_v1_method_is_allowed(
+        &Method::DELETE,
+        hard_delete_path,
+        true
+    ));
+    assert!(!direct_api_v1_method_is_allowed(
+        &Method::DELETE,
+        hard_delete_path,
+        false
+    ));
     assert!(!direct_api_v1_method_is_allowed(
         &Method::PATCH,
         "/api/v1/scan-configs/12345678-1234-1234-1234-123456789abc/families",
@@ -378,13 +388,18 @@ fn native_direct_api_allows_scan_config_metadata_patch_trash_move_and_restore_un
     assert!(detail.contains("x-turbovas-replaces: scan-config-trash-move"));
     assert!(detail.contains("x-turbovas-safety-contract: write-control-v1"));
     assert!(detail.contains(
-        "x-turbovas-inherited-still-owns: scan-config-preferences-selector-import-export-create-trash-hard-delete"
+        "x-turbovas-inherited-still-owns: scan-config-preferences-selector-import-export-create"
     ));
 
     let restore = openapi_path_block("/scan-configs/{scan_config_id}/restore");
     assert!(restore.contains("post:"));
     assert!(restore.contains("x-turbovas-replaces: scan-config-restore"));
     assert!(restore.contains("x-turbovas-safety-contract: write-control-v1"));
+
+    let hard_delete = openapi_path_block("/scan-configs/{scan_config_id}/trash");
+    assert!(hard_delete.contains("delete:"));
+    assert!(hard_delete.contains("x-turbovas-replaces: scan-config-hard-delete"));
+    assert!(hard_delete.contains("x-turbovas-safety-contract: write-control-v1"));
 
     let families = openapi_path_block("/scan-configs/{scan_config_id}/families");
     assert!(families.contains("get:"));

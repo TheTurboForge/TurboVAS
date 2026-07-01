@@ -47,6 +47,13 @@ pub(crate) fn scan_config_live_task_count_sql() -> &'static str {
         AND hidden = 0;"
 }
 
+pub(crate) fn scan_config_trash_task_count_sql() -> &'static str {
+    "SELECT count(*)::bigint
+       FROM tasks
+      WHERE config = $1
+        AND config_location = 1;"
+}
+
 pub(crate) fn scan_config_trash_insert_sql() -> &'static str {
     "INSERT INTO configs_trash
         (uuid, owner, name, nvt_selector, comment, family_count, nvt_count,
@@ -149,6 +156,26 @@ pub(crate) fn scan_config_trash_tag_locations_to_live_sql() -> &'static str {
 
 pub(crate) fn scan_config_delete_trash_preferences_sql() -> &'static str {
     "DELETE FROM config_preferences_trash WHERE config = $1;"
+}
+
+pub(crate) fn scan_config_delete_trash_selector_sql() -> &'static str {
+    "DELETE FROM nvt_selectors
+      WHERE name != '54b45713-d4f4-4435-b20d-304c175ed8c5'
+        AND name = (SELECT nvt_selector FROM configs_trash WHERE id = $1);"
+}
+
+pub(crate) fn scan_config_trash_tag_delete_sql() -> &'static str {
+    "DELETE FROM tag_resources
+      WHERE resource_type = 'config'
+        AND resource = $1
+        AND resource_location = 1;"
+}
+
+pub(crate) fn scan_config_trash_tag_trash_delete_sql() -> &'static str {
+    "DELETE FROM tag_resources_trash
+      WHERE resource_type = 'config'
+        AND resource = $1
+        AND resource_location = 1;"
 }
 
 pub(crate) fn scan_config_delete_trash_metadata_sql() -> &'static str {

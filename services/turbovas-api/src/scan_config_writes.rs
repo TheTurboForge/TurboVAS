@@ -48,6 +48,34 @@ pub(crate) async fn delete_scan_config(
     Ok(StatusCode::NO_CONTENT)
 }
 
+pub(crate) async fn hard_delete_scan_config(
+    State(state): State<AppState>,
+    Path(scan_config_id): Path<String>,
+    operator: Option<Extension<DirectApiOperator>>,
+) -> Result<StatusCode, ApiError> {
+    let operator = require_scan_config_write_operator(operator)?;
+    let mut client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let tx = client.transaction().await.map_err(|error| {
+        map_scan_config_write_db_error(error, "begin hard-delete scan-config transaction")
+    })?;
+    resolve_scan_config_write_operator_owner(&tx, &operator).await?;
+    tx.batch_execute(
+        "LOCK TABLE configs_trash, config_preferences_trash, nvt_selectors, tasks, tag_resources, tag_resources_trash IN SHARE ROW EXCLUSIVE MODE;",
+    )
+    .await
+    .map_err(|error| {
+        map_scan_config_write_db_error(error, "lock scan-config trash tables for hard delete")
+    })?;
+    let trash = load_scan_config_trash_state(&tx, &scan_config_id).await?;
+    ensure_scan_config_not_in_use_by_trash_tasks(&tx, trash.internal_id).await?;
+    execute_scan_config_hard_delete_transaction(&tx, trash.internal_id).await?;
+    tx.commit().await.map_err(|error| {
+        map_scan_config_write_db_error(error, "commit hard-delete scan-config transaction")
+    })?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
 pub(crate) async fn restore_scan_config(
     State(state): State<AppState>,
     Path(scan_config_id): Path<String>,
@@ -183,6 +211,48 @@ pub(crate) async fn execute_scan_config_trash_transaction(
     )
     .await?;
     Ok(record)
+}
+
+pub(crate) async fn execute_scan_config_hard_delete_transaction(
+    tx: &Transaction<'_>,
+    trash_scan_config_internal_id: i32,
+) -> Result<(), ApiError> {
+    execute_scan_config_write_sql(
+        tx,
+        scan_config_trash_tag_delete_sql(),
+        &[&trash_scan_config_internal_id],
+        "delete scan-config trash tag links",
+    )
+    .await?;
+    execute_scan_config_write_sql(
+        tx,
+        scan_config_trash_tag_trash_delete_sql(),
+        &[&trash_scan_config_internal_id],
+        "delete trashed tag links to scan-config trash id",
+    )
+    .await?;
+    execute_scan_config_write_sql(
+        tx,
+        scan_config_delete_trash_selector_sql(),
+        &[&trash_scan_config_internal_id],
+        "delete scan-config trash NVT selector for hard delete",
+    )
+    .await?;
+    execute_scan_config_write_sql(
+        tx,
+        scan_config_delete_trash_preferences_sql(),
+        &[&trash_scan_config_internal_id],
+        "delete scan-config trash preferences for hard delete",
+    )
+    .await?;
+    execute_scan_config_write_sql(
+        tx,
+        scan_config_delete_trash_metadata_sql(),
+        &[&trash_scan_config_internal_id],
+        "delete scan-config trash metadata for hard delete",
+    )
+    .await?;
+    Ok(())
 }
 
 pub(crate) async fn execute_scan_config_restore_transaction(
