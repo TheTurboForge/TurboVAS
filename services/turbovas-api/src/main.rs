@@ -3,6 +3,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 mod alert_payloads;
+mod alert_write_db;
+mod alert_write_sql;
+mod alert_write_validation;
+mod alert_writes;
 mod alerts;
 mod app_state;
 mod auth;
@@ -151,6 +155,8 @@ async fn main() -> Result<(), ApiError> {
 
 #[cfg(test)]
 mod alert_write_characterization_tests;
+#[cfg(test)]
+mod alert_writes_tests;
 #[cfg(test)]
 mod asset_detail_contract_tests;
 #[cfg(test)]

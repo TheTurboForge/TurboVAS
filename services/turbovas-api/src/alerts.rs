@@ -181,8 +181,15 @@ pub(crate) async fn alert_asset_detail(
     State(state): State<AppState>,
     Path(alert_id): Path<String>,
 ) -> Result<Json<AlertAssetItem>, ApiError> {
-    let alert_id = parse_uuid(&alert_id)?.to_string();
     let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    Ok(Json(load_alert_asset_detail(&client, &alert_id).await?))
+}
+
+pub(crate) async fn load_alert_asset_detail(
+    client: &tokio_postgres::Client,
+    alert_id: &str,
+) -> Result<AlertAssetItem, ApiError> {
+    let alert_id = parse_uuid(alert_id)?.to_string();
     let row = client
         .query_opt(alert_asset_detail_sql(), &[&alert_id])
         .await
@@ -207,5 +214,5 @@ pub(crate) async fn alert_asset_detail(
         .collect();
     let mut item = alert_asset_from_row(&row);
     item.tasks = tasks;
-    Ok(Json(item))
+    Ok(item)
 }

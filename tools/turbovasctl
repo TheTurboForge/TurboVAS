@@ -489,6 +489,7 @@ OPENAPI_ALLOWED_REPLACES_VALUES = frozenset(
     {
         "alert-metadata-list-read",
         "alert-metadata-detail-read",
+        "alert-metadata-modify",
         "cert-bund-advisory-catalog-detail-read",
         "cert-bund-advisory-list-read",
         "credential-redacted-metadata-detail-read",
@@ -643,6 +644,7 @@ OPENAPI_ALLOWED_MIGRATION_METADATA_VALUES = {
 OPENAPI_REQUIRED_EXPOSURE = {
     ("get", "/alerts"): "direct-read",
     ("get", "/alerts/{alert_id}"): "direct-read",
+    ("patch", "/alerts/{alert_id}"): "direct-write",
     ("get", "/cert-bund-advisories"): "direct-read",
     ("get", "/cert-bund-advisories/{cert_bund_advisory_id}"): "direct-read",
     ("get", "/cpes"): "direct-read",
@@ -742,6 +744,15 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-inherited-still-owns": "alert-detail-delivery-control",
         "x-turbovas-maturity": "live-read",
         "x-turbovas-replaces": "alert-metadata-detail-read",
+    },
+    ("patch", "/alerts/{alert_id}"): {
+        "x-turbovas-inherited-still-owns": "alert-detail-delivery-control",
+        "x-turbovas-maturity": "live-write",
+        "x-turbovas-operator-identity": "direct-token-operator",
+        "x-turbovas-owner-semantics": "preserve-existing-owner",
+        "x-turbovas-replaces": "alert-metadata-modify",
+        "x-turbovas-safety-contract": "write-control-v1",
+        "x-turbovas-side-effect": "metadata-write",
     },
     ("get", "/feeds"): {
         "x-turbovas-inherited-still-owns": "feed-sync-import-control",
@@ -2770,7 +2781,7 @@ def native_tooling_residue(relative_path: str, category: str) -> tuple[str, str]
     if relative_path == "components/gsa/src/gmp/http/http.ts":
         return "gsa-session-http-transport", "GSA still needs inherited session/transport plumbing for retained GMP workflows."
     if name == "alert.ts":
-        return "alert-delivery-and-credentials", "Alert detail, delivery payloads, tests, credentials, and writes remain inherited."
+        return "alert-delivery-and-credentials", "Alert delivery payloads, tests, credentials, and broad alert control remain inherited; native direct write-control covers name/comment metadata only."
     if name in {"credential-store.ts", "scanner.ts"}:
         return "scanner-control-or-credential", "Scanner and credential surfaces remain inherited until control/secret handling is designed."
     if name == "task.ts":
@@ -6846,7 +6857,7 @@ def summarize_native_tooling(items: list[dict[str, Any]], repo_root: Path | None
                 "notes": [
                     "Metadata list only; alert delivery and payload detail remain inherited.",
                     "Alert method delivery values and event/condition payload data remain redacted or absent.",
-                    "No alert writes, test delivery, credentials, URLs, hosts, paths, email/message bodies, or certificate data.",
+                    "No alert active state, delivery/test, credentials, URLs, hosts, paths, email/message bodies, or certificate data.",
                 ],
             },
             {
@@ -6856,7 +6867,17 @@ def summarize_native_tooling(items: list[dict[str, Any]], repo_root: Path | None
                 "notes": [
                     "Redacted metadata detail only; alert delivery and payload detail remain inherited.",
                     "Task references are id/name metadata only.",
-                    "No alert writes, test delivery, credentials, URLs, hosts, paths, email/message bodies, or certificate data.",
+                    "No alert active state, delivery/test, credentials, URLs, hosts, paths, email/message bodies, or certificate data.",
+                ],
+            },
+            {
+                "method": "patch",
+                "endpoint": "/api/v1/alerts/{alert_id}",
+                "status": "implemented_direct_write_control",
+                "direct_access": "direct_write_control",
+                "replacement_candidates": ["direct native alert name/comment metadata modification"],
+                "notes": [
+                    "Metadata write only; alert active state, event/condition/method data, delivery payloads, credentials, destinations, task links, export, test, create, clone, restore, and delete remain inherited.",
                 ],
             },
             {
@@ -12294,6 +12315,7 @@ def direct_smoke_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
             "native-api-direct.tag-resource-remove",
             "native-api-direct.tag-resource-in-use-after-remove",
             "native-api-direct.alert-fixture",
+            "native-api-direct.alert-write-update",
             "native-api-direct.alert-tag-write-create",
             "native-api-direct.alert-tag-resource-add",
             "native-api-direct.alert-tag-resource-in-use-after-add",
@@ -13289,6 +13311,17 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
             findings.append(alert_fixture_finding)
 
             if alert_resource_id:
+                alert_patch_body = json.dumps(
+                    {
+                        "comment": "TurboVAS direct write smoke updated temporary alert comment"
+                    },
+                    separators=(",", ":"),
+                )
+                alert_patch = direct_native_api_curl(repo_root, f"/api/v1/alerts/{urllib.parse.quote(alert_resource_id)}", token=token, env=env, method="PATCH", body=alert_patch_body, extra_headers=content_type)
+                alert_patch_json, alert_patch_status = parse_json_output_with_http_status(alert_patch)
+                alert_patch_ok = alert_patch.returncode == 0 and alert_patch_status == 200 and isinstance(alert_patch_json, dict) and alert_patch_json.get("id") == alert_resource_id and alert_patch_json.get("comment") == "TurboVAS direct write smoke updated temporary alert comment"
+                findings.append(native_api_probe_finding("pass" if alert_patch_ok else "fail", "native-api-direct.alert-write-update", "Direct write-control patched temporary alert metadata." if alert_patch_ok else "Direct write-control failed to patch temporary alert metadata.", alert_patch, direct_native_api_display_command(f"/api/v1/alerts/{urllib.parse.quote(alert_resource_id)}", token=token, env=env, method="PATCH", body=alert_patch_body, extra_headers=content_type), alert_patch_json, {"http_status": alert_patch_status, "alert_id": alert_resource_id, **summarize_native_api_response(alert_patch_json)}))
+
                 alert_tag_create_body = json.dumps(
                     {
                         "name": alert_tag_name,

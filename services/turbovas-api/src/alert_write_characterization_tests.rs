@@ -308,7 +308,7 @@ fn python_gvm_still_exposes_alert_mutation_and_test_requests() {
 }
 
 #[test]
-fn native_alert_delivery_and_mutation_routes_remain_closed() {
+fn native_alert_delivery_and_broad_mutation_routes_remain_closed() {
     for path in [
         "/api/v1/alerts",
         "/api/v1/alerts/12345678-1234-1234-1234-123456789abc",
@@ -321,13 +321,33 @@ fn native_alert_delivery_and_mutation_routes_remain_closed() {
             direct_api_v1_method_is_allowed(&Method::GET, path, false),
             "alert read path must allow GET without write control: {path}"
         );
-        for method in [Method::POST, Method::PUT, Method::PATCH, Method::DELETE] {
+        for method in [Method::POST, Method::PUT, Method::DELETE] {
             assert!(
                 !direct_api_v1_method_is_allowed(&method, path, true),
                 "alert native mutation must remain closed for {method} {path}"
             );
         }
     }
+    assert!(
+        !direct_api_v1_method_is_allowed(&Method::PATCH, "/api/v1/alerts", true),
+        "alert collection PATCH must remain closed"
+    );
+    assert!(
+        !direct_api_v1_method_is_allowed(
+            &Method::PATCH,
+            "/api/v1/alerts/12345678-1234-1234-1234-123456789abc",
+            false
+        ),
+        "alert metadata PATCH must require direct write-control"
+    );
+    assert!(
+        direct_api_v1_method_is_allowed(
+            &Method::PATCH,
+            "/api/v1/alerts/12345678-1234-1234-1234-123456789abc",
+            true
+        ),
+        "alert metadata PATCH must be allowed when direct write-control is enabled"
+    );
 
     for path in [
         "/api/v1/alerts/12345678-1234-1234-1234-123456789abc/test",
@@ -345,9 +365,17 @@ fn native_alert_delivery_and_mutation_routes_remain_closed() {
         );
     }
 
-    for (path, replaces) in [
-        ("/alerts", "alert-metadata-list-read"),
-        ("/alerts/{alert_id}", "alert-metadata-detail-read"),
+    for (path, replaces, forbidden_methods) in [
+        (
+            "/alerts",
+            "alert-metadata-list-read",
+            ["    post:", "    put:", "    patch:", "    delete:"].as_slice(),
+        ),
+        (
+            "/alerts/{alert_id}",
+            "alert-metadata-detail-read",
+            ["    post:", "    put:", "    delete:"].as_slice(),
+        ),
     ] {
         let block = openapi_path_block(path);
         for required in [
@@ -358,11 +386,26 @@ fn native_alert_delivery_and_mutation_routes_remain_closed() {
         ] {
             assert!(block.contains(required), "{path} missing {required}");
         }
-        for forbidden in ["    post:", "    put:", "    patch:", "    delete:"] {
+        for forbidden in forbidden_methods {
             assert!(
                 !block.contains(forbidden),
                 "{path} must not declare alert mutation method {forbidden}"
             );
         }
+    }
+    let detail = openapi_path_block("/alerts/{alert_id}");
+    for required in [
+        "    patch:",
+        "operationId: patchAlertsByAlertId",
+        "x-turbovas-exposure: direct-write",
+        "x-turbovas-replaces: alert-metadata-modify",
+        "x-turbovas-safety-contract: write-control-v1",
+        "AlertPatchRequest",
+        "event/condition/method data, delivery payloads, credentials, destinations, task links, export, test, create, clone, restore, and delete remain on inherited compatibility paths",
+    ] {
+        assert!(
+            detail.contains(required),
+            "/alerts/{{alert_id}} missing {required}"
+        );
     }
 }

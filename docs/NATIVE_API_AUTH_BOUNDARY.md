@@ -102,8 +102,9 @@ script/curl -> opt-in direct bearer listener -> turbovas-api -> PostgreSQL
   `/api/v1/feeds` is allowed only as a classified scriptable read endpoint.
 - Read-only tag-dialog resource-name lookups, including alert, are also
   allowlisted scriptable reads. They expose only id/type/name lookup data;
-  alert delivery, method/event/condition payloads, and alert mutations remain
-  inherited.
+  alert name/comment metadata PATCH is direct write-control, while alert
+  delivery, method/event/condition payloads, active state, task links,
+  credentials, export/test actions, and broad mutations remain inherited.
 - Do not expose arbitrary GMP command forwarding through `/api/v1`.
 - Treat `X-Request-Id` as correlation metadata only. It is not authentication,
   authorization, operator identity, or a trusted audit principal.
