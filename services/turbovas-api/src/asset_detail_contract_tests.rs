@@ -596,13 +596,18 @@ fn scan_config_detail_contract_excludes_preferences_and_secret_material() {
     let detail_source = source
         .split_once("pub(crate) async fn scan_config_asset_detail")
         .expect("scan config detail handler must exist")
-        .1
-        .split_once("pub(crate) async fn scan_config_asset_families")
-        .expect("scan config detail handler must precede family endpoint")
-        .0;
+        .1;
+    let routes = include_str!("routes.rs");
+    let detail_route = routes
+        .find("get(scan_config_asset_detail)")
+        .expect("scan config detail route must exist");
+    let family_route = routes
+        .find("get(scan_config_asset_families)")
+        .expect("scan config family route must exist");
 
     assert!(detail_source.contains("scan_config_task_references"));
     assert!(detail_source.contains("scan_config_user_tags"));
+    assert!(detail_route < family_route);
     assert!(!detail_source.contains("preferences"));
     assert!(!detail_source.contains("nvt_selector"));
     assert!(!detail_source.contains("credential"));

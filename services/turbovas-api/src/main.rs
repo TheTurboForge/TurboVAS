@@ -80,6 +80,7 @@ mod result_payloads;
 mod routes;
 mod row_helpers;
 mod runtime;
+mod scan_config_families;
 mod scan_config_payloads;
 mod scan_config_write_db;
 mod scan_config_write_sql;

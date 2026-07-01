@@ -46,6 +46,7 @@ use crate::{
     report_tls_certificates::report_tls_certificates,
     request_shapes::MAX_DIRECT_API_WRITE_BODY_BYTES,
     result_payloads::*,
+    scan_config_families::scan_config_asset_families,
     scan_config_writes::patch_scan_config,
     scan_configs::*,
     scanner_assets::*,
