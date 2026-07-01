@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::{
-    report_cve_query_sql::report_cves_sql, report_payloads::raw_report_sql,
-    report_port_query_sql::report_ports_sql,
+    report_cve_query_sql::report_cves_sql, report_error_query_sql::report_errors_sql,
+    report_payloads::raw_report_sql, report_port_query_sql::report_ports_sql,
     report_tls_certificate_query_sql::report_tls_certificates_sql,
 };
 
@@ -22,6 +22,32 @@ fn raw_report_payload_exposes_report_progress_without_control_paths() {
         assert!(
             !upper_sql.contains(forbidden),
             "raw report read SQL must not include control/mutation path: {forbidden}"
+        );
+    }
+}
+
+#[test]
+fn raw_report_error_sql_is_report_scoped_error_message_read_only() {
+    let sql = report_errors_sql("created_at_unix DESC");
+    let upper_sql = sql.to_ascii_uppercase();
+
+    for required in [
+        "SELECT id, uuid FROM reports WHERE lower(uuid) = lower($1)",
+        "JOIN results r ON r.report = sr.id",
+        "WHERE (r.type = 'Error Message' OR coalesce(r.severity, 0) = -3)",
+        "AND coalesce(nullif(r.host, ''), r.hostname, '') <> ''",
+        "count(*) OVER()::bigint AS total",
+        "ORDER BY created_at_unix DESC, id ASC LIMIT $3 OFFSET $4",
+    ] {
+        assert!(
+            sql.contains(required),
+            "raw report error SQL missing {required}"
+        );
+    }
+    for forbidden in ["INSERT ", "UPDATE ", "DELETE ", "START_TASK", "STOP_TASK"] {
+        assert!(
+            !upper_sql.contains(forbidden),
+            "raw report error SQL must not include control/mutation path: {forbidden}"
         );
     }
 }

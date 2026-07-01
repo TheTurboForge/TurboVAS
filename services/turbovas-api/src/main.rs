@@ -81,6 +81,7 @@ mod report_config_writes;
 mod report_configs;
 mod report_cve_query_sql;
 mod report_cves;
+mod report_error_query_sql;
 mod report_errors;
 mod report_evidence_payloads;
 mod report_format_payloads;
