@@ -141,6 +141,10 @@ pub(crate) fn native_api_router() -> Router<AppState> {
         )
         .route("/api/v1/filters", get(filter_assets))
         .route("/api/v1/filters/:filter_id", get(filter_asset_detail))
+        .route(
+            "/api/v1/filters/:filter_id/export",
+            get(export_filter_metadata),
+        )
         .route("/api/v1/feeds", get(feeds))
         .route("/api/v1/alerts", get(alert_assets))
         .route("/api/v1/alerts/:alert_id", get(alert_asset_detail))

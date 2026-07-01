@@ -1018,6 +1018,39 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
+  /filters/{filter_id}/export:
+    get:
+      operationId: getFiltersByFilterIdExport
+      x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: saved-filter-metadata-export-read
+      x-turbovas-inherited-still-owns: saved-filter-export-and-alert-linkage
+      summary: Export saved-filter metadata
+      description: Read-only metadata export for one live saved filter, backed by the same PostgreSQL loader as saved-filter detail. This endpoint returns the native JSON metadata payload only; inherited compatibility paths still own XML/file export, bulk export, and alert-linkage semantics.
+      parameters:
+        - $ref: '#/components/parameters/FilterId'
+      responses:
+        '200':
+          description: Saved-filter metadata export
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilterAsset'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '413':
+          $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /filters/{filter_id}/clone:
     post:
       operationId: postFiltersByFilterIdClone

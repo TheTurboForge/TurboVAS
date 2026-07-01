@@ -105,6 +105,14 @@ pub(crate) async fn filter_asset_detail(
     Ok(Json(load_filter_asset_detail(&client, &filter_id).await?))
 }
 
+pub(crate) async fn export_filter_metadata(
+    State(state): State<AppState>,
+    Path(filter_id): Path<String>,
+) -> Result<Json<FilterAssetItem>, ApiError> {
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    Ok(Json(load_filter_asset_detail(&client, &filter_id).await?))
+}
+
 pub(crate) async fn load_filter_asset_detail(
     client: &Client,
     filter_id: &str,
