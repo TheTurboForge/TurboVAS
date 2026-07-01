@@ -1,9 +1,11 @@
 /* SPDX-FileCopyrightText: 2026 Robert Pelfrey <Robert@Pelfrey.de>
+ * TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
 import CollectionCounts from 'gmp/collection/collection-counts';
+import Response from 'gmp/http/response';
 import type {UrlParams} from 'gmp/http/utils';
 import CertBundAdv from 'gmp/models/cert-bund';
 import type Filter from 'gmp/models/filter';
@@ -233,4 +235,16 @@ export const fetchNativeCertBundAdvisory = async (
   return {
     certbund: nativeCertBundAdvisoryToModel(payload, {detail: true}),
   };
+};
+
+export const exportNativeCertBundAdvisoryMetadata = async (
+  gmp: NativeApiGmp,
+  id: string,
+): Promise<Response<string>> => {
+  const payload = await fetchNativeJson<NativeCertBundAdvisoryPayload>(
+    gmp,
+    `api/v1/cert-bund-advisories/${encodeURIComponent(id)}/export`,
+    {token: gmp.session.token},
+  );
+  return new Response(`${JSON.stringify(payload, null, 2)}\n`);
 };

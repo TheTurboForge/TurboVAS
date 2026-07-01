@@ -255,8 +255,10 @@ native_api_path_is_allowed (const gchar *path)
   const gchar *cve_export_suffix = "/export";
   const gchar *cert_bund_advisories_path = "/api/v1/cert-bund-advisories";
   const gchar *cert_bund_advisory_prefix = "/api/v1/cert-bund-advisories/";
+  const gchar *cert_bund_advisory_export_suffix = "/export";
   const gchar *dfn_cert_advisories_path = "/api/v1/dfn-cert-advisories";
   const gchar *dfn_cert_advisory_prefix = "/api/v1/dfn-cert-advisories/";
+  const gchar *dfn_cert_advisory_export_suffix = "/export";
   const gchar *nvts_path = "/api/v1/nvts";
   const gchar *nvt_prefix = "/api/v1/nvts/";
   const gchar *nvt_export_suffix = "/export";
@@ -382,6 +384,10 @@ native_api_path_is_allowed (const gchar *path)
   if (g_str_has_prefix (path, cert_bund_advisory_prefix))
     {
       const gchar *id = path + strlen (cert_bund_advisory_prefix);
+      if (g_str_has_suffix (id, cert_bund_advisory_export_suffix))
+        return is_advisory_id_segment (id,
+                                       strlen (id)
+                                       - strlen (cert_bund_advisory_export_suffix));
       return is_advisory_id_segment (id, strlen (id));
     }
 
@@ -391,6 +397,10 @@ native_api_path_is_allowed (const gchar *path)
   if (g_str_has_prefix (path, dfn_cert_advisory_prefix))
     {
       const gchar *id = path + strlen (dfn_cert_advisory_prefix);
+      if (g_str_has_suffix (id, dfn_cert_advisory_export_suffix))
+        return is_advisory_id_segment (id,
+                                       strlen (id)
+                                       - strlen (dfn_cert_advisory_export_suffix));
       return is_advisory_id_segment (id, strlen (id));
     }
 

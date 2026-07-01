@@ -4729,6 +4729,8 @@ class TurboVASCtlTests(unittest.TestCase):
 
         self.assertIn('GSA CVE detail metadata export', native_tooling)
         self.assertIn('GSA NVT detail metadata export', native_tooling)
+        self.assertIn('GSA CERT-Bund advisory metadata export', native_tooling)
+        self.assertIn('GSA DFN-CERT advisory metadata export', native_tooling)
 
         expected_asset_metadata = [
             (operating_systems, "getOperatingSystems", "operating-system-asset-list-read", "operating-system-writes-deletes-and-rich-history"),

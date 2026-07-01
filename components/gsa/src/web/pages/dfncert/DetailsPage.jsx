@@ -1,9 +1,11 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
 import React from 'react';
+import {exportNativeDfnCertAdvisoryMetadata} from 'gmp/native-api/dfn-cert-advisories';
 import {isDefined} from 'gmp/utils/identity';
 import {DfnCertAdvIcon} from 'web/components/icon';
 import ExportIcon from 'web/components/icon/ExportIcon';
@@ -28,6 +30,7 @@ import EntityComponent from 'web/entity/EntityComponent';
 import EntityPage from 'web/entity/EntityPage';
 import EntityTags from 'web/entity/Tags';
 import withEntityContainer from 'web/entity/withEntityContainer';
+import useGmp from 'web/hooks/useGmp';
 import useTranslation from 'web/hooks/useTranslation';
 import DfnCertAdvDetails from 'web/pages/dfncert/Details';
 import {selector, loadEntity} from 'web/store/entities/dfncerts';
@@ -114,10 +117,20 @@ const DfnCertAdvPage = ({
 
   ...props
 }) => {
+  const gmp = useGmp();
   const [_] = useTranslation();
+  const canUseNativeApi = typeof gmp?.buildUrl === 'function';
+  const exportDfnCertAdvisory = advisory => {
+    if (canUseNativeApi) {
+      return exportNativeDfnCertAdvisoryMetadata(gmp, advisory.id);
+    }
+    return gmp.dfncert.export(advisory);
+  };
 
   return (
     <EntityComponent
+      download={exportDfnCertAdvisory}
+      downloadOptions={canUseNativeApi ? {extension: 'json'} : undefined}
       name="dfncert"
       onDownloadError={onError}
       onDownloaded={onDownloaded}

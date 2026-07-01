@@ -1,9 +1,11 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
 import React from 'react';
+import {exportNativeCertBundAdvisoryMetadata} from 'gmp/native-api/cert-bund-advisories';
 import DateTime from 'web/components/date/DateTime';
 import {CertBundAdvIcon} from 'web/components/icon';
 import ExportIcon from 'web/components/icon/ExportIcon';
@@ -34,6 +36,7 @@ import EntityComponent from 'web/entity/EntityComponent';
 import EntityPage from 'web/entity/EntityPage';
 import EntityTags from 'web/entity/Tags';
 import withEntityContainer from 'web/entity/withEntityContainer';
+import useGmp from 'web/hooks/useGmp';
 import useTranslation from 'web/hooks/useTranslation';
 import CertBundAdvDetails from 'web/pages/certbund/Details';
 import {selector, loadEntity} from 'web/store/entities/certbund';
@@ -175,10 +178,20 @@ const CertBundAdvPage = ({
 
   ...props
 }) => {
+  const gmp = useGmp();
   const [_] = useTranslation();
+  const canUseNativeApi = typeof gmp?.buildUrl === 'function';
+  const exportCertBundAdvisory = advisory => {
+    if (canUseNativeApi) {
+      return exportNativeCertBundAdvisoryMetadata(gmp, advisory.id);
+    }
+    return gmp.certbund.export(advisory);
+  };
 
   return (
     <EntityComponent
+      download={exportCertBundAdvisory}
+      downloadOptions={canUseNativeApi ? {extension: 'json'} : undefined}
       name="certbund"
       onDownloadError={onError}
       onDownloaded={onDownloaded}
