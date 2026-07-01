@@ -43,6 +43,15 @@ fn patch_request_with_term_type(
 }
 
 #[test]
+fn filter_write_rejects_operator_owner_mismatch() {
+    assert!(ensure_filter_owner_matches_operator(7, 7).is_ok());
+    assert!(matches!(
+        ensure_filter_owner_matches_operator(7, 8),
+        Err(ApiError::Forbidden)
+    ));
+}
+
+#[test]
 fn filter_clone_request_accepts_default_or_metadata_override() {
     let default =
         validate_filter_clone_request(clone_request(None, None)).expect("default clone metadata");
@@ -354,6 +363,9 @@ fn filter_patch_request_rejects_oversized_metadata_fields() {
 
 #[test]
 fn filter_patch_sql_updates_metadata_term_and_type_only() {
+    let state = filter_write_state_sql();
+    assert!(state.contains("owner::integer"));
+
     let sql = filter_update_metadata_sql();
     assert!(sql.contains("UPDATE filters"));
     assert!(sql.contains("name = coalesce($2, name)"));

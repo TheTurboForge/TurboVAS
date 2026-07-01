@@ -81,7 +81,8 @@ pub(crate) fn filter_delete_metadata_sql() -> &'static str {
 }
 
 pub(crate) fn filter_write_state_sql() -> &'static str {
-    "SELECT id::integer
+    "SELECT id::integer,
+            owner::integer
        FROM filters
       WHERE uuid = $1;"
 }

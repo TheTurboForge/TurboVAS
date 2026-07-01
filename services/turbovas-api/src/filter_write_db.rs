@@ -27,6 +27,7 @@ pub(crate) struct FilterTrashWriteRecord {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FilterWriteState {
     pub(crate) internal_id: i32,
+    pub(crate) owner_id: i32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -71,8 +72,25 @@ pub(crate) async fn load_filter_write_state(
         .map_err(|error| map_filter_write_db_error(error, "load filter write state"))?
         .map(|row| FilterWriteState {
             internal_id: row.get(0),
+            owner_id: row.get(1),
         })
         .ok_or(ApiError::NotFound)
+}
+
+pub(crate) fn ensure_filter_owner_matches_operator(
+    filter_owner_id: i32,
+    operator_owner_id: i32,
+) -> Result<(), ApiError> {
+    if filter_owner_id == operator_owner_id {
+        Ok(())
+    } else {
+        tracing::warn!(
+            filter_owner_id,
+            operator_owner_id,
+            "direct API filter write owner mismatch"
+        );
+        Err(ApiError::Forbidden)
+    }
 }
 
 pub(crate) async fn load_filter_trash_state(
