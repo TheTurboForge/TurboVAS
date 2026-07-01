@@ -216,6 +216,7 @@ pub(crate) fn native_api_router() -> Router<AppState> {
         .route("/api/v1/scopes/:scope_id", get(scope_detail))
         .route("/api/v1/targets", get(targets))
         .route("/api/v1/targets/:target_id", get(target_detail))
+        .route("/api/v1/targets/:target_id/export", get(target_export))
         .route("/api/v1/tasks", get(tasks))
         .route("/api/v1/tasks/:task_id", get(task_detail))
         .route("/api/v1/scope-reports", get(scope_reports))

@@ -360,7 +360,6 @@ fn native_target_broad_mutation_routes_remain_closed() {
     );
 
     for (method, path) in [
-        (&Method::POST, "/api/v1/targets"),
         (&Method::DELETE, "/api/v1/targets"),
         (
             &Method::PATCH,
@@ -425,7 +424,7 @@ fn native_target_broad_mutation_routes_remain_closed() {
             "{path} OpenAPI block must keep {replacement}"
         );
         assert!(block.contains(
-            "x-turbovas-inherited-still-owns: target-create-export-credential-link-and-secret-mutation"
+            "x-turbovas-inherited-still-owns: target-export-credential-link-and-secret-mutation"
         ));
     }
     let detail = openapi_path_block("/targets/{target_id}");

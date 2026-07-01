@@ -3868,7 +3868,7 @@ paths:
       x-turbovas-replaces: target-list-read
       x-turbovas-inherited-still-owns: target-export-credential-link-and-secret-mutation
       summary: List scan targets
-      description: Read-only target metadata backed by gvmd/PostgreSQL. Native direct write-control can create operator-owned target metadata with explicit safe scan inputs, patch target name/comment metadata and bounded scan inputs, clone an owned target with existing credential references, move an unscoped target to trash, restore it, and hard-delete trash metadata. Credential-link mutation, task/control semantics, export, and credential secret material remain inherited.
+      description: Read-only target metadata backed by gvmd/PostgreSQL. Native direct write-control can create operator-owned target metadata with explicit safe scan inputs, patch target name/comment metadata and bounded scan inputs, clone an owned target with existing credential references, move an unscoped target to trash, restore it, and hard-delete trash metadata. Credential-link mutation, task/control semantics, file export, and credential secret material remain inherited.
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
@@ -3905,7 +3905,7 @@ paths:
       x-turbovas-safety-contract: write-control-v1
       x-turbovas-side-effect: metadata-write
       summary: Create target metadata and bounded scan inputs
-      description: Direct write-control endpoint for creating an operator-owned target with name, comment, existing port-list reference, simple explicit host lists, alive-test bitfield, reverse-DNS flags, and simultaneous-IP behavior only. CIDR/range host grammar, inline port-list creation, credential-link mutation, task/control semantics, export, and credential secret material remain inherited.
+      description: Direct write-control endpoint for creating an operator-owned target with name, comment, existing port-list reference, simple explicit host lists, alive-test bitfield, reverse-DNS flags, and simultaneous-IP behavior only. CIDR/range host grammar, inline port-list creation, credential-link mutation, task/control semantics, file export, and credential secret material remain inherited.
       requestBody:
         required: true
         content:
@@ -3951,7 +3951,7 @@ paths:
       x-turbovas-replaces: target-detail-summary-read
       x-turbovas-inherited-still-owns: target-export-credential-link-and-secret-mutation
       summary: Read one scan target summary
-      description: Read-only target metadata backed by gvmd/PostgreSQL. Detail includes safe credential references already visible in the inherited UI. Native direct write-control can create operator-owned target metadata, patch target name/comment metadata plus bounded scan inputs, including simple explicit host lists, clone an owned target with existing credential references, move an unscoped target to trash, restore it, and hard-delete trash metadata. Credential-link mutation, task/control semantics, export, and credential secret material remain inherited.
+      description: Read-only target metadata backed by gvmd/PostgreSQL. Detail includes safe credential references already visible in the inherited UI. Native direct write-control can create operator-owned target metadata, patch target name/comment metadata plus bounded scan inputs, including simple explicit host lists, clone an owned target with existing credential references, move an unscoped target to trash, restore it, and hard-delete trash metadata. Credential-link mutation, task/control semantics, file export, and credential secret material remain inherited.
       parameters:
         - $ref: '#/components/parameters/TargetId'
       responses:
@@ -3987,7 +3987,7 @@ paths:
       x-turbovas-safety-contract: write-control-v1
       x-turbovas-side-effect: metadata-write
       summary: Update target metadata and bounded scan inputs
-      description: Direct write-control endpoint for updating target name, comment, port-list reference, simple explicit host lists, alive-test bitfield, reverse-DNS flags, and simultaneous-IP behavior only. Host-list, port-list, reverse-DNS, and simultaneous-IP changes are rejected while the target is referenced by live tasks, matching inherited safety semantics. CIDR/range host grammar, credential-link mutation, task/control semantics, export, and credential secret material remain inherited.
+      description: Direct write-control endpoint for updating target name, comment, port-list reference, simple explicit host lists, alive-test bitfield, reverse-DNS flags, and simultaneous-IP behavior only. Host-list, port-list, reverse-DNS, and simultaneous-IP changes are rejected while the target is referenced by live tasks, matching inherited safety semantics. CIDR/range host grammar, credential-link mutation, task/control semantics, file export, and credential secret material remain inherited.
       parameters:
         - $ref: '#/components/parameters/TargetId'
       requestBody:
@@ -4049,6 +4049,39 @@ paths:
           $ref: '#/components/responses/MethodNotAllowed'
         '409':
           $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /targets/{target_id}/export:
+    get:
+      operationId: getTargetsByTargetIdExport
+      x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: target-metadata-export-read
+      x-turbovas-inherited-still-owns: target-export-credential-link-and-secret-mutation
+      summary: Export scan target metadata
+      description: Scriptable metadata export for one target, backed by the same redacted target detail payload. Credential references include id/name/type/port only; credential secret material, credential-link mutation, task/control semantics, and inherited file-export formats remain outside this endpoint.
+      parameters:
+        - $ref: '#/components/parameters/TargetId'
+      responses:
+        '200':
+          description: Target metadata export
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Target'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
         '429':

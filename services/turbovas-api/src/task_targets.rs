@@ -2,5 +2,5 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-pub(crate) use crate::target_handlers::{target_detail, targets};
+pub(crate) use crate::target_handlers::{target_detail, target_export, targets};
 pub(crate) use crate::task_handlers::{task_detail, tasks};
