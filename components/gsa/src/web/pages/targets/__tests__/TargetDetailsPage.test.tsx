@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import {describe, test, expect, testing} from '@gsa/testing';
+import {afterEach, describe, test, expect, testing} from '@gsa/testing';
 import {rendererWith, fireEvent, screen, wait} from 'web/testing';
 import CollectionCounts from 'gmp/collection/collection-counts';
 import Filter from 'gmp/models/filter';
@@ -66,7 +66,12 @@ const target = Target.fromElement({
   },
 });
 
-const createGmp = (settings = {}) => ({
+const createGmp = ({
+  buildUrl = undefined,
+  exportTarget = testing.fn().mockResolvedValue({foo: 'bar'}),
+  ...settings
+}: any = {}) => ({
+  buildUrl,
   target: {
     get: testing.fn().mockResolvedValue({
       data: target,
@@ -77,9 +82,7 @@ const createGmp = (settings = {}) => ({
     delete: testing.fn().mockResolvedValue({
       foo: 'bar',
     }),
-    export: testing.fn().mockResolvedValue({
-      foo: 'bar',
-    }),
+    export: exportTarget,
   },
   permissions: {
     get: testing.fn().mockResolvedValue({
@@ -95,12 +98,20 @@ const createGmp = (settings = {}) => ({
     reloadInterval: -1,
     ...settings,
   },
-  session: createSession({timezone: 'CET'}),
+  session: {
+    ...createSession({timezone: 'CET'}),
+    token: 'test-token',
+    jwt: 'jwt-token',
+  },
   user: {
     currentSettings: testing
       .fn()
       .mockResolvedValue(currentSettingsDefaultResponse),
   },
+});
+
+afterEach(() => {
+  testing.unstubAllGlobals();
 });
 
 describe('TargetDetailsPage tests', () => {
@@ -297,5 +308,55 @@ describe('TargetDetailsPage tests', () => {
     const deleteIcon = screen.getByTitle('Move Target to trashcan');
     fireEvent.click(deleteIcon);
     expect(gmp.target.delete).toHaveBeenCalledWith({id: target.id});
+  });
+
+  test('should use native metadata export for downloads', async () => {
+    const nativePayload = {
+      id: target.id,
+      name: 'target 1',
+      hosts: ['127.0.0.1'],
+      credentials: {
+        ssh: {
+          id: '1235',
+          name: 'ssh',
+          port: 22,
+        },
+      },
+    };
+    const fetchMock = testing.fn().mockResolvedValue({
+      json: testing.fn().mockResolvedValue(nativePayload),
+      ok: true,
+      status: 200,
+    });
+    testing.stubGlobal('fetch', fetchMock);
+    const exportTarget = testing.fn().mockResolvedValue({foo: 'bar'});
+    const buildUrl = testing.fn(
+      (path, _params) => `https://turbovas.example/${path}`,
+    );
+    const gmp = createGmp({buildUrl, exportTarget});
+    const {render, store} = rendererWith({
+      gmp,
+      capabilities: true,
+      router: true,
+      store: true,
+    });
+
+    store.dispatch(entityLoadingActions.success('46264', target));
+    render(<TargetDetailsPage id="46264" />);
+    await wait();
+
+    fetchMock.mockClear();
+    const exportIcon = screen.getByTitle('Export Target as XML');
+    fireEvent.click(exportIcon);
+    await expect.poll(() => fetchMock.mock.calls.length).toBe(1);
+
+    expect(exportTarget).not.toHaveBeenCalled();
+    expect(buildUrl).toHaveBeenCalledWith('api/v1/targets/46264/export', {
+      token: 'test-token',
+    });
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
+      'https://turbovas.example/api/v1/targets/46264/export',
+      expect.objectContaining({credentials: 'include'}),
+    );
   });
 });

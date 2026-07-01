@@ -10,6 +10,7 @@ import {
   type TargetExcludeSource,
   type TargetSource,
 } from 'gmp/commands/target';
+import {type EntityCommandParams} from 'gmp/commands/entity';
 import {
   type default as Credential,
   type CredentialType,
@@ -22,6 +23,7 @@ import {
   SCAN_CONFIG_DEFAULT,
 } from 'gmp/models/target';
 import {fetchNativePortLists} from 'gmp/native-api/port-lists';
+import {exportNativeTargetMetadata} from 'gmp/native-api/targets';
 import {first} from 'gmp/utils/array';
 import {isDefined} from 'gmp/utils/identity';
 import useEntityClone, {
@@ -91,6 +93,14 @@ export const TARGET_RESOURCE_PROPERTIES_NAMES = [
 
 const canUseNativeApi = (gmp: {buildUrl?: unknown}) =>
   typeof gmp?.buildUrl === 'function';
+
+const exportTarget = (gmp: any, target: EntityCommandParams) => {
+  if (canUseNativeApi(gmp)) {
+    return exportNativeTargetMetadata(gmp, target.id as string);
+  }
+  return gmp.target.export(target as Target);
+};
+
 const NATIVE_PORT_LIST_PAGE_SIZE = 1000;
 
 const TargetComponent = ({
@@ -419,7 +429,7 @@ const TargetComponent = ({
   };
 
   const handleEntityDownload = useEntityDownload<Target>(
-    entity => gmp.target.export(entity),
+    entity => exportTarget(gmp, entity),
     {
       onDownloaded,
       onDownloadError,
