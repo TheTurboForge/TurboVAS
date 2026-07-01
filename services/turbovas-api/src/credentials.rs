@@ -21,31 +21,76 @@ use crate::{
     errors::ApiError,
     path_ids::parse_uuid,
     query::{
-        ApiQuery, Collection, CollectionQuery, collection_total_with_empty_page_probe,
+        ApiQuery, Collection, CollectionQuery, collection_total_with_empty_page_probe_params,
         normalize_collection_query, sort_clause,
     },
 };
 
+#[derive(Debug, serde::Deserialize)]
+pub(crate) struct CredentialCollectionQuery {
+    page: Option<i64>,
+    page_size: Option<i64>,
+    sort: Option<String>,
+    filter: Option<String>,
+    filter_type: Option<String>,
+    active: Option<String>,
+    predefined: Option<String>,
+    resource_type: Option<String>,
+    text: Option<String>,
+    task_name: Option<String>,
+    value: Option<String>,
+    credential_type: Option<String>,
+}
+
+impl CredentialCollectionQuery {
+    fn collection_query(&self) -> CollectionQuery {
+        CollectionQuery {
+            page: self.page,
+            page_size: self.page_size,
+            sort: self.sort.clone(),
+            filter: self.filter.clone(),
+            filter_type: self.filter_type.clone(),
+            active: self.active.clone(),
+            predefined: self.predefined.clone(),
+            resource_type: self.resource_type.clone(),
+            text: self.text.clone(),
+            task_name: self.task_name.clone(),
+            value: self.value.clone(),
+        }
+    }
+}
+
 pub(crate) async fn credential_assets(
     State(state): State<AppState>,
-    ApiQuery(query): ApiQuery<CollectionQuery>,
+    ApiQuery(query): ApiQuery<CredentialCollectionQuery>,
 ) -> Result<Json<Collection<CredentialAssetItem>>, ApiError> {
-    let params = normalize_collection_query(query, CREDENTIAL_ASSET_DEFAULT_SORT)?;
+    let credential_type = query.credential_type.clone().unwrap_or_default();
+    let params =
+        normalize_collection_query(query.collection_query(), CREDENTIAL_ASSET_DEFAULT_SORT)?;
     let sort_sql = sort_clause(&params.sort, CREDENTIAL_ASSET_SORT_FIELDS)?;
     let sql = credential_assets_sql(&sort_sql);
     let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
     let rows = client
-        .query(&sql, &[&params.filter, &params.page_size, &params.offset])
+        .query(
+            &sql,
+            &[
+                &params.filter,
+                &params.page_size,
+                &params.offset,
+                &credential_type,
+            ],
+        )
         .await
         .map_err(|error| {
             tracing::warn!(%error, "credential asset list query failed");
             ApiError::Database
         })?;
-    let total = collection_total_with_empty_page_probe(
+    let total = collection_total_with_empty_page_probe_params(
         &client,
         &rows,
         &sql,
         &params,
+        &[&params.filter, &1_i64, &0_i64, &credential_type],
         "credential asset list",
     )
     .await?;

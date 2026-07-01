@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2026 Robert Pelfrey <Robert@Pelfrey.de>
+ * TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -58,6 +59,7 @@ export interface NativeCredentialsQuery {
   pageSize: number;
   sort: string;
   filter: string;
+  credentialType?: CredentialType;
 }
 
 export interface NativeCredentialsResponse {
@@ -74,6 +76,13 @@ const CREDENTIAL_SORT_FIELDS: Record<string, string> = {
   login: 'name',
   owner: 'owner',
   modified: 'modified',
+};
+
+const nativeCredentialTypeFromFilter = (
+  filter?: QueryFilter,
+): CredentialType | undefined => {
+  const value = filter?.get('type') ?? filter?.get('credential_type');
+  return typeof value === 'string' ? (value as CredentialType) : undefined;
 };
 
 const CREDENTIAL_PERMISSIONS = [
@@ -120,6 +129,7 @@ export const nativeCredentialsQueryFromFilter = (
     pageSize,
     sort: nativeSortFromFilter(filter),
     filter: nativeSearchFromFilter(filter),
+    credentialType: nativeCredentialTypeFromFilter(filter),
   };
 };
 
@@ -201,6 +211,7 @@ export const fetchNativeCredentials = async (
       page_size: query.pageSize,
       sort: query.sort,
       filter: query.filter,
+      ...(query.credentialType ? {credential_type: query.credentialType} : {}),
     },
   );
   const page = normalizePage(payload.page, query);

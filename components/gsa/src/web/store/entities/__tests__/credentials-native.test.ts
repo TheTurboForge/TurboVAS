@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2026 Robert Pelfrey <Robert@Pelfrey.de>
+ * TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -49,6 +50,7 @@ describe('native API credentials', () => {
       pageSize: 25,
       sort: 'name',
       filter: '',
+      credentialType: 'up',
     });
 
     const credential = response.credentials[0];
@@ -69,6 +71,7 @@ describe('native API credentials', () => {
       page_size: 25,
       sort: 'name',
       filter: '',
+      credential_type: 'up',
     });
     expect(fetchMock).toHaveBeenCalledWith(
       'https://turbovas.example/api/v1/credentials',

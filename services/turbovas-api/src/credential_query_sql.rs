@@ -30,6 +30,7 @@ pub(crate) fn credential_assets_sql(sort_sql: &str) -> String {
                      OR lower(comment) LIKE '%' || lower($1) || '%'
                      OR lower(owner_name) LIKE '%' || lower($1) || '%'
                      OR lower(credential_type) LIKE '%' || lower($1) || '%')
+                AND ($4 = '' OR credential_type = $4)
          )
          SELECT count(*) OVER()::bigint AS total, * FROM filtered
           ORDER BY {sort_sql}, name ASC, id ASC LIMIT $2 OFFSET $3;"#,

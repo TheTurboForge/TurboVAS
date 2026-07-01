@@ -34,6 +34,14 @@ fn openapi_path_block(path: &str) -> String {
 }
 
 #[test]
+fn credential_list_supports_exact_type_filter_without_secret_tables() {
+    let sql = credential_assets_sql("name ASC");
+    assert!(sql.contains("credential_type = $4"));
+    assert!(sql.contains("AND ($4 = '' OR credential_type = $4)"));
+    assert!(!sql.to_ascii_lowercase().contains("credentials_data"));
+}
+
+#[test]
 fn credential_native_reads_do_not_select_secret_data_tables_or_values() {
     let list_sql = credential_assets_sql("name ASC");
     for sql in [
@@ -63,6 +71,13 @@ fn credential_native_reads_do_not_select_secret_data_tables_or_values() {
             );
         }
     }
+}
+
+#[test]
+fn credential_openapi_documents_exact_type_filter() {
+    let block = openapi_path_block("/credentials");
+    assert!(block.contains("name: credential_type"));
+    assert!(block.contains("Optional exact credential type filter"));
 }
 
 #[test]

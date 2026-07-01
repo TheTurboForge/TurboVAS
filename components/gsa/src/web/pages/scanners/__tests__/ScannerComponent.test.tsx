@@ -1,9 +1,10 @@
 /* SPDX-FileCopyrightText: 2025 Greenbone AG
+ * TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import {describe, test, expect, testing} from '@gsa/testing';
+import {afterEach, describe, test, expect, testing} from '@gsa/testing';
 import {screen, fireEvent, rendererWith, wait} from 'web/testing';
 import Filter from 'gmp/models/filter';
 import Scanner, {
@@ -13,6 +14,10 @@ import Scanner, {
 import {createSession} from 'gmp/testing';
 import {currentSettingsDefaultResponse} from 'web/pages/__fixtures__/current-settings';
 import ScannerComponent from 'web/pages/scanners/ScannerComponent';
+
+afterEach(() => {
+  testing.unstubAllGlobals();
+});
 
 const createGmp = (object?: unknown) => {
   const gmp = {
@@ -62,6 +67,76 @@ describe('ScannerComponent tests', () => {
 
     expect(handleCloned).toHaveBeenCalledWith(scanner);
     expect(handleCloneError).not.toHaveBeenCalled();
+  });
+
+  test('should load scanner certificate credentials through native API when available', async () => {
+    const scanner = new Scanner({
+      id: '1234',
+      name: 'Test Scanner',
+      host: 'http://scanner-host',
+      port: 443,
+      scannerType: OPENVASD_SCANNER_TYPE,
+    });
+    const fetchMock = testing.fn().mockResolvedValue({
+      json: testing.fn().mockResolvedValue({
+        page: {page: 1, page_size: 500, total: 1, sort: 'name', filter: ''},
+        items: [
+          {
+            id: 'df6f4d9d-cd6a-4ed2-a9cd-22564fbb87b1',
+            name: 'Client Certificate',
+            owner: 'admin',
+            credential_type: 'cc',
+            allow_insecure: false,
+            target_count: 0,
+            scanner_count: 0,
+          },
+        ],
+      }),
+      ok: true,
+      status: 200,
+    });
+    testing.stubGlobal('fetch', fetchMock);
+    const gmp = createGmp({
+      buildUrl: testing.fn((path: string) => `https://turbovas.example/${path}`),
+      scanner: {
+        get: testing.fn().mockResolvedValue({data: scanner}),
+        save: testing.fn().mockResolvedValue(scanner),
+      },
+      credentials: {
+        getAll: testing.fn().mockResolvedValue([]),
+      },
+    });
+    const {render} = rendererWith({capabilities: true, gmp, store: true});
+    render(
+      <ScannerComponent>
+        {({edit}) => (
+          <button aria-label="edit" onClick={() => edit(scanner)}></button>
+        )}
+      </ScannerComponent>,
+    );
+
+    fireEvent.click(screen.getByRole('button', {name: 'edit'}));
+
+    await wait();
+
+    expect(gmp.credentials.getAll).not.toHaveBeenCalled();
+    expect(gmp.buildUrl).toHaveBeenCalledWith('api/v1/credentials', {
+      token: gmp.session.token,
+      page: 1,
+      page_size: 500,
+      sort: 'name',
+      filter: '',
+      credential_type: 'cc',
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://turbovas.example/api/v1/credentials',
+      {
+        credentials: 'include',
+        headers: {
+          Accept: 'application/json',
+        },
+      },
+    );
   });
 
   test('should handle error on cloning a scanner', async () => {

@@ -23,6 +23,7 @@ import {
   OPENVASD_SCANNER_TYPE,
   OPENVASD_SENSOR_SCANNER_TYPE,
 } from 'gmp/models/scanner';
+import {fetchNativeCredentials} from 'gmp/native-api/credentials';
 import {exportNativeScannerMetadata} from 'gmp/native-api/scanners';
 import {hasId} from 'gmp/utils/id';
 import {isDefined} from 'gmp/utils/identity';
@@ -80,6 +81,7 @@ interface ScannerComponentProps {
 }
 
 const MIME_TYPE_PEM = 'application/x-pem-file';
+const NATIVE_SCANNER_CREDENTIAL_PAGE_SIZE = 500;
 
 const canUseNativeApi = (gmp: {buildUrl?: unknown}) =>
   typeof gmp?.buildUrl === 'function';
@@ -89,6 +91,43 @@ const exportScanner = (gmp: any, scanner: EntityCommandParams) => {
     return exportNativeScannerMetadata(gmp, scanner.id as string);
   }
   return gmp.scanner.export(scanner as Scanner);
+};
+
+const fetchScannerCredentials = async (
+  gmp: any,
+  types: CredentialType[],
+): Promise<Credential[]> => {
+  if (types.length === 0) {
+    return [];
+  }
+  if (canUseNativeApi(gmp)) {
+    const credentials = await Promise.all(
+      types.map(async type => {
+        const typeCredentials: Credential[] = [];
+        for (let page = 1; ; page += 1) {
+          const response = await fetchNativeCredentials(gmp, {
+            page,
+            pageSize: NATIVE_SCANNER_CREDENTIAL_PAGE_SIZE,
+            sort: 'name',
+            filter: '',
+            credentialType: type,
+          });
+          typeCredentials.push(...response.credentials);
+          const total = response.page?.total ?? typeCredentials.length;
+          if (response.credentials.length === 0 || typeCredentials.length >= total) {
+            break;
+          }
+        }
+        return typeCredentials;
+      }),
+    );
+    return credentials.flat();
+  }
+  return gmp.credentials
+    .getAll({
+      filter: createCredentialsFilter(types),
+    })
+    .then(response => response.data);
 };
 
 const createCaCertificateFile = (name: string, certificate: string) =>
@@ -162,14 +201,7 @@ const ScannerComponent = ({
         scanner.scannerType === OPENVASD_SENSOR_SCANNER_TYPE
           ? [CERTIFICATE_CREDENTIAL_TYPE]
           : [];
-      const credentialsPromise =
-        credentialTypes.length > 0
-          ? gmp.credentials
-              .getAll({
-                filter: createCredentialsFilter(credentialTypes),
-              })
-              .then(response => response.data)
-          : Promise.resolve([]);
+      const credentialsPromise = fetchScannerCredentials(gmp, credentialTypes);
 
       const [credentials, loadedScanner] = await Promise.all<
         [Promise<Credential[]>, Promise<Scanner>]
@@ -209,11 +241,7 @@ const ScannerComponent = ({
       setCaCertificate(caCertificate);
     } else {
       const credentialTypes: CredentialType[] = [CERTIFICATE_CREDENTIAL_TYPE];
-      const credentials = await gmp.credentials
-        .getAll({
-          filter: createCredentialsFilter(credentialTypes),
-        })
-        .then(response => response.data);
+      const credentials = await fetchScannerCredentials(gmp, credentialTypes);
       setCaCertificate(undefined);
       setComment(undefined);
       setCredentialId(undefined);
@@ -274,11 +302,7 @@ const ScannerComponent = ({
 
     setCredentialId(credential.id);
 
-    const credentials = await gmp.credentials
-      .getAll({
-        filter: createCredentialsFilter(credentialTypes),
-      })
-      .then(response => response.data);
+    const credentials = await fetchScannerCredentials(gmp, credentialTypes);
     setCredentials(credentials);
     closeCredentialsDialog();
   };

@@ -1075,6 +1075,12 @@ paths:
         - $ref: '#/components/parameters/PageSize'
         - $ref: '#/components/parameters/Sort'
         - $ref: '#/components/parameters/Filter'
+        - name: credential_type
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional exact credential type filter for redacted metadata lists, for example cc for client certificate credentials.
       responses:
         '200':
           description: Redacted credential metadata collection
