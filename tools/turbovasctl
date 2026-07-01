@@ -592,7 +592,7 @@ OPENAPI_ALLOWED_REPLACES_VALUES = frozenset(
         "tag-resource-reference-read",
         "target-detail-summary-read",
         "target-list-read",
-        "target-metadata-modify",
+        "target-metadata-and-alive-test-modify",
         "task-metadata-modify",
         "task-detail-summary-read",
         "task-list-read",
@@ -1318,7 +1318,7 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-maturity": "live-write",
         "x-turbovas-operator-identity": "direct-token-operator",
         "x-turbovas-owner-semantics": "preserve-existing-owner",
-        "x-turbovas-replaces": "target-metadata-modify",
+        "x-turbovas-replaces": "target-metadata-and-alive-test-modify",
         "x-turbovas-safety-contract": "write-control-v1",
         "x-turbovas-side-effect": "metadata-write",
     },
@@ -12495,6 +12495,7 @@ def direct_smoke_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
             "native-api-direct.credential-fixture-cleanup",
             "native-api-direct.target-fixture",
             "native-api-direct.target-write-update",
+            "native-api-direct.target-alive-test-update",
             "native-api-direct.target-fixture-cleanup",
             "native-api-direct.task-fixture",
             "native-api-direct.task-write-update",
@@ -13696,6 +13697,23 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
                 target_state_after = psql_value(psql(repo_root, target_state_sql))
                 target_patch_ok = target_patch.returncode == 0 and target_patch_status == 200 and isinstance(target_patch_json, dict) and target_patch_json.get("id") == target_id and target_patch_json.get("comment") == target_updated_comment and target_state_before and target_state_before == target_state_after
                 findings.append(native_api_probe_finding("pass" if target_patch_ok else "fail", "native-api-direct.target-write-update", "Direct write-control patched target metadata without changing hosts, port-list, alive-test, reverse-DNS, or credential links." if target_patch_ok else "Direct write-control failed to patch target metadata or changed adjacent target state.", target_patch, direct_native_api_display_command(f"/api/v1/targets/{urllib.parse.quote(target_id)}", token=token, env=env, method="PATCH", body=target_patch_body, extra_headers=content_type), target_patch_json, {"http_status": target_patch_status, "target_id": target_id, "state_checksum_before": target_state_before, "state_checksum_after": target_state_after, **summarize_native_api_response(target_patch_json)}))
+
+                target_non_alive_state_sql = (
+                    "SELECT md5(coalesce(hosts, '') || '|' || coalesce(exclude_hosts, '') || '|' || "
+                    "coalesce(port_list::text, '') || '|' || coalesce(reverse_lookup_only::text, '') || '|' || "
+                    "coalesce(reverse_lookup_unify::text, '') || '|' || coalesce(allow_simultaneous_ips::text, '') || '|' || "
+                    "(SELECT count(*)::text FROM targets_login_data WHERE target = targets.id)) "
+                    "FROM targets "
+                    f"WHERE uuid = {sql_literal(target_id)};"
+                )
+                target_non_alive_state_before = psql_value(psql(repo_root, target_non_alive_state_sql))
+                target_alive_patch_body = json.dumps({"alive_tests": ["TCP-SYN Service Ping"]}, separators=(",", ":"))
+                target_alive_patch = direct_native_api_curl(repo_root, f"/api/v1/targets/{urllib.parse.quote(target_id)}", token=token, env=env, method="PATCH", body=target_alive_patch_body, extra_headers=content_type)
+                target_alive_patch_json, target_alive_patch_status = parse_json_output_with_http_status(target_alive_patch)
+                target_alive_bitfield = psql_value(psql(repo_root, f"SELECT alive_test::text FROM targets WHERE uuid = {sql_literal(target_id)};"))
+                target_non_alive_state_after = psql_value(psql(repo_root, target_non_alive_state_sql))
+                target_alive_patch_ok = target_alive_patch.returncode == 0 and target_alive_patch_status == 200 and isinstance(target_alive_patch_json, dict) and target_alive_patch_json.get("id") == target_id and target_alive_patch_json.get("alive_tests") == ["TCP-SYN Service Ping"] and target_alive_bitfield == "16" and target_non_alive_state_before and target_non_alive_state_before == target_non_alive_state_after
+                findings.append(native_api_probe_finding("pass" if target_alive_patch_ok else "fail", "native-api-direct.target-alive-test-update", "Direct write-control patched target alive-test bitfield without changing hosts, port-list, reverse-DNS, or credential links." if target_alive_patch_ok else "Direct write-control failed to patch target alive-test bitfield or changed adjacent target state.", target_alive_patch, direct_native_api_display_command(f"/api/v1/targets/{urllib.parse.quote(target_id)}", token=token, env=env, method="PATCH", body=target_alive_patch_body, extra_headers=content_type), target_alive_patch_json, {"http_status": target_alive_patch_status, "target_id": target_id, "alive_test_bitfield": target_alive_bitfield, "state_checksum_before": target_non_alive_state_before, "state_checksum_after": target_non_alive_state_after, **summarize_native_api_response(target_alive_patch_json)}))
 
                 task_fixture_sql = (
                     "WITH live_target AS (SELECT id, owner FROM targets "

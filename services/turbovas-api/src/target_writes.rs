@@ -60,7 +60,12 @@ pub(crate) async fn execute_target_patch_transaction(
     query_target_write_record(
         tx,
         target_update_metadata_sql(),
-        &[&target_internal_id, &request.name, &request.comment],
+        &[
+            &target_internal_id,
+            &request.name,
+            &request.comment,
+            &request.alive_test,
+        ],
         "update target metadata",
     )
     .await

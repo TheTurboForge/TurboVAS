@@ -25,6 +25,7 @@ pub(crate) fn target_update_metadata_sql() -> &'static str {
     "UPDATE targets
         SET name = coalesce($2, name),
             comment = coalesce($3, comment),
+            alive_test = coalesce($4, alive_test),
             modification_time = m_now()
       WHERE id = $1
       RETURNING uuid::text;"

@@ -3620,7 +3620,7 @@ paths:
       x-turbovas-replaces: target-list-read
       x-turbovas-inherited-still-owns: target-credential-secrets-writes-and-deletes
       summary: List scan targets
-      description: Read-only target metadata backed by gvmd/PostgreSQL. Native direct write-control can patch target name/comment metadata; target hosts, exclude hosts, port list, alive-test settings, reverse-DNS settings, credential links, task/control semantics, export, clone, delete, and credential secret material remain inherited.
+      description: Read-only target metadata backed by gvmd/PostgreSQL. Native direct write-control can patch target name/comment metadata and alive-test settings; target hosts, exclude hosts, port list, reverse-DNS settings, credential links, task/control semantics, export, clone, delete, and credential secret material remain inherited.
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
@@ -3654,7 +3654,7 @@ paths:
       x-turbovas-replaces: target-detail-summary-read
       x-turbovas-inherited-still-owns: target-credential-secrets-writes-and-deletes
       summary: Read one scan target summary
-      description: Read-only target metadata backed by gvmd/PostgreSQL. Detail includes safe credential references already visible in the inherited UI. Native direct write-control can patch target name/comment metadata; target hosts, exclude hosts, port list, alive-test settings, reverse-DNS settings, credential links, task/control semantics, export, clone, delete, and credential secret material remain inherited.
+      description: Read-only target metadata backed by gvmd/PostgreSQL. Detail includes safe credential references already visible in the inherited UI. Native direct write-control can patch target name/comment metadata and alive-test settings; target hosts, exclude hosts, port list, reverse-DNS settings, credential links, task/control semantics, export, clone, delete, and credential secret material remain inherited.
       parameters:
         - $ref: '#/components/parameters/TargetId'
       responses:
@@ -3683,14 +3683,14 @@ paths:
       x-turbovas-direct: true
       x-turbovas-exposure: direct-write
       x-turbovas-maturity: live-write
-      x-turbovas-replaces: target-metadata-modify
+      x-turbovas-replaces: target-metadata-and-alive-test-modify
       x-turbovas-inherited-still-owns: target-credential-secrets-writes-and-deletes
       x-turbovas-operator-identity: direct-token-operator
       x-turbovas-owner-semantics: preserve-existing-owner
       x-turbovas-safety-contract: write-control-v1
       x-turbovas-side-effect: metadata-write
-      summary: Update target metadata
-      description: Direct write-control endpoint for updating target name and comment only. Target hosts, exclude hosts, port list, alive-test settings, reverse-DNS settings, credential links, task/control semantics, export, clone, delete, and credential secret material remain inherited.
+      summary: Update target metadata and alive test
+      description: Direct write-control endpoint for updating target name, comment, and alive-test bitfield only. Target hosts, exclude hosts, port list, reverse-DNS settings, credential links, task/control semantics, export, clone, delete, and credential secret material remain inherited.
       parameters:
         - $ref: '#/components/parameters/TargetId'
       requestBody:
@@ -4698,6 +4698,18 @@ components:
           type: string
           maxLength: 4096
           description: New target comment. Blank comments clear the comment after trimming.
+        alive_tests:
+          type: array
+          description: Alive-test labels to store as the inherited target alive-test bitfield. Use exactly Scan Config Default, exactly Consider Alive, or one or more probe labels.
+          items:
+            type: string
+            enum:
+              - Scan Config Default
+              - Consider Alive
+              - TCP-ACK Service Ping
+              - ICMP Ping
+              - ARP Ping
+              - TCP-SYN Service Ping
     TaskPatchRequest:
       type: object
       additionalProperties: false

@@ -7,7 +7,8 @@ use crate::{
     target_write_db::ensure_target_owner_matches_operator,
     target_write_sql::*,
     target_write_validation::{
-        MAX_TARGET_TEXT_BYTES, TargetPatchRequest, validate_target_patch_request,
+        MAX_TARGET_TEXT_BYTES, TargetPatchRequest, validate_alive_tests,
+        validate_target_patch_request,
     },
 };
 
@@ -15,6 +16,15 @@ fn patch_request(name: Option<&str>, comment: Option<&str>) -> TargetPatchReques
     TargetPatchRequest {
         name: name.map(str::to_string),
         comment: comment.map(str::to_string),
+        alive_tests: None,
+    }
+}
+
+fn alive_patch_request(values: &[&str]) -> TargetPatchRequest {
+    TargetPatchRequest {
+        name: None,
+        comment: None,
+        alive_tests: Some(values.iter().map(|value| value.to_string()).collect()),
     }
 }
 
@@ -79,7 +89,47 @@ fn target_patch_request_rejects_oversized_metadata_fields() {
         validate_target_patch_request(TargetPatchRequest {
             name: Some("x".repeat(MAX_TARGET_TEXT_BYTES + 1)),
             comment: None,
+            alive_tests: None,
         }),
+        Err(ApiError::BadRequest(_))
+    ));
+}
+
+#[test]
+fn target_patch_request_validates_alive_test_bitfields() {
+    let validated = validate_target_patch_request(alive_patch_request(&[
+        "ICMP Ping",
+        "TCP-ACK Service Ping",
+        "TCP-SYN Service Ping",
+    ]))
+    .expect("valid alive-test patch");
+    assert_eq!(validated.alive_test, Some(19));
+    assert_eq!(
+        validate_alive_tests(Some(vec![])).expect("empty default"),
+        Some(0)
+    );
+    assert_eq!(
+        validate_alive_tests(Some(vec!["Scan Config Default".to_string()])).expect("default"),
+        Some(0)
+    );
+    assert_eq!(
+        validate_alive_tests(Some(vec!["Consider Alive".to_string()])).expect("consider alive"),
+        Some(8)
+    );
+}
+
+#[test]
+fn target_patch_request_rejects_ambiguous_alive_test_values() {
+    assert!(matches!(
+        validate_target_patch_request(alive_patch_request(&["Banana Ping"])),
+        Err(ApiError::BadRequest(_))
+    ));
+    assert!(matches!(
+        validate_target_patch_request(alive_patch_request(&["Scan Config Default", "ICMP Ping"])),
+        Err(ApiError::BadRequest(_))
+    ));
+    assert!(matches!(
+        validate_target_patch_request(alive_patch_request(&["Consider Alive", "ARP Ping"])),
         Err(ApiError::BadRequest(_))
     ));
 }
@@ -90,6 +140,7 @@ fn target_patch_sql_is_metadata_only() {
     assert!(sql.contains("UPDATE targets"));
     assert!(sql.contains("name = coalesce($2, name)"));
     assert!(sql.contains("comment = coalesce($3, comment)"));
+    assert!(sql.contains("alive_test = coalesce($4, alive_test)"));
     assert!(sql.contains("modification_time = m_now()"));
     assert!(sql.contains("RETURNING uuid::text"));
     for forbidden in [
@@ -101,7 +152,6 @@ fn target_patch_sql_is_metadata_only() {
         "hosts =",
         "exclude_hosts",
         "port_list",
-        "alive_test",
         "allow_simultaneous_ips",
         "reverse_lookup",
         "ssh",

@@ -108,6 +108,32 @@ fn inherited_target_create_and_modify_are_host_port_credential_and_in_use_guarde
 }
 
 #[test]
+fn inherited_target_alive_test_modify_is_not_task_in_use_guarded() {
+    let modify = inherited_function(MANAGE_SQL_TARGETS_C, "modify_target");
+    let alive_start = modify
+        .find("if (alive_tests && alive_tests->len")
+        .expect("alive-tests modify block exists");
+    let port_list_start = modify
+        .find("if (port_list_id)")
+        .expect("port-list modify block exists");
+    let alive_block = &modify[alive_start..port_list_start];
+    assert!(alive_block.contains("alive_test_from_array (alive_tests)"));
+    assert!(alive_block.contains("alive_test_from_string (alive_test_str)"));
+    assert!(alive_block.contains("alive_test = '%i'"));
+    assert!(
+        !alive_block.contains("target_in_use (target)"),
+        "inherited alive-test modification is not guarded by target_in_use"
+    );
+
+    let allow_start = modify
+        .find("if (allow_simultaneous_ips)")
+        .expect("allow-simultaneous modify block exists");
+    let allow_block = &modify[allow_start..alive_start];
+    assert!(allow_block.contains("target_in_use (target)"));
+    assert!(modify[port_list_start..].contains("target_in_use (target)"));
+}
+
+#[test]
 fn inherited_target_clone_delete_and_restore_preserve_login_data_and_task_links() {
     let copy = inherited_function(MANAGE_SQL_TARGETS_C, "copy_target");
     for required in [
@@ -351,7 +377,7 @@ fn native_target_broad_mutation_routes_remain_closed() {
         ));
     }
     let detail = openapi_path_block("/targets/{target_id}");
-    assert!(detail.contains("x-turbovas-replaces: target-metadata-modify"));
+    assert!(detail.contains("x-turbovas-replaces: target-metadata-and-alive-test-modify"));
     for forbidden in ["post:", "delete:", "/clone", "/restore", "/trash"] {
         assert!(
             !detail.contains(forbidden),
