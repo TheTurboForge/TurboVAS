@@ -1,15 +1,30 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
 import type CollectionCounts from 'gmp/collection/collection-counts';
 import EntitiesCommand from 'gmp/commands/entities';
-import {type HttpCommandOptions} from 'gmp/commands/http';
+import {
+  type HttpCommandInputParams,
+  type HttpCommandOptions,
+} from 'gmp/commands/http';
+import {
+  canUseNativeApi,
+  filterFromCommandParams,
+  nativeCollectionMeta,
+  NATIVE_COMMAND_PAGE_SIZE,
+} from 'gmp/commands/native';
 import type Http from 'gmp/http/http';
+import Response from 'gmp/http/response';
 import type Filter from 'gmp/models/filter';
 import {type Element} from 'gmp/models/model';
 import Task, {type TaskElement} from 'gmp/models/task';
+import {
+  fetchNativeTasks,
+  nativeTaskQueryFromFilter,
+} from 'gmp/native-api/tasks';
 import {parseYesNo, type YesNo} from 'gmp/parser';
 import {isDefined} from 'gmp/utils/identity';
 
@@ -57,6 +72,18 @@ class TasksCommand extends EntitiesCommand<Task, GetTasksResponse> {
     {filter, schedulesOnly}: TasksCommandGetParams = {},
     options?: HttpCommandOptions,
   ) {
+    if (canUseNativeApi(this.http) && !schedulesOnly) {
+      const nativeFilter = filterFromCommandParams({filter});
+      const nativeResponse = await fetchNativeTasks(
+        this.http,
+        nativeTaskQueryFromFilter(nativeFilter),
+      );
+      return new Response(nativeResponse.tasks, {
+        filter: nativeFilter,
+        counts: nativeResponse.counts,
+      });
+    }
+
     const params = {
       filter,
       usage_type: 'scan',
@@ -73,6 +100,37 @@ class TasksCommand extends EntitiesCommand<Task, GetTasksResponse> {
     return response.set<Task[], {filter: Filter; counts: CollectionCounts}>(
       entities,
       {filter: responseFilter, counts},
+    );
+  }
+
+  async getAll(
+    params: HttpCommandInputParams & {schedulesOnly?: boolean} = {},
+    options?: HttpCommandOptions,
+  ) {
+    if (!canUseNativeApi(this.http) || params.schedulesOnly) {
+      return super.getAll(params, options);
+    }
+
+    const filter = filterFromCommandParams(params).all();
+    const tasks: Task[] = [];
+    let total = Number.POSITIVE_INFINITY;
+
+    for (let page = 1; tasks.length < total; page += 1) {
+      const nativeResponse = await fetchNativeTasks(this.http, {
+        ...nativeTaskQueryFromFilter(filter),
+        page,
+        pageSize: NATIVE_COMMAND_PAGE_SIZE,
+      });
+      tasks.push(...nativeResponse.tasks);
+      total = nativeResponse.page.total;
+      if (nativeResponse.tasks.length === 0) {
+        break;
+      }
+    }
+
+    return new Response(
+      tasks,
+      nativeCollectionMeta(filter, tasks, Number.isFinite(total) ? total : 0),
     );
   }
 

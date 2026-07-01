@@ -1,9 +1,10 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import {describe, test, expect} from '@gsa/testing';
+import {afterEach, describe, test, expect, testing} from '@gsa/testing';
 import TasksCommand from 'gmp/commands/tasks';
 import {
   createHttp,
@@ -11,6 +12,11 @@ import {
   createAggregatesResponse,
 } from 'gmp/commands/testing';
 import Task from 'gmp/models/task';
+import {createSession} from 'gmp/testing';
+
+afterEach(() => {
+  testing.unstubAllGlobals();
+});
 
 describe('TasksCommand tests', () => {
   test('should fetch tasks with default params', async () => {
@@ -105,6 +111,102 @@ describe('TasksCommand tests', () => {
     expect(result.data).toEqual([
       new Task({id: '4', name: 'All Tasks 1'}),
       new Task({id: '5', name: 'All Tasks 2'}),
+    ]);
+  });
+
+  test('should fetch tasks through native API when available', async () => {
+    const fetchMock = testing.fn().mockResolvedValue({
+      json: testing.fn().mockResolvedValue({
+        page: {page: 1, page_size: 25, total: 1, sort: 'name', filter: 'scan'},
+        items: [
+          {
+            id: 'task-1',
+            name: 'Native scan task',
+            comment: 'native task metadata',
+            status: 'Done',
+            progress: 100,
+            trend: 'same',
+            usage_type: 'scan',
+            target: {id: 'target-1', name: 'Web target'},
+            config: {id: 'config-1', name: 'Full and fast'},
+            scanner: {id: 'scanner-1', name: 'Default scanner'},
+            scanner_type: 2,
+            report_count: {total: 1, finished: 1},
+            last_report: {id: 'report-1', severity: 5.5},
+          },
+        ],
+      }),
+      ok: true,
+      status: 200,
+    });
+    testing.stubGlobal('fetch', fetchMock);
+    const fakeHttp = createHttp(undefined) as ReturnType<typeof createHttp> & {
+      buildUrl: ReturnType<typeof testing.fn>;
+      session: ReturnType<typeof createSession>;
+    };
+    fakeHttp.buildUrl = testing.fn(
+      (path: string) => `https://turbovas.example/${path}`,
+    );
+    fakeHttp.session = createSession();
+    fakeHttp.session.token = 'test-token';
+    fakeHttp.session.jwt = 'jwt-token';
+
+    const cmd = new TasksCommand(fakeHttp);
+    const result = await cmd.get({filter: 'first=1 rows=25 search=scan'});
+
+    expect(fakeHttp.request).not.toHaveBeenCalled();
+    expect(result.data[0].id).toEqual('task-1');
+    expect(result.data[0].name).toEqual('Native scan task');
+    expect(result.data[0].status).toEqual('Done');
+    expect(result.data[0].report_count?.total).toEqual(1);
+    expect(fakeHttp.buildUrl).toHaveBeenCalledWith('api/v1/tasks', {
+      token: 'test-token',
+      page: 1,
+      page_size: 25,
+      sort: 'name',
+      filter: 'scan',
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://turbovas.example/api/v1/tasks',
+      {
+        credentials: 'include',
+        headers: {
+          Accept: 'application/json',
+          Authorization: 'Bearer jwt-token',
+        },
+      },
+    );
+  });
+
+  test('should keep schedules-only task lists on GMP', async () => {
+    const response = createEntitiesResponse('task', [
+      {_id: 'scheduled-task-1', name: 'Scheduled Task'},
+    ]);
+    const fakeHttp = createHttp(response) as ReturnType<typeof createHttp> & {
+      buildUrl: ReturnType<typeof testing.fn>;
+      session: ReturnType<typeof createSession>;
+    };
+    fakeHttp.buildUrl = testing.fn(
+      (path: string) => `https://turbovas.example/${path}`,
+    );
+    fakeHttp.session = createSession();
+    const fetchMock = testing.fn();
+    testing.stubGlobal('fetch', fetchMock);
+
+    const cmd = new TasksCommand(fakeHttp);
+    const result = await cmd.getAll({schedulesOnly: true});
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fakeHttp.request).toHaveBeenCalledWith('get', {
+      args: {
+        cmd: 'get_tasks',
+        filter: 'first=1 rows=-1',
+        usage_type: 'scan',
+        schedules_only: 1,
+      },
+    });
+    expect(result.data).toEqual([
+      new Task({id: 'scheduled-task-1', name: 'Scheduled Task'}),
     ]);
   });
 
