@@ -7,7 +7,18 @@
 import registerCommand from 'gmp/command';
 import EntitiesCommand from 'gmp/commands/entities';
 import EntityCommand from 'gmp/commands/entity';
+import {
+  canUseNativeApi,
+  filterFromCommandParams,
+  nativeCollectionMeta,
+  NATIVE_COMMAND_PAGE_SIZE,
+} from 'gmp/commands/native';
+import Response from 'gmp/http/response';
 import Vulnerability from 'gmp/models/vulnerability';
+import {
+  fetchNativeVulnerabilities,
+  nativeVulnerabilitiesQueryFromFilter,
+} from 'gmp/native-api/vulnerabilities';
 
 class VulnerabilityCommand extends EntityCommand {
   constructor(http) {
@@ -22,6 +33,54 @@ class VulnerabilitiesCommand extends EntitiesCommand {
 
   getEntitiesResponse(root) {
     return root.get_vulns.get_vulns_response;
+  }
+
+  async get(params = {}, options) {
+    if (!canUseNativeApi(this.http)) {
+      return super.get(params, options);
+    }
+
+    const filter = filterFromCommandParams(params);
+    const nativeResponse = await fetchNativeVulnerabilities(
+      this.http,
+      nativeVulnerabilitiesQueryFromFilter(filter),
+    );
+    return new Response(nativeResponse.vulnerabilities, {
+      filter,
+      counts: nativeResponse.counts,
+    });
+  }
+
+  async getAll(params = {}, options) {
+    if (!canUseNativeApi(this.http)) {
+      return super.getAll(params, options);
+    }
+
+    const filter = filterFromCommandParams(params).all();
+    const vulnerabilities = [];
+    let total = Number.POSITIVE_INFINITY;
+
+    for (let page = 1; vulnerabilities.length < total; page += 1) {
+      const nativeResponse = await fetchNativeVulnerabilities(this.http, {
+        ...nativeVulnerabilitiesQueryFromFilter(filter),
+        page,
+        pageSize: NATIVE_COMMAND_PAGE_SIZE,
+      });
+      vulnerabilities.push(...nativeResponse.vulnerabilities);
+      total = nativeResponse.page.total;
+      if (nativeResponse.vulnerabilities.length === 0) {
+        break;
+      }
+    }
+
+    return new Response(
+      vulnerabilities,
+      nativeCollectionMeta(
+        filter,
+        vulnerabilities,
+        Number.isFinite(total) ? total : 0,
+      ),
+    );
   }
 
   getSeverityAggregates({filter} = {}) {

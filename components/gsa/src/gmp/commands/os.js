@@ -1,4 +1,5 @@
 /* SPDX-FileCopyrightText: 2024 Greenbone AG
+ * TurboVAS modifications Copyright (C) 2026 Robert Pelfrey <Robert@Pelfrey.de>.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -7,7 +8,18 @@ import registerCommand from 'gmp/command';
 import EntitiesCommand from 'gmp/commands/entities';
 import EntityCommand from 'gmp/commands/entity';
 import {BULK_SELECT_BY_IDS} from 'gmp/commands/http';
+import {
+  canUseNativeApi,
+  filterFromCommandParams,
+  nativeCollectionMeta,
+  NATIVE_COMMAND_PAGE_SIZE,
+} from 'gmp/commands/native';
+import Response from 'gmp/http/response';
 import OperatingSystem from 'gmp/models/os';
+import {
+  fetchNativeOperatingSystems,
+  nativeOperatingSystemsQueryFromFilter,
+} from 'gmp/native-api/operating-systems';
 
 class OperatingSystemCommand extends EntityCommand {
   constructor(http) {
@@ -28,6 +40,54 @@ class OperatingSystemsCommand extends EntitiesCommand {
 
   getEntitiesResponse(root) {
     return root.get_assets.get_assets_response;
+  }
+
+  async get(params = {}, options) {
+    if (!canUseNativeApi(this.http)) {
+      return super.get(params, options);
+    }
+
+    const filter = filterFromCommandParams(params);
+    const nativeResponse = await fetchNativeOperatingSystems(
+      this.http,
+      nativeOperatingSystemsQueryFromFilter(filter),
+    );
+    return new Response(nativeResponse.operatingSystems, {
+      filter,
+      counts: nativeResponse.counts,
+    });
+  }
+
+  async getAll(params = {}, options) {
+    if (!canUseNativeApi(this.http)) {
+      return super.getAll(params, options);
+    }
+
+    const filter = filterFromCommandParams(params).all();
+    const operatingSystems = [];
+    let total = Number.POSITIVE_INFINITY;
+
+    for (let page = 1; operatingSystems.length < total; page += 1) {
+      const nativeResponse = await fetchNativeOperatingSystems(this.http, {
+        ...nativeOperatingSystemsQueryFromFilter(filter),
+        page,
+        pageSize: NATIVE_COMMAND_PAGE_SIZE,
+      });
+      operatingSystems.push(...nativeResponse.operatingSystems);
+      total = nativeResponse.page.total;
+      if (nativeResponse.operatingSystems.length === 0) {
+        break;
+      }
+    }
+
+    return new Response(
+      operatingSystems,
+      nativeCollectionMeta(
+        filter,
+        operatingSystems,
+        Number.isFinite(total) ? total : 0,
+      ),
+    );
   }
 
   getAverageSeverityAggregates({filter} = {}) {
