@@ -169,6 +169,8 @@ mod scan_config_characterization_tests;
 #[cfg(test)]
 mod scan_config_writes_tests;
 #[cfg(test)]
+mod scanner_control_characterization_tests;
+#[cfg(test)]
 mod schedule_characterization_tests;
 #[cfg(test)]
 mod scope_contract_tests;
