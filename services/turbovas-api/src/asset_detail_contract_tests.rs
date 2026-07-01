@@ -28,6 +28,7 @@ use crate::{
         scan_config_asset_detail_sql, scan_config_asset_list_sql, scan_config_task_references_sql,
     },
     scanner_asset_query_sql::{scanner_asset_detail_sql, scanner_task_references_sql},
+    schedule_query_sql::{schedule_asset_detail_sql, schedule_assets_sql, schedule_tasks_sql},
     tls_certificate_query_sql::{
         tls_certificate_asset_detail_sql, tls_certificate_assets_sql, tls_certificate_sources_sql,
     },
@@ -717,6 +718,9 @@ fn scan_config_task_references_are_non_hidden_config_backlinks_only() {
 #[test]
 fn schedule_user_tags_are_detail_only_active_schedule_tags() {
     let source = include_str!("schedule_payloads.rs");
+    let list_sql = schedule_assets_sql("name ASC");
+    let detail_sql = schedule_asset_detail_sql();
+    let tasks_sql = schedule_tasks_sql();
     let schedule_list_payload = source
         .split_once("struct ScheduleAssetItem {")
         .expect("schedule list payload struct must exist")
@@ -734,6 +738,32 @@ fn schedule_user_tags_are_detail_only_active_schedule_tags() {
 
     assert!(!schedule_list_payload.contains("user_tags"));
     assert!(schedule_detail_payload.contains("user_tags: Vec<ReportUserTag>"));
+    for required in [
+        "FROM schedules s",
+        "coalesce(next_time_ical",
+        "task_count",
+        "ORDER BY name ASC, name ASC, id ASC LIMIT $2 OFFSET $3",
+    ] {
+        assert!(
+            list_sql.contains(required),
+            "schedule list SQL missing {required}"
+        );
+    }
+    assert!(detail_sql.contains("FROM schedules s"));
+    assert!(detail_sql.contains("WHERE s.uuid = $1"));
+    assert!(detail_sql.contains("next_time_ical"));
+    assert!(tasks_sql.contains("FROM tasks t"));
+    assert!(tasks_sql.contains("WHERE t.schedule = $1"));
+    for sql in [list_sql.as_str(), detail_sql, tasks_sql] {
+        for forbidden in ["INSERT", "UPDATE", "DELETE", "CREATE", "DROP"] {
+            assert!(
+                !sql.contains(forbidden),
+                "schedule read SQL must not mutate with {forbidden}"
+            );
+        }
+        assert!(!sql.contains("icalendar_from_string"));
+        assert!(!sql.contains("icalendar_approximate_rrule"));
+    }
 
     let sql = schedule_user_tags_sql();
     assert!(sql.contains("FROM tags t"));

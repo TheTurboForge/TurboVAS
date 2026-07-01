@@ -119,6 +119,7 @@ mod scanner_asset_payloads;
 mod scanner_asset_query_sql;
 mod scanner_assets;
 mod schedule_payloads;
+mod schedule_query_sql;
 mod schedule_write_db;
 #[cfg(test)]
 mod schedule_write_plans;
