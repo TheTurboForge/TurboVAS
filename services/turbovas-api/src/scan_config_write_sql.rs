@@ -67,6 +67,53 @@ pub(crate) fn scan_config_trash_insert_sql() -> &'static str {
       RETURNING id::integer, uuid::text;"
 }
 
+pub(crate) fn scan_config_clone_metadata_sql() -> &'static str {
+    "INSERT INTO configs
+        (uuid, owner, name, nvt_selector, comment, family_count, nvt_count,
+         families_growing, nvts_growing, predefined, creation_time,
+         modification_time, usage_type)
+     SELECT make_uuid(),
+            $2,
+            coalesce($3, uniquify('config', name, $2, ' Clone')),
+            make_uuid(),
+            comment,
+            family_count,
+            nvt_count,
+            families_growing,
+            nvts_growing,
+            0,
+            m_now(),
+            m_now(),
+            'scan'
+       FROM configs
+      WHERE id = $1
+      RETURNING id::integer, uuid::text;"
+}
+
+pub(crate) fn scan_config_clone_preferences_sql() -> &'static str {
+    "INSERT INTO config_preferences
+        (config, type, name, value, default_value, pref_nvt, pref_id, pref_type, pref_name)
+     SELECT $2, type, name, value, default_value, pref_nvt, pref_id, pref_type, pref_name
+       FROM config_preferences
+      WHERE config = $1;"
+}
+
+pub(crate) fn scan_config_clone_selectors_sql() -> &'static str {
+    "INSERT INTO nvt_selectors (name, exclude, type, family_or_nvt, family)
+     SELECT (SELECT nvt_selector FROM configs WHERE id = $2), exclude, type, family_or_nvt, family
+       FROM nvt_selectors
+      WHERE name = (SELECT nvt_selector FROM configs WHERE id = $1);"
+}
+
+pub(crate) fn scan_config_clone_tags_sql() -> &'static str {
+    "INSERT INTO tag_resources (tag, resource_type, resource, resource_uuid, resource_location)
+     SELECT tag, resource_type, $2, $3, resource_location
+       FROM tag_resources
+      WHERE resource_type = 'config'
+        AND resource = $1
+        AND resource_location = 0;"
+}
+
 pub(crate) fn scan_config_preferences_trash_insert_sql() -> &'static str {
     "INSERT INTO config_preferences_trash
         (config, type, name, value, default_value, pref_nvt, pref_id, pref_type, pref_name)

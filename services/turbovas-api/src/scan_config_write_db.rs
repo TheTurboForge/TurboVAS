@@ -120,6 +120,22 @@ pub(crate) fn ensure_scan_config_not_predefined(
     }
 }
 
+pub(crate) fn ensure_scan_config_clone_source_allowed(
+    state: &ScanConfigWriteState,
+    operator_owner_id: i32,
+) -> Result<(), ApiError> {
+    if state.predefined || state.owner_id == operator_owner_id {
+        Ok(())
+    } else {
+        tracing::warn!(
+            scan_config_owner_id = state.owner_id,
+            operator_owner_id,
+            "direct API scan-config clone source owner mismatch"
+        );
+        Err(ApiError::Forbidden)
+    }
+}
+
 pub(crate) async fn ensure_unique_scan_config_name(
     tx: &Transaction<'_>,
     name: &str,

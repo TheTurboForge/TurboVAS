@@ -51,7 +51,8 @@ use crate::{
     result_payloads::*,
     scan_config_families::scan_config_asset_families,
     scan_config_writes::{
-        delete_scan_config, hard_delete_scan_config, patch_scan_config, restore_scan_config,
+        clone_scan_config, delete_scan_config, hard_delete_scan_config, patch_scan_config,
+        restore_scan_config,
     },
     scan_configs::*,
     scanner_assets::*,
@@ -278,6 +279,10 @@ pub(crate) fn direct_native_api_router(
             .route(
                 "/api/v1/scan-configs/:scan_config_id",
                 delete(delete_scan_config),
+            )
+            .route(
+                "/api/v1/scan-configs/:scan_config_id/clone",
+                post(clone_scan_config),
             )
             .route(
                 "/api/v1/scan-configs/:scan_config_id/restore",

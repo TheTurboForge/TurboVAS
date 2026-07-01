@@ -4,8 +4,8 @@
 
 use crate::errors::ApiError;
 use crate::scan_config_write_db::{
-    ScanConfigWriteState, ensure_scan_config_not_predefined,
-    ensure_scan_config_owner_matches_operator,
+    ScanConfigWriteState, ensure_scan_config_clone_source_allowed,
+    ensure_scan_config_not_predefined, ensure_scan_config_owner_matches_operator,
 };
 use crate::scan_config_write_sql::*;
 use crate::scan_config_write_validation::*;
@@ -17,6 +17,12 @@ fn patch_request(name: Option<&str>, comment: Option<&str>) -> ScanConfigPatchRe
     }
 }
 
+fn clone_request(name: Option<&str>) -> ScanConfigCloneRequest {
+    ScanConfigCloneRequest {
+        name: name.map(str::to_string),
+    }
+}
+
 #[test]
 fn scan_config_write_rejects_operator_owner_mismatch() {
     assert!(ensure_scan_config_owner_matches_operator(7, 7).is_ok());
@@ -24,6 +30,45 @@ fn scan_config_write_rejects_operator_owner_mismatch() {
         ensure_scan_config_owner_matches_operator(7, 8),
         Err(ApiError::Forbidden)
     ));
+}
+
+#[test]
+fn scan_config_clone_source_allows_predefined_or_operator_owned_sources() {
+    let operator_owned = ScanConfigWriteState {
+        internal_id: 1,
+        owner_id: 7,
+        predefined: false,
+    };
+    assert!(ensure_scan_config_clone_source_allowed(&operator_owned, 7).is_ok());
+    assert!(matches!(
+        ensure_scan_config_clone_source_allowed(&operator_owned, 8),
+        Err(ApiError::Forbidden)
+    ));
+
+    let predefined = ScanConfigWriteState {
+        predefined: true,
+        ..operator_owned
+    };
+    assert!(ensure_scan_config_clone_source_allowed(&predefined, 8).is_ok());
+}
+
+#[test]
+fn scan_config_clone_request_trims_optional_name_and_rejects_unknown_fields() {
+    let validated = validate_scan_config_clone_request(clone_request(Some("  copied scan  ")))
+        .expect("valid scan-config clone");
+    assert_eq!(validated.name.as_deref(), Some("copied scan"));
+    assert_eq!(
+        validate_scan_config_clone_request(clone_request(None))
+            .expect("default scan-config clone name")
+            .name,
+        None
+    );
+    assert!(matches!(
+        validate_scan_config_clone_request(clone_request(Some("   "))),
+        Err(ApiError::BadRequest(_))
+    ));
+    let request = serde_json::json!({"name": "copy", "comment": "not yet"});
+    assert!(serde_json::from_value::<ScanConfigCloneRequest>(request).is_err());
 }
 
 #[test]
@@ -43,6 +88,33 @@ fn scan_config_write_blocks_predefined_live_mutations() {
         ensure_scan_config_not_predefined(&predefined),
         Err(ApiError::Conflict(_))
     ));
+}
+
+#[test]
+fn scan_config_clone_sql_copies_preferences_selectors_tags_and_makes_user_owned_scan_config() {
+    let metadata = scan_config_clone_metadata_sql();
+    assert!(metadata.contains("INSERT INTO configs"));
+    assert!(metadata.contains("make_uuid()"));
+    assert!(metadata.contains("coalesce($3, uniquify('config', name, $2, ' Clone'))"));
+    assert!(metadata.contains("predefined"));
+    assert!(metadata.contains("0,"));
+    assert!(metadata.contains("'scan'"));
+    assert!(metadata.contains("RETURNING id::integer, uuid::text"));
+
+    let prefs = scan_config_clone_preferences_sql();
+    assert!(prefs.contains("INSERT INTO config_preferences"));
+    assert!(prefs.contains("SELECT $2, type, name, value, default_value"));
+    assert!(prefs.contains("FROM config_preferences"));
+
+    let selectors = scan_config_clone_selectors_sql();
+    assert!(selectors.contains("INSERT INTO nvt_selectors"));
+    assert!(selectors.contains("SELECT (SELECT nvt_selector FROM configs WHERE id = $2)"));
+    assert!(selectors.contains("WHERE name = (SELECT nvt_selector FROM configs WHERE id = $1)"));
+
+    let tags = scan_config_clone_tags_sql();
+    assert!(tags.contains("INSERT INTO tag_resources"));
+    assert!(tags.contains("resource_type = 'config'"));
+    assert!(tags.contains("resource_location = 0"));
 }
 
 #[test]

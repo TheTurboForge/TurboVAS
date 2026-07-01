@@ -17,10 +17,30 @@ pub(crate) struct ScanConfigPatchRequest {
     pub(crate) comment: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ScanConfigCloneRequest {
+    #[serde(default)]
+    pub(crate) name: Option<String>,
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct ValidatedScanConfigPatch {
     pub(crate) name: Option<String>,
     pub(crate) comment: Option<String>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct ValidatedScanConfigClone {
+    pub(crate) name: Option<String>,
+}
+
+pub(crate) fn validate_scan_config_clone_request(
+    request: ScanConfigCloneRequest,
+) -> Result<ValidatedScanConfigClone, ApiError> {
+    Ok(ValidatedScanConfigClone {
+        name: normalize_optional_required_scan_config_text(request.name, "name")?,
+    })
 }
 
 pub(crate) fn validate_scan_config_patch_request(

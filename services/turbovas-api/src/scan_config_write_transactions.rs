@@ -10,8 +10,49 @@ use crate::{
         ScanConfigWriteRecord, execute_scan_config_write_sql, query_scan_config_write_record,
     },
     scan_config_write_sql::*,
-    scan_config_write_validation::ValidatedScanConfigPatch,
+    scan_config_write_validation::{ValidatedScanConfigClone, ValidatedScanConfigPatch},
 };
+
+pub(crate) async fn execute_scan_config_clone_transaction(
+    tx: &Transaction<'_>,
+    source_scan_config_internal_id: i32,
+    owner_id: i32,
+    request: &ValidatedScanConfigClone,
+) -> Result<ScanConfigWriteRecord, ApiError> {
+    let record = query_scan_config_write_record(
+        tx,
+        scan_config_clone_metadata_sql(),
+        &[&source_scan_config_internal_id, &owner_id, &request.name],
+        "clone scan-config metadata",
+    )
+    .await?;
+    execute_scan_config_write_sql(
+        tx,
+        scan_config_clone_preferences_sql(),
+        &[&source_scan_config_internal_id, &record.internal_id],
+        "clone scan-config preferences",
+    )
+    .await?;
+    execute_scan_config_write_sql(
+        tx,
+        scan_config_clone_selectors_sql(),
+        &[&source_scan_config_internal_id, &record.internal_id],
+        "clone scan-config selectors",
+    )
+    .await?;
+    execute_scan_config_write_sql(
+        tx,
+        scan_config_clone_tags_sql(),
+        &[
+            &source_scan_config_internal_id,
+            &record.internal_id,
+            &record.uuid,
+        ],
+        "clone scan-config tags",
+    )
+    .await?;
+    Ok(record)
+}
 
 pub(crate) async fn execute_scan_config_metadata_patch_transaction(
     tx: &Transaction<'_>,

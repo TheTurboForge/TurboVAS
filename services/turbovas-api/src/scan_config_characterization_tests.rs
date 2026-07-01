@@ -348,6 +348,16 @@ fn native_direct_api_allows_scan_config_write_control_paths() {
     ));
     assert!(direct_api_v1_method_is_allowed(
         &Method::POST,
+        "/api/v1/scan-configs/12345678-1234-1234-1234-123456789abc/clone",
+        true
+    ));
+    assert!(!direct_api_v1_method_is_allowed(
+        &Method::POST,
+        "/api/v1/scan-configs/12345678-1234-1234-1234-123456789abc/clone",
+        false
+    ));
+    assert!(direct_api_v1_method_is_allowed(
+        &Method::POST,
         restore_path,
         true
     ));
@@ -388,6 +398,14 @@ fn native_direct_api_allows_scan_config_write_control_paths() {
     assert!(detail.contains("x-turbovas-replaces: scan-config-trash-move"));
     assert!(detail.contains("x-turbovas-safety-contract: write-control-v1"));
     assert!(detail.contains(
+        "x-turbovas-inherited-still-owns: scan-config-preferences-selector-import-export-create"
+    ));
+
+    let clone = openapi_path_block("/scan-configs/{scan_config_id}/clone");
+    assert!(clone.contains("post:"));
+    assert!(clone.contains("x-turbovas-replaces: scan-config-clone"));
+    assert!(clone.contains("x-turbovas-safety-contract: write-control-v1"));
+    assert!(clone.contains(
         "x-turbovas-inherited-still-owns: scan-config-preferences-selector-import-export-create"
     ));
 
