@@ -41,6 +41,7 @@ mod filter_writes;
 mod filters;
 mod formatters;
 mod host_asset_payloads;
+mod host_asset_query_sql;
 mod host_assets;
 mod metrics;
 mod metrics_payloads;

@@ -10,6 +10,9 @@ use crate::{
         tls_certificate_user_tags_sql,
     },
     collections::{ALERT_DEFAULT_SORT, ALERT_SORT_FIELDS},
+    host_asset_query_sql::{
+        host_asset_identifiers_sql, host_asset_operating_systems_sql, host_asset_safe_details_sql,
+    },
     operating_system_query_sql::{operating_system_asset_detail_sql, operating_system_assets_sql},
     port_list_query_sql::{
         port_list_asset_detail_sql, port_list_assets_sql, port_list_ranges_sql,
@@ -444,6 +447,42 @@ fn host_user_tags_are_detail_only_active_host_tags() {
     assert!(!sql.contains("credentials"));
     assert!(!sql.contains("reports"));
     assert!(!sql.contains("results"));
+}
+
+#[test]
+fn host_asset_detail_side_queries_are_bounded_safe_metadata() {
+    let identifiers = host_asset_identifiers_sql();
+    let operating_systems = host_asset_operating_systems_sql();
+    let details = host_asset_safe_details_sql();
+    let combined = format!("{identifiers}\n{operating_systems}\n{details}");
+
+    for required in [
+        "JOIN host_identifiers hi",
+        "hi.name IN ('ip', 'hostname', 'DNS-via-TargetDefinition', 'MAC', 'OS')",
+        "left(coalesce(hi.source_data, ''), 512)",
+        "JOIN host_oss ho",
+        "JOIN oss ON oss.id = ho.os",
+        "hd.name IN ('best_os_cpe', 'best_os_txt', 'traceroute')",
+        "left(coalesce(hd.value, ''), 4096)",
+    ] {
+        assert!(
+            combined.contains(required),
+            "host detail SQL missing {required}"
+        );
+    }
+    for forbidden in [
+        "INSERT INTO",
+        "UPDATE ",
+        "DELETE FROM",
+        "credentials",
+        "password",
+        "secret",
+    ] {
+        assert!(
+            !combined.contains(forbidden),
+            "host detail SQL must not contain {forbidden}"
+        );
+    }
 }
 
 #[test]
