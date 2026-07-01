@@ -77,7 +77,9 @@ use crate::{
         update_tag_resources,
     },
     tags::*,
-    target_writes::{clone_target, patch_target},
+    target_writes::{
+        clone_target, delete_target, hard_delete_target, patch_target, restore_target,
+    },
     task_targets::*,
     task_writes::patch_task,
     timezones::timezones,
@@ -307,7 +309,13 @@ pub(crate) fn direct_native_api_router(
                 patch(patch_credential),
             )
             .route("/api/v1/targets/:target_id", patch(patch_target))
+            .route("/api/v1/targets/:target_id", delete(delete_target))
             .route("/api/v1/targets/:target_id/clone", post(clone_target))
+            .route("/api/v1/targets/:target_id/restore", post(restore_target))
+            .route(
+                "/api/v1/targets/:target_id/trash",
+                delete(hard_delete_target),
+            )
             .route("/api/v1/tasks/:task_id", patch(patch_task))
             .route("/api/v1/port-lists/:port_list_id", patch(patch_port_list))
             .route("/api/v1/port-lists/:port_list_id", delete(delete_port_list))

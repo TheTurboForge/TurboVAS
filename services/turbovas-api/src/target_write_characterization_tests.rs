@@ -361,9 +361,26 @@ fn native_target_broad_mutation_routes_remain_closed() {
 
     for (method, path) in [
         (&Method::POST, "/api/v1/targets"),
+        (&Method::DELETE, "/api/v1/targets"),
+        (
+            &Method::PATCH,
+            "/api/v1/targets/12345678-1234-1234-1234-123456789abc/restore",
+        ),
+    ] {
+        assert!(
+            !direct_api_v1_method_is_allowed(method, path, true),
+            "target broad mutation path must not be reachable yet: {method} {path}"
+        );
+    }
+
+    for (method, path) in [
         (
             &Method::DELETE,
             "/api/v1/targets/12345678-1234-1234-1234-123456789abc",
+        ),
+        (
+            &Method::POST,
+            "/api/v1/targets/12345678-1234-1234-1234-123456789abc/clone",
         ),
         (
             &Method::POST,
@@ -375,19 +392,14 @@ fn native_target_broad_mutation_routes_remain_closed() {
         ),
     ] {
         assert!(
-            !direct_api_v1_method_is_allowed(method, path, true),
-            "target broad mutation path must not be reachable yet: {method} {path}"
+            direct_api_v1_method_is_allowed(method, path, true),
+            "target lifecycle path must be explicitly opened by this bounded slice: {method} {path}"
+        );
+        assert!(
+            !direct_api_v1_method_is_allowed(method, path, false),
+            "target lifecycle path must require direct write-control: {method} {path}"
         );
     }
-
-    assert!(
-        direct_api_v1_method_is_allowed(
-            &Method::POST,
-            "/api/v1/targets/12345678-1234-1234-1234-123456789abc/clone",
-            true,
-        ),
-        "target clone is the only target lifecycle subpath opened in this bounded slice"
-    );
 
     for path in [
         "/api/v1/targets/12345678-1234-1234-1234-123456789abc/clone",
@@ -404,6 +416,8 @@ fn native_target_broad_mutation_routes_remain_closed() {
         ("/targets", "target-list-read"),
         ("/targets/{target_id}", "target-detail-summary-read"),
         ("/targets/{target_id}/clone", "target-clone"),
+        ("/targets/{target_id}/restore", "target-restore"),
+        ("/targets/{target_id}/trash", "target-hard-delete"),
     ] {
         let block = openapi_path_block(path);
         assert!(
@@ -411,12 +425,13 @@ fn native_target_broad_mutation_routes_remain_closed() {
             "{path} OpenAPI block must keep {replacement}"
         );
         assert!(block.contains(
-            "x-turbovas-inherited-still-owns: target-credential-secrets-create-delete-restore-export-and-credential-link-mutation"
+            "x-turbovas-inherited-still-owns: target-create-export-credential-link-and-secret-mutation"
         ));
     }
     let detail = openapi_path_block("/targets/{target_id}");
     assert!(detail.contains("x-turbovas-replaces: target-metadata-and-simple-scan-inputs-modify"));
-    for forbidden in ["post:", "delete:", "/clone", "/restore", "/trash"] {
+    assert!(detail.contains("x-turbovas-replaces: target-trash-move"));
+    for forbidden in ["post:", "/clone", "/restore", "/trash"] {
         assert!(
             !detail.contains(forbidden),
             "target detail OpenAPI must not expose broad mutation {forbidden}"

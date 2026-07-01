@@ -151,8 +151,23 @@ const APPROVED_NATIVE_WRITE_ROUTE_CONTRACTS: &[NativeWriteRouteContract] = &[
         safety_contract: "write-control-v1",
     },
     NativeWriteRouteContract {
+        method: "delete",
+        path: "/api/v1/targets/:target_id",
+        safety_contract: "write-control-v1",
+    },
+    NativeWriteRouteContract {
         method: "post",
         path: "/api/v1/targets/:target_id/clone",
+        safety_contract: "write-control-v1",
+    },
+    NativeWriteRouteContract {
+        method: "post",
+        path: "/api/v1/targets/:target_id/restore",
+        safety_contract: "write-control-v1",
+    },
+    NativeWriteRouteContract {
+        method: "delete",
+        path: "/api/v1/targets/:target_id/trash",
         safety_contract: "write-control-v1",
     },
     NativeWriteRouteContract {

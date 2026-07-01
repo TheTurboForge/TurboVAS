@@ -15,10 +15,7 @@ use crate::{
     errors::ApiError,
     target_handlers::load_target_detail,
     target_write_db::*,
-    target_write_sql::{
-        target_clone_login_data_sql, target_clone_metadata_sql, target_clone_tags_sql,
-        target_update_metadata_sql,
-    },
+    target_write_sql::*,
     target_write_validation::{
         TargetCloneRequest, TargetPatchRequest, ValidatedTargetClone, ValidatedTargetPatch,
         validate_target_clone_request, validate_target_patch_request,
@@ -63,6 +60,92 @@ pub(crate) async fn clone_target(
         target_write_location_headers(&record.uuid)?,
         Json(load_target_detail(&client, &record.uuid).await?),
     ))
+}
+
+pub(crate) async fn delete_target(
+    State(state): State<AppState>,
+    Path(target_id): Path<String>,
+    operator: Option<Extension<DirectApiOperator>>,
+) -> Result<StatusCode, ApiError> {
+    let operator = require_target_write_operator(operator)?;
+    let mut client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let tx = client
+        .transaction()
+        .await
+        .map_err(|error| map_target_write_db_error(error, "begin delete target transaction"))?;
+    let owner_id = resolve_target_write_operator_owner(&tx, &operator).await?;
+    tx.batch_execute(
+        "LOCK TABLE targets, targets_trash, targets_login_data, targets_trash_login_data, tasks, scope_targets, tag_resources, tag_resources_trash IN SHARE ROW EXCLUSIVE MODE;",
+    )
+    .await
+    .map_err(|error| map_target_write_db_error(error, "lock target tables for delete"))?;
+    let state = load_target_write_state(&tx, &target_id).await?;
+    ensure_target_owner_matches_operator(state.owner_id, owner_id)?;
+    ensure_target_not_in_use_for_delete(&tx, state.internal_id).await?;
+    ensure_target_not_in_scope(&tx, state.internal_id).await?;
+    execute_target_trash_transaction(&tx, state.internal_id).await?;
+    tx.commit()
+        .await
+        .map_err(|error| map_target_write_db_error(error, "commit delete target transaction"))?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+pub(crate) async fn hard_delete_target(
+    State(state): State<AppState>,
+    Path(target_id): Path<String>,
+    operator: Option<Extension<DirectApiOperator>>,
+) -> Result<StatusCode, ApiError> {
+    let operator = require_target_write_operator(operator)?;
+    let mut client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let tx = client.transaction().await.map_err(|error| {
+        map_target_write_db_error(error, "begin hard-delete target transaction")
+    })?;
+    let owner_id = resolve_target_write_operator_owner(&tx, &operator).await?;
+    tx.batch_execute(
+        "LOCK TABLE targets_trash, targets_trash_login_data, tasks, tag_resources, tag_resources_trash IN SHARE ROW EXCLUSIVE MODE;",
+    )
+    .await
+    .map_err(|error| map_target_write_db_error(error, "lock target trash tables for hard delete"))?;
+    let trash = load_target_trash_state(&tx, &target_id).await?;
+    ensure_target_owner_matches_operator(trash.owner_id, owner_id)?;
+    ensure_trash_target_not_in_use(&tx, trash.internal_id).await?;
+    execute_target_hard_delete_transaction(&tx, trash.internal_id).await?;
+    tx.commit().await.map_err(|error| {
+        map_target_write_db_error(error, "commit hard-delete target transaction")
+    })?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+pub(crate) async fn restore_target(
+    State(state): State<AppState>,
+    Path(target_id): Path<String>,
+    operator: Option<Extension<DirectApiOperator>>,
+) -> Result<Json<TargetItem>, ApiError> {
+    let operator = require_target_write_operator(operator)?;
+    let mut client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    let tx = client
+        .transaction()
+        .await
+        .map_err(|error| map_target_write_db_error(error, "begin restore target transaction"))?;
+    let owner_id = resolve_target_write_operator_owner(&tx, &operator).await?;
+    tx.batch_execute(
+        "LOCK TABLE targets, targets_trash, targets_login_data, targets_trash_login_data, tasks, tag_resources, tag_resources_trash IN SHARE ROW EXCLUSIVE MODE;",
+    )
+    .await
+    .map_err(|error| map_target_write_db_error(error, "lock target tables for restore"))?;
+    let trash = load_target_trash_state(&tx, &target_id).await?;
+    ensure_target_owner_matches_operator(trash.owner_id, owner_id)?;
+    ensure_unique_live_target_name_for_owner(&tx, &trash.name, trash.owner_id).await?;
+    ensure_target_uuid_not_live(&tx, &trash.uuid).await?;
+    ensure_trash_target_references_live_resources(&tx, trash.internal_id).await?;
+    let record = execute_target_restore_transaction(&tx, trash.internal_id).await?;
+    tx.commit()
+        .await
+        .map_err(|error| map_target_write_db_error(error, "commit restore target transaction"))?;
+
+    Ok(Json(load_target_detail(&client, &record.uuid).await?))
 }
 
 pub(crate) async fn patch_target(
@@ -173,6 +256,153 @@ pub(crate) async fn execute_target_clone_transaction(
     )
     .await?;
     Ok(TargetWriteRecord { uuid: record.uuid })
+}
+
+pub(crate) async fn execute_target_trash_transaction(
+    tx: &Transaction<'_>,
+    target_internal_id: i32,
+) -> Result<TargetWriteRecordWithInternalId, ApiError> {
+    let record = query_target_write_record_with_internal_id(
+        tx,
+        target_trash_insert_sql(),
+        &[&target_internal_id],
+        "move target metadata to trash",
+    )
+    .await?;
+    execute_target_write_sql(
+        tx,
+        target_trash_login_data_insert_sql(),
+        &[&record.internal_id, &target_internal_id],
+        "move target credential references to trash",
+    )
+    .await?;
+    execute_target_write_sql(
+        tx,
+        target_trash_task_relink_sql(),
+        &[&record.internal_id, &target_internal_id],
+        "relink trash tasks to trashed target",
+    )
+    .await?;
+    execute_target_write_sql(
+        tx,
+        target_tag_locations_to_trash_sql(),
+        &[&record.internal_id, &target_internal_id],
+        "move target tag links to trash",
+    )
+    .await?;
+    execute_target_write_sql(
+        tx,
+        target_trash_tag_locations_to_trash_sql(),
+        &[&record.internal_id, &target_internal_id],
+        "move trashed tag links to target trash id",
+    )
+    .await?;
+    execute_target_write_sql(
+        tx,
+        target_delete_login_data_sql(),
+        &[&target_internal_id],
+        "delete live target credential references after trash move",
+    )
+    .await?;
+    execute_target_write_sql(
+        tx,
+        target_delete_metadata_sql(),
+        &[&target_internal_id],
+        "delete live target after trash move",
+    )
+    .await?;
+    Ok(record)
+}
+
+pub(crate) async fn execute_target_restore_transaction(
+    tx: &Transaction<'_>,
+    trash_target_internal_id: i32,
+) -> Result<TargetWriteRecordWithInternalId, ApiError> {
+    let record = query_target_write_record_with_internal_id(
+        tx,
+        target_restore_metadata_sql(),
+        &[&trash_target_internal_id],
+        "restore target metadata from trash",
+    )
+    .await?;
+    execute_target_write_sql(
+        tx,
+        target_restore_login_data_sql(),
+        &[&trash_target_internal_id, &record.internal_id],
+        "restore target credential references from trash",
+    )
+    .await?;
+    execute_target_write_sql(
+        tx,
+        target_restore_task_relink_sql(),
+        &[&trash_target_internal_id, &record.internal_id],
+        "relink trash tasks to restored target",
+    )
+    .await?;
+    execute_target_write_sql(
+        tx,
+        target_tag_locations_to_live_sql(),
+        &[&trash_target_internal_id, &record.internal_id],
+        "restore target tag links from trash",
+    )
+    .await?;
+    execute_target_write_sql(
+        tx,
+        target_trash_tag_locations_to_live_sql(),
+        &[&trash_target_internal_id, &record.internal_id],
+        "restore trashed tag links from target trash id",
+    )
+    .await?;
+    execute_target_write_sql(
+        tx,
+        target_delete_trash_login_data_sql(),
+        &[&trash_target_internal_id],
+        "delete target trash credential references after restore",
+    )
+    .await?;
+    execute_target_write_sql(
+        tx,
+        target_delete_trash_metadata_sql(),
+        &[&trash_target_internal_id],
+        "delete target trash metadata after restore",
+    )
+    .await?;
+    Ok(record)
+}
+
+pub(crate) async fn execute_target_hard_delete_transaction(
+    tx: &Transaction<'_>,
+    trash_target_internal_id: i32,
+) -> Result<(), ApiError> {
+    execute_target_write_sql(
+        tx,
+        target_trash_tag_delete_sql(),
+        &[&trash_target_internal_id],
+        "delete target trash tag links",
+    )
+    .await?;
+    execute_target_write_sql(
+        tx,
+        target_trash_tag_trash_delete_sql(),
+        &[&trash_target_internal_id],
+        "delete trashed tag links to target trash id",
+    )
+    .await?;
+    execute_target_write_sql(
+        tx,
+        target_delete_trash_login_data_sql(),
+        &[&trash_target_internal_id],
+        "delete target trash credential references for hard delete",
+    )
+    .await?;
+    execute_target_write_sql(
+        tx,
+        target_delete_trash_metadata_sql(),
+        &[&trash_target_internal_id],
+        "delete target trash metadata for hard delete",
+    )
+    .await?;
+    Ok(())
 }
 
 fn target_write_location_headers(target_id: &str) -> Result<HeaderMap, ApiError> {

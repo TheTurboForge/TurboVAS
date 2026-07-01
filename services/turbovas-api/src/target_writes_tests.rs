@@ -405,6 +405,52 @@ fn target_clone_sql_copies_metadata_credential_references_and_active_tags_only()
 }
 
 #[test]
+fn target_lifecycle_sql_moves_metadata_references_and_tags_without_secrets() {
+    let trash = target_trash_insert_sql();
+    assert!(trash.contains("INSERT INTO targets_trash"));
+    assert!(trash.contains("port_list_location"));
+    assert!(trash.contains("RETURNING id::integer, uuid::text"));
+
+    let trash_login = target_trash_login_data_insert_sql();
+    assert!(trash_login.contains("INSERT INTO targets_trash_login_data"));
+    assert!(trash_login.contains("credential_location"));
+    assert!(trash_login.contains("FROM targets_login_data"));
+    assert!(!trash_login.contains("credentials_data"));
+
+    let restore = target_restore_metadata_sql();
+    assert!(restore.contains("INSERT INTO targets"));
+    assert!(restore.contains("FROM targets_trash"));
+
+    let restore_login = target_restore_login_data_sql();
+    assert!(restore_login.contains("INSERT INTO targets_login_data"));
+    assert!(restore_login.contains("FROM targets_trash_login_data"));
+    assert!(!restore_login.contains("credentials_data"));
+
+    for sql in [
+        target_trash_task_relink_sql(),
+        target_restore_task_relink_sql(),
+    ] {
+        assert!(sql.contains("UPDATE tasks"));
+        assert!(sql.contains("target_location"));
+    }
+
+    for sql in [
+        target_tag_locations_to_trash_sql(),
+        target_trash_tag_locations_to_trash_sql(),
+        target_tag_locations_to_live_sql(),
+        target_trash_tag_locations_to_live_sql(),
+    ] {
+        assert!(sql.contains("resource_type = 'target'"));
+        assert!(sql.contains("resource_location"));
+    }
+
+    assert!(target_scope_membership_count_sql().contains("FROM scope_targets"));
+    assert!(target_trash_task_count_sql().contains("target_location = 1"));
+    assert!(target_trash_blocked_reference_count_sql().contains("credential_location = 1"));
+    assert!(target_trash_blocked_reference_count_sql().contains("port_list_location = 1"));
+}
+
+#[test]
 fn target_patch_state_and_uniqueness_are_live_metadata_only() {
     let state = target_write_state_sql();
     assert!(state.contains("FROM targets"));

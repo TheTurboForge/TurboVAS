@@ -25,6 +25,14 @@ pub(crate) struct TargetWriteState {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TargetTrashState {
+    pub(crate) internal_id: i32,
+    pub(crate) uuid: String,
+    pub(crate) owner_id: i32,
+    pub(crate) name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct AssignableTargetPortList {
     pub(crate) internal_id: i32,
 }
@@ -64,6 +72,23 @@ pub(crate) async fn load_target_write_state(
         .map(|row| TargetWriteState {
             internal_id: row.get(0),
             owner_id: row.get(1),
+        })
+        .ok_or(ApiError::NotFound)
+}
+
+pub(crate) async fn load_target_trash_state(
+    tx: &Transaction<'_>,
+    target_id: &str,
+) -> Result<TargetTrashState, ApiError> {
+    let target_id = parse_uuid(target_id)?.to_string();
+    tx.query_opt(target_trash_state_sql(), &[&target_id])
+        .await
+        .map_err(|error| map_target_write_db_error(error, "load target trash state"))?
+        .map(|row| TargetTrashState {
+            internal_id: row.get(0),
+            uuid: row.get(1),
+            owner_id: row.get(2),
+            name: row.get(3),
         })
         .ok_or(ApiError::NotFound)
 }
@@ -109,6 +134,121 @@ pub(crate) async fn ensure_unique_target_name(
         )
         .await
         .map_err(|error| map_target_write_db_error(error, "check target name uniqueness"))?
+        .get(0);
+    if count == 0 {
+        Ok(())
+    } else {
+        Err(ApiError::Conflict(
+            "target with the same name already exists".to_string(),
+        ))
+    }
+}
+
+pub(crate) async fn ensure_target_not_in_use_for_delete(
+    tx: &Transaction<'_>,
+    target_internal_id: i32,
+) -> Result<(), ApiError> {
+    let count: i64 = tx
+        .query_one(target_in_use_sql(), &[&target_internal_id])
+        .await
+        .map_err(|error| map_target_write_db_error(error, "check target task references"))?
+        .get(0);
+    if count == 0 {
+        Ok(())
+    } else {
+        Err(ApiError::Conflict(
+            "target cannot be deleted while it is used by a live task".to_string(),
+        ))
+    }
+}
+
+pub(crate) async fn ensure_target_not_in_scope(
+    tx: &Transaction<'_>,
+    target_internal_id: i32,
+) -> Result<(), ApiError> {
+    let count: i64 = tx
+        .query_one(target_scope_membership_count_sql(), &[&target_internal_id])
+        .await
+        .map_err(|error| map_target_write_db_error(error, "check target scope memberships"))?
+        .get(0);
+    if count == 0 {
+        Ok(())
+    } else {
+        Err(ApiError::Conflict(
+            "target cannot be deleted while it belongs to a scope".to_string(),
+        ))
+    }
+}
+
+pub(crate) async fn ensure_trash_target_not_in_use(
+    tx: &Transaction<'_>,
+    target_internal_id: i32,
+) -> Result<(), ApiError> {
+    let count: i64 = tx
+        .query_one(target_trash_task_count_sql(), &[&target_internal_id])
+        .await
+        .map_err(|error| map_target_write_db_error(error, "check trash target task references"))?
+        .get(0);
+    if count == 0 {
+        Ok(())
+    } else {
+        Err(ApiError::Conflict(
+            "target cannot be hard-deleted while trash tasks reference it".to_string(),
+        ))
+    }
+}
+
+pub(crate) async fn ensure_trash_target_references_live_resources(
+    tx: &Transaction<'_>,
+    target_internal_id: i32,
+) -> Result<(), ApiError> {
+    let count: i64 = tx
+        .query_one(
+            target_trash_blocked_reference_count_sql(),
+            &[&target_internal_id],
+        )
+        .await
+        .map_err(|error| map_target_write_db_error(error, "check target restore references"))?
+        .get(0);
+    if count == 0 {
+        Ok(())
+    } else {
+        Err(ApiError::Conflict(
+            "target cannot be restored while its port list or credentials are in trash".to_string(),
+        ))
+    }
+}
+
+pub(crate) async fn ensure_target_uuid_not_live(
+    tx: &Transaction<'_>,
+    target_uuid: &str,
+) -> Result<(), ApiError> {
+    let count: i64 = tx
+        .query_one(target_live_uuid_conflict_sql(), &[&target_uuid])
+        .await
+        .map_err(|error| map_target_write_db_error(error, "check live target uuid conflict"))?
+        .get(0);
+    if count == 0 {
+        Ok(())
+    } else {
+        Err(ApiError::Conflict(
+            "target with the same id already exists".to_string(),
+        ))
+    }
+}
+
+pub(crate) async fn ensure_unique_live_target_name_for_owner(
+    tx: &Transaction<'_>,
+    name: &str,
+    owner_id: i32,
+) -> Result<(), ApiError> {
+    let count: i64 = tx
+        .query_one(
+            target_trash_unique_live_owner_name_sql(),
+            &[&name, &owner_id],
+        )
+        .await
+        .map_err(|error| map_target_write_db_error(error, "check live target name conflict"))?
         .get(0);
     if count == 0 {
         Ok(())

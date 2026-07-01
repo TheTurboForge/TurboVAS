@@ -593,8 +593,11 @@ OPENAPI_ALLOWED_REPLACES_VALUES = frozenset(
         "tag-resource-reference-read",
         "target-detail-summary-read",
         "target-clone",
+        "target-hard-delete",
         "target-list-read",
         "target-metadata-and-simple-scan-inputs-modify",
+        "target-restore",
+        "target-trash-move",
         "task-metadata-modify",
         "task-detail-summary-read",
         "task-list-read",
@@ -630,6 +633,7 @@ OPENAPI_ALLOWED_INHERITED_STILL_OWNS_VALUES = frozenset(
         "scope-report-generation",
         "scope-report-generation-retention-and-mutations",
         "tag-security-info-filter-actions-export",
+        "target-create-export-credential-link-and-secret-mutation",
         "target-credential-secrets-create-delete-restore-export-and-credential-link-mutation",
         "target-credential-secrets-writes-and-deletes",
         "task-scan-control-writes-and-deletes",
@@ -674,7 +678,10 @@ OPENAPI_REQUIRED_EXPOSURE = {
     ("get", "/credentials/{credential_id}"): "direct-read",
     ("patch", "/credentials/{credential_id}"): "direct-write",
     ("patch", "/targets/{target_id}"): "direct-write",
+    ("delete", "/targets/{target_id}"): "direct-write",
     ("post", "/targets/{target_id}/clone"): "direct-write",
+    ("post", "/targets/{target_id}/restore"): "direct-write",
+    ("delete", "/targets/{target_id}/trash"): "direct-write",
     ("patch", "/tasks/{task_id}"): "direct-write",
     ("get", "/scan-configs"): "direct-read",
     ("get", "/scan-configs/{scan_config_id}"): "direct-read",
@@ -1314,17 +1321,17 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-replaces": "scope-metadata-membership-write",
     },
     ("get", "/targets"): {
-        "x-turbovas-inherited-still-owns": "target-credential-secrets-create-delete-restore-export-and-credential-link-mutation",
+        "x-turbovas-inherited-still-owns": "target-create-export-credential-link-and-secret-mutation",
         "x-turbovas-maturity": "live-read",
         "x-turbovas-replaces": "target-list-read",
     },
     ("get", "/targets/{target_id}"): {
-        "x-turbovas-inherited-still-owns": "target-credential-secrets-create-delete-restore-export-and-credential-link-mutation",
+        "x-turbovas-inherited-still-owns": "target-create-export-credential-link-and-secret-mutation",
         "x-turbovas-maturity": "live-read",
         "x-turbovas-replaces": "target-detail-summary-read",
     },
     ("patch", "/targets/{target_id}"): {
-        "x-turbovas-inherited-still-owns": "target-credential-secrets-create-delete-restore-export-and-credential-link-mutation",
+        "x-turbovas-inherited-still-owns": "target-create-export-credential-link-and-secret-mutation",
         "x-turbovas-maturity": "live-write",
         "x-turbovas-operator-identity": "direct-token-operator",
         "x-turbovas-owner-semantics": "preserve-existing-owner",
@@ -1332,14 +1339,41 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-safety-contract": "write-control-v1",
         "x-turbovas-side-effect": "metadata-write",
     },
+    ("delete", "/targets/{target_id}"): {
+        "x-turbovas-inherited-still-owns": "target-create-export-credential-link-and-secret-mutation",
+        "x-turbovas-maturity": "live-write",
+        "x-turbovas-operator-identity": "direct-token-operator",
+        "x-turbovas-owner-semantics": "preserve-existing-owner",
+        "x-turbovas-replaces": "target-trash-move",
+        "x-turbovas-safety-contract": "write-control-v1",
+        "x-turbovas-side-effect": "metadata-delete",
+    },
     ("post", "/targets/{target_id}/clone"): {
-        "x-turbovas-inherited-still-owns": "target-credential-secrets-create-delete-restore-export-and-credential-link-mutation",
+        "x-turbovas-inherited-still-owns": "target-create-export-credential-link-and-secret-mutation",
         "x-turbovas-maturity": "live-write",
         "x-turbovas-operator-identity": "direct-token-operator",
         "x-turbovas-owner-semantics": "request-operator-owner",
         "x-turbovas-replaces": "target-clone",
         "x-turbovas-safety-contract": "write-control-v1",
         "x-turbovas-side-effect": "metadata-write",
+    },
+    ("post", "/targets/{target_id}/restore"): {
+        "x-turbovas-inherited-still-owns": "target-create-export-credential-link-and-secret-mutation",
+        "x-turbovas-maturity": "live-write",
+        "x-turbovas-operator-identity": "direct-token-operator",
+        "x-turbovas-owner-semantics": "preserve-existing-owner",
+        "x-turbovas-replaces": "target-restore",
+        "x-turbovas-safety-contract": "write-control-v1",
+        "x-turbovas-side-effect": "metadata-write",
+    },
+    ("delete", "/targets/{target_id}/trash"): {
+        "x-turbovas-inherited-still-owns": "target-create-export-credential-link-and-secret-mutation",
+        "x-turbovas-maturity": "live-write",
+        "x-turbovas-operator-identity": "direct-token-operator",
+        "x-turbovas-owner-semantics": "preserve-existing-owner",
+        "x-turbovas-replaces": "target-hard-delete",
+        "x-turbovas-safety-contract": "write-control-v1",
+        "x-turbovas-side-effect": "metadata-delete",
     },
     ("get", "/tasks"): {
         "x-turbovas-inherited-still-owns": "task-scan-control-writes-and-deletes",
@@ -7408,6 +7442,27 @@ def summarize_native_tooling(items: list[dict[str, Any]], repo_root: Path | None
                 "replacement_candidates": ["direct native target clone with copied scan inputs and credential references"],
             },
             {
+                "method": "delete",
+                "endpoint": "/api/v1/targets/{target_id}",
+                "status": "implemented_direct_write_control",
+                "direct_access": "direct_write_control",
+                "replacement_candidates": ["direct native target live-to-trash move"],
+            },
+            {
+                "method": "post",
+                "endpoint": "/api/v1/targets/{target_id}/restore",
+                "status": "implemented_direct_write_control",
+                "direct_access": "direct_write_control",
+                "replacement_candidates": ["direct native target restore from trash"],
+            },
+            {
+                "method": "delete",
+                "endpoint": "/api/v1/targets/{target_id}/trash",
+                "status": "implemented_direct_write_control",
+                "direct_access": "direct_write_control",
+                "replacement_candidates": ["direct native target hard delete from trash"],
+            },
+            {
                 "endpoint": "/api/v1/tasks",
                 "status": "implemented_internal_and_browser_proxied",
                 "replacement_candidates": ["GSA task list reads (migrated through gsad same-origin proxy)", "read-only task automation", "native-api-request helper"],
@@ -12534,6 +12589,9 @@ def direct_smoke_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
             "native-api-direct.target-fixture",
             "native-api-direct.target-write-update",
             "native-api-direct.target-write-clone",
+            "native-api-direct.target-write-delete-clone",
+            "native-api-direct.target-write-hard-delete-clone",
+            "native-api-direct.target-write-post-hard-delete-clone",
             "native-api-direct.target-alive-test-update",
             "native-api-direct.target-port-list-update",
             "native-api-direct.target-hosts-update",
@@ -12541,6 +12599,12 @@ def direct_smoke_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
             "native-api-direct.target-scan-settings-in-use-denied",
             "native-api-direct.target-port-list-in-use-denied",
             "native-api-direct.target-hosts-in-use-denied",
+            "native-api-direct.target-write-delete",
+            "native-api-direct.target-write-post-delete",
+            "native-api-direct.target-write-restore",
+            "native-api-direct.target-write-delete-after-restore",
+            "native-api-direct.target-write-hard-delete",
+            "native-api-direct.target-write-post-hard-delete",
             "native-api-direct.target-fixture-cleanup",
             "native-api-direct.task-fixture",
             "native-api-direct.task-write-update",
@@ -13860,6 +13924,22 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
                 target_clone_ok = target_clone.returncode == 0 and target_clone_status == 201 and bool(target_clone_id) and target_clone_id != target_id and isinstance(target_clone_json, dict) and target_clone_json.get("name") == target_clone_name and target_clone_json.get("comment") == "TurboVAS direct write smoke cloned target comment" and target_clone_json.get("hosts") == ["192.0.2.42", "192.0.2.43"] and target_clone_json.get("exclude_hosts") == ["192.0.2.43"] and target_clone_state == "192.0.2.42, 192.0.2.43|192.0.2.43|16|1|1|0|0"
                 findings.append(native_api_probe_finding("pass" if target_clone_ok else "fail", "native-api-direct.target-write-clone", "Direct write-control cloned the temporary target without tasks or credential secrets." if target_clone_ok else "Direct write-control failed to clone the temporary target safely.", target_clone, direct_native_api_display_command(f"/api/v1/targets/{urllib.parse.quote(target_id)}/clone", token=token, env=env, method="POST", body=target_clone_body, extra_headers=content_type), target_clone_json, {"http_status": target_clone_status, "target_id": target_id, "target_clone_id": target_clone_id, "clone_state": target_clone_state, **summarize_native_api_response(target_clone_json)}))
 
+                if target_clone_id:
+                    target_clone_delete = direct_native_api_curl(repo_root, f"/api/v1/targets/{urllib.parse.quote(target_clone_id)}", token=token, env=env, method="DELETE")
+                    target_clone_delete_json, target_clone_delete_status = parse_json_output_with_http_status(target_clone_delete)
+                    target_clone_delete_ok = target_clone_delete.returncode == 0 and target_clone_delete_status == 204
+                    findings.append(native_api_probe_finding("pass" if target_clone_delete_ok else "fail", "native-api-direct.target-write-delete-clone", "Direct write-control moved the cloned target to trash." if target_clone_delete_ok else "Direct write-control failed to move the cloned target to trash.", target_clone_delete, direct_native_api_display_command(f"/api/v1/targets/{urllib.parse.quote(target_clone_id)}", token=token, env=env, method="DELETE"), target_clone_delete_json, {"http_status": target_clone_delete_status, "target_clone_id": target_clone_id, **summarize_native_api_response(target_clone_delete_json)}))
+
+                    target_clone_hard_delete = direct_native_api_curl(repo_root, f"/api/v1/targets/{urllib.parse.quote(target_clone_id)}/trash", token=token, env=env, method="DELETE")
+                    target_clone_hard_delete_json, target_clone_hard_delete_status = parse_json_output_with_http_status(target_clone_hard_delete)
+                    target_clone_hard_delete_ok = target_clone_hard_delete.returncode == 0 and target_clone_hard_delete_status == 204
+                    findings.append(native_api_probe_finding("pass" if target_clone_hard_delete_ok else "fail", "native-api-direct.target-write-hard-delete-clone", "Direct write-control hard-deleted the trashed target clone." if target_clone_hard_delete_ok else "Direct write-control failed to hard-delete the trashed target clone.", target_clone_hard_delete, direct_native_api_display_command(f"/api/v1/targets/{urllib.parse.quote(target_clone_id)}/trash", token=token, env=env, method="DELETE"), target_clone_hard_delete_json, {"http_status": target_clone_hard_delete_status, "target_clone_id": target_clone_id, **summarize_native_api_response(target_clone_hard_delete_json)}))
+
+                    target_clone_post_hard_delete = direct_native_api_curl(repo_root, f"/api/v1/targets/{urllib.parse.quote(target_clone_id)}", token=token, env=env)
+                    target_clone_post_hard_delete_json, target_clone_post_hard_delete_status = parse_json_output_with_http_status(target_clone_post_hard_delete)
+                    target_clone_post_hard_delete_ok = target_clone_post_hard_delete.returncode == 0 and target_clone_post_hard_delete_status == 404
+                    findings.append(native_api_probe_finding("pass" if target_clone_post_hard_delete_ok else "fail", "native-api-direct.target-write-post-hard-delete-clone", "Direct native API no longer returns the hard-deleted target clone." if target_clone_post_hard_delete_ok else "Direct native API still returned the hard-deleted target clone.", target_clone_post_hard_delete, direct_native_api_display_command(f"/api/v1/targets/{urllib.parse.quote(target_clone_id)}", token=token, env=env), target_clone_post_hard_delete_json, {"http_status": target_clone_post_hard_delete_status, "target_clone_id": target_clone_id, **summarize_native_api_response(target_clone_post_hard_delete_json)}))
+
                 task_fixture_sql = (
                     "WITH live_target AS (SELECT id, owner FROM targets "
                     f"WHERE uuid = {sql_literal(target_id)} AND name = {sql_literal(target_name)}), "
@@ -13942,25 +14022,61 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
                         task_cleanup_details.update({"task_id": task_id, "task_name": task_name, "deleted_count": task_cleanup_deleted})
                     findings.append(task_cleanup_finding)
 
+                target_delete = direct_native_api_curl(repo_root, f"/api/v1/targets/{urllib.parse.quote(target_id)}", token=token, env=env, method="DELETE")
+                target_delete_json, target_delete_status = parse_json_output_with_http_status(target_delete)
+                target_delete_ok = target_delete.returncode == 0 and target_delete_status == 204
+                findings.append(native_api_probe_finding("pass" if target_delete_ok else "fail", "native-api-direct.target-write-delete", "Direct write-control moved the temporary target to trash." if target_delete_ok else "Direct write-control failed to move the temporary target to trash.", target_delete, direct_native_api_display_command(f"/api/v1/targets/{urllib.parse.quote(target_id)}", token=token, env=env, method="DELETE"), target_delete_json, {"http_status": target_delete_status, "target_id": target_id, **summarize_native_api_response(target_delete_json)}))
+
+                target_post_delete = direct_native_api_curl(repo_root, f"/api/v1/targets/{urllib.parse.quote(target_id)}", token=token, env=env)
+                target_post_delete_json, target_post_delete_status = parse_json_output_with_http_status(target_post_delete)
+                target_post_delete_ok = target_post_delete.returncode == 0 and target_post_delete_status == 404
+                findings.append(native_api_probe_finding("pass" if target_post_delete_ok else "fail", "native-api-direct.target-write-post-delete", "Direct native API no longer returns the target after trash move." if target_post_delete_ok else "Direct native API still returned the target after trash move.", target_post_delete, direct_native_api_display_command(f"/api/v1/targets/{urllib.parse.quote(target_id)}", token=token, env=env), target_post_delete_json, {"http_status": target_post_delete_status, "target_id": target_id, **summarize_native_api_response(target_post_delete_json)}))
+
+                target_restore = direct_native_api_curl(repo_root, f"/api/v1/targets/{urllib.parse.quote(target_id)}/restore", token=token, env=env, method="POST")
+                target_restore_json, target_restore_status = parse_json_output_with_http_status(target_restore)
+                target_restore_ok = target_restore.returncode == 0 and target_restore_status == 200 and isinstance(target_restore_json, dict) and target_restore_json.get("id") == target_id
+                findings.append(native_api_probe_finding("pass" if target_restore_ok else "fail", "native-api-direct.target-write-restore", "Direct write-control restored the trashed target with its UUID and owner-preserved metadata." if target_restore_ok else "Direct write-control failed to restore the trashed target.", target_restore, direct_native_api_display_command(f"/api/v1/targets/{urllib.parse.quote(target_id)}/restore", token=token, env=env, method="POST"), target_restore_json, {"http_status": target_restore_status, "target_id": target_id, **summarize_native_api_response(target_restore_json)}))
+
+                target_delete_after_restore = direct_native_api_curl(repo_root, f"/api/v1/targets/{urllib.parse.quote(target_id)}", token=token, env=env, method="DELETE")
+                target_delete_after_restore_json, target_delete_after_restore_status = parse_json_output_with_http_status(target_delete_after_restore)
+                target_delete_after_restore_ok = target_delete_after_restore.returncode == 0 and target_delete_after_restore_status == 204
+                findings.append(native_api_probe_finding("pass" if target_delete_after_restore_ok else "fail", "native-api-direct.target-write-delete-after-restore", "Direct write-control moved the restored target back to trash." if target_delete_after_restore_ok else "Direct write-control failed to move the restored target back to trash.", target_delete_after_restore, direct_native_api_display_command(f"/api/v1/targets/{urllib.parse.quote(target_id)}", token=token, env=env, method="DELETE"), target_delete_after_restore_json, {"http_status": target_delete_after_restore_status, "target_id": target_id, **summarize_native_api_response(target_delete_after_restore_json)}))
+
+                target_hard_delete = direct_native_api_curl(repo_root, f"/api/v1/targets/{urllib.parse.quote(target_id)}/trash", token=token, env=env, method="DELETE")
+                target_hard_delete_json, target_hard_delete_status = parse_json_output_with_http_status(target_hard_delete)
+                target_hard_delete_ok = target_hard_delete.returncode == 0 and target_hard_delete_status == 204
+                findings.append(native_api_probe_finding("pass" if target_hard_delete_ok else "fail", "native-api-direct.target-write-hard-delete", "Direct write-control hard-deleted the trashed target." if target_hard_delete_ok else "Direct write-control failed to hard-delete the trashed target.", target_hard_delete, direct_native_api_display_command(f"/api/v1/targets/{urllib.parse.quote(target_id)}/trash", token=token, env=env, method="DELETE"), target_hard_delete_json, {"http_status": target_hard_delete_status, "target_id": target_id, **summarize_native_api_response(target_hard_delete_json)}))
+
+                target_post_hard_delete = direct_native_api_curl(repo_root, f"/api/v1/targets/{urllib.parse.quote(target_id)}", token=token, env=env)
+                target_post_hard_delete_json, target_post_hard_delete_status = parse_json_output_with_http_status(target_post_hard_delete)
+                target_post_hard_delete_ok = target_post_hard_delete.returncode == 0 and target_post_hard_delete_status == 404
+                findings.append(native_api_probe_finding("pass" if target_post_hard_delete_ok else "fail", "native-api-direct.target-write-post-hard-delete", "Direct native API no longer returns the hard-deleted target." if target_post_hard_delete_ok else "Direct native API still returned the hard-deleted target.", target_post_hard_delete, direct_native_api_display_command(f"/api/v1/targets/{urllib.parse.quote(target_id)}", token=token, env=env), target_post_hard_delete_json, {"http_status": target_post_hard_delete_status, "target_id": target_id, **summarize_native_api_response(target_post_hard_delete_json)}))
+
                 target_cleanup_sql = (
                     "WITH live_target AS (SELECT id FROM targets "
                     f"WHERE (uuid = {sql_literal(target_id)} AND name = {sql_literal(target_name)}) "
                     f"OR (uuid = {sql_literal(target_clone_id or '')} AND name = {sql_literal(target_clone_name)})), "
+                    "trash_target AS (SELECT id FROM targets_trash "
+                    f"WHERE (uuid = {sql_literal(target_id)} AND name = {sql_literal(target_name)}) "
+                    f"OR (uuid = {sql_literal(target_clone_id or '')} AND name = {sql_literal(target_clone_name)})), "
                     "deleted_scope_targets AS (DELETE FROM scope_targets WHERE target IN (SELECT id FROM live_target)), "
-                    "deleted_login_data AS (DELETE FROM targets_login_data WHERE target IN (SELECT id FROM live_target)), "
-                    "deleted_tags AS (DELETE FROM tag_resources WHERE resource_type = 'target' AND resource IN (SELECT id FROM live_target)), "
-                    "deleted_trash_tags AS (DELETE FROM tag_resources_trash WHERE resource_type = 'target' AND resource IN (SELECT id FROM live_target)), "
-                    "deleted_target AS (DELETE FROM targets WHERE id IN (SELECT id FROM live_target) RETURNING id) "
-                    "SELECT count(*) FROM deleted_target;"
+                    "deleted_live_login_data AS (DELETE FROM targets_login_data WHERE target IN (SELECT id FROM live_target)), "
+                    "deleted_trash_login_data AS (DELETE FROM targets_trash_login_data WHERE target IN (SELECT id FROM trash_target)), "
+                    "deleted_live_tags AS (DELETE FROM tag_resources WHERE resource_type = 'target' AND resource_location = 0 AND resource IN (SELECT id FROM live_target)), "
+                    "deleted_live_trash_tags AS (DELETE FROM tag_resources_trash WHERE resource_type = 'target' AND resource_location = 0 AND resource IN (SELECT id FROM live_target)), "
+                    "deleted_trash_tags AS (DELETE FROM tag_resources WHERE resource_type = 'target' AND resource_location = 1 AND resource IN (SELECT id FROM trash_target)), "
+                    "deleted_trash_trash_tags AS (DELETE FROM tag_resources_trash WHERE resource_type = 'target' AND resource_location = 1 AND resource IN (SELECT id FROM trash_target)), "
+                    "deleted_live_target AS (DELETE FROM targets WHERE id IN (SELECT id FROM live_target) RETURNING id), "
+                    "deleted_trash_target AS (DELETE FROM targets_trash WHERE id IN (SELECT id FROM trash_target) RETURNING id) "
+                    "SELECT (SELECT count(*) FROM deleted_live_target)::text || '|' || (SELECT count(*) FROM deleted_trash_target)::text;"
                 )
                 target_cleanup = psql(repo_root, target_cleanup_sql)
                 target_cleanup_deleted = psql_value(target_cleanup)
-                expected_target_cleanup_deleted = "2" if target_clone_id else "1"
-                target_cleanup_ok = target_cleanup.returncode == 0 and target_cleanup_deleted == expected_target_cleanup_deleted
-                target_cleanup_finding = process_step_finding("pass" if target_cleanup_ok else "fail", "native-api-direct.target-fixture-cleanup", "Direct write-control smoke removed the temporary target fixture and clone." if target_cleanup_ok else "Direct write-control smoke failed to clean up the temporary target fixture or clone.", target_cleanup, ["psql", "fixed-target-smoke-cleanup"])
+                target_cleanup_ok = target_cleanup.returncode == 0
+                target_cleanup_finding = process_step_finding("pass" if target_cleanup_ok else "fail", "native-api-direct.target-fixture-cleanup", "Direct write-control smoke verified or removed any temporary target live/trash residue." if target_cleanup_ok else "Direct write-control smoke failed to clean up temporary target live/trash residue.", target_cleanup, ["psql", "fixed-target-smoke-cleanup"])
                 target_cleanup_details = target_cleanup_finding.setdefault("details", {})
                 if isinstance(target_cleanup_details, dict):
-                    target_cleanup_details.update({"target_id": target_id, "target_clone_id": target_clone_id, "target_name": target_name, "deleted_count": target_cleanup_deleted, "expected_deleted_count": expected_target_cleanup_deleted})
+                    target_cleanup_details.update({"target_id": target_id, "target_clone_id": target_clone_id, "target_name": target_name, "deleted_counts": target_cleanup_deleted})
                 findings.append(target_cleanup_finding)
 
             patch_body = json.dumps(
@@ -14552,6 +14668,39 @@ def command_runtime_native_api_direct_smoke(repo_root: Path, status_only: bool =
     disabled_target_clone_json, disabled_target_clone_status = parse_json_output_with_http_status(disabled_target_clone)
     disabled_target_clone_ok = disabled_target_clone.returncode == 0 and disabled_target_clone_status == 405 and isinstance(disabled_target_clone_json, dict) and disabled_target_clone_json.get("error", {}).get("code") == "method_not_allowed"
     findings.append(native_api_probe_finding("pass" if disabled_target_clone_ok else "fail", "native-api-direct.target-clone-disabled", "Direct native API rejects target clones while direct write-control is disabled." if disabled_target_clone_ok else "Direct native API did not reject a target clone while direct write-control is disabled.", disabled_target_clone, direct_native_api_display_command("/api/v1/targets/00000000-0000-0000-0000-000000000000/clone", token=token, env=env, method="POST"), disabled_target_clone_json, {"http_status": disabled_target_clone_status, **summarize_native_api_response(disabled_target_clone_json)}))
+
+    disabled_target_delete = direct_native_api_curl(
+        repo_root,
+        "/api/v1/targets/00000000-0000-0000-0000-000000000000",
+        token=token,
+        env=env,
+        method="DELETE",
+    )
+    disabled_target_delete_json, disabled_target_delete_status = parse_json_output_with_http_status(disabled_target_delete)
+    disabled_target_delete_ok = disabled_target_delete.returncode == 0 and disabled_target_delete_status == 405 and isinstance(disabled_target_delete_json, dict) and disabled_target_delete_json.get("error", {}).get("code") == "method_not_allowed"
+    findings.append(native_api_probe_finding("pass" if disabled_target_delete_ok else "fail", "native-api-direct.target-delete-disabled", "Direct native API rejects target deletes while direct write-control is disabled." if disabled_target_delete_ok else "Direct native API did not reject a target delete while direct write-control is disabled.", disabled_target_delete, direct_native_api_display_command("/api/v1/targets/00000000-0000-0000-0000-000000000000", token=token, env=env, method="DELETE"), disabled_target_delete_json, {"http_status": disabled_target_delete_status, **summarize_native_api_response(disabled_target_delete_json)}))
+
+    disabled_target_restore = direct_native_api_curl(
+        repo_root,
+        "/api/v1/targets/00000000-0000-0000-0000-000000000000/restore",
+        token=token,
+        env=env,
+        method="POST",
+    )
+    disabled_target_restore_json, disabled_target_restore_status = parse_json_output_with_http_status(disabled_target_restore)
+    disabled_target_restore_ok = disabled_target_restore.returncode == 0 and disabled_target_restore_status == 405 and isinstance(disabled_target_restore_json, dict) and disabled_target_restore_json.get("error", {}).get("code") == "method_not_allowed"
+    findings.append(native_api_probe_finding("pass" if disabled_target_restore_ok else "fail", "native-api-direct.target-restore-disabled", "Direct native API rejects target restores while direct write-control is disabled." if disabled_target_restore_ok else "Direct native API did not reject a target restore while direct write-control is disabled.", disabled_target_restore, direct_native_api_display_command("/api/v1/targets/00000000-0000-0000-0000-000000000000/restore", token=token, env=env, method="POST"), disabled_target_restore_json, {"http_status": disabled_target_restore_status, **summarize_native_api_response(disabled_target_restore_json)}))
+
+    disabled_target_hard_delete = direct_native_api_curl(
+        repo_root,
+        "/api/v1/targets/00000000-0000-0000-0000-000000000000/trash",
+        token=token,
+        env=env,
+        method="DELETE",
+    )
+    disabled_target_hard_delete_json, disabled_target_hard_delete_status = parse_json_output_with_http_status(disabled_target_hard_delete)
+    disabled_target_hard_delete_ok = disabled_target_hard_delete.returncode == 0 and disabled_target_hard_delete_status == 405 and isinstance(disabled_target_hard_delete_json, dict) and disabled_target_hard_delete_json.get("error", {}).get("code") == "method_not_allowed"
+    findings.append(native_api_probe_finding("pass" if disabled_target_hard_delete_ok else "fail", "native-api-direct.target-hard-delete-disabled", "Direct native API rejects target hard deletes while direct write-control is disabled." if disabled_target_hard_delete_ok else "Direct native API did not reject a target hard delete while direct write-control is disabled.", disabled_target_hard_delete, direct_native_api_display_command("/api/v1/targets/00000000-0000-0000-0000-000000000000/trash", token=token, env=env, method="DELETE"), disabled_target_hard_delete_json, {"http_status": disabled_target_hard_delete_status, **summarize_native_api_response(disabled_target_hard_delete_json)}))
 
     disabled_task_patch = direct_native_api_curl(
         repo_root,
