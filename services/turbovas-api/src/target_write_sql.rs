@@ -13,6 +13,22 @@ pub(crate) fn target_write_state_sql() -> &'static str {
       WHERE uuid = $1;"
 }
 
+pub(crate) fn target_source_port_list_is_assignable_sql() -> &'static str {
+    "SELECT count(*)::bigint
+       FROM targets t
+       JOIN port_lists pl ON pl.id = t.port_list
+      WHERE t.id = $1
+        AND NOT (coalesce(pl.predefined, 0) != 0 OR pl.owner = $2);"
+}
+
+pub(crate) fn target_source_unassignable_credential_count_sql() -> &'static str {
+    "SELECT count(*)::bigint
+       FROM targets_login_data tld
+       JOIN credentials c ON c.id = tld.credential
+      WHERE tld.target = $1
+        AND c.owner != $2;"
+}
+
 pub(crate) fn target_unique_name_sql() -> &'static str {
     "SELECT count(*)::bigint
        FROM targets
@@ -51,4 +67,43 @@ pub(crate) fn target_update_metadata_sql() -> &'static str {
             modification_time = m_now()
       WHERE id = $1
       RETURNING uuid::text;"
+}
+
+pub(crate) fn target_clone_metadata_sql() -> &'static str {
+    "INSERT INTO targets
+        (uuid, owner, name, hosts, exclude_hosts, reverse_lookup_only,
+         reverse_lookup_unify, comment, port_list, alive_test, creation_time,
+         modification_time, allow_simultaneous_ips)
+     SELECT make_uuid(),
+            $2,
+            coalesce($3, uniquify('target', name, $2, ' Clone')),
+            hosts,
+            exclude_hosts,
+            reverse_lookup_only,
+            reverse_lookup_unify,
+            coalesce($4, comment),
+            port_list,
+            alive_test,
+            m_now(),
+            m_now(),
+            allow_simultaneous_ips
+       FROM targets
+      WHERE id = $1
+      RETURNING id::integer, uuid::text;"
+}
+
+pub(crate) fn target_clone_login_data_sql() -> &'static str {
+    "INSERT INTO targets_login_data (target, type, credential, port)
+     SELECT $2, type, credential, port
+       FROM targets_login_data
+      WHERE target = $1;"
+}
+
+pub(crate) fn target_clone_tags_sql() -> &'static str {
+    "INSERT INTO tag_resources (tag, resource_type, resource, resource_uuid, resource_location)
+     SELECT tag, resource_type, $2, $3, resource_location
+       FROM tag_resources
+      WHERE resource_type = 'target'
+        AND resource = $1
+        AND resource_location = 0;"
 }

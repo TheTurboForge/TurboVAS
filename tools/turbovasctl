@@ -592,6 +592,7 @@ OPENAPI_ALLOWED_REPLACES_VALUES = frozenset(
         "tag-resource-name-read",
         "tag-resource-reference-read",
         "target-detail-summary-read",
+        "target-clone",
         "target-list-read",
         "target-metadata-and-simple-scan-inputs-modify",
         "task-metadata-modify",
@@ -629,6 +630,7 @@ OPENAPI_ALLOWED_INHERITED_STILL_OWNS_VALUES = frozenset(
         "scope-report-generation",
         "scope-report-generation-retention-and-mutations",
         "tag-security-info-filter-actions-export",
+        "target-credential-secrets-create-delete-restore-export-and-credential-link-mutation",
         "target-credential-secrets-writes-and-deletes",
         "task-scan-control-writes-and-deletes",
         "tls-certificate-export-delete-and-rich-history",
@@ -672,6 +674,7 @@ OPENAPI_REQUIRED_EXPOSURE = {
     ("get", "/credentials/{credential_id}"): "direct-read",
     ("patch", "/credentials/{credential_id}"): "direct-write",
     ("patch", "/targets/{target_id}"): "direct-write",
+    ("post", "/targets/{target_id}/clone"): "direct-write",
     ("patch", "/tasks/{task_id}"): "direct-write",
     ("get", "/scan-configs"): "direct-read",
     ("get", "/scan-configs/{scan_config_id}"): "direct-read",
@@ -1311,21 +1314,30 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-replaces": "scope-metadata-membership-write",
     },
     ("get", "/targets"): {
-        "x-turbovas-inherited-still-owns": "target-credential-secrets-writes-and-deletes",
+        "x-turbovas-inherited-still-owns": "target-credential-secrets-create-delete-restore-export-and-credential-link-mutation",
         "x-turbovas-maturity": "live-read",
         "x-turbovas-replaces": "target-list-read",
     },
     ("get", "/targets/{target_id}"): {
-        "x-turbovas-inherited-still-owns": "target-credential-secrets-writes-and-deletes",
+        "x-turbovas-inherited-still-owns": "target-credential-secrets-create-delete-restore-export-and-credential-link-mutation",
         "x-turbovas-maturity": "live-read",
         "x-turbovas-replaces": "target-detail-summary-read",
     },
     ("patch", "/targets/{target_id}"): {
-        "x-turbovas-inherited-still-owns": "target-credential-secrets-writes-and-deletes",
+        "x-turbovas-inherited-still-owns": "target-credential-secrets-create-delete-restore-export-and-credential-link-mutation",
         "x-turbovas-maturity": "live-write",
         "x-turbovas-operator-identity": "direct-token-operator",
         "x-turbovas-owner-semantics": "preserve-existing-owner",
         "x-turbovas-replaces": "target-metadata-and-simple-scan-inputs-modify",
+        "x-turbovas-safety-contract": "write-control-v1",
+        "x-turbovas-side-effect": "metadata-write",
+    },
+    ("post", "/targets/{target_id}/clone"): {
+        "x-turbovas-inherited-still-owns": "target-credential-secrets-create-delete-restore-export-and-credential-link-mutation",
+        "x-turbovas-maturity": "live-write",
+        "x-turbovas-operator-identity": "direct-token-operator",
+        "x-turbovas-owner-semantics": "request-operator-owner",
+        "x-turbovas-replaces": "target-clone",
         "x-turbovas-safety-contract": "write-control-v1",
         "x-turbovas-side-effect": "metadata-write",
     },
@@ -7389,6 +7401,13 @@ def summarize_native_tooling(items: list[dict[str, Any]], repo_root: Path | None
                 "replacement_candidates": ["direct native target name/comment metadata patch"],
             },
             {
+                "method": "post",
+                "endpoint": "/api/v1/targets/{target_id}/clone",
+                "status": "implemented_direct_write_control",
+                "direct_access": "direct_write_control",
+                "replacement_candidates": ["direct native target clone with copied scan inputs and credential references"],
+            },
+            {
                 "endpoint": "/api/v1/tasks",
                 "status": "implemented_internal_and_browser_proxied",
                 "replacement_candidates": ["GSA task list reads (migrated through gsad same-origin proxy)", "read-only task automation", "native-api-request helper"],
@@ -12514,6 +12533,7 @@ def direct_smoke_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
             "native-api-direct.credential-fixture-cleanup",
             "native-api-direct.target-fixture",
             "native-api-direct.target-write-update",
+            "native-api-direct.target-write-clone",
             "native-api-direct.target-alive-test-update",
             "native-api-direct.target-port-list-update",
             "native-api-direct.target-hosts-update",
@@ -12664,7 +12684,9 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
     credential_name = f"turbovas-direct-write-smoke-credential-{int(time.time())}-{os.getpid()}"
     credential_updated_comment = "TurboVAS direct write smoke updated credential metadata"
     target_id: str | None = None
+    target_clone_id: str | None = None
     target_name = f"turbovas-direct-write-smoke-target-{int(time.time())}-{os.getpid()}"
+    target_clone_name = f"{target_name}-clone"
     target_updated_comment = "TurboVAS direct write smoke updated target metadata"
     task_id: str | None = None
     task_name = f"turbovas-direct-write-smoke-task-{int(time.time())}-{os.getpid()}"
@@ -13824,6 +13846,20 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
                 target_hosts_patch_ok = target_hosts_patch.returncode == 0 and target_hosts_patch_status == 200 and isinstance(target_hosts_patch_json, dict) and target_hosts_patch_json.get("id") == target_id and target_hosts_patch_json.get("hosts") == ["192.0.2.42", "192.0.2.43"] and target_hosts_patch_json.get("exclude_hosts") == ["192.0.2.43"] and target_hosts_values == "192.0.2.42, 192.0.2.43|192.0.2.43" and target_non_hosts_state_before and target_non_hosts_state_before == target_non_hosts_state_after
                 findings.append(native_api_probe_finding("pass" if target_hosts_patch_ok else "fail", "native-api-direct.target-hosts-update", "Direct write-control patched simple target hosts/exclude-hosts without changing port-list, scan-setting flags, alive-test, or credential links." if target_hosts_patch_ok else "Direct write-control failed to patch simple target hosts/exclude-hosts or changed adjacent target state.", target_hosts_patch, direct_native_api_display_command(f"/api/v1/targets/{urllib.parse.quote(target_id)}", token=token, env=env, method="PATCH", body=target_hosts_patch_body, extra_headers=content_type), target_hosts_patch_json, {"http_status": target_hosts_patch_status, "target_id": target_id, "host_values": target_hosts_values, "state_checksum_before": target_non_hosts_state_before, "state_checksum_after": target_non_hosts_state_after, **summarize_native_api_response(target_hosts_patch_json)}))
 
+                target_clone_body = json.dumps(
+                    {
+                        "name": target_clone_name,
+                        "comment": "TurboVAS direct write smoke cloned target comment",
+                    },
+                    separators=(",", ":"),
+                )
+                target_clone = direct_native_api_curl(repo_root, f"/api/v1/targets/{urllib.parse.quote(target_id)}/clone", token=token, env=env, method="POST", body=target_clone_body, extra_headers=content_type)
+                target_clone_json, target_clone_status = parse_json_output_with_http_status(target_clone)
+                target_clone_id = target_clone_json.get("id") if isinstance(target_clone_json, dict) and isinstance(target_clone_json.get("id"), str) else None
+                target_clone_state = psql_value(psql(repo_root, f"SELECT coalesce(hosts, '') || '|' || coalesce(exclude_hosts, '') || '|' || coalesce(alive_test::text, '') || '|' || coalesce(reverse_lookup_only::text, '') || '|' || coalesce(reverse_lookup_unify::text, '') || '|' || coalesce(allow_simultaneous_ips::text, '') || '|' || (SELECT count(*)::text FROM targets_login_data WHERE target = targets.id) FROM targets WHERE uuid = {sql_literal(target_clone_id or '')};"))
+                target_clone_ok = target_clone.returncode == 0 and target_clone_status == 201 and bool(target_clone_id) and target_clone_id != target_id and isinstance(target_clone_json, dict) and target_clone_json.get("name") == target_clone_name and target_clone_json.get("comment") == "TurboVAS direct write smoke cloned target comment" and target_clone_json.get("hosts") == ["192.0.2.42", "192.0.2.43"] and target_clone_json.get("exclude_hosts") == ["192.0.2.43"] and target_clone_state == "192.0.2.42, 192.0.2.43|192.0.2.43|16|1|1|0|0"
+                findings.append(native_api_probe_finding("pass" if target_clone_ok else "fail", "native-api-direct.target-write-clone", "Direct write-control cloned the temporary target without tasks or credential secrets." if target_clone_ok else "Direct write-control failed to clone the temporary target safely.", target_clone, direct_native_api_display_command(f"/api/v1/targets/{urllib.parse.quote(target_id)}/clone", token=token, env=env, method="POST", body=target_clone_body, extra_headers=content_type), target_clone_json, {"http_status": target_clone_status, "target_id": target_id, "target_clone_id": target_clone_id, "clone_state": target_clone_state, **summarize_native_api_response(target_clone_json)}))
+
                 task_fixture_sql = (
                     "WITH live_target AS (SELECT id, owner FROM targets "
                     f"WHERE uuid = {sql_literal(target_id)} AND name = {sql_literal(target_name)}), "
@@ -13908,8 +13944,10 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
 
                 target_cleanup_sql = (
                     "WITH live_target AS (SELECT id FROM targets "
-                    f"WHERE uuid = {sql_literal(target_id)} AND name = {sql_literal(target_name)}), "
+                    f"WHERE (uuid = {sql_literal(target_id)} AND name = {sql_literal(target_name)}) "
+                    f"OR (uuid = {sql_literal(target_clone_id or '')} AND name = {sql_literal(target_clone_name)})), "
                     "deleted_scope_targets AS (DELETE FROM scope_targets WHERE target IN (SELECT id FROM live_target)), "
+                    "deleted_login_data AS (DELETE FROM targets_login_data WHERE target IN (SELECT id FROM live_target)), "
                     "deleted_tags AS (DELETE FROM tag_resources WHERE resource_type = 'target' AND resource IN (SELECT id FROM live_target)), "
                     "deleted_trash_tags AS (DELETE FROM tag_resources_trash WHERE resource_type = 'target' AND resource IN (SELECT id FROM live_target)), "
                     "deleted_target AS (DELETE FROM targets WHERE id IN (SELECT id FROM live_target) RETURNING id) "
@@ -13917,11 +13955,12 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
                 )
                 target_cleanup = psql(repo_root, target_cleanup_sql)
                 target_cleanup_deleted = psql_value(target_cleanup)
-                target_cleanup_ok = target_cleanup.returncode == 0 and target_cleanup_deleted == "1"
-                target_cleanup_finding = process_step_finding("pass" if target_cleanup_ok else "fail", "native-api-direct.target-fixture-cleanup", "Direct write-control smoke removed the temporary target fixture." if target_cleanup_ok else "Direct write-control smoke failed to clean up the temporary target fixture.", target_cleanup, ["psql", "fixed-target-smoke-cleanup"])
+                expected_target_cleanup_deleted = "2" if target_clone_id else "1"
+                target_cleanup_ok = target_cleanup.returncode == 0 and target_cleanup_deleted == expected_target_cleanup_deleted
+                target_cleanup_finding = process_step_finding("pass" if target_cleanup_ok else "fail", "native-api-direct.target-fixture-cleanup", "Direct write-control smoke removed the temporary target fixture and clone." if target_cleanup_ok else "Direct write-control smoke failed to clean up the temporary target fixture or clone.", target_cleanup, ["psql", "fixed-target-smoke-cleanup"])
                 target_cleanup_details = target_cleanup_finding.setdefault("details", {})
                 if isinstance(target_cleanup_details, dict):
-                    target_cleanup_details.update({"target_id": target_id, "target_name": target_name, "deleted_count": target_cleanup_deleted})
+                    target_cleanup_details.update({"target_id": target_id, "target_clone_id": target_clone_id, "target_name": target_name, "deleted_count": target_cleanup_deleted, "expected_deleted_count": expected_target_cleanup_deleted})
                 findings.append(target_cleanup_finding)
 
             patch_body = json.dumps(
@@ -14502,6 +14541,17 @@ def command_runtime_native_api_direct_smoke(repo_root: Path, status_only: bool =
     disabled_target_patch_json, disabled_target_patch_status = parse_json_output_with_http_status(disabled_target_patch)
     disabled_target_patch_ok = disabled_target_patch.returncode == 0 and disabled_target_patch_status == 405 and isinstance(disabled_target_patch_json, dict) and disabled_target_patch_json.get("error", {}).get("code") == "method_not_allowed"
     findings.append(native_api_probe_finding("pass" if disabled_target_patch_ok else "fail", "native-api-direct.target-patch-disabled", "Direct native API rejects target patches while direct write-control is disabled." if disabled_target_patch_ok else "Direct native API did not reject a target patch while direct write-control is disabled.", disabled_target_patch, direct_native_api_display_command("/api/v1/targets/00000000-0000-0000-0000-000000000000", token=token, env=env, method="PATCH"), disabled_target_patch_json, {"http_status": disabled_target_patch_status, **summarize_native_api_response(disabled_target_patch_json)}))
+
+    disabled_target_clone = direct_native_api_curl(
+        repo_root,
+        "/api/v1/targets/00000000-0000-0000-0000-000000000000/clone",
+        token=token,
+        env=env,
+        method="POST",
+    )
+    disabled_target_clone_json, disabled_target_clone_status = parse_json_output_with_http_status(disabled_target_clone)
+    disabled_target_clone_ok = disabled_target_clone.returncode == 0 and disabled_target_clone_status == 405 and isinstance(disabled_target_clone_json, dict) and disabled_target_clone_json.get("error", {}).get("code") == "method_not_allowed"
+    findings.append(native_api_probe_finding("pass" if disabled_target_clone_ok else "fail", "native-api-direct.target-clone-disabled", "Direct native API rejects target clones while direct write-control is disabled." if disabled_target_clone_ok else "Direct native API did not reject a target clone while direct write-control is disabled.", disabled_target_clone, direct_native_api_display_command("/api/v1/targets/00000000-0000-0000-0000-000000000000/clone", token=token, env=env, method="POST"), disabled_target_clone_json, {"http_status": disabled_target_clone_status, **summarize_native_api_response(disabled_target_clone_json)}))
 
     disabled_task_patch = direct_native_api_curl(
         repo_root,

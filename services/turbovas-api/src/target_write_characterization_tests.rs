@@ -28,11 +28,11 @@ fn inherited_function(source: &str, name: &str) -> String {
 }
 
 fn openapi_path_block(path: &str) -> String {
-    let marker = format!("  {path}:");
+    let marker = format!("\n  {path}:");
     let start = OPENAPI
         .find(&marker)
         .unwrap_or_else(|| panic!("{path} path block must exist"));
-    let tail = &OPENAPI[start..];
+    let tail = &OPENAPI[start + 1..];
     tail.lines()
         .enumerate()
         .skip(1)
@@ -367,10 +367,6 @@ fn native_target_broad_mutation_routes_remain_closed() {
         ),
         (
             &Method::POST,
-            "/api/v1/targets/12345678-1234-1234-1234-123456789abc/clone",
-        ),
-        (
-            &Method::POST,
             "/api/v1/targets/12345678-1234-1234-1234-123456789abc/restore",
         ),
         (
@@ -383,6 +379,15 @@ fn native_target_broad_mutation_routes_remain_closed() {
             "target broad mutation path must not be reachable yet: {method} {path}"
         );
     }
+
+    assert!(
+        direct_api_v1_method_is_allowed(
+            &Method::POST,
+            "/api/v1/targets/12345678-1234-1234-1234-123456789abc/clone",
+            true,
+        ),
+        "target clone is the only target lifecycle subpath opened in this bounded slice"
+    );
 
     for path in [
         "/api/v1/targets/12345678-1234-1234-1234-123456789abc/clone",
@@ -398,6 +403,7 @@ fn native_target_broad_mutation_routes_remain_closed() {
     for (path, replacement) in [
         ("/targets", "target-list-read"),
         ("/targets/{target_id}", "target-detail-summary-read"),
+        ("/targets/{target_id}/clone", "target-clone"),
     ] {
         let block = openapi_path_block(path);
         assert!(
@@ -405,7 +411,7 @@ fn native_target_broad_mutation_routes_remain_closed() {
             "{path} OpenAPI block must keep {replacement}"
         );
         assert!(block.contains(
-            "x-turbovas-inherited-still-owns: target-credential-secrets-writes-and-deletes"
+            "x-turbovas-inherited-still-owns: target-credential-secrets-create-delete-restore-export-and-credential-link-mutation"
         ));
     }
     let detail = openapi_path_block("/targets/{target_id}");

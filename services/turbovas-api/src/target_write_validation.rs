@@ -12,6 +12,15 @@ pub(crate) const MAX_TARGET_HOSTS: usize = 4095;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub(crate) struct TargetCloneRequest {
+    #[serde(default)]
+    pub(crate) name: Option<String>,
+    #[serde(default)]
+    pub(crate) comment: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct TargetPatchRequest {
     #[serde(default)]
     pub(crate) name: Option<String>,
@@ -34,6 +43,12 @@ pub(crate) struct TargetPatchRequest {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+pub(crate) struct ValidatedTargetClone {
+    pub(crate) name: Option<String>,
+    pub(crate) comment: Option<String>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct ValidatedTargetPatch {
     pub(crate) name: Option<String>,
     pub(crate) comment: Option<String>,
@@ -44,6 +59,15 @@ pub(crate) struct ValidatedTargetPatch {
     pub(crate) port_list_id: Option<String>,
     pub(crate) hosts: Option<String>,
     pub(crate) exclude_hosts: Option<String>,
+}
+
+pub(crate) fn validate_target_clone_request(
+    request: TargetCloneRequest,
+) -> Result<ValidatedTargetClone, ApiError> {
+    Ok(ValidatedTargetClone {
+        name: normalize_optional_required_target_text(request.name, "name")?,
+        comment: normalize_optional_target_text(request.comment, "comment")?,
+    })
 }
 
 impl ValidatedTargetPatch {

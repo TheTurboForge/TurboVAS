@@ -7,8 +7,8 @@ use crate::{
     target_write_db::ensure_target_owner_matches_operator,
     target_write_sql::*,
     target_write_validation::{
-        MAX_TARGET_HOSTS, MAX_TARGET_TEXT_BYTES, TargetPatchRequest, validate_alive_tests,
-        validate_target_patch_request,
+        MAX_TARGET_HOSTS, MAX_TARGET_TEXT_BYTES, TargetCloneRequest, TargetPatchRequest,
+        validate_alive_tests, validate_target_clone_request, validate_target_patch_request,
     },
 };
 
@@ -296,6 +296,27 @@ fn target_patch_request_rejects_ambiguous_alive_test_values() {
 }
 
 #[test]
+fn target_clone_request_allows_only_optional_metadata_overrides() {
+    let validated = validate_target_clone_request(TargetCloneRequest {
+        name: Some("  cloned target  ".to_string()),
+        comment: Some("  copied safely  ".to_string()),
+    })
+    .expect("valid target clone request");
+    assert_eq!(validated.name.as_deref(), Some("cloned target"));
+    assert_eq!(validated.comment.as_deref(), Some("copied safely"));
+
+    assert!(matches!(
+        validate_target_clone_request(TargetCloneRequest {
+            name: Some("   ".to_string()),
+            comment: None,
+        }),
+        Err(ApiError::BadRequest(_))
+    ));
+    let request = serde_json::json!({"name": "Clone", "hosts": ["192.0.2.1"]});
+    assert!(serde_json::from_value::<TargetCloneRequest>(request).is_err());
+}
+
+#[test]
 fn target_patch_sql_is_metadata_only() {
     let sql = target_update_metadata_sql();
     assert!(sql.contains("UPDATE targets"));
@@ -326,6 +347,61 @@ fn target_patch_sql_is_metadata_only() {
             "target patch SQL must not touch {forbidden}"
         );
     }
+}
+
+#[test]
+fn target_clone_sql_copies_metadata_credential_references_and_active_tags_only() {
+    let clone = target_clone_metadata_sql();
+    assert!(clone.contains("INSERT INTO targets"));
+    assert!(clone.contains("make_uuid()"));
+    assert!(clone.contains("coalesce($3, uniquify('target', name, $2, ' Clone'))"));
+    for required in [
+        "hosts",
+        "exclude_hosts",
+        "port_list",
+        "reverse_lookup_only",
+        "reverse_lookup_unify",
+        "alive_test",
+        "allow_simultaneous_ips",
+        "m_now()",
+    ] {
+        assert!(
+            clone.contains(required),
+            "target clone SQL missing {required}"
+        );
+    }
+    for forbidden in [
+        "tasks",
+        "permissions",
+        "credentials_data",
+        "password",
+        "secret",
+    ] {
+        assert!(
+            !clone.contains(forbidden),
+            "target clone metadata SQL must not touch {forbidden}"
+        );
+    }
+
+    let login = target_clone_login_data_sql();
+    assert!(login.contains("INSERT INTO targets_login_data"));
+    assert!(login.contains("SELECT $2, type, credential, port"));
+    assert!(login.contains("WHERE target = $1"));
+    assert!(!login.contains("credentials_data"));
+
+    let tags = target_clone_tags_sql();
+    assert!(tags.contains("INSERT INTO tag_resources"));
+    assert!(tags.contains("resource_type = 'target'"));
+    assert!(tags.contains("resource_location = 0"));
+
+    let port_list_guard = target_source_port_list_is_assignable_sql();
+    assert!(port_list_guard.contains("JOIN port_lists"));
+    assert!(port_list_guard.contains("coalesce(pl.predefined, 0) != 0 OR pl.owner = $2"));
+
+    let credential_guard = target_source_unassignable_credential_count_sql();
+    assert!(credential_guard.contains("JOIN credentials"));
+    assert!(credential_guard.contains("c.owner != $2"));
+    assert!(!credential_guard.contains("credentials_data"));
 }
 
 #[test]

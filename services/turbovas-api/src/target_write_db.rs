@@ -13,6 +13,12 @@ pub(crate) struct TargetWriteRecord {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TargetWriteRecordWithInternalId {
+    pub(crate) internal_id: i32,
+    pub(crate) uuid: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TargetWriteState {
     pub(crate) internal_id: i32,
     pub(crate) owner_id: i32,
@@ -60,6 +66,34 @@ pub(crate) async fn load_target_write_state(
             owner_id: row.get(1),
         })
         .ok_or(ApiError::NotFound)
+}
+
+pub(crate) async fn query_target_write_record_with_internal_id(
+    tx: &Transaction<'_>,
+    sql: &str,
+    params: &[&(dyn ToSql + Sync)],
+    action: &'static str,
+) -> Result<TargetWriteRecordWithInternalId, ApiError> {
+    tx.query_opt(sql, params)
+        .await
+        .map_err(|error| map_target_write_db_error(error, action))?
+        .map(|row| TargetWriteRecordWithInternalId {
+            internal_id: row.get(0),
+            uuid: row.get(1),
+        })
+        .ok_or(ApiError::NotFound)
+}
+
+pub(crate) async fn execute_target_write_sql(
+    tx: &Transaction<'_>,
+    sql: &str,
+    params: &[&(dyn ToSql + Sync)],
+    action: &'static str,
+) -> Result<(), ApiError> {
+    tx.execute(sql, params)
+        .await
+        .map_err(|error| map_target_write_db_error(error, action))?;
+    Ok(())
 }
 
 pub(crate) async fn ensure_unique_target_name(
@@ -127,6 +161,57 @@ pub(crate) async fn load_assignable_target_port_list(
             port_list_owner_id = owner_id,
             operator_owner_id,
             "direct API target write operator cannot assign port list"
+        );
+        Err(ApiError::Forbidden)
+    }
+}
+
+pub(crate) async fn ensure_target_source_port_list_assignable(
+    tx: &Transaction<'_>,
+    target_internal_id: i32,
+    operator_owner_id: i32,
+) -> Result<(), ApiError> {
+    let count: i64 = tx
+        .query_one(
+            target_source_port_list_is_assignable_sql(),
+            &[&target_internal_id, &operator_owner_id],
+        )
+        .await
+        .map_err(|error| map_target_write_db_error(error, "check target clone port list"))?
+        .get(0);
+    if count == 0 {
+        Ok(())
+    } else {
+        tracing::warn!(
+            target_internal_id,
+            operator_owner_id,
+            "direct API target clone source references an unassignable port list"
+        );
+        Err(ApiError::Forbidden)
+    }
+}
+
+pub(crate) async fn ensure_target_source_credentials_assignable(
+    tx: &Transaction<'_>,
+    target_internal_id: i32,
+    operator_owner_id: i32,
+) -> Result<(), ApiError> {
+    let count: i64 = tx
+        .query_one(
+            target_source_unassignable_credential_count_sql(),
+            &[&target_internal_id, &operator_owner_id],
+        )
+        .await
+        .map_err(|error| map_target_write_db_error(error, "check target clone credentials"))?
+        .get(0);
+    if count == 0 {
+        Ok(())
+    } else {
+        tracing::warn!(
+            target_internal_id,
+            operator_owner_id,
+            unassignable_credential_count = count,
+            "direct API target clone source references unassignable credentials"
         );
         Err(ApiError::Forbidden)
     }
