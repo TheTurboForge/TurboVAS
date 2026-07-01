@@ -1051,6 +1051,8 @@ class TurboVASCtlTests(unittest.TestCase):
                 self.assertIn(f'tools/turbovasctl {command} "$@"', justfile)
         self.assertIn("def command_native_tooling_state", source)
         self.assertIn("def command_native_api_request", source)
+        self.assertIn('native_api_request.add_argument("--status-only"', source)
+        self.assertIn("status_only=args.status_only", source)
         self.assertIn("def command_native_api_client_contract", source)
         self.assertIn("def command_native_api_cargo_audit", source)
         self.assertIn("def command_native_api_semgrep_audit", source)
@@ -4578,6 +4580,42 @@ class TurboVASCtlTests(unittest.TestCase):
         self.assertIn("body_bytes", rendered)
         self.assertNotIn(secret_body, rendered)
         self.assertNotIn("do-not-print", rendered)
+
+    def test_native_api_request_status_only_omits_full_response_body(self):
+        result = {
+            "status": "pass",
+            "summary": "Native API request completed.",
+            "findings": [
+                {
+                    "status": "pass",
+                    "check": "native-api-request.direct",
+                    "message": "Direct native API GET /api/v1/port-lists/id/export returned authenticated JSON.",
+                    "details": {"response_summary": {"parsed": True, "id": "port-list-id"}},
+                }
+            ],
+            "details": {
+                "path": "/api/v1/port-lists/id/export",
+                "direct": True,
+                "method": "GET",
+                "http_status": 200,
+                "body_bytes": 0,
+                "response": {
+                    "id": "port-list-id",
+                    "name": "Port list",
+                    "port_ranges": [{"start": 1, "end": 65535, "comment": "large-payload-marker"}],
+                    "targets": [{"id": "target-id", "name": "private-target-marker"}],
+                },
+            },
+        }
+
+        compact = turbovasctl.native_api_request_status_only_result(result)
+        rendered = json.dumps(compact, sort_keys=True)
+
+        self.assertEqual(compact["status"], "pass")
+        self.assertEqual(compact["details"]["response_summary"]["id"], "port-list-id")
+        self.assertNotIn("response", compact["details"])
+        self.assertNotIn("large-payload-marker", rendered)
+        self.assertNotIn("private-target-marker", rendered)
 
     def test_native_api_request_direct_rejects_non_get_before_bad_config(self):
         with tempfile.TemporaryDirectory() as tmp:

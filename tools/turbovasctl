@@ -15290,6 +15290,7 @@ def command_native_api_request(
     request_id: str | None = None,
     body_json: str | None = None,
     allow_write_control: bool = False,
+    status_only: bool = False,
 ) -> dict[str, Any]:
     findings: list[dict[str, Any]] = []
     try:
@@ -15361,6 +15362,8 @@ def command_native_api_request(
         )
         result = make_result("native-api-request", repo_root, "Direct native API request completed." if ok else "Direct native API request failed.", findings)
         result["details"] = {"path": request_path, "direct": True, "method": method, "http_status": http_status, "request_id": request_id, "body_bytes": len(body.encode("utf-8")) if body is not None else 0, "response": parsed if isinstance(parsed, dict) else None}
+        if status_only:
+            result = native_api_request_status_only_result(result)
         return result
 
     response = native_api_curl(repo_root, request_path, method=method, request_id=request_id, body=body)
@@ -15379,7 +15382,40 @@ def command_native_api_request(
     )
     result = make_result("native-api-request", repo_root, "Native API request completed." if ok else "Native API request failed.", findings)
     result["details"] = {"path": request_path, "method": method, "request_id": request_id, "body_bytes": len(body.encode("utf-8")) if body is not None else 0, "response": parsed if isinstance(parsed, dict) else None}
+    if status_only:
+        result = native_api_request_status_only_result(result)
     return result
+
+
+def compact_native_api_request_finding(item: dict[str, Any]) -> dict[str, Any]:
+    compact = compact_doctor_finding(item)
+    details = item.get("details")
+    if isinstance(details, dict) and isinstance(details.get("response_summary"), dict):
+        compact.setdefault("details", {})["response_summary"] = details["response_summary"]
+    return compact
+
+
+def native_api_request_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
+    compact = dict(result)
+    findings = result.get("findings", [])
+    non_pass = [
+        compact_native_api_request_finding(item)
+        for item in findings
+        if isinstance(item, dict) and item.get("status") != "pass"
+    ]
+    details = result.get("details", {}) if isinstance(result.get("details"), dict) else {}
+    response = details.get("response") if isinstance(details.get("response"), dict) else None
+    compact_details = {
+        key: details[key]
+        for key in ("path", "direct", "method", "http_status", "request_id", "body_bytes")
+        if key in details
+    }
+    compact_details["response_summary"] = summarize_native_api_response(response)
+    compact["details"] = compact_details
+    compact["findings"] = non_pass or [
+        finding("pass", "native-api-request.status-only", "Native API request passed; response body summarized.")
+    ]
+    return compact
 
 
 def parse_json_output(result: subprocess.CompletedProcess[str]) -> dict[str, Any] | None:
@@ -18074,6 +18110,7 @@ def build_parser() -> argparse.ArgumentParser:
     native_api_request.add_argument("--request-id", help="optional safe X-Request-Id correlation value")
     native_api_request.add_argument("--body-json", help="validated JSON request body; redacted in rendered commands")
     native_api_request.add_argument("--allow-write-control", action="store_true", help="allow intentional non-GET/write-control-shaped request probes")
+    native_api_request.add_argument("--status-only", action="store_true", help="emit compact response summary and only non-pass findings")
     native_tooling_state = subparsers.add_parser("native-tooling-state", parents=[common], help="inventory inherited GMP/python-gvm/gvm-tools dependency surfaces")
     native_tooling_state.add_argument("--compact", action="store_true", help="omit full item and endpoint inventories, but keep review detail such as removal candidates")
     native_tooling_state.add_argument("--summary", action="store_true", help="emit status/count contract summaries without removal-candidate paths or endpoint inventories")
@@ -18227,6 +18264,7 @@ def main(argv: list[str] | None = None) -> int:
             request_id=args.request_id,
             body_json=args.body_json,
             allow_write_control=args.allow_write_control,
+            status_only=args.status_only,
         )
     elif args.command == "native-tooling-state":
         result = command_native_tooling_state(repo_root, compact=args.compact, summary_only=args.summary, status_only=args.status_only)
