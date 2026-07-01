@@ -307,7 +307,17 @@ fn native_direct_api_keeps_task_lifecycle_methods_closed_until_scanner_contract_
         "/api/v1/tasks/12345678-1234-1234-1234-123456789abc",
         false,
     ));
-    for method in [Method::POST, Method::PATCH, Method::DELETE, Method::PUT] {
+    assert!(!direct_api_v1_method_is_allowed(
+        &Method::PATCH,
+        "/api/v1/tasks/12345678-1234-1234-1234-123456789abc",
+        false,
+    ));
+    assert!(direct_api_v1_method_is_allowed(
+        &Method::PATCH,
+        "/api/v1/tasks/12345678-1234-1234-1234-123456789abc",
+        true,
+    ));
+    for method in [Method::POST, Method::DELETE, Method::PUT] {
         assert!(
             !direct_api_v1_method_is_allowed(&method, "/api/v1/tasks", true),
             "{method} /api/v1/tasks must remain closed"
@@ -321,6 +331,10 @@ fn native_direct_api_keeps_task_lifecycle_methods_closed_until_scanner_contract_
             "{method} /api/v1/tasks/{{id}} must remain closed"
         );
     }
+    assert!(
+        !direct_api_v1_method_is_allowed(&Method::PATCH, "/api/v1/tasks", true),
+        "PATCH /api/v1/tasks collection must remain closed"
+    );
     for action in ["start", "stop", "resume", "delete"] {
         let path = format!("/api/v1/tasks/12345678-1234-1234-1234-123456789abc/{action}");
         assert!(
@@ -335,25 +349,32 @@ fn native_direct_api_keeps_task_lifecycle_methods_closed_until_scanner_contract_
 }
 
 #[test]
-fn openapi_documents_tasks_as_read_only_until_lifecycle_contract_lands() {
+fn openapi_documents_task_metadata_patch_without_lifecycle_contract() {
     let list = openapi_path_block("/tasks");
     assert!(list.contains("get:"));
     assert!(!list.contains("post:"));
     assert!(list.contains("x-turbovas-exposure: direct-read"));
     assert!(list.contains("x-turbovas-inherited-still-owns: task-scan-control-writes-and-deletes"));
-    assert!(list.contains("Native direct API currently exposes task reads only"));
-    assert!(list.contains("Start, stop, modify, delete, clone, export, resume, and scanner-control semantics remain inherited"));
+    assert!(list.contains("Native direct API exposes task reads plus metadata-only task updates"));
+    assert!(list.contains(
+        "Start, stop, delete, clone, export, resume, target/config/schedule/scanner changes"
+    ));
 
     let detail = openapi_path_block("/tasks/{task_id}");
     assert!(detail.contains("get:"));
-    assert!(!detail.contains("patch:"));
+    assert!(detail.contains("patch:"));
     assert!(!detail.contains("delete:"));
     assert!(detail.contains("x-turbovas-exposure: direct-read"));
+    assert!(detail.contains("x-turbovas-exposure: direct-write"));
+    assert!(detail.contains("x-turbovas-replaces: task-metadata-modify"));
+    assert!(detail.contains("$ref: '#/components/schemas/TaskPatchRequest'"));
     assert!(
         detail.contains("x-turbovas-inherited-still-owns: task-scan-control-writes-and-deletes")
     );
-    assert!(detail.contains("Native direct API currently exposes task summary reads only"));
-    assert!(detail.contains(
-        "Start/stop lifecycle control remains inherited until a native scanner-control contract"
-    ));
+    assert!(
+        detail.contains("Direct write-control endpoint for updating task name and comment only")
+    );
+    assert!(
+        detail.contains("task/report status transitions remain on inherited compatibility paths")
+    );
 }

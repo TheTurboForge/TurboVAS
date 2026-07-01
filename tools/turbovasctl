@@ -593,6 +593,7 @@ OPENAPI_ALLOWED_REPLACES_VALUES = frozenset(
         "target-detail-summary-read",
         "target-list-read",
         "target-metadata-modify",
+        "task-metadata-modify",
         "task-detail-summary-read",
         "task-list-read",
         "tls-certificate-asset-detail-info-read",
@@ -670,6 +671,7 @@ OPENAPI_REQUIRED_EXPOSURE = {
     ("get", "/credentials/{credential_id}"): "direct-read",
     ("patch", "/credentials/{credential_id}"): "direct-write",
     ("patch", "/targets/{target_id}"): "direct-write",
+    ("patch", "/tasks/{task_id}"): "direct-write",
     ("get", "/scan-configs"): "direct-read",
     ("get", "/scan-configs/{scan_config_id}"): "direct-read",
     ("patch", "/scan-configs/{scan_config_id}"): "direct-write",
@@ -1329,6 +1331,15 @@ OPENAPI_REQUIRED_MIGRATION_METADATA = {
         "x-turbovas-inherited-still-owns": "task-scan-control-writes-and-deletes",
         "x-turbovas-maturity": "live-read",
         "x-turbovas-replaces": "task-detail-summary-read",
+    },
+    ("patch", "/tasks/{task_id}"): {
+        "x-turbovas-inherited-still-owns": "task-scan-control-writes-and-deletes",
+        "x-turbovas-maturity": "live-write",
+        "x-turbovas-operator-identity": "direct-token-operator",
+        "x-turbovas-owner-semantics": "preserve-existing-owner",
+        "x-turbovas-replaces": "task-metadata-modify",
+        "x-turbovas-safety-contract": "write-control-v1",
+        "x-turbovas-side-effect": "metadata-write",
     },
     ("get", "/scopes/{scope_id}/reports/{scope_report_id}/results"): {
         "x-turbovas-inherited-still-owns": "scope-report-generation-retention-and-mutations",
@@ -7316,6 +7327,13 @@ def summarize_native_tooling(items: list[dict[str, Any]], repo_root: Path | None
                 "replacement_candidates": ["GSA task detail reads (migrated through gsad same-origin proxy)", "read-only task automation"],
             },
             {
+                "method": "patch",
+                "endpoint": "/api/v1/tasks/{task_id}",
+                "status": "implemented_direct_write_control",
+                "direct_access": "direct_write_control",
+                "replacement_candidates": ["direct native task name/comment metadata patch"],
+            },
+            {
                 "endpoint": "/api/v1/scope-reports",
                 "status": "implemented_internal_and_browser_proxied",
                 "replacement_candidates": ["runtime-scope-report-summary helper (migrated)", "GSA scope-report list reads (migrated through gsad same-origin proxy)", "native-api-request helper"],
@@ -12419,6 +12437,9 @@ def direct_smoke_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
             "native-api-direct.target-fixture",
             "native-api-direct.target-write-update",
             "native-api-direct.target-fixture-cleanup",
+            "native-api-direct.task-fixture",
+            "native-api-direct.task-write-update",
+            "native-api-direct.task-fixture-cleanup",
             "native-api-direct.alert-tag-write-create",
             "native-api-direct.alert-tag-resource-add",
             "native-api-direct.alert-tag-resource-in-use-after-add",
@@ -12558,6 +12579,9 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
     target_id: str | None = None
     target_name = f"turbovas-direct-write-smoke-target-{int(time.time())}-{os.getpid()}"
     target_updated_comment = "TurboVAS direct write smoke updated target metadata"
+    task_id: str | None = None
+    task_name = f"turbovas-direct-write-smoke-task-{int(time.time())}-{os.getpid()}"
+    task_updated_comment = "TurboVAS direct write smoke updated task metadata"
     if aggregate_status(findings) != "fail":
         config = run_command(compose_command(repo_root, "config", "--quiet", env=env), repo_root, env=env)
         findings.append(finding("pass" if config.returncode == 0 else "fail", "compose.direct-write.config", f"Compose direct write-control config validation exit code {config.returncode}.", str(compose_file(repo_root).relative_to(repo_root)), {"output_tail": output_tail(config.stdout, 40)}))
@@ -13603,6 +13627,61 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
                 target_patch_ok = target_patch.returncode == 0 and target_patch_status == 200 and isinstance(target_patch_json, dict) and target_patch_json.get("id") == target_id and target_patch_json.get("comment") == target_updated_comment and target_state_before and target_state_before == target_state_after
                 findings.append(native_api_probe_finding("pass" if target_patch_ok else "fail", "native-api-direct.target-write-update", "Direct write-control patched target metadata without changing hosts, port-list, alive-test, reverse-DNS, or credential links." if target_patch_ok else "Direct write-control failed to patch target metadata or changed adjacent target state.", target_patch, direct_native_api_display_command(f"/api/v1/targets/{urllib.parse.quote(target_id)}", token=token, env=env, method="PATCH", body=target_patch_body, extra_headers=content_type), target_patch_json, {"http_status": target_patch_status, "target_id": target_id, "state_checksum_before": target_state_before, "state_checksum_after": target_state_after, **summarize_native_api_response(target_patch_json)}))
 
+                task_fixture_sql = (
+                    "WITH live_target AS (SELECT id, owner FROM targets "
+                    f"WHERE uuid = {sql_literal(target_id)} AND name = {sql_literal(target_name)}), "
+                    "inserted AS (INSERT INTO tasks "
+                    "(uuid, owner, name, comment, target, hidden, usage_type, run_status, creation_time, modification_time) "
+                    f"SELECT make_uuid(), owner, {sql_literal(task_name)}, 'TurboVAS direct write smoke temporary task', "
+                    "id, 0, 'scan', 0, m_now(), m_now() FROM live_target RETURNING id, uuid) "
+                    "SELECT uuid FROM inserted;"
+                )
+                task_fixture = psql(repo_root, task_fixture_sql)
+                task_id = psql_value(task_fixture)
+                task_fixture_ok = task_fixture.returncode == 0 and bool(task_id)
+                task_fixture_finding = process_step_finding("pass" if task_fixture_ok else "fail", "native-api-direct.task-fixture", "Direct write-control smoke created a temporary task fixture linked to the temporary target." if task_fixture_ok else "Direct write-control smoke failed to create a temporary task fixture.", task_fixture, ["psql", "fixed-task-smoke-fixture"])
+                task_fixture_details = task_fixture_finding.setdefault("details", {})
+                if isinstance(task_fixture_details, dict):
+                    task_fixture_details.update({"task_id": task_id, "task_name": task_name, "target_id": target_id})
+                findings.append(task_fixture_finding)
+
+                if task_id:
+                    task_state_sql = (
+                        "SELECT md5(coalesce(target::text, '') || '|' || coalesce(config::text, '') || '|' || "
+                        "coalesce(schedule::text, '') || '|' || coalesce(scanner::text, '') || '|' || "
+                        "coalesce(run_status::text, '') || '|' || coalesce(start_time::text, '') || '|' || "
+                        "coalesce(end_time::text, '') || '|' || coalesce(schedule_next_time::text, '') || '|' || "
+                        "coalesce(schedule_periods::text, '') || '|' || coalesce(alterable::text, '') || '|' || "
+                        "coalesce(upload_result_count::text, '') || '|' || coalesce(hidden::text, '') || '|' || "
+                        "coalesce(usage_type, '')) "
+                        "FROM tasks "
+                        f"WHERE uuid = {sql_literal(task_id)};"
+                    )
+                    task_state_before = psql_value(psql(repo_root, task_state_sql))
+                    task_patch_body = json.dumps({"comment": task_updated_comment}, separators=(",", ":"))
+                    task_patch = direct_native_api_curl(repo_root, f"/api/v1/tasks/{urllib.parse.quote(task_id)}", token=token, env=env, method="PATCH", body=task_patch_body, extra_headers=content_type)
+                    task_patch_json, task_patch_status = parse_json_output_with_http_status(task_patch)
+                    task_state_after = psql_value(psql(repo_root, task_state_sql))
+                    task_patch_ok = task_patch.returncode == 0 and task_patch_status == 200 and isinstance(task_patch_json, dict) and task_patch_json.get("id") == task_id and task_patch_json.get("comment") == task_updated_comment and task_state_before and task_state_before == task_state_after
+                    findings.append(native_api_probe_finding("pass" if task_patch_ok else "fail", "native-api-direct.task-write-update", "Direct write-control patched task metadata without changing target/config/schedule/scanner/status lifecycle state." if task_patch_ok else "Direct write-control failed to patch task metadata or changed adjacent task lifecycle state.", task_patch, direct_native_api_display_command(f"/api/v1/tasks/{urllib.parse.quote(task_id)}", token=token, env=env, method="PATCH", body=task_patch_body, extra_headers=content_type), task_patch_json, {"http_status": task_patch_status, "task_id": task_id, "state_checksum_before": task_state_before, "state_checksum_after": task_state_after, **summarize_native_api_response(task_patch_json)}))
+
+                    task_cleanup_sql = (
+                        "WITH live_task AS (SELECT id FROM tasks "
+                        f"WHERE uuid = {sql_literal(task_id)} AND name = {sql_literal(task_name)}), "
+                        "deleted_task_tags AS (DELETE FROM tag_resources WHERE resource_type = 'task' AND resource IN (SELECT id FROM live_task)), "
+                        "deleted_task_trash_tags AS (DELETE FROM tag_resources_trash WHERE resource_type = 'task' AND resource IN (SELECT id FROM live_task)), "
+                        "deleted_task AS (DELETE FROM tasks WHERE id IN (SELECT id FROM live_task) RETURNING id) "
+                        "SELECT count(*) FROM deleted_task;"
+                    )
+                    task_cleanup = psql(repo_root, task_cleanup_sql)
+                    task_cleanup_deleted = psql_value(task_cleanup)
+                    task_cleanup_ok = task_cleanup.returncode == 0 and task_cleanup_deleted == "1"
+                    task_cleanup_finding = process_step_finding("pass" if task_cleanup_ok else "fail", "native-api-direct.task-fixture-cleanup", "Direct write-control smoke removed the temporary task fixture." if task_cleanup_ok else "Direct write-control smoke failed to clean up the temporary task fixture.", task_cleanup, ["psql", "fixed-task-smoke-cleanup"])
+                    task_cleanup_details = task_cleanup_finding.setdefault("details", {})
+                    if isinstance(task_cleanup_details, dict):
+                        task_cleanup_details.update({"task_id": task_id, "task_name": task_name, "deleted_count": task_cleanup_deleted})
+                    findings.append(task_cleanup_finding)
+
                 target_cleanup_sql = (
                     "WITH live_target AS (SELECT id FROM targets "
                     f"WHERE uuid = {sql_literal(target_id)} AND name = {sql_literal(target_name)}), "
@@ -14183,6 +14262,17 @@ def command_runtime_native_api_direct_smoke(repo_root: Path, status_only: bool =
     disabled_target_patch_json, disabled_target_patch_status = parse_json_output_with_http_status(disabled_target_patch)
     disabled_target_patch_ok = disabled_target_patch.returncode == 0 and disabled_target_patch_status == 405 and isinstance(disabled_target_patch_json, dict) and disabled_target_patch_json.get("error", {}).get("code") == "method_not_allowed"
     findings.append(native_api_probe_finding("pass" if disabled_target_patch_ok else "fail", "native-api-direct.target-patch-disabled", "Direct native API rejects target patches while direct write-control is disabled." if disabled_target_patch_ok else "Direct native API did not reject a target patch while direct write-control is disabled.", disabled_target_patch, direct_native_api_display_command("/api/v1/targets/00000000-0000-0000-0000-000000000000", token=token, env=env, method="PATCH"), disabled_target_patch_json, {"http_status": disabled_target_patch_status, **summarize_native_api_response(disabled_target_patch_json)}))
+
+    disabled_task_patch = direct_native_api_curl(
+        repo_root,
+        "/api/v1/tasks/00000000-0000-0000-0000-000000000000",
+        token=token,
+        env=env,
+        method="PATCH",
+    )
+    disabled_task_patch_json, disabled_task_patch_status = parse_json_output_with_http_status(disabled_task_patch)
+    disabled_task_patch_ok = disabled_task_patch.returncode == 0 and disabled_task_patch_status == 405 and isinstance(disabled_task_patch_json, dict) and disabled_task_patch_json.get("error", {}).get("code") == "method_not_allowed"
+    findings.append(native_api_probe_finding("pass" if disabled_task_patch_ok else "fail", "native-api-direct.task-patch-disabled", "Direct native API rejects task patches while direct write-control is disabled." if disabled_task_patch_ok else "Direct native API did not reject a task patch while direct write-control is disabled.", disabled_task_patch, direct_native_api_display_command("/api/v1/tasks/00000000-0000-0000-0000-000000000000", token=token, env=env, method="PATCH"), disabled_task_patch_json, {"http_status": disabled_task_patch_status, **summarize_native_api_response(disabled_task_patch_json)}))
 
     disabled_override_patch = direct_native_api_curl(
         repo_root,

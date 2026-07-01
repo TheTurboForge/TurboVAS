@@ -78,6 +78,7 @@ use crate::{
     tags::*,
     target_writes::patch_target,
     task_targets::*,
+    task_writes::patch_task,
     timezones::timezones,
     tls_certificates::*,
     trashcan::trashcan_summary,
@@ -301,6 +302,7 @@ pub(crate) fn direct_native_api_router(
                 patch(patch_credential),
             )
             .route("/api/v1/targets/:target_id", patch(patch_target))
+            .route("/api/v1/tasks/:task_id", patch(patch_task))
             .route("/api/v1/port-lists/:port_list_id", patch(patch_port_list))
             .route("/api/v1/port-lists/:port_list_id", delete(delete_port_list))
             .route(

@@ -3731,7 +3731,7 @@ paths:
       x-turbovas-replaces: task-list-read
       x-turbovas-inherited-still-owns: task-scan-control-writes-and-deletes
       summary: List scan tasks
-      description: Native direct API currently exposes task reads only. Start, stop, modify, delete, clone, export, resume, and scanner-control semantics remain inherited until their scanner, report, permission, and rejection-path contracts are characterized.
+      description: Native direct API exposes task reads plus metadata-only task updates. Start, stop, delete, clone, export, resume, target/config/schedule/scanner changes, preferences, alerts, and scanner-control semantics remain inherited until their scanner, report, permission, and rejection-path contracts are characterized.
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
@@ -3765,7 +3765,7 @@ paths:
       x-turbovas-replaces: task-detail-summary-read
       x-turbovas-inherited-still-owns: task-scan-control-writes-and-deletes
       summary: Read one scan task summary
-      description: Native direct API currently exposes task summary reads only. Start/stop lifecycle control remains inherited until a native scanner-control contract defines report creation, scanner side effects, task/report status transitions, audit behavior, and failure mapping.
+      description: Native direct API exposes task summary reads plus metadata-only task updates. Start/stop lifecycle control remains inherited until a native scanner-control contract defines report creation, scanner side effects, task/report status transitions, audit behavior, and failure mapping.
       parameters:
         - $ref: '#/components/parameters/TaskId'
       responses:
@@ -3783,6 +3783,50 @@ paths:
           $ref: '#/components/responses/NotFound'
         '405':
           $ref: '#/components/responses/MethodNotAllowed'
+        '413':
+          $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      operationId: patchTasksByTaskId
+      x-turbovas-direct: true
+      x-turbovas-exposure: direct-write
+      x-turbovas-maturity: live-write
+      x-turbovas-replaces: task-metadata-modify
+      x-turbovas-inherited-still-owns: task-scan-control-writes-and-deletes
+      x-turbovas-operator-identity: direct-token-operator
+      x-turbovas-owner-semantics: preserve-existing-owner
+      x-turbovas-safety-contract: write-control-v1
+      x-turbovas-side-effect: metadata-write
+      summary: Update task metadata
+      description: Direct write-control endpoint for updating task name and comment only. Start, stop, resume, delete, clone, export, target/config/schedule/scanner changes, alert links, preferences, report creation, scanner side effects, and task/report status transitions remain on inherited compatibility paths.
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskPatchRequest'
+      responses:
+        '200':
+          description: Task metadata updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '413':
           $ref: '#/components/responses/RequestTooLarge'
         '429':
@@ -4654,6 +4698,19 @@ components:
           type: string
           maxLength: 4096
           description: New target comment. Blank comments clear the comment after trimming.
+    TaskPatchRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          maxLength: 4096
+          description: New task name. Blank names are rejected after trimming.
+        comment:
+          type: string
+          maxLength: 4096
+          description: New task comment. Blank comments clear the comment after trimming.
     TaskCollection:
       type: object
       required: [page, items]

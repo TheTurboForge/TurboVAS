@@ -57,9 +57,16 @@ pub(crate) async fn task_detail(
     State(state): State<AppState>,
     Path(task_id): Path<String>,
 ) -> Result<Json<TaskItem>, ApiError> {
+    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
+    Ok(Json(load_task_detail(&client, &task_id).await?))
+}
+
+pub(crate) async fn load_task_detail(
+    client: &tokio_postgres::Client,
+    task_id: &str,
+) -> Result<TaskItem, ApiError> {
     parse_uuid(&task_id)?;
     let sql = task_sql("lower(uuid) = lower($1)", "name ASC", "");
-    let client = state.pool.get().await.map_err(|_| ApiError::Database)?;
     let row = client
         .query_opt(&sql, &[&task_id])
         .await
@@ -68,7 +75,7 @@ pub(crate) async fn task_detail(
             ApiError::Database
         })?
         .ok_or(ApiError::NotFound)?;
-    Ok(Json(task_from_row(&row)))
+    Ok(task_from_row(&row))
 }
 
 fn task_sql(filtered_predicate: &str, sort_sql: &str, limit_clause: &str) -> String {
