@@ -17,7 +17,7 @@ use crate::{
     path_ids::parse_uuid,
     query::{
         ApiQuery, Collection, CollectionQuery, collection_total_with_empty_page_probe,
-        normalize_collection_query, sort_clause,
+        collection_total_with_empty_page_probe_params, normalize_collection_query, sort_clause,
     },
     report_helpers::raw_report_exists,
     result_payload_rows::{
@@ -456,7 +456,17 @@ pub(crate) async fn report_results(
     if rows.is_empty() && !raw_report_exists(&client, &report_id).await? {
         return Err(ApiError::NotFound);
     }
-    let total = rows.first().map(|row| row.get::<_, i64>(0)).unwrap_or(0);
+    let probe_page_size = 1_i64;
+    let probe_offset = 0_i64;
+    let total = collection_total_with_empty_page_probe_params(
+        &client,
+        &rows,
+        &sql,
+        &params,
+        &[&report_id, &params.filter, &probe_page_size, &probe_offset],
+        "raw report result list",
+    )
+    .await?;
     let items = rows.iter().map(result_from_row).collect();
     Ok(Json(Collection {
         page: params.page_info(total),
