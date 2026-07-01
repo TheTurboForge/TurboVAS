@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::{
-    alerts::{alert_asset_detail_sql, alert_asset_tasks_sql, alert_assets_sql},
+    alert_query_sql::{alert_asset_detail_sql, alert_asset_tasks_sql, alert_assets_sql},
     collections::{ALERT_DEFAULT_SORT, ALERT_SORT_FIELDS},
     host_assets::host_user_tags_sql,
     operating_systems::operating_system_user_tags_sql,

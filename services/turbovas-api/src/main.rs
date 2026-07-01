@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 mod alert_payloads;
+mod alert_query_sql;
 mod alert_write_db;
 mod alert_write_sql;
 mod alert_write_validation;
