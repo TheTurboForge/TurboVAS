@@ -9,7 +9,10 @@ pub(crate) fn scope_write_operator_owner_sql() -> &'static str {
 }
 
 pub(crate) fn scope_write_mutability_sql() -> &'static str {
-    "SELECT id::integer, coalesce(predefined, 0)::integer, coalesce(is_global, 0)::integer
+    "SELECT id::integer,
+            owner::integer,
+            coalesce(predefined, 0)::integer,
+            coalesce(is_global, 0)::integer
        FROM scopes
       WHERE uuid = $1;"
 }

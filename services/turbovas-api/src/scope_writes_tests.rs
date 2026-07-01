@@ -3,7 +3,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use super::*;
-use crate::scope_write_db::{ensure_scope_is_mutable, ensure_scope_write_references_visible};
+use crate::scope_write_db::{
+    ensure_scope_is_mutable, ensure_scope_owner_matches_operator,
+    ensure_scope_write_references_visible,
+};
 use crate::scope_write_plans::*;
 use crate::scope_write_sql::*;
 use crate::scope_write_validation::{ValidatedScopeCreate, ValidatedScopePatch};
@@ -41,6 +44,15 @@ fn scope_create_request_normalizes_defaults_and_membership_ids() {
     })
     .expect("defaulted create request");
     assert_eq!(defaulted.protection_requirement, "normal");
+}
+
+#[test]
+fn scope_write_rejects_operator_owner_mismatch() {
+    assert!(ensure_scope_owner_matches_operator(7, 7).is_ok());
+    assert!(matches!(
+        ensure_scope_owner_matches_operator(7, 8),
+        Err(ApiError::Forbidden)
+    ));
 }
 
 #[test]
@@ -202,6 +214,7 @@ fn scope_write_transaction_plans_keep_validation_before_mutations() {
             steps: vec![
                 ScopeWriteStep::ResolveOperatorOwner,
                 ScopeWriteStep::VerifyScopeMutable,
+                ScopeWriteStep::VerifyOwnerMatch,
                 ScopeWriteStep::VerifyReferenceVisibility,
                 ScopeWriteStep::UpdateScopeMetadata,
                 ScopeWriteStep::ReplaceTargetMembership,
@@ -216,6 +229,7 @@ fn scope_write_transaction_plans_keep_validation_before_mutations() {
             steps: vec![
                 ScopeWriteStep::ResolveOperatorOwner,
                 ScopeWriteStep::VerifyScopeMutable,
+                ScopeWriteStep::VerifyOwnerMatch,
                 ScopeWriteStep::VerifyNoScopeReportHistory,
                 ScopeWriteStep::DeleteScopeMembership,
                 ScopeWriteStep::DeleteScope,
@@ -241,6 +255,7 @@ fn scope_write_scaffold_sql_is_read_only_and_targets_expected_tables() {
     }
     assert!(scope_write_operator_owner_sql().contains("FROM users"));
     assert!(scope_write_mutability_sql().contains("FROM scopes"));
+    assert!(scope_write_mutability_sql().contains("owner::integer"));
     assert!(scope_write_report_history_sql().contains("FROM scope_reports"));
     assert!(scope_write_visible_targets_sql().contains("FROM targets"));
     assert!(scope_write_visible_hosts_sql().contains("FROM hosts"));
@@ -403,7 +418,9 @@ fn scope_write_handlers_require_operator_transactions_and_payload_reload() {
     }
     assert!(create_body.contains("verify_scope_write_references_visible"));
     assert!(patch_body.contains("load_mutable_scope_write_state"));
+    assert!(patch_body.contains("ensure_scope_owner_matches_operator"));
     assert!(patch_body.contains("verify_scope_write_references_visible"));
+    assert!(delete_body.contains("ensure_scope_owner_matches_operator"));
     assert!(delete_body.contains("ensure_scope_has_no_report_history"));
     for body in [create_body, patch_body] {
         assert!(body.contains("load_scope_detail(&client"));
