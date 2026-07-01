@@ -2,7 +2,10 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::{report_cve_query_sql::report_cves_sql, report_payloads::raw_report_sql};
+use crate::{
+    report_cve_query_sql::report_cves_sql, report_payloads::raw_report_sql,
+    report_port_query_sql::report_ports_sql,
+};
 
 #[test]
 fn raw_report_payload_exposes_report_progress_without_control_paths() {
@@ -18,6 +21,33 @@ fn raw_report_payload_exposes_report_progress_without_control_paths() {
         assert!(
             !upper_sql.contains(forbidden),
             "raw report read SQL must not include control/mutation path: {forbidden}"
+        );
+    }
+}
+
+#[test]
+fn raw_report_port_sql_is_report_scoped_visible_port_read_only() {
+    let sql = report_ports_sql("max_severity DESC");
+    let upper_sql = sql.to_ascii_uppercase();
+
+    for required in [
+        "SELECT id, uuid FROM reports WHERE lower(uuid) = lower($1)",
+        "JOIN results r ON r.report = sr.id",
+        "WHERE coalesce(r.severity, 0) != -3.0",
+        "AND coalesce(r.port, '') <> ''",
+        "FILTER (WHERE coalesce(r.severity, 0) > 0)::bigint AS vulnerability_count",
+        "count(*) OVER()::bigint AS total",
+        "ORDER BY max_severity DESC, port ASC LIMIT $3 OFFSET $4",
+    ] {
+        assert!(
+            sql.contains(required),
+            "raw report port SQL missing {required}"
+        );
+    }
+    for forbidden in ["INSERT ", "UPDATE ", "DELETE ", "START_TASK", "STOP_TASK"] {
+        assert!(
+            !upper_sql.contains(forbidden),
+            "raw report port SQL must not include control/mutation path: {forbidden}"
         );
     }
 }
