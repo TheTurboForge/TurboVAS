@@ -201,6 +201,15 @@ const nativeScannersPayload = {
   page: {page: 1, page_size: 500, total: 1, sort: 'name', filter: ''},
   items: [{id: 's1', name: 'Scanner 1', scanner_type: 2}],
 };
+const nativeFamiliesPayload = {
+  scan_config_id: 'c1',
+  family_count: 2,
+  families_growing: 1,
+  families: [
+    {name: 'family1', nvt_count: 2, max_nvt_count: 2, growing: 1},
+    {name: 'family2', nvt_count: 1, max_nvt_count: 4, growing: 0},
+  ],
+};
 
 const familyNvts: FamilyNvt[] = [
   {oid: 'nvt-1', name: 'NVT One', severity: 5, selected: YES_VALUE},
@@ -244,10 +253,15 @@ const createGmp = (overrides: Record<string, unknown> = {}): GmpFactory => {
   const buildUrl = testing.fn(
     (path: string) => `https://turbovas.example/${path}`,
   );
-  const fetchNativeScanners = testing.fn().mockResolvedValue({
-    json: testing.fn().mockResolvedValue(nativeScannersPayload),
-    ok: true,
-    status: 200,
+  const fetchNativeScanners = testing.fn((url: string) => {
+    const payload = url.endsWith('/families')
+      ? nativeFamiliesPayload
+      : nativeScannersPayload;
+    return Promise.resolve({
+      json: testing.fn().mockResolvedValue(payload),
+      ok: true,
+      status: 200,
+    });
   });
   testing.stubGlobal('fetch', fetchNativeScanners);
 
@@ -418,7 +432,7 @@ describe('ScanConfigComponent', () => {
   });
 
   describe('openEditConfigDialog / closeEditConfigDialog', () => {
-    test('should open edit dialog and load config, families, scanners', async () => {
+    test('should open edit dialog and load config, native families, scanners', async () => {
       const {gmp, mocks} = createGmp();
       const childFn = renderComponent(gmp);
 
@@ -431,10 +445,34 @@ describe('ScanConfigComponent', () => {
 
       await waitFor(() => {
         expect(mocks.getScanConfig).toHaveBeenCalledWith({id: 'c1'});
-        expect(mocks.getNvtFamilies).toHaveBeenCalled();
         expect(mocks.fetchNativeScanners).toHaveBeenCalled();
       });
+      expect(mocks.getNvtFamilies).not.toHaveBeenCalled();
       expect(mocks.getScannersAll).not.toHaveBeenCalled();
+      expect(mocks.buildUrl).toHaveBeenCalledWith('api/v1/scan-configs/c1/families', {
+        token: 'test-token',
+      });
+
+      await screen.findByText('Edit Scan Config Test Config');
+    });
+
+    test('should use inherited family list when native API is unavailable', async () => {
+      const {gmp, mocks} = createGmp({buildUrl: undefined});
+      const childFn = renderComponent(gmp);
+
+      const props = childFn.mock.calls[0]?.[0] as Record<
+        string,
+        (arg: typeof config) => void
+      >;
+      const edit = props.edit as (arg: typeof config) => void;
+      edit(config);
+
+      await waitFor(() => {
+        expect(mocks.getScanConfig).toHaveBeenCalledWith({id: 'c1'});
+        expect(mocks.getNvtFamilies).toHaveBeenCalled();
+        expect(mocks.getScannersAll).toHaveBeenCalled();
+      });
+      expect(mocks.fetchNativeScanners).not.toHaveBeenCalled();
 
       await screen.findByText('Edit Scan Config Test Config');
     });
@@ -792,7 +830,13 @@ describe('ScanConfigComponent', () => {
 
       await waitFor(async () => {
         expect(mocks.getScanConfig).toHaveBeenCalledWith({id: 'c1'});
-        expect(mocks.getNvtFamilies).toHaveBeenCalled();
+        expect(mocks.getNvtFamilies).not.toHaveBeenCalled();
+        expect(mocks.buildUrl).toHaveBeenCalledWith(
+          'api/v1/scan-configs/c1/families',
+          {
+            token: 'test-token',
+          },
+        );
       });
 
       await waitFor(() => {

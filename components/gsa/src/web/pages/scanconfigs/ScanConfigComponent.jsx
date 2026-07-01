@@ -5,7 +5,10 @@
  */
 
 import {useState} from 'react';
-import {exportNativeScanConfigMetadata} from 'gmp/native-api/scan-configs';
+import {
+  exportNativeScanConfigMetadata,
+  fetchNativeScanConfigFamilies,
+} from 'gmp/native-api/scan-configs';
 import {fetchNativeScanners} from 'gmp/native-api/scanners';
 import {YES_VALUE} from 'gmp/parser';
 import {forEach} from 'gmp/utils/array';
@@ -25,6 +28,12 @@ import PropTypes from 'web/utils/PropTypes';
 const NATIVE_SCANNER_PAGE_SIZE = 500;
 
 const canUseNativeApi = gmp => typeof gmp?.buildUrl === 'function';
+
+const nativeFamiliesForEditDialog = scanConfig =>
+  (scanConfig.family_list ?? []).map(family => ({
+    name: family.name,
+    maxNvtCount: family.nvts?.max ?? 0,
+  }));
 
 const exportScanConfig = (gmp, scanConfig) => {
   if (canUseNativeApi(gmp)) {
@@ -157,9 +166,19 @@ const ScanConfigComponent = ({
       });
   };
 
-  const loadFamilies = (silent = false) => {
+  const loadFamilies = (configId, silent = false) => {
     if (!silent) {
       setIsLoadingFamilies(true);
+    }
+
+    if (canUseNativeApi(gmp)) {
+      return fetchNativeScanConfigFamilies(gmp, configId)
+        .then(response => {
+          setFamilies(nativeFamiliesForEditDialog(response.scanConfig));
+        })
+        .finally(() => {
+          setIsLoadingFamilies(false);
+        });
     }
 
     return gmp.nvtfamilies
@@ -175,7 +194,7 @@ const ScanConfigComponent = ({
   const loadEditScanConfigSettings = (configId, silent) => {
     return Promise.all([
       loadScanConfig(configId, silent),
-      loadFamilies(silent),
+      loadFamilies(configId, silent),
     ]);
   };
 
