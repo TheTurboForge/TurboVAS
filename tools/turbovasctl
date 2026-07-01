@@ -2291,6 +2291,64 @@ def direct_native_api_display_command(
     return command
 
 
+def direct_native_api_health_probe(
+    repo_root: Path,
+    env: dict[str, str],
+) -> tuple[subprocess.CompletedProcess[str], dict[str, Any] | None, int | None, bool]:
+    health = direct_native_api_curl(repo_root, "/healthz", token=None, env=env)
+    health_json, health_status = parse_json_output_with_http_status(health)
+    health_ok = (
+        health.returncode == 0
+        and health_status == 200
+        and isinstance(health_json, dict)
+        and health_json.get("status") == "ok"
+    )
+    return health, health_json, health_status, health_ok
+
+
+def wait_for_direct_native_api_health(
+    repo_root: Path,
+    env: dict[str, str],
+    *,
+    check: str,
+    ready_message: str,
+    failed_message: str,
+    attempts: int = 20,
+    delay_seconds: float = 1.0,
+) -> dict[str, Any]:
+    last_health: subprocess.CompletedProcess[str] | None = None
+    last_health_json: dict[str, Any] | None = None
+    last_health_status: int | None = None
+    for attempt in range(1, attempts + 1):
+        health, health_json, health_status, health_ok = direct_native_api_health_probe(repo_root, env)
+        last_health = health
+        last_health_json = health_json
+        last_health_status = health_status
+        if health_ok:
+            return native_api_probe_finding(
+                "pass",
+                check,
+                ready_message,
+                health,
+                direct_native_api_display_command("/healthz", token=None, env=env),
+                health_json,
+                {"http_status": health_status, "attempt": attempt, "max_attempts": attempts, **summarize_native_api_response(health_json)},
+            )
+        if attempt < attempts:
+            time.sleep(delay_seconds)
+    if last_health is None:
+        last_health = subprocess.CompletedProcess([], 1, "", "direct native API health probe was not attempted")
+    return native_api_probe_finding(
+        "fail",
+        check,
+        failed_message,
+        last_health,
+        direct_native_api_display_command("/healthz", token=None, env=env),
+        last_health_json,
+        {"http_status": last_health_status, "attempts": attempts, **summarize_native_api_response(last_health_json)},
+    )
+
+
 def parse_json_output_with_http_status(result: subprocess.CompletedProcess[str]) -> tuple[dict[str, Any] | None, int | None]:
     body, separator, status_text = result.stdout.rstrip().rpartition("\n")
     if not separator:
@@ -12345,6 +12403,7 @@ def direct_smoke_status_only_result(result: dict[str, Any]) -> dict[str, Any]:
             "native-api-direct.tag-hard-delete-disabled",
             "native-api-direct.write-control-operator",
             "native-api-direct.write-control-up",
+            "native-api-direct.write-control-healthz",
             "native-api-direct.scope-write-create",
             "native-api-direct.scope-write-update",
             "native-api-direct.scope-write-query-denied",
@@ -12594,6 +12653,17 @@ def command_runtime_native_api_direct_write_smoke(repo_root: Path, status_only: 
         up = run_command(compose_command(repo_root, "--profile", "app", "up", "-d", "--no-deps", "--force-recreate", "turbovas-api", env=env), repo_root, env=env, timeout=300)
         started_write_control = up.returncode == 0
         findings.append(process_step_finding("pass" if up.returncode == 0 else "fail", "native-api-direct.write-control-up", f"docker compose direct write-control turbovas-api up exit code {up.returncode}.", up, compose_command(repo_root, "--profile", "app", "up", "-d", "--no-deps", "--force-recreate", "turbovas-api", env=env)))
+
+    if aggregate_status(findings) != "fail":
+        findings.append(
+            wait_for_direct_native_api_health(
+                repo_root,
+                env,
+                check="native-api-direct.write-control-healthz",
+                ready_message="Direct write-control native API health endpoint is reachable after restart.",
+                failed_message="Direct write-control native API health endpoint did not become reachable after restart.",
+            )
+        )
 
     if aggregate_status(findings) != "fail":
         content_type = (("Content-Type", "application/json"),)
@@ -13894,10 +13964,15 @@ def command_runtime_native_api_direct_smoke(repo_root: Path, status_only: bool =
             result = direct_smoke_status_only_result(result)
         return result
 
-    health = direct_native_api_curl(repo_root, "/healthz", token=None, env=env)
-    health_json, health_status = parse_json_output_with_http_status(health)
-    health_ok = health.returncode == 0 and health_status == 200 and isinstance(health_json, dict) and health_json.get("status") == "ok"
-    findings.append(native_api_probe_finding("pass" if health_ok else "fail", "native-api-direct.healthz", "Direct native API health endpoint is reachable without bearer auth." if health_ok else "Direct native API health endpoint failed.", health, direct_native_api_display_command("/healthz", token=None, env=env), health_json, {"http_status": health_status, **summarize_native_api_response(health_json)}))
+    findings.append(
+        wait_for_direct_native_api_health(
+            repo_root,
+            env,
+            check="native-api-direct.healthz",
+            ready_message="Direct native API health endpoint is reachable without bearer auth.",
+            failed_message="Direct native API health endpoint did not become reachable after restart.",
+        )
+    )
 
     missing = direct_native_api_curl(repo_root, "/api/v1/reports?page_size=1", token=None, env=env, include_response_headers=True)
     missing_json, missing_status, missing_headers = parse_json_output_with_headers_and_http_status(missing)

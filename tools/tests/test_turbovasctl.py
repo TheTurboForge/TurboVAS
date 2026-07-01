@@ -6512,6 +6512,8 @@ db2:keys=5,expires=0,avg_ttl=0
 
             def fake_direct_curl(_root, path, *, method="GET", body=None, **_kwargs):
                 probes.append((method, path))
+                if method == "GET" and path == "/healthz":
+                    return turbovasctl.subprocess.CompletedProcess([], 0, '{"status":"ok"}\n200', "")
                 if method == "POST" and path == "/api/v1/scopes":
                     payload = json.loads(body)
                     self.assertEqual(payload["target_ids"], [])
@@ -6734,6 +6736,7 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertEqual(result["status"], "pass", json.dumps(result, sort_keys=True))
         self.assertEqual(result["findings"][0]["check"], "runtime-native-api-direct-write-smoke.status-only")
         self.assertEqual(checks["native-api-direct.write-control-operator"], "pass")
+        self.assertEqual(checks["native-api-direct.write-control-healthz"], "pass")
         self.assertEqual(checks["native-api-direct.scope-write-create"], "pass")
         self.assertEqual(checks["native-api-direct.scope-write-update"], "pass")
         self.assertEqual(checks["native-api-direct.scope-write-query-denied"], "pass")
@@ -6841,7 +6844,7 @@ db2:keys=5,expires=0,avg_ttl=0
         self.assertIn(("DELETE", f"/api/v1/tags/{alert_tag_uuid}"), probes)
         self.assertIn(("GET", f"/api/v1/tags/{alert_tag_uuid}"), probes)
         self.assertIn(("PATCH", f"/api/v1/targets/{target_uuid}"), probes)
-        self.assertEqual(probes[0][0], "POST")
+        self.assertEqual(probes[0], ("GET", "/healthz"))
         self.assertTrue(any(method == "GET" for method, _path in probes))
         rendered = json.dumps(result, sort_keys=True)
         self.assertNotIn(token, rendered)
