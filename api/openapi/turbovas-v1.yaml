@@ -381,6 +381,39 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
+  /cert-bund-advisories/{cert_bund_advisory_id}/export:
+    get:
+      operationId: getCertBundAdvisoriesByCertBundAdvisoryIdExport
+      x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: cert-bund-advisory-metadata-export-read
+      x-turbovas-inherited-still-owns: cert-advisory-rich-detail-export
+      summary: Export one CERT-Bund advisory metadata record
+      description: Direct scriptable CERT-Bund advisory metadata export backed by the same PostgreSQL loader as the native detail endpoint. This returns native JSON metadata, CVE references, and active user tags only; inherited rich feed/XML export and extended advisory detail remain compatibility paths.
+      parameters:
+        - $ref: '#/components/parameters/CertBundAdvisoryId'
+      responses:
+        '200':
+          description: CERT-Bund advisory metadata export
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CertBundAdvisoryDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '413':
+          $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /dfn-cert-advisories:
     get:
       operationId: getDfnCertAdvisories
@@ -430,6 +463,39 @@ paths:
       responses:
         '200':
           description: DFN-CERT advisory catalog detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DfnCertAdvisoryDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '413':
+          $ref: '#/components/responses/RequestTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /dfn-cert-advisories/{dfn_cert_advisory_id}/export:
+    get:
+      operationId: getDfnCertAdvisoriesByDfnCertAdvisoryIdExport
+      x-turbovas-direct: true
+      x-turbovas-exposure: direct-read
+      x-turbovas-maturity: live-read
+      x-turbovas-replaces: dfn-cert-advisory-metadata-export-read
+      x-turbovas-inherited-still-owns: cert-advisory-rich-detail-export
+      summary: Export one DFN-CERT advisory metadata record
+      description: Direct scriptable DFN-CERT advisory metadata export backed by the same PostgreSQL loader as the native detail endpoint. This returns native JSON metadata, CVE references, and active user tags only; inherited rich feed/XML export and extended advisory detail remain compatibility paths.
+      parameters:
+        - $ref: '#/components/parameters/DfnCertAdvisoryId'
+      responses:
+        '200':
+          description: DFN-CERT advisory metadata export
           content:
             application/json:
               schema:

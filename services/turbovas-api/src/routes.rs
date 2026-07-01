@@ -103,12 +103,20 @@ pub(crate) fn native_api_router() -> Router<AppState> {
         .route("/api/v1/cves/:cve_id/export", get(cve_catalog_export))
         .route("/api/v1/cert-bund-advisories", get(cert_bund_advisories))
         .route(
-            "/api/v1/cert-bund-advisories/*advisory_id",
+            "/api/v1/cert-bund-advisories/:advisory_id/export",
+            get(cert_bund_advisory_export),
+        )
+        .route(
+            "/api/v1/cert-bund-advisories/:advisory_id",
             get(cert_bund_advisory_detail),
         )
         .route("/api/v1/dfn-cert-advisories", get(dfn_cert_advisories))
         .route(
-            "/api/v1/dfn-cert-advisories/*advisory_id",
+            "/api/v1/dfn-cert-advisories/:advisory_id/export",
+            get(dfn_cert_advisory_export),
+        )
+        .route(
+            "/api/v1/dfn-cert-advisories/:advisory_id",
             get(dfn_cert_advisory_detail),
         )
         .route("/api/v1/nvts", get(nvt_catalog))

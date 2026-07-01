@@ -337,6 +337,16 @@ fn cert_advisory_detail_user_tags_use_resolved_uuid_only() {
     );
     assert!(!cert_bund_list_source.contains("catalog_user_tags"));
     assert!(!dfn_cert_list_source.contains("catalog_user_tags"));
+
+    let routes_source = include_str!("routes.rs");
+    assert!(routes_source.contains("/api/v1/cert-bund-advisories/:advisory_id"));
+    assert!(routes_source.contains("/api/v1/cert-bund-advisories/:advisory_id/export"));
+    assert!(!routes_source.contains("/api/v1/cert-bund-advisories/*advisory_id"));
+    assert!(routes_source.contains("/api/v1/dfn-cert-advisories/:advisory_id"));
+    assert!(routes_source.contains("/api/v1/dfn-cert-advisories/:advisory_id/export"));
+    assert!(!routes_source.contains("/api/v1/dfn-cert-advisories/*advisory_id"));
+    assert!(source.contains("cert_bund_advisory_detail(state, path).await"));
+    assert!(source.contains("dfn_cert_advisory_detail(state, path).await"));
 }
 
 #[test]

@@ -126,6 +126,13 @@ pub(crate) async fn dfn_cert_advisory_detail(
     }))
 }
 
+pub(crate) async fn dfn_cert_advisory_export(
+    state: State<AppState>,
+    path: Path<String>,
+) -> Result<Json<DfnCertAdvisoryDetail>, ApiError> {
+    dfn_cert_advisory_detail(state, path).await
+}
+
 pub(crate) async fn cert_bund_advisories(
     State(state): State<AppState>,
     ApiQuery(query): ApiQuery<CollectionQuery>,
@@ -227,4 +234,11 @@ pub(crate) async fn cert_bund_advisory_detail(
         item: cert_bund_advisory_from_row(&row),
         user_tags,
     }))
+}
+
+pub(crate) async fn cert_bund_advisory_export(
+    state: State<AppState>,
+    path: Path<String>,
+) -> Result<Json<CertBundAdvisoryDetail>, ApiError> {
+    cert_bund_advisory_detail(state, path).await
 }

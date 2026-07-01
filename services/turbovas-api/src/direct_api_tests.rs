@@ -297,6 +297,12 @@ fn direct_api_path_classifier_uses_positive_scriptable_allowlist() {
         "/api/v1/cves/CVE-2025-1234/export"
     ));
     assert!(direct_api_v1_path_is_allowed(
+        "/api/v1/cert-bund-advisories/CB-K26-0123/export"
+    ));
+    assert!(direct_api_v1_path_is_allowed(
+        "/api/v1/dfn-cert-advisories/DFN-CERT-2026-2178/export"
+    ));
+    assert!(direct_api_v1_path_is_allowed(
         "/api/v1/nvts/1.3.6.1.4.1.25623.1.0.100000/export"
     ));
     assert!(direct_api_v1_path_is_allowed(
