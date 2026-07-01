@@ -243,7 +243,7 @@ fn openapi_tag_contract_records_remaining_inherited_tail() {
         let block = openapi_path_block(path);
         assert!(
             block.contains(
-                "x-turbovas-inherited-still-owns: tag-security-info-filter-actions-export"
+                "x-turbovas-inherited-still-owns: tag-filter-actions-export-and-assigned-resource-delete"
             )
         );
     }
